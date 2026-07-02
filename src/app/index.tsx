@@ -1,5 +1,6 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,6 +19,9 @@ export default function MainMenu() {
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <Head>
+        <title>Coptic Hymns Centre</title>
+      </Head>
       <AppHeader title="Coptic Hymns Centre" />
 
       <View style={styles.actionRow}>

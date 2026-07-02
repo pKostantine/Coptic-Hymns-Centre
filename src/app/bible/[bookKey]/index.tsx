@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
@@ -64,6 +65,9 @@ export default function BibleNestedList() {
 
   return (
     <View style={styles.screen}>
+      <Head>
+        <title>{`CHC ${title || bookKey || 'Bible'}`}</title>
+      </Head>
       <AppHeader
         title={{ english: title || bookKey || '', arabic: arabic || '' }}
         canGoBack

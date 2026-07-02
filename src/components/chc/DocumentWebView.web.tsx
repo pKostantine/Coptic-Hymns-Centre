@@ -16,6 +16,8 @@ interface DocumentWebViewProps {
   fontSize?: number;
   visibleColumns?: VisibleColumns;
   selectText?: boolean;
+  displayComments?: boolean;
+  displaySilentPrayers?: boolean;
 }
 
 /**
@@ -26,7 +28,7 @@ interface DocumentWebViewProps {
  * required in the sandbox so the builder's embedded scrollToSection script runs.
  */
 const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
-  ({ sections, fontSize = 18, visibleColumns, selectText = false }, ref) => {
+  ({ sections, fontSize = 18, visibleColumns, selectText = false, displayComments = false, displaySilentPrayers = false }, ref) => {
     const copticFontDataUri = useCopticFontDataUri();
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -38,8 +40,11 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     }));
 
     const html = useMemo(
-      () => (copticFontDataUri ? buildDocumentHtml(sections, { copticFontDataUri, fontSize, visibleColumns, selectText }) : null),
-      [sections, copticFontDataUri, fontSize, visibleColumns, selectText],
+      () =>
+        copticFontDataUri
+          ? buildDocumentHtml(sections, { copticFontDataUri, fontSize, visibleColumns, selectText, displayComments, displaySilentPrayers })
+          : null,
+      [sections, copticFontDataUri, fontSize, visibleColumns, selectText, displayComments, displaySilentPrayers],
     );
 
     if (!html) {

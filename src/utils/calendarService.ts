@@ -20,6 +20,12 @@ function toIsoDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function addDaysIso(isoDate: string, delta: number): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return toIsoDate(d);
+}
+
 /** Gregorian calendar-month grid: every row in `calendar.coptic_date_conversions` for the given Gregorian year/month. */
 export async function getGregorianMonthGrid(year: number, month: number): Promise<CalendarDay[]> {
   const firstDate = toIsoDate(new Date(Date.UTC(year, month - 1, 1)));
@@ -142,4 +148,104 @@ export async function getSeasonRanges(fromDate: string, toDate: string): Promise
     startEvent: row.start_event,
     endEvent: row.end_event,
   }));
+}
+
+// ─── Single-day feast events ────────────────────────────────────────────────
+// The old app's Season Selector sourced these from a static local dataset
+// that's since been stubbed out to empty during its own migration to a
+// live-data model (see Coptic-Hymns-Centre-Old/.claude/memory/project_migration.md).
+// There's no live-DB table for named single-day feasts, so this resolves the
+// well-established Coptic Orthodox feast calendar directly against
+// `calendar.coptic_date_conversions` (fixed Coptic-date feasts) and against
+// the `season_ranges` boundaries already fetched above (movable/Easter-relative
+// feasts, and the fixed feasts that fall exactly at a fast's end+1 boundary).
+
+export interface SingleDayEvent {
+  key: string;
+  title: string;
+  date: string;
+}
+
+/** Coptic month name spellings exactly as stored in `coptic_date_conversions.coptic_month_name`. */
+const FIXED_FEASTS: { monthName: string; day: number; key: string; title: string }[] = [
+  { monthName: 'Thoout', day: 1, key: 'nayrouz', title: 'Nayrouz (Coptic New Year)' },
+  { monthName: 'Thoout', day: 17, key: 'feast-of-the-cross', title: 'Feast of the Cross' },
+  { monthName: 'Kiahk', day: 29, key: 'nativity', title: 'Nativity' },
+  { monthName: 'Tobe', day: 6, key: 'circumcision', title: 'Circumcision' },
+  { monthName: 'Tobe', day: 11, key: 'theophany', title: 'Theophany' },
+  { monthName: 'Tobe', day: 13, key: 'wedding-at-cana', title: 'Wedding at Cana' },
+  { monthName: 'Meshir', day: 8, key: 'entry-into-temple', title: 'Entry into the Temple' },
+  { monthName: 'Paremhotep', day: 29, key: 'annunciation', title: 'Annunciation' },
+  { monthName: 'Pashons', day: 24, key: 'entry-into-egypt', title: 'Entry into Egypt' },
+  { monthName: 'Mesore', day: 13, key: 'transfiguration', title: 'Transfiguration' },
+];
+
+async function resolveCopticDate(copticYear: number, monthName: string, day: number): Promise<string | null> {
+  const { data, error } = await supabase
+    .schema('calendar')
+    .from('coptic_date_conversions')
+    .select('gregorian_date')
+    .eq('coptic_year', copticYear)
+    .eq('coptic_month_name', monthName)
+    .eq('coptic_day', day)
+    .maybeSingle();
+  if (error) throw new Error(`Unable to resolve ${monthName} ${day}, ${copticYear} AM: ${error.message}`);
+  return data?.gregorian_date ?? null;
+}
+
+async function getKiahkSundays(copticYear: number): Promise<SingleDayEvent[]> {
+  const { data, error } = await supabase
+    .schema('calendar')
+    .from('coptic_date_conversions')
+    .select('gregorian_date, coptic_day')
+    .eq('coptic_year', copticYear)
+    .eq('coptic_month_name', 'Kiahk')
+    .eq('weekday', 'Sunday')
+    .lte('coptic_day', 28)
+    .order('coptic_day');
+  if (error) throw new Error(`Unable to load Kiahk Sundays: ${error.message}`);
+
+  const ordinals = ['First', 'Second', 'Third', 'Fourth'];
+  return (data || []).slice(0, 4).map((row, index) => ({
+    key: `kiahk-sunday-${index + 1}`,
+    title: `${ordinals[index]} Sunday of Kiahk`,
+    date: row.gregorian_date,
+  }));
+}
+
+/** Every named single-day feast for a Coptic year: fixed Coptic-date feasts, Easter-relative movable feasts, and the Kiahk Sundays. */
+export async function getSingleDayEventsForCopticYear(copticYear: number, periods: SeasonRange[]): Promise<SingleDayEvent[]> {
+  const byKey = (key: string) => periods.find((p) => p.rangeKey === key);
+  const holyWeek = byKey('holy-week');
+  const holy50Days = byKey('holy-50-days');
+  const greatFast = byKey('great-fast');
+  const jonahsFast = byKey('jonahs-fast');
+  const apostlesFast = byKey('apostles-fast');
+  const stMaryFast = byKey('st-mary-fast');
+
+  const fixed = await Promise.all(
+    FIXED_FEASTS.map(async (feast) => {
+      const date = await resolveCopticDate(copticYear, feast.monthName, feast.day);
+      return date ? { key: feast.key, title: feast.title, date } : null;
+    }),
+  );
+
+  const movable: (SingleDayEvent | null)[] = [
+    holyWeek ? { key: 'palm-sunday', title: 'Palm Sunday', date: addDaysIso(holyWeek.startDate, 1) } : null,
+    holy50Days ? { key: 'holy-thursday', title: 'Holy Thursday', date: addDaysIso(holy50Days.startDate, -3) } : null,
+    holy50Days ? { key: 'good-friday', title: 'Good Friday', date: addDaysIso(holy50Days.startDate, -2) } : null,
+    holy50Days ? { key: 'bright-saturday', title: 'Bright Saturday', date: addDaysIso(holy50Days.startDate, 1) } : null,
+    holy50Days ? { key: 'thomas-sunday', title: "Thomas Sunday", date: addDaysIso(holy50Days.startDate, 7) } : null,
+    holy50Days ? { key: 'ascension', title: 'Ascension', date: addDaysIso(holy50Days.startDate, 39) } : null,
+    greatFast ? { key: 'last-friday-of-lent', title: 'Last Friday of Lent', date: greatFast.endDate } : null,
+    jonahsFast ? { key: 'jonahs-feast', title: "Jonah's Feast", date: addDaysIso(jonahsFast.endDate, 1) } : null,
+    apostlesFast ? { key: 'apostles-feast', title: "Apostles' Feast", date: addDaysIso(apostlesFast.endDate, 1) } : null,
+    stMaryFast ? { key: 'st-marys-feast', title: "St. Mary's Feast", date: addDaysIso(stMaryFast.endDate, 1) } : null,
+  ];
+
+  const kiahkSundays = await getKiahkSundays(copticYear);
+
+  return [...fixed, ...movable, ...kiahkSundays]
+    .filter((event): event is SingleDayEvent => Boolean(event))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }

@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,6 +23,9 @@ export default function ServiceSubmenu({ categoryId, title, arabic, services }: 
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <Head>
+        <title>{`CHC ${title}`}</title>
+      </Head>
       <AppHeader title={{ english: title, arabic }} canGoBack onBack={() => router.back()} />
       <FlatList
         contentContainerStyle={styles.listContent}

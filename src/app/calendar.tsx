@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -115,6 +116,9 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
+      <Head>
+        <title>CHC Calendar</title>
+      </Head>
       <View style={[styles.header, { paddingTop: safeAreaInsets.top }]}>
         <Pressable accessibilityLabel="Close calendar" style={styles.headerButton} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={30} color={COLORS.white} />

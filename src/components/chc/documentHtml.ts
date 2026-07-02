@@ -14,6 +14,8 @@ export interface DocumentSection {
   verses: DocumentVerse[];
   alternateEvery?: number | null;
   forceWhiteVerses?: boolean;
+  /** hymn_titles.prayer_type — "Silent Prayer" here means the whole hymn is a silent prayer. */
+  titlePrayerType?: string | null;
 }
 
 export interface VisibleColumns {
@@ -46,7 +48,16 @@ export function buildDocumentHtml(
     fontSize,
     visibleColumns = DEFAULT_VISIBLE_COLUMNS,
     selectText = false,
-  }: { copticFontDataUri: string; fontSize: number; visibleColumns?: VisibleColumns; selectText?: boolean },
+    displayComments = false,
+    displaySilentPrayers = false,
+  }: {
+    copticFontDataUri: string;
+    fontSize: number;
+    visibleColumns?: VisibleColumns;
+    selectText?: boolean;
+    displayComments?: boolean;
+    displaySilentPrayers?: boolean;
+  },
 ) {
   const sectionTitleFontSize = Math.max(Math.round(fontSize * 0.5), 14);
   const sectionTitleLineHeight = Math.max(Math.round(fontSize * 0.62), 18);
@@ -54,13 +65,19 @@ export function buildDocumentHtml(
   const arabicFontSize = Math.round(fontSize * 1.15);
   const verseLineHeight = Math.round(fontSize * 1.25);
 
-  const htmlSections = sections.map((section) => renderSection(section, { fontSize, visibleColumns })).join('');
+  const visibleSections = sections.filter(
+    (section) => displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer',
+  );
+  const htmlSections = visibleSections
+    .map((section) => renderSection(section, { fontSize, visibleColumns, displayComments, displaySilentPrayers }))
+    .join('');
 
   return `<!doctype html>
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <style>
+      @import url("https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&display=swap");
       @font-face {
         font-family: "CopticCHC";
         src: url("${copticFontDataUri}") format("truetype");
@@ -122,13 +139,13 @@ export function buildDocumentHtml(
       .coptic {
         font-family: CopticCHC, Georgia, serif !important;
         font-size: ${copticFontSize}px;
-        line-height: ${copticFontSize}px;
+        line-height: ${verseLineHeight}px;
       }
       .arabic {
         direction: rtl;
-        font-family: Arial, sans-serif !important;
+        font-family: "Amiri", serif !important;
         font-size: ${arabicFontSize}px;
-        line-height: ${copticFontSize}px;
+        line-height: ${verseLineHeight}px;
       }
       .centered { text-align: center; }
       .speaker-label.priest { color: ${COLORS.priest}; }
@@ -144,7 +161,7 @@ export function buildDocumentHtml(
         margin: 0;
       }
       .section-title.arabic {
-        font-family: Arial, sans-serif;
+        font-family: "Amiri", serif;
         text-align: right;
       }
     </style>
@@ -164,10 +181,29 @@ export function buildDocumentHtml(
 </html>`;
 }
 
-function renderSection(section: DocumentSection, opts: { fontSize: number; visibleColumns: VisibleColumns }) {
-  const { visibleColumns } = opts;
+function renderSection(
+  section: DocumentSection,
+  opts: {
+    fontSize: number;
+    visibleColumns: VisibleColumns;
+    displayComments: boolean;
+    displaySilentPrayers: boolean;
+  },
+) {
+  const { visibleColumns, displayComments, displaySilentPrayers } = opts;
   const titleHtml = renderSectionTitle(section, visibleColumns);
-  const versesHtml = section.verses.map((verse, index) => renderVerse(verse, index, section, opts)).join('');
+
+  // Speaker-label suppression (only the first verse of a consecutive same-speaker
+  // run shows its "Priest:"/"Deacon:"/etc. label) is computed against the full,
+  // unfiltered verse list — comments never break a speaker run, whether or not
+  // they're currently visible — then verses are filtered for display.
+  const suppressFlags = computeSuppressSpeakerLabelFlags(section.verses);
+  const versesHtml = section.verses
+    .map((verse, index) => ({ verse, index }))
+    .filter(({ verse }) => displayComments || verse.type !== 'comment')
+    .filter(({ verse }) => displaySilentPrayers || verse.type !== 'silentPrayer')
+    .map(({ verse, index }) => renderVerse(verse, index, section, suppressFlags[index], opts))
+    .join('');
 
   return `
     <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
@@ -175,6 +211,18 @@ function renderSection(section: DocumentSection, opts: { fontSize: number; visib
       <div class="section-content">${versesHtml}</div>
     </section>
   `;
+}
+
+/** A verse's speaker label is suppressed if the nearest preceding non-comment verse shares its type. */
+function computeSuppressSpeakerLabelFlags(verses: DocumentVerse[]): boolean[] {
+  return verses.map((verse, index) => {
+    if (!RUBRIC[verse.type]) return false;
+    for (let i = index - 1; i >= 0; i -= 1) {
+      if (verses[i].type === 'comment') continue;
+      return verses[i].type === verse.type;
+    }
+    return false;
+  });
 }
 
 function renderSectionTitle(section: DocumentSection, visibleColumns: VisibleColumns) {
@@ -220,10 +268,11 @@ function renderVerse(
   verse: DocumentVerse,
   index: number,
   section: DocumentSection,
+  suppressSpeakerLabel: boolean,
   { visibleColumns }: { fontSize: number; visibleColumns: VisibleColumns },
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section);
-  const rubric = RUBRIC[verse.type];
+  const rubric = suppressSpeakerLabel ? undefined : RUBRIC[verse.type];
   const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
 
   const languages: { className: string; key: keyof VisibleColumns; text: string; speakerLabel?: string; speakerClass?: string }[] = [

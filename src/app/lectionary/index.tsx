@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -74,6 +75,9 @@ export default function LectionaryDocument() {
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <Head>
+        <title>CHC Lectionary</title>
+      </Head>
       <AppHeader
         title={{ english: 'Lectionary', arabic: 'القطمارس' }}
         canGoBack

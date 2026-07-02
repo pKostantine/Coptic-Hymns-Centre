@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -48,7 +49,7 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
     setSections(null);
     setError(null);
 
-    hydrateSupabaseServiceHymn(schema, table, effectiveDate)
+    hydrateSupabaseServiceHymn(schema, table, effectiveDate, { BishopPresent: preferences.bishopPresent })
       .then((result) => {
         if (!cancelled) setSections(result as DocumentSection[]);
       })
@@ -59,7 +60,7 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate]);
+  }, [schema, table, effectiveDate, preferences.bishopPresent]);
 
   const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
   const selectorSwipeStartX = Math.max(screenWidth - selectorEdgeWidth, 0);
@@ -92,6 +93,9 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
       style={styles.safeArea}
       {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}
     >
+      <Head>
+        <title>{`CHC ${title}`}</title>
+      </Head>
       {!isMobileDocument ? (
         <AppHeader
           title={{ english: title, arabic }}
@@ -125,6 +129,8 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
               arabic: preferences.visibleLanguages.arabic,
             }}
             selectText={preferences.selectText}
+            displayComments={preferences.displayComments}
+            displaySilentPrayers={preferences.displaySilentPrayers}
           />
           <ContentSelectorDrawer
             visible={selectorOpen}

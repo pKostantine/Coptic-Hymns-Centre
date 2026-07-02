@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -42,6 +43,9 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <Head>
+        <title>CHC Settings</title>
+      </Head>
       <AppHeader title="Settings" canGoBack onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>

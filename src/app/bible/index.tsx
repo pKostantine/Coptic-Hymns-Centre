@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,6 +19,9 @@ export default function BibleTestamentList() {
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <Head>
+        <title>CHC Bible</title>
+      </Head>
       <AppHeader
         title={{ english: 'Bible', arabic: 'الكتاب المقدس' }}
         canGoBack

@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -54,6 +55,9 @@ export default function BookmarksScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <Head>
+        <title>CHC Bookmarks</title>
+      </Head>
       <AppHeader title="Bookmarks" canGoBack onBack={() => router.back()} />
       {entries.length === 0 ? (
         <View style={styles.emptyState}>
