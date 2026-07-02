@@ -1,0 +1,113 @@
+/**
+ * CHC main-menu + submenu manifest. The six top-level categories match the
+ * six icon files provided in assets/images/CHC App Symbols (psalmody,
+ * liturgy, veneration, lectionary, agpeya, bible) — that icon set is the
+ * source of truth for what belongs on the main menu.
+ */
+
+export type CategoryId = 'psalmody' | 'liturgy' | 'veneration' | 'lectionary' | 'agpeya' | 'bible';
+
+export interface CategoryDef {
+  id: CategoryId;
+  title: string;
+  arabic: string;
+  meta: string;
+  icon: number; // require() asset id
+  /** Category screen behavior: 'submenu' shows a list of services; 'direct' opens the single service immediately; 'bible' has its own book/chapter flow; 'lectionary' opens the readings screen directly. */
+  kind: 'submenu' | 'direct' | 'bible' | 'lectionary';
+  schema?: string;
+  table?: string; // only for kind: 'direct'
+}
+
+export interface ServiceDef {
+  id: string;
+  schema: string;
+  table: string;
+  title: string;
+  arabic: string;
+}
+
+export const CATEGORIES: CategoryDef[] = [
+  {
+    id: 'psalmody',
+    title: 'Psalmody',
+    arabic: 'الإبصلمودية',
+    meta: 'Vespers · Midnight · Morning',
+    icon: require('../../assets/images/CHC App Symbols/psalmody.png'),
+    kind: 'submenu',
+    schema: 'psalmody',
+  },
+  {
+    id: 'liturgy',
+    title: 'Liturgy',
+    arabic: 'القداس',
+    meta: 'Raising of Incense · Divine Liturgy',
+    icon: require('../../assets/images/CHC App Symbols/liturgy.png'),
+    kind: 'submenu',
+    schema: 'liturgy',
+  },
+  {
+    id: 'veneration',
+    title: 'Veneration',
+    arabic: 'تمجيد',
+    meta: 'Doxologies of the saints',
+    icon: require('../../assets/images/CHC App Symbols/veneration.png'),
+    kind: 'direct',
+    schema: 'veneration',
+    table: 'veneration',
+  },
+  {
+    id: 'lectionary',
+    title: 'Lectionary',
+    arabic: 'القطمارس',
+    meta: "Today's readings",
+    icon: require('../../assets/images/CHC App Symbols/lectionary.png'),
+    kind: 'lectionary',
+  },
+  {
+    id: 'agpeya',
+    title: 'Agpeya',
+    arabic: 'الأجبية',
+    meta: 'The book of the seven hours',
+    icon: require('../../assets/images/CHC App Symbols/agpeya.png'),
+    kind: 'submenu',
+    schema: 'agpeya',
+  },
+  {
+    id: 'bible',
+    title: 'Bible',
+    arabic: 'الكتاب المقدس',
+    meta: 'Old & New Testament',
+    icon: require('../../assets/images/CHC App Symbols/bible.png'),
+    kind: 'bible',
+  },
+];
+
+export const SERVICES_BY_CATEGORY: Record<string, ServiceDef[]> = {
+  psalmody: [
+    { id: 'vespers_praises', schema: 'psalmody', table: 'vespers_praises', title: 'Vespers Praises', arabic: 'تسبحة عشية' },
+    { id: 'midnight_praises', schema: 'psalmody', table: 'midnight_praises', title: 'Midnight Praises', arabic: 'تسبحة نصف الليل' },
+    { id: 'morning_doxology', schema: 'psalmody', table: 'morning_doxology', title: 'Morning Doxology', arabic: 'تسبحة باكر' },
+    { id: 'antiphonary', schema: 'psalmody', table: 'antiphonary', title: 'Antiphonary', arabic: 'الإبصالية' },
+  ],
+  liturgy: [
+    { id: 'raising_of_incense', schema: 'liturgy', table: 'raising_of_incense', title: 'Raising of Incense', arabic: 'رفع بخور' },
+    { id: 'offering_of_the_lamb', schema: 'liturgy', table: 'offering_of_the_lamb', title: 'Offering of the Lamb', arabic: 'تقديم الحمل' },
+    { id: 'liturgy_of_the_word', schema: 'liturgy', table: 'liturgy_of_the_word', title: 'Liturgy of the Word', arabic: 'قداس الكلمة' },
+    { id: 'liturgy_of_st_basil', schema: 'liturgy', table: 'liturgy_of_st_basil', title: 'Liturgy of St. Basil', arabic: 'قداس القديس باسيليوس' },
+    { id: 'liturgy_of_st_gregory', schema: 'liturgy', table: 'liturgy_of_st_gregory', title: 'Liturgy of St. Gregory', arabic: 'قداس القديس غريغوريوس' },
+    { id: 'liturgy_of_st_cyril', schema: 'liturgy', table: 'liturgy_of_st_cyril', title: 'Liturgy of St. Cyril', arabic: 'قداس القديس كيرلس' },
+    { id: 'distribution', schema: 'liturgy', table: 'distribution', title: 'Distribution', arabic: 'التوزيع' },
+  ],
+  agpeya: [
+    { id: 'first_hour', schema: 'agpeya', table: 'first_hour', title: '1st Hour', arabic: 'الساعة الأولى' },
+    { id: 'third_hour', schema: 'agpeya', table: 'third_hour', title: '3rd Hour', arabic: 'الساعة الثالثة' },
+    { id: 'sixth_hour', schema: 'agpeya', table: 'sixth_hour', title: '6th Hour', arabic: 'الساعة السادسة' },
+    { id: 'ninth_hour', schema: 'agpeya', table: 'ninth_hour', title: '9th Hour', arabic: 'الساعة التاسعة' },
+    { id: 'eleventh_hour', schema: 'agpeya', table: 'eleventh_hour', title: '11th Hour', arabic: 'الساعة الحادية عشرة' },
+    { id: 'twelfth_hour', schema: 'agpeya', table: 'twelfth_hour', title: '12th Hour', arabic: 'الساعة الثانية عشرة' },
+    { id: 'midnight_hour', schema: 'agpeya', table: 'midnight_hour', title: 'Midnight Hour', arabic: 'ساعة نصف الليل' },
+    { id: 'prayer_of_the_veil', schema: 'agpeya', table: 'prayer_of_the_veil', title: 'Prayer of the Veil', arabic: 'صلاة الستار' },
+    { id: 'other_prayers', schema: 'agpeya', table: 'other_prayers', title: 'Other Prayers', arabic: 'صلوات أخرى' },
+  ],
+};

@@ -1,0 +1,6 @@
+import ServiceSubmenu from '@/components/chc/screens/ServiceSubmenu';
+import { SERVICES_BY_CATEGORY } from '@/constants/manifest';
+
+export default function AgpeyaSubmenu() {
+  return <ServiceSubmenu categoryId="agpeya" title="Agpeya" arabic="الأجبية" services={SERVICES_BY_CATEGORY.agpeya} />;
+}
