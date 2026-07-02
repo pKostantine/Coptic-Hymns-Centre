@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,18 +6,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../ui/AppHeader';
 import HymnCard from '../ui/HymnCard';
 import { COLORS, SPACING } from '../../../constants/theme';
-import { CategoryId, ServiceDef } from '../../../constants/manifest';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
+import { goBack } from '../../../utils/navigation';
 
-interface ServiceSubmenuProps {
-  categoryId: CategoryId;
+interface ServiceSubmenuItem {
+  id: string;
   title: string;
   arabic: string;
-  services: ServiceDef[];
+  /** Present only for actual bookmarkable services — omitted for pure navigational groups (e.g. Liturgy's Raising of Incense / Divine Liturgy). */
+  schema?: string;
+  table?: string;
 }
 
-/** Generic submenu screen: lists the order-table services within a category (Psalmody, Liturgy, Agpeya). Ported from HymnListScreen.js. */
-export default function ServiceSubmenu({ categoryId, title, arabic, services }: ServiceSubmenuProps) {
+interface ServiceSubmenuProps {
+  /** Base path this submenu navigates into, e.g. "liturgy" or "liturgy/raising-of-incense". */
+  basePath: string;
+  title: string;
+  arabic: string;
+  services: ServiceSubmenuItem[];
+  /** Where "back" should land when there's no navigation history to pop (direct deep link, page reload). */
+  backHref: Href;
+}
+
+/** Generic submenu screen: lists the order-table services (or navigational sub-groups) within a category. Ported from HymnListScreen.js. */
+export default function ServiceSubmenu({ basePath, title, arabic, services, backHref }: ServiceSubmenuProps) {
   const router = useRouter();
   const { isBookmarked } = useReadingPreferences();
 
@@ -26,7 +38,7 @@ export default function ServiceSubmenu({ categoryId, title, arabic, services }: 
       <Head>
         <title>{`CHC ${title}`}</title>
       </Head>
-      <AppHeader title={{ english: title, arabic }} canGoBack onBack={() => router.back()} />
+      <AppHeader title={{ english: title, arabic }} canGoBack onBack={() => goBack(router, backHref)} />
       <FlatList
         contentContainerStyle={styles.listContent}
         data={services}
@@ -35,8 +47,8 @@ export default function ServiceSubmenu({ categoryId, title, arabic, services }: 
           <HymnCard
             title={item.title}
             arabic={item.arabic}
-            isBookmarked={isBookmarked(`${item.schema}:${item.table}`)}
-            onPress={() => router.push(`/${categoryId}/${item.id}` as never)}
+            isBookmarked={item.schema && item.table ? isBookmarked(`${item.schema}:${item.table}`) : false}
+            onPress={() => router.push(`/${basePath}/${item.id}` as never)}
           />
         )}
       />

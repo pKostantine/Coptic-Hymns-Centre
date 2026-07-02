@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { CATEGORIES, SERVICES_BY_CATEGORY } from '@/constants/manifest';
+import { CATEGORIES, DIVINE_LITURGY_SERVICES, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
+import { goBack } from '@/utils/navigation';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 
 interface BookmarkEntry {
@@ -41,6 +42,24 @@ function buildBookmarkIndex(): Record<string, BookmarkEntry> {
     }
   }
 
+  for (const option of RAISING_OF_INCENSE_OPTIONS) {
+    index[`${option.schema}:${option.table}`] = {
+      id: `${option.schema}:${option.table}`,
+      title: option.title,
+      arabic: option.arabic,
+      href: `/liturgy/raising-of-incense/${option.id}`,
+    };
+  }
+
+  for (const service of DIVINE_LITURGY_SERVICES) {
+    index[`${service.schema}:${service.table}`] = {
+      id: `${service.schema}:${service.table}`,
+      title: service.title,
+      arabic: service.arabic,
+      href: `/liturgy/divine-liturgy/${service.id}`,
+    };
+  }
+
   return index;
 }
 
@@ -58,7 +77,7 @@ export default function BookmarksScreen() {
       <Head>
         <title>CHC Bookmarks</title>
       </Head>
-      <AppHeader title="Bookmarks" canGoBack onBack={() => router.back()} />
+      <AppHeader title="Bookmarks" canGoBack onBack={() => goBack(router, '/')} />
       {entries.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No bookmarks yet.</Text>

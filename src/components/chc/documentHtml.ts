@@ -16,6 +16,9 @@ export interface DocumentSection {
   forceWhiteVerses?: boolean;
   /** hymn_titles.prayer_type — "Silent Prayer" here means the whole hymn is a silent prayer. */
   titlePrayerType?: string | null;
+  /** order table `minimization` column: null = normal, "Minimizable" = collapsible-but-open, "Minimized" = collapsible-and-closed. */
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
 }
 
 export interface VisibleColumns {
@@ -26,13 +29,26 @@ export interface VisibleColumns {
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, coptic: true, arabic: true };
 
-const RUBRIC: Record<string, { color: string; english: string; arabic: string; class: string }> = {
-  priest: { color: COLORS.priest, english: 'Priest:', arabic: 'الكاهن:', class: 'priest' },
-  bishop: { color: COLORS.bishop, english: 'Bishop:', arabic: 'الأسقف:', class: 'bishop' },
-  deacon: { color: COLORS.deacon, english: 'Deacon:', arabic: 'الشماس:', class: 'deacon' },
-  reader: { color: COLORS.reader, english: 'Reader:', arabic: 'القارئ:', class: 'reader' },
-  people: { color: COLORS.people, english: 'People:', arabic: 'الشعب:', class: 'people' },
+// A non-breaking space, not an empty string: the Coptic column gets a blank
+// placeholder label so its text still starts on the same line as the
+// English/Arabic columns' label+<br/>+text layout, keeping all three columns
+// vertically aligned.
+const BLANK_COPTIC_LABEL = ' ';
+
+const RUBRIC: Record<string, { color: string; english: string; arabic: string; coptic: string; class: string }> = {
+  priest: { color: COLORS.priest, english: 'Priest:', arabic: 'الكاهن:', coptic: BLANK_COPTIC_LABEL, class: 'priest' },
+  bishop: { color: COLORS.bishop, english: 'Bishop:', arabic: 'الأسقف:', coptic: BLANK_COPTIC_LABEL, class: 'bishop' },
+  deacon: { color: COLORS.deacon, english: 'Deacon:', arabic: 'الشماس:', coptic: BLANK_COPTIC_LABEL, class: 'deacon' },
+  reader: { color: COLORS.reader, english: 'Reader:', arabic: 'القارئ:', coptic: BLANK_COPTIC_LABEL, class: 'reader' },
+  people: { color: COLORS.people, english: 'People:', arabic: 'الشعب:', coptic: BLANK_COPTIC_LABEL, class: 'people' },
+  refrain: { color: COLORS.refrain, english: 'Refrain:', arabic: 'قرار:', coptic: BLANK_COPTIC_LABEL, class: 'refrain' },
 };
+
+/** "Bishop/Priest" resolves to "bishop" or "priest" at render time based on the Bishop Present toggle. */
+function resolveRubricKey(verseType: string, bishopPresent: boolean) {
+  if (verseType === 'bishopOrPriest') return bishopPresent ? 'bishop' : 'priest';
+  return verseType;
+}
 
 /**
  * Builds the trilingual liturgical document HTML shared by the native
@@ -50,6 +66,7 @@ export function buildDocumentHtml(
     selectText = false,
     displayComments = false,
     displaySilentPrayers = false,
+    bishopPresent = false,
   }: {
     copticFontDataUri: string;
     fontSize: number;
@@ -57,6 +74,7 @@ export function buildDocumentHtml(
     selectText?: boolean;
     displayComments?: boolean;
     displaySilentPrayers?: boolean;
+    bishopPresent?: boolean;
   },
 ) {
   const sectionTitleFontSize = Math.max(Math.round(fontSize * 0.5), 14);
@@ -69,7 +87,7 @@ export function buildDocumentHtml(
     (section) => displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer',
   );
   const htmlSections = visibleSections
-    .map((section) => renderSection(section, { fontSize, visibleColumns, displayComments, displaySilentPrayers }))
+    .map((section) => renderSection(section, { fontSize, visibleColumns, displayComments, displaySilentPrayers, bishopPresent }))
     .join('');
 
   return `<!doctype html>
@@ -117,8 +135,27 @@ export function buildDocumentHtml(
         align-items: center;
         grid-template-columns: 1fr;
       }
+      .title-row.has-collapse-button {
+        grid-template-columns: 1fr auto;
+      }
       .title-text-group {
         display: grid;
+      }
+      .collapse-button {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        color: ${COLORS.gold};
+        cursor: pointer;
+        display: flex;
+        font-size: ${sectionTitleFontSize}px;
+        height: 40px;
+        justify-content: center;
+        padding: 0;
+        width: 40px;
+      }
+      .section.collapsed .section-content {
+        display: none !important;
       }
       .cell, .title-cell {
         box-sizing: border-box;
@@ -148,10 +185,14 @@ export function buildDocumentHtml(
         line-height: ${verseLineHeight}px;
       }
       .centered { text-align: center; }
+      .speaker-label {
+        font-size: 50%;
+      }
       .speaker-label.priest { color: ${COLORS.priest}; }
       .speaker-label.bishop { color: ${COLORS.bishop}; }
       .speaker-label.people { color: ${COLORS.people}; }
       .speaker-label.deacon, .speaker-label.reader { color: ${COLORS.deacon}; }
+      .speaker-label.refrain { color: ${COLORS.refrain}; text-decoration: underline; }
       .section-title {
         color: ${COLORS.gold};
         font-family: Georgia, serif;
@@ -176,6 +217,14 @@ export function buildDocumentHtml(
           window.scrollTo({ top: Math.max(top - 1, 0), behavior: 'auto' });
         }
       };
+      document.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-collapse-button]');
+        if (!button) return;
+        var section = button.closest('.section');
+        if (!section) return;
+        section.classList.toggle('collapsed');
+        button.textContent = section.classList.contains('collapsed') ? '▸' : '▾';
+      });
     </script>
   </body>
 </html>`;
@@ -188,16 +237,21 @@ function renderSection(
     visibleColumns: VisibleColumns;
     displayComments: boolean;
     displaySilentPrayers: boolean;
+    bishopPresent: boolean;
   },
 ) {
-  const { visibleColumns, displayComments, displaySilentPrayers } = opts;
-  const titleHtml = renderSectionTitle(section, visibleColumns);
+  const { visibleColumns, displayComments, displaySilentPrayers, bishopPresent } = opts;
+  const isCollapsed = Boolean(section.collapsible && section.defaultCollapsed);
+  const titleHtml = renderSectionTitle(section, visibleColumns, isCollapsed);
 
   // Speaker-label suppression (only the first verse of a consecutive same-speaker
-  // run shows its "Priest:"/"Deacon:"/etc. label) is computed against the full,
-  // unfiltered verse list — comments never break a speaker run, whether or not
-  // they're currently visible — then verses are filtered for display.
-  const suppressFlags = computeSuppressSpeakerLabelFlags(section.verses);
+  // run shows its "Priest:"/"Deacon:"/"Refrain:"/etc. label) is computed against
+  // the full, unfiltered verse list — comments never break a speaker run,
+  // whether or not they're currently visible — then verses are filtered for
+  // display. Suppression compares *resolved* types so a "Bishop/Priest" verse
+  // and a plain "Priest" verse are treated as the same speaker when the
+  // Bishop Present toggle is off (both render as "Priest:").
+  const suppressFlags = computeSuppressSpeakerLabelFlags(section.verses, bishopPresent);
   const versesHtml = section.verses
     .map((verse, index) => ({ verse, index }))
     .filter(({ verse }) => displayComments || verse.type !== 'comment')
@@ -206,26 +260,28 @@ function renderSection(
     .join('');
 
   return `
-    <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
+    <section class="section ${isCollapsed ? 'collapsed' : ''}" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
       ${titleHtml}
       <div class="section-content">${versesHtml}</div>
     </section>
   `;
 }
 
-/** A verse's speaker label is suppressed if the nearest preceding non-comment verse shares its type. */
-function computeSuppressSpeakerLabelFlags(verses: DocumentVerse[]): boolean[] {
+/** A verse's speaker label is suppressed if the nearest preceding non-comment verse resolves to the same speaker/type. */
+function computeSuppressSpeakerLabelFlags(verses: DocumentVerse[], bishopPresent: boolean): boolean[] {
+  const resolvedTypes = verses.map((verse) => resolveRubricKey(verse.type, bishopPresent));
   return verses.map((verse, index) => {
-    if (!RUBRIC[verse.type]) return false;
+    const resolved = resolvedTypes[index];
+    if (!RUBRIC[resolved]) return false;
     for (let i = index - 1; i >= 0; i -= 1) {
       if (verses[i].type === 'comment') continue;
-      return verses[i].type === verse.type;
+      return resolvedTypes[i] === resolved;
     }
     return false;
   });
 }
 
-function renderSectionTitle(section: DocumentSection, visibleColumns: VisibleColumns) {
+function renderSectionTitle(section: DocumentSection, visibleColumns: VisibleColumns, isCollapsed: boolean) {
   const titleEn = section.title?.english || '';
   const titleAr = section.title?.arabic || '';
   if (!titleEn && !titleAr) return '';
@@ -255,11 +311,17 @@ function renderSectionTitle(section: DocumentSection, visibleColumns: VisibleCol
     )
     .join('');
 
+  const collapseButtonHtml = section.collapsible
+    ? `<button class="collapse-button" data-collapse-button="${escapeAttribute(section.id)}" aria-label="Toggle section">${isCollapsed ? '▸' : '▾'}</button>`
+    : '';
+  const titleRowClass = section.collapsible ? 'title-row has-collapse-button' : 'title-row';
+
   return `
-    <div class="title-row">
+    <div class="${titleRowClass}">
       <div class="title-text-group" style="grid-template-columns: ${gridTemplateColumns};">
         ${titleCells}
       </div>
+      ${collapseButtonHtml}
     </div>
   `;
 }
@@ -269,15 +331,22 @@ function renderVerse(
   index: number,
   section: DocumentSection,
   suppressSpeakerLabel: boolean,
-  { visibleColumns }: { fontSize: number; visibleColumns: VisibleColumns },
+  { visibleColumns, bishopPresent }: { fontSize: number; visibleColumns: VisibleColumns; bishopPresent: boolean },
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section);
-  const rubric = suppressSpeakerLabel ? undefined : RUBRIC[verse.type];
-  const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
+  const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveRubricKey(verse.type, bishopPresent)];
+  const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference' || verse.type === 'inlineTitle';
+  const isBold = verse.type === 'inlineTitle';
 
   const languages: { className: string; key: keyof VisibleColumns; text: string; speakerLabel?: string; speakerClass?: string }[] = [
     { className: 'english', key: 'english' as const, text: verse.english || '', speakerLabel: rubric?.english, speakerClass: rubric?.class },
-    { className: 'coptic', key: 'coptic' as const, text: verse.coptic || '' },
+    {
+      className: 'coptic',
+      key: 'coptic' as const,
+      text: verse.coptic || '',
+      speakerLabel: rubric?.coptic,
+      speakerClass: rubric?.class,
+    },
     {
       className: 'arabic',
       key: 'arabic' as const,
@@ -288,7 +357,7 @@ function renderVerse(
   ].filter((language) => visibleColumns[language.key]);
 
   const gridTemplateColumns = `repeat(${Math.max(languages.length, 1)}, minmax(0, 1fr))`;
-  const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;
+  const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'}; font-weight:${isBold ? 700 : 400};`;
 
   const cells = languages
     .map(
@@ -309,7 +378,7 @@ function resolveVerseColor(verse: DocumentVerse, index: number, section: Documen
   if (verse.type === 'comment') return { color: COLORS.comment, italic: true };
   if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
   if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: false };
-  if (verse.type === 'readingReference') return { color: COLORS.gold, italic: false };
+  if (verse.type === 'readingReference' || verse.type === 'inlineTitle') return { color: COLORS.gold, italic: false };
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 
   const colorIndex = Math.floor(index / section.alternateEvery) % 2;

@@ -11,6 +11,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { fontScaleToPx } from '@/utils/preferencesStorage';
 import { supabase } from '@/utils/supabase';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
+import { goBack } from '@/utils/navigation';
 
 interface VerseRow {
   verse_number: number;
@@ -62,7 +63,7 @@ export default function BibleChapterDocument() {
       <AppHeader
         title={{ english: `${title || bookKey || ''} ${chapter}`, arabic: `الإصحاح ${chapter}` }}
         canGoBack
-        onBack={() => router.back()}
+        onBack={() => goBack(router, bookKey ? { pathname: '/bible/[bookKey]', params: { bookKey, title } } : '/bible')}
         rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
         rightLeadingIconFamily="material"
         onRightLeadingPress={toggleFullscreen}

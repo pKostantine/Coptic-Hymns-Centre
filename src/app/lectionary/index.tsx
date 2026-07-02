@@ -12,6 +12,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { fontScaleToPx } from '@/utils/preferencesStorage';
 import { supabase } from '@/utils/supabase';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
+import { goBack } from '@/utils/navigation';
 
 interface ResolvedVerse {
   verse_number: number;
@@ -81,7 +82,7 @@ export default function LectionaryDocument() {
       <AppHeader
         title={{ english: 'Lectionary', arabic: 'القطمارس' }}
         canGoBack
-        onBack={() => router.back()}
+        onBack={() => goBack(router, '/')}
         rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
         rightLeadingIconFamily="material"
         onRightLeadingPress={toggleFullscreen}

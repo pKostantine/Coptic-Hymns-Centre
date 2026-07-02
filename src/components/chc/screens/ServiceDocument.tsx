@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,12 +13,17 @@ import { useCalendar } from '../../../context/CalendarContext';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
 import { fontScaleToPx } from '../../../utils/preferencesStorage';
+import { goBack } from '../../../utils/navigation';
 
 interface ServiceDocumentProps {
   schema: string;
   table: string;
   title: string;
   arabic: string;
+  /** Extra condition flags forced true for this entry point (e.g. Vespers/Matins on the shared raising_of_incense document). */
+  extraContext?: Record<string, boolean>;
+  /** Where "back" should land when there's no navigation history to pop (direct deep link, page reload). */
+  backHref: Href;
 }
 
 const isMobileDocument = Platform.OS !== 'web';
@@ -30,7 +35,7 @@ const isMobileDocument = Platform.OS !== 'web';
  * (right-edge swipe-left opens the Content selector, left-edge swipe-right
  * goes back).
  */
-export default function ServiceDocument({ schema, table, title, arabic }: ServiceDocumentProps) {
+export default function ServiceDocument({ schema, table, title, arabic, extraContext, backHref }: ServiceDocumentProps) {
   const router = useRouter();
   const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent } = useReadingPreferences();
   const { effectiveDate } = useCalendar();
@@ -49,7 +54,7 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
     setSections(null);
     setError(null);
 
-    hydrateSupabaseServiceHymn(schema, table, effectiveDate, { BishopPresent: preferences.bishopPresent })
+    hydrateSupabaseServiceHymn(schema, table, effectiveDate, { BishopPresent: preferences.bishopPresent, ...extraContext })
       .then((result) => {
         if (!cancelled) setSections(result as DocumentSection[]);
       })
@@ -60,7 +65,7 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, preferences.bishopPresent]);
+  }, [schema, table, effectiveDate, preferences.bishopPresent, extraContext]);
 
   const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
   const selectorSwipeStartX = Math.max(screenWidth - selectorEdgeWidth, 0);
@@ -80,11 +85,11 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
             return;
           }
           if (gestureState.x0 < 56 && gestureState.dx > 60) {
-            router.back();
+            goBack(router, backHref);
           }
         },
       }),
-    [router, selectorSwipeStartX],
+    [router, selectorSwipeStartX, backHref],
   );
 
   return (
@@ -100,7 +105,7 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
         <AppHeader
           title={{ english: title, arabic }}
           canGoBack
-          onBack={() => router.back()}
+          onBack={() => goBack(router, backHref)}
           rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
           rightLeadingIconFamily="material"
           onRightLeadingPress={toggleFullscreen}
@@ -131,6 +136,7 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
             selectText={preferences.selectText}
             displayComments={preferences.displayComments}
             displaySilentPrayers={preferences.displaySilentPrayers}
+            bishopPresent={preferences.bishopPresent}
           />
           <ContentSelectorDrawer
             visible={selectorOpen}

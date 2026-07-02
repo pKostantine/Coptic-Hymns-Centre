@@ -19,6 +19,7 @@ interface DocumentWebViewProps {
   selectText?: boolean;
   displayComments?: boolean;
   displaySilentPrayers?: boolean;
+  bishopPresent?: boolean;
 }
 
 /**
@@ -27,7 +28,10 @@ interface DocumentWebViewProps {
  * DocumentWebView.web.tsx is the web counterpart (plain iframe).
  */
 const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
-  ({ sections, fontSize = 18, visibleColumns, selectText = false, displayComments = false, displaySilentPrayers = false }, ref) => {
+  (
+    { sections, fontSize = 18, visibleColumns, selectText = false, displayComments = false, displaySilentPrayers = false, bishopPresent = false },
+    ref,
+  ) => {
     const copticFontDataUri = useCopticFontDataUri();
     const webviewRef = useRef<WebView>(null);
 
@@ -40,9 +44,17 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     const html = useMemo(
       () =>
         copticFontDataUri
-          ? buildDocumentHtml(sections, { copticFontDataUri, fontSize, visibleColumns, selectText, displayComments, displaySilentPrayers })
+          ? buildDocumentHtml(sections, {
+              copticFontDataUri,
+              fontSize,
+              visibleColumns,
+              selectText,
+              displayComments,
+              displaySilentPrayers,
+              bishopPresent,
+            })
           : null,
-      [sections, copticFontDataUri, fontSize, visibleColumns, selectText, displayComments, displaySilentPrayers],
+      [sections, copticFontDataUri, fontSize, visibleColumns, selectText, displayComments, displaySilentPrayers, bishopPresent],
     );
 
     if (!html) {

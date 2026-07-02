@@ -7,6 +7,7 @@ import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING } from '@/constants/theme';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
+import { goBack } from '@/utils/navigation';
 
 const TESTAMENTS = [
   { key: 'OT', title: 'Old Testament', arabic: 'العهد القديم' },
@@ -25,7 +26,7 @@ export default function BibleTestamentList() {
       <AppHeader
         title={{ english: 'Bible', arabic: 'الكتاب المقدس' }}
         canGoBack
-        onBack={() => router.back()}
+        onBack={() => goBack(router, '/')}
         rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
         rightLeadingIconFamily="material"
         onRightLeadingPress={toggleFullscreen}

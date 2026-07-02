@@ -27,6 +27,18 @@ export interface ServiceDef {
   arabic: string;
 }
 
+/** A navigational group within a category's submenu (e.g. Liturgy → Raising of Incense / Divine Liturgy). Not itself bookmarkable. */
+export interface ServiceGroupDef {
+  id: string;
+  title: string;
+  arabic: string;
+}
+
+/** A submenu entry that opens an existing document but forces extra condition flags (e.g. Vespers/Matins both open raising_of_incense). */
+export interface ServiceOptionDef extends ServiceDef {
+  extraContext: Record<string, boolean>;
+}
+
 export const CATEGORIES: CategoryDef[] = [
   {
     id: 'psalmody',
@@ -90,15 +102,6 @@ export const SERVICES_BY_CATEGORY: Record<string, ServiceDef[]> = {
     { id: 'morning_doxology', schema: 'psalmody', table: 'morning_doxology', title: 'Morning Doxology', arabic: 'تسبحة باكر' },
     { id: 'antiphonary', schema: 'psalmody', table: 'antiphonary', title: 'Antiphonary', arabic: 'الإبصالية' },
   ],
-  liturgy: [
-    { id: 'raising_of_incense', schema: 'liturgy', table: 'raising_of_incense', title: 'Raising of Incense', arabic: 'رفع بخور' },
-    { id: 'offering_of_the_lamb', schema: 'liturgy', table: 'offering_of_the_lamb', title: 'Offering of the Lamb', arabic: 'تقديم الحمل' },
-    { id: 'liturgy_of_the_word', schema: 'liturgy', table: 'liturgy_of_the_word', title: 'Liturgy of the Word', arabic: 'قداس الكلمة' },
-    { id: 'liturgy_of_st_basil', schema: 'liturgy', table: 'liturgy_of_st_basil', title: 'Liturgy of St. Basil', arabic: 'قداس القديس باسيليوس' },
-    { id: 'liturgy_of_st_gregory', schema: 'liturgy', table: 'liturgy_of_st_gregory', title: 'Liturgy of St. Gregory', arabic: 'قداس القديس غريغوريوس' },
-    { id: 'liturgy_of_st_cyril', schema: 'liturgy', table: 'liturgy_of_st_cyril', title: 'Liturgy of St. Cyril', arabic: 'قداس القديس كيرلس' },
-    { id: 'distribution', schema: 'liturgy', table: 'distribution', title: 'Distribution', arabic: 'التوزيع' },
-  ],
   agpeya: [
     { id: 'first_hour', schema: 'agpeya', table: 'first_hour', title: '1st Hour', arabic: 'الساعة الأولى' },
     { id: 'third_hour', schema: 'agpeya', table: 'third_hour', title: '3rd Hour', arabic: 'الساعة الثالثة' },
@@ -111,3 +114,38 @@ export const SERVICES_BY_CATEGORY: Record<string, ServiceDef[]> = {
     { id: 'other_prayers', schema: 'agpeya', table: 'other_prayers', title: 'Other Prayers', arabic: 'صلوات أخرى' },
   ],
 };
+
+/** Liturgy top-level submenu: Raising of Incense (its own nested submenu) and the Divine Liturgy (its own list of services). */
+export const LITURGY_GROUPS: ServiceGroupDef[] = [
+  { id: 'raising-of-incense', title: 'Raising of Incense', arabic: 'رفع بخور' },
+  { id: 'divine-liturgy', title: 'The Divine Liturgy', arabic: 'القداس الإلهي' },
+];
+
+/** Vespers and Matins both open liturgy.raising_of_incense, differing only in which condition flag is forced true. */
+export const RAISING_OF_INCENSE_OPTIONS: ServiceOptionDef[] = [
+  {
+    id: 'vespers',
+    schema: 'liturgy',
+    table: 'raising_of_incense',
+    title: 'Vespers',
+    arabic: 'عشية',
+    extraContext: { Vespers: true },
+  },
+  {
+    id: 'matins',
+    schema: 'liturgy',
+    table: 'raising_of_incense',
+    title: 'Matins',
+    arabic: 'باكر',
+    extraContext: { Matins: true },
+  },
+];
+
+export const DIVINE_LITURGY_SERVICES: ServiceDef[] = [
+  { id: 'offering_of_the_lamb', schema: 'liturgy', table: 'offering_of_the_lamb', title: 'Offering of the Lamb', arabic: 'تقديم الحمل' },
+  { id: 'liturgy_of_the_word', schema: 'liturgy', table: 'liturgy_of_the_word', title: 'Liturgy of the Word', arabic: 'قداس الكلمة' },
+  { id: 'liturgy_of_st_basil', schema: 'liturgy', table: 'liturgy_of_st_basil', title: 'Liturgy of St. Basil', arabic: 'قداس القديس باسيليوس' },
+  { id: 'liturgy_of_st_gregory', schema: 'liturgy', table: 'liturgy_of_st_gregory', title: 'Liturgy of St. Gregory', arabic: 'قداس القديس غريغوريوس' },
+  { id: 'liturgy_of_st_cyril', schema: 'liturgy', table: 'liturgy_of_st_cyril', title: 'Liturgy of St. Cyril', arabic: 'قداس القديس كيرلس' },
+  { id: 'distribution', schema: 'liturgy', table: 'distribution', title: 'Distribution', arabic: 'التوزيع' },
+];

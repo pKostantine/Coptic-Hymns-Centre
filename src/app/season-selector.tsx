@@ -14,6 +14,7 @@ import {
   getSingleDayEventsForCopticYear,
   SeasonRange,
 } from '@/utils/calendarService';
+import { goBack } from '@/utils/navigation';
 
 function formatCopticYear(year: number) {
   return `${year} AM`;
@@ -109,7 +110,7 @@ export default function SeasonSelectorScreen() {
 
   function selectItem(item: SelectorItem) {
     selectDate(new Date(`${itemStart(item)}T00:00:00Z`));
-    router.back();
+    goBack(router, '/calendar');
   }
 
   return (
@@ -118,7 +119,7 @@ export default function SeasonSelectorScreen() {
         <title>CHC Season Selector</title>
       </Head>
       <View style={[styles.header, { paddingTop: safeAreaInsets.top }]}>
-        <Pressable accessibilityLabel="Close season selector" style={styles.headerButton} onPress={() => router.back()}>
+        <Pressable accessibilityLabel="Close season selector" style={styles.headerButton} onPress={() => goBack(router, '/calendar')}>
           <Ionicons name="chevron-back" size={28} color={COLORS.white} />
         </Pressable>
         <Text style={styles.headerTitle}>Season Selector</Text>

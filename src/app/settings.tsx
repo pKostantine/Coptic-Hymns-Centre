@@ -9,6 +9,7 @@ import ToggleRow from '@/components/chc/ui/ToggleRow';
 import { COLORS, SPACING } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { OrientationMode, VisibleLanguages } from '@/utils/preferencesStorage';
+import { goBack } from '@/utils/navigation';
 
 const LANGUAGE_OPTIONS: { key: keyof VisibleLanguages; label: string }[] = [
   { key: 'english', label: 'English' },
@@ -46,7 +47,7 @@ export default function SettingsScreen() {
       <Head>
         <title>CHC Settings</title>
       </Head>
-      <AppHeader title="Settings" canGoBack onBack={() => router.back()} />
+      <AppHeader title="Settings" canGoBack onBack={() => goBack(router, '/')} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>
           <Text style={styles.groupLabel}>Languages</Text>

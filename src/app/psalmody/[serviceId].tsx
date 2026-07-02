@@ -9,5 +9,5 @@ export default function PsalmodyDocument() {
 
   if (!service) return null;
 
-  return <ServiceDocument schema={service.schema} table={service.table} title={service.title} arabic={service.arabic} />;
+  return <ServiceDocument schema={service.schema} table={service.table} title={service.title} arabic={service.arabic} backHref="/psalmody" />;
 }

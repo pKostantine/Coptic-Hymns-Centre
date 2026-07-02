@@ -8,6 +8,7 @@ import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { supabase } from '@/utils/supabase';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
+import { goBack } from '@/utils/navigation';
 
 interface BibleBook {
   book_key: string;
@@ -71,7 +72,7 @@ export default function BibleNestedList() {
       <AppHeader
         title={{ english: title || bookKey || '', arabic: arabic || '' }}
         canGoBack
-        onBack={() => router.back()}
+        onBack={() => goBack(router, '/bible')}
         rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
         rightLeadingIconFamily="material"
         onRightLeadingPress={toggleFullscreen}

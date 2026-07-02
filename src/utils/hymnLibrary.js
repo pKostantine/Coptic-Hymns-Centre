@@ -67,6 +67,14 @@ const SERVICE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, category, t
 // isn't actually needed: line_order is sufficient for sorting.
 const SERVICE_TEXT_FIELDS =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key";
+// agpeya.hymn_texts is missing both item_type and inline_hymn_key (every
+// other schema's hymn_texts has them) — omit those columns there so the
+// query doesn't 400, and agpeya lines simply never resolve as
+// Inline/Subdocument/Hyperlink line items (which matches reality: agpeya
+// hymn_texts never uses those).
+const SERVICE_TEXT_FIELDS_NO_ITEM_TYPE =
+  "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition";
+const SCHEMAS_WITHOUT_TEXT_ITEM_TYPE = new Set(["agpeya"]);
 
 export async function fetchServiceRows(schema, table) {
   const orderRows = await fetchOrderRows(schema, table);
@@ -123,12 +131,13 @@ async function fetchSchemaTitlesByKeys(schema, hymnKeys) {
 
 async function fetchSchemaTextRowsByKeys(schema, hymnKeys) {
   if (!hymnKeys.length) return [];
+  const selectFields = SCHEMAS_WITHOUT_TEXT_ITEM_TYPE.has(schema) ? SERVICE_TEXT_FIELDS_NO_ITEM_TYPE : SERVICE_TEXT_FIELDS;
   const results = await Promise.all(
     chunk(hymnKeys, HYMN_KEY_CHUNK_SIZE).map(async (batch) => {
       const { data, error } = await supabase
         .schema(schema)
         .from("hymn_texts")
-        .select(SERVICE_TEXT_FIELDS)
+        .select(selectFields)
         .in("hymn_key", batch)
         .order("hymn_key", { ascending: true })
         .order("line_order", { ascending: true });
@@ -302,7 +311,11 @@ export function getServiceVerseType(personType, prayerType) {
   if (prayerType === "Refrain") return "refrain";
   if (prayerType === "Pre-Refrain") return "refrainLabel";
   if (personType === "Comment") return "comment";
-  if (personType === "Priest" || personType === "Bishop/Priest") return "priest";
+  // "Bishop/Priest" is a distinct type from plain "Priest": the renderer
+  // resolves it to "Bishop:" or "Priest:" at display time based on the
+  // Bishop Present toggle, whereas plain "Priest" always shows "Priest:".
+  if (personType === "Bishop/Priest") return "bishopOrPriest";
+  if (personType === "Priest") return "priest";
   if (personType === "Deacon") return "deacon";
   if (personType === "Reader") return "reader";
   if (personType === "People") return "people";
@@ -333,6 +346,20 @@ async function hydrateWithFlags(schema, table, flags, depth) {
       if (depth >= 3) continue;
       const target = SUBDOCUMENT_MAP[section.hymn_key];
       if (!target) continue; // not-yet-built or reading-sentinel; handled elsewhere
+      // The placeholder's own title (resolved from the calling schema's
+      // hymn_titles, with public fallback, keyed by the sentinel hymn_key)
+      // is only shown if the calling schema actually defined one for this
+      // sentinel — otherwise the nested content flows in with no heading.
+      if (section.title.english || section.title.arabic) {
+        hydrated.push({
+          id: section.id,
+          title: section.title,
+          verses: [],
+          alternateEvery: null,
+          forceWhiteVerses: true,
+          titlePrayerType: null,
+        });
+      }
       const nested = await hydrateWithFlags(target.schema, target.table, flags, depth + 1);
       hydrated.push(...nested);
       continue;
@@ -344,7 +371,19 @@ async function hydrateWithFlags(schema, table, flags, depth) {
 
       if (verse.type === "inlinePlaceholder") {
         if (depth >= 3) continue;
-        const inlineVerses = await fetchInlineHymnVerses(schema, verse.inlineHymnKey);
+        const [inlineTitle, inlineVerses] = await Promise.all([
+          fetchInlineHymnTitle(schema, verse.inlineHymnKey),
+          fetchInlineHymnVerses(schema, verse.inlineHymnKey),
+        ]);
+        if (inlineTitle?.title_english || inlineTitle?.title_arabic) {
+          verses.push({
+            english: inlineTitle.title_english || "",
+            coptic: "",
+            arabic: inlineTitle.title_arabic || "",
+            type: "inlineTitle",
+            prayerType: null,
+          });
+        }
         inlineVerses
           .filter((row) => evaluateCondition(row.condition, flags))
           .forEach((row) => {
@@ -362,10 +401,67 @@ async function hydrateWithFlags(schema, table, flags, depth) {
       verses.push(verse);
     }
 
-    hydrated.push({ ...section, verses });
+    hydrated.push(applyCopticCaseToSection({ ...section, verses }));
   }
 
   return hydrated;
+}
+
+// ─── Coptic case normalization ──────────────────────────────────────────────
+// Coptic hymn_texts rows are stored uppercase/mixed-case; the traditional
+// print convention is all-lowercase Coptic with a single capitalized initial
+// letter opening the hymn (only when the hymn actually has an English title
+// to "open" — untitled continuation sections don't get a capital).
+const COPTIC_CHAR_PATTERN = /[Ϣ-ϯⲀ-⳿]/;
+const COPTIC_CHAR_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿]/g;
+
+function applyCopticCaseToSection(section) {
+  const verses = section.verses.map((verse) =>
+    verse.coptic ? { ...verse, coptic: lowercaseCoptic(verse.coptic) } : verse,
+  );
+
+  if (section.title?.english) {
+    const firstIndex = verses.findIndex((verse) => verse.coptic && verse.coptic.trim());
+    if (firstIndex !== -1) {
+      verses[firstIndex] = { ...verses[firstIndex], coptic: uppercaseFirstCopticChar(verses[firstIndex].coptic) };
+    }
+  }
+
+  return { ...section, verses };
+}
+
+function lowercaseCoptic(text) {
+  return text.replace(COPTIC_CHAR_GLOBAL_PATTERN, (char) => char.toLocaleLowerCase());
+}
+
+function uppercaseFirstCopticChar(text) {
+  const index = text.search(COPTIC_CHAR_PATTERN);
+  if (index === -1) return text;
+  return text.slice(0, index) + text[index].toLocaleUpperCase() + text.slice(index + 1);
+}
+
+const INLINE_TITLE_FIELDS = "hymn_key, title_english, title_arabic";
+
+async function fetchInlineHymnTitle(schema, hymnKey) {
+  const { data: nativeRow, error: nativeError } = await supabase
+    .schema(schema)
+    .from("hymn_titles")
+    .select(INLINE_TITLE_FIELDS)
+    .eq("hymn_key", hymnKey)
+    .maybeSingle();
+  if (nativeError) throw createReadableSupabaseError(nativeError, `${schema}.hymn_titles`);
+  if (nativeRow) return nativeRow;
+
+  if (schema === "public") return null;
+
+  const { data: publicRow, error: publicError } = await supabase
+    .schema("public")
+    .from("hymn_titles")
+    .select(INLINE_TITLE_FIELDS)
+    .eq("hymn_key", hymnKey)
+    .maybeSingle();
+  if (publicError) throw createReadableSupabaseError(publicError, "public.hymn_titles");
+  return publicRow || null;
 }
 
 const INLINE_TEXT_FIELDS =
