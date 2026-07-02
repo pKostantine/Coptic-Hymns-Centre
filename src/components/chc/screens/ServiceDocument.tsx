@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
-import IconButton from '../ui/IconButton';
-import DocumentWebView, { DocumentSection } from '../DocumentWebView';
+import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
+import DocumentWebView, { DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
+import { useCalendar } from '../../../context/CalendarContext';
+import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
+import { fontScaleToPx } from '../../../utils/preferencesStorage';
 
 interface ServiceDocumentProps {
   schema: string;
@@ -15,18 +20,35 @@ interface ServiceDocumentProps {
   arabic: string;
 }
 
-/** Generic document reader: hydrates a service for today and renders it in the trilingual WebView table. */
+const isMobileDocument = Platform.OS !== 'web';
+
+/**
+ * Generic document reader — ported from HymnDisplayScreen.js. On web it keeps
+ * the Header (fullscreen toggle + content-list icon); on native there is no
+ * header at all, matching the old app exactly — navigation is gesture-only
+ * (right-edge swipe-left opens the Content selector, left-edge swipe-right
+ * goes back).
+ */
 export default function ServiceDocument({ schema, table, title, arabic }: ServiceDocumentProps) {
   const router = useRouter();
+  const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent } = useReadingPreferences();
+  const { effectiveDate } = useCalendar();
+  const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
+  const { width: screenWidth } = useWindowDimensions();
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const documentRef = useRef<DocumentWebViewHandle>(null);
+
+  const bookmarkId = `${schema}:${table}`;
+  const bookmarked = isBookmarked(bookmarkId);
 
   useEffect(() => {
     let cancelled = false;
     setSections(null);
     setError(null);
 
-    hydrateSupabaseServiceHymn(schema, table, new Date())
+    hydrateSupabaseServiceHymn(schema, table, effectiveDate)
       .then((result) => {
         if (!cancelled) setSections(result as DocumentSection[]);
       })
@@ -37,17 +59,52 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
     return () => {
       cancelled = true;
     };
-  }, [schema, table]);
+  }, [schema, table, effectiveDate]);
+
+  const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
+  const selectorSwipeStartX = Math.max(screenWidth - selectorEdgeWidth, 0);
+
+  const gesturePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          const startsInRightEdge = gestureState.x0 >= selectorSwipeStartX;
+          const startsInLeftEdge = gestureState.x0 < 56;
+          const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+          return (startsInRightEdge || startsInLeftEdge) && isHorizontal && Math.abs(gestureState.dx) > 18;
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.x0 >= selectorSwipeStartX && gestureState.dx <= -36) {
+            setSelectorOpen(true);
+            return;
+          }
+          if (gestureState.x0 < 56 && gestureState.dx > 60) {
+            router.back();
+          }
+        },
+      }),
+    [router, selectorSwipeStartX],
+  );
 
   return (
-    <View style={styles.screen}>
-      <AppHeader
-        title={title}
-        arabic={arabic}
-        canGoBack
-        onBack={() => router.back()}
-        right={<IconButton icon="bookmark-outline" label="Bookmark" size="sm" onPress={() => {}} />}
-      />
+    <SafeAreaView
+      edges={['left', 'right', 'bottom']}
+      style={styles.safeArea}
+      {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}
+    >
+      {!isMobileDocument ? (
+        <AppHeader
+          title={{ english: title, arabic }}
+          canGoBack
+          onBack={() => router.back()}
+          rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
+          rightLeadingIconFamily="material"
+          onRightLeadingPress={toggleFullscreen}
+          rightIcon="list-outline"
+          rightAccessibilityLabel="Open content list"
+          onRightPress={() => setSelectorOpen(true)}
+        />
+      ) : null}
       {error ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
@@ -57,15 +114,39 @@ export default function ServiceDocument({ schema, table, title, arabic }: Servic
           <Text style={styles.loading}>Loading…</Text>
         </View>
       ) : (
-        <DocumentWebView sections={sections} />
+        <>
+          <DocumentWebView
+            ref={documentRef}
+            sections={sections}
+            fontSize={fontScaleToPx(preferences.fontScale)}
+            visibleColumns={{
+              english: preferences.visibleLanguages.english,
+              coptic: preferences.visibleLanguages.coptic,
+              arabic: preferences.visibleLanguages.arabic,
+            }}
+            selectText={preferences.selectText}
+          />
+          <ContentSelectorDrawer
+            visible={selectorOpen}
+            sections={sections}
+            onClose={() => setSelectorOpen(false)}
+            onSelectSection={(id) => documentRef.current?.scrollToSection(id)}
+            bookmarked={bookmarked}
+            onToggleBookmark={() => toggleBookmark(bookmarkId)}
+            onOpenCalendar={() => router.push('/calendar')}
+            onOpenSettings={() => router.push('/settings')}
+            bishopPresent={preferences.bishopPresent}
+            onToggleBishopPresent={toggleBishopPresent}
+          />
+        </>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: COLORS.black },
+  safeArea: { flex: 1, backgroundColor: COLORS.black },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
-  loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: TYPOGRAPHY.fsBody },
-  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: TYPOGRAPHY.fsBody, textAlign: 'center' },
+  loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
+  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17, textAlign: 'center' },
 });

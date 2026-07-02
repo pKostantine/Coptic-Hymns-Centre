@@ -1,45 +1,70 @@
-import { useMemo } from 'react';
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { COLORS } from '../../constants/theme';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
-import { buildDocumentHtml, DocumentSection } from './documentHtml';
+import { buildDocumentHtml, DocumentSection, VisibleColumns } from './documentHtml';
 
 export type { DocumentSection, DocumentVerse } from './documentHtml';
+
+export interface DocumentWebViewHandle {
+  scrollToSection: (id: string) => void;
+}
+
+interface DocumentWebViewProps {
+  sections: DocumentSection[];
+  fontSize?: number;
+  visibleColumns?: VisibleColumns;
+  selectText?: boolean;
+}
 
 /**
  * Native (iOS/Android) document renderer — see documentHtml.ts for the
  * shared HTML builder. Uses react-native-webview, which doesn't support web;
  * DocumentWebView.web.tsx is the web counterpart (plain iframe).
  */
-export default function DocumentWebView({ sections, fontSize = 18 }: { sections: DocumentSection[]; fontSize?: number }) {
-  const copticFontDataUri = useCopticFontDataUri();
+const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
+  ({ sections, fontSize = 18, visibleColumns, selectText = false }, ref) => {
+    const copticFontDataUri = useCopticFontDataUri();
+    const webviewRef = useRef<WebView>(null);
 
-  const html = useMemo(
-    () => (copticFontDataUri ? buildDocumentHtml(sections, { copticFontDataUri, fontSize }) : null),
-    [sections, copticFontDataUri, fontSize],
-  );
+    useImperativeHandle(ref, () => ({
+      scrollToSection: (id: string) => {
+        webviewRef.current?.injectJavaScript(`window.scrollToSection(${JSON.stringify(id)}); true;`);
+      },
+    }));
 
-  if (!html) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={COLORS.gold} />
-      </View>
+    const html = useMemo(
+      () => (copticFontDataUri ? buildDocumentHtml(sections, { copticFontDataUri, fontSize, visibleColumns, selectText }) : null),
+      [sections, copticFontDataUri, fontSize, visibleColumns, selectText],
     );
-  }
 
-  return (
-    <WebView
-      originWhitelist={['*']}
-      source={{ html }}
-      style={styles.webview}
-      scrollEnabled
-      showsVerticalScrollIndicator={false}
-      javaScriptEnabled={false}
-    />
-  );
-}
+    if (!html) {
+      return (
+        <View style={styles.loading}>
+          <ActivityIndicator color={COLORS.gold} />
+        </View>
+      );
+    }
+
+    return (
+      <WebView
+        ref={webviewRef}
+        originWhitelist={['*']}
+        source={{ html }}
+        style={styles.webview}
+        scrollEnabled
+        showsVerticalScrollIndicator={false}
+        javaScriptEnabled
+      />
+    );
+  },
+);
+
+DocumentWebView.displayName = 'DocumentWebView';
+
+export default DocumentWebView;
 
 const styles = StyleSheet.create({
   loading: {

@@ -1,29 +1,53 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts as useCormorantFonts, CormorantGaramond_500Medium, CormorantGaramond_600SemiBold, CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond';
-import { useFonts as useAmiriFonts, Amiri_400Regular, Amiri_700Bold } from '@expo-google-fonts/amiri';
 import { useFonts as useLocalFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View } from 'react-native';
 
 import { COLORS } from '@/constants/theme';
+import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { CalendarProvider } from '@/context/CalendarContext';
 
 SplashScreen.preventAutoHideAsync();
 
+const ORIENTATION_LOCKS = {
+  auto: 'UNLOCK',
+  landscape: 'LANDSCAPE_RIGHT',
+  reverseLandscape: 'LANDSCAPE_LEFT',
+  portrait: 'PORTRAIT_UP',
+} as const;
+
+function OrientationLock() {
+  const { preferences } = useReadingPreferences();
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    (async () => {
+      const ScreenOrientation = await import('expo-screen-orientation');
+      const mode = ORIENTATION_LOCKS[preferences.orientationMode];
+      if (mode === 'UNLOCK') {
+        await ScreenOrientation.unlockAsync();
+      } else {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock[mode]);
+      }
+    })();
+  }, [preferences.orientationMode]);
+
+  return null;
+}
+
 export default function RootLayout() {
-  const [cormorantLoaded] = useCormorantFonts({
-    CormorantGaramond_500Medium,
-    CormorantGaramond_600SemiBold,
-    CormorantGaramond_700Bold,
-  });
-  const [amiriLoaded] = useAmiriFonts({ Amiri_400Regular, Amiri_700Bold });
+  // Matches the old app's App.js exactly: only the bundled Coptic font is
+  // loaded via expo-font. Georgia/Arial/System are OS fonts, not bundled.
   const [copticLoaded] = useLocalFonts({
     'CopticCHC-Regular': require('../../assets/fonts/CopticCHC-Regular-V3.ttf'),
   });
 
-  const fontsReady = cormorantLoaded && amiriLoaded && copticLoaded;
+  const fontsReady = copticLoaded;
 
   useEffect(() => {
     if (fontsReady) {
@@ -37,13 +61,18 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" backgroundColor={COLORS.navy} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: COLORS.black },
-        }}
-      />
+      <ReadingPreferencesProvider>
+        <CalendarProvider>
+          <StatusBar style="light" />
+          <OrientationLock />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: COLORS.black },
+            }}
+          />
+        </CalendarProvider>
+      </ReadingPreferencesProvider>
     </SafeAreaProvider>
   );
 }

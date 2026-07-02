@@ -1,15 +1,14 @@
 /**
- * CHC design tokens — ported from the CHC Design System (Claude Design
- * project "CHC Design System") tokens/colors.css, tokens/spacing.css,
- * tokens/typography.css. Dark, elegant liturgical theme: navy + gold on
- * near-black surfaces. This is the single source of truth for CHC styling;
- * there is no light mode.
+ * CHC design tokens — ported 1:1 from the predecessor app's
+ * `constants/theme.js` (Coptic-Hymns-Centre-Old) plus the literal color/size
+ * values hardcoded throughout its components (Header.js, CategoryCard.js,
+ * HymnCard.js, HymnDisplayScreen.js, LanguageToggleBar.js,
+ * CalendarDatePicker.js, SeasonSelector.js). This file is the single source
+ * of truth for CHC styling; there is no light mode.
  */
 
-import { Platform } from 'react-native';
-
 export const COLORS = {
-  // Brand palette (base)
+  // Brand palette (base) — exact old-app COLORS.primary/primaryDark/etc.
   navy: '#003566',
   navyDark: '#001D3D',
   gold: '#C9A227',
@@ -20,13 +19,14 @@ export const COLORS = {
   muted: '#C9D3DC',
   border: '#262626',
   rowBlue: '#8EC5FF',
+  shadow: '#000000',
 
-  // Gold tints (derived)
+  // Gold tints (derived, used verbatim throughout the old app's inline styles)
   goldSoft: 'rgba(201, 162, 39, 0.13)',
   goldLine: 'rgba(201, 162, 39, 0.45)',
   goldBright: '#D8C77A',
 
-  // Liturgical speaker & verse colors
+  // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',
   bishop: '#D64545',
   deacon: '#FFFF00',
@@ -34,12 +34,8 @@ export const COLORS = {
   people: '#E28A2E',
   comment: '#8FD19E',
   silent: '#C5CBD2',
+  silentTitle: '#AEB7C0',
   refrain: '#D8C77A',
-
-  // Semantic aliases
-  bgApp: '#000000',
-  bgChrome: '#003566',
-  bgChromeDeep: '#001D3D',
 
   // theme.colors.* shape expected by SlideshowContainer/VerseBlock
   text: '#FFFFFF',
@@ -51,30 +47,35 @@ export const SPACING = {
   md: 16,
   lg: 24,
   xl: 32,
-  xxl: 48,
 } as const;
 
+/**
+ * The old app has no shared radius scale — each component hardcodes its own
+ * literal (8, 16, 18, 20, 24...). These four are the ones reused often enough
+ * to name; anywhere else, components hardcode the old app's literal directly
+ * to stay exact.
+ */
 export const RADII = {
-  sm: 8, // action buttons
+  sm: 8, // buttons, toggle rows, selector items
   md: 16, // icon chips
-  lg: 18, // cards
-  pill: 999,
+  lg: 18, // CategoryCard / HymnCard
+  pill: 999, // switches, pills
 } as const;
 
 export const SHADOWS = {
   card: {
-    shadowColor: '#000000',
+    shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
   },
-  raised: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    elevation: 8,
+  hymnCard: {
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
 } as const;
 
@@ -85,36 +86,18 @@ export const MOTION = {
 } as const;
 
 /**
- * Title font: Georgia is a native system serif on iOS but not on Android,
- * so Android/web fall back to the bundled Cormorant Garamond (loaded via
- * @expo-google-fonts/cormorant-garamond in the root layout).
+ * Exactly the old app's font set (constants/theme.js: title:"Georgia",
+ * body:"System") — no Cormorant Garamond, no Amiri. The old app never
+ * special-cases Android/web font fallback; we don't either, so the rendered
+ * typeface matches on every platform this runs next to the old app on.
+ * Arabic text uses "Arial" (hardcoded inline in the old app's Arabic styles
+ * and its generated document HTML), not a bundled font.
  */
 export const TYPOGRAPHY = {
-  title: Platform.select({ ios: 'Georgia', default: 'CormorantGaramond_700Bold' }) as string,
-  titleMedium: Platform.select({ ios: 'Georgia', default: 'CormorantGaramond_600SemiBold' }) as string,
-  body: Platform.select({
-    ios: 'System',
-    android: 'sans-serif',
-    default: 'System',
-  }) as string,
+  title: 'Georgia',
+  body: 'System',
   coptic: 'CopticCHC-Regular',
-  arabic: 'Amiri_400Regular',
-  arabicBold: 'Amiri_700Bold',
-
-  // Type scale (px)
-  fsDisplay: 34,
-  fsH1: 26,
-  fsH2: 22,
-  fsTitle: 21,
-  fsBody: 17,
-  fsSm: 15,
-  fsXs: 13,
-  fsCoptic: 21,
-
-  // Line heights (multipliers)
-  lhTight: 1.15,
-  lhTitle: 1.25,
-  lhBody: 1.5,
+  arabic: 'Arial',
 } as const;
 
 /** Reader-only liturgical rubric colors, keyed by DB `Person Type` values. */

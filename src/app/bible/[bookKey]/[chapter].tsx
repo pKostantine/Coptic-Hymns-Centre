@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import DocumentWebView, { DocumentSection } from '@/components/chc/DocumentWebView';
-import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { fontScaleToPx } from '@/utils/preferencesStorage';
 import { supabase } from '@/utils/supabase';
+import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 
 interface VerseRow {
   verse_number: number;
@@ -16,7 +20,9 @@ interface VerseRow {
 
 export default function BibleChapterDocument() {
   const router = useRouter();
-  const { bookKey, chapter } = useLocalSearchParams<{ bookKey: string; chapter: string }>();
+  const { bookKey, chapter, title } = useLocalSearchParams<{ bookKey: string; chapter: string; title?: string }>();
+  const { preferences } = useReadingPreferences();
+  const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,8 +54,15 @@ export default function BibleChapterDocument() {
   }, [bookKey, chapter]);
 
   return (
-    <View style={styles.screen}>
-      <AppHeader title={bookKey || ''} arabic={`الإصحاح ${chapter}`} canGoBack onBack={() => router.back()} />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+      <AppHeader
+        title={{ english: `${title || bookKey || ''} ${chapter}`, arabic: `الإصحاح ${chapter}` }}
+        canGoBack
+        onBack={() => router.back()}
+        rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
+        rightLeadingIconFamily="material"
+        onRightLeadingPress={toggleFullscreen}
+      />
       {error ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
@@ -59,15 +72,24 @@ export default function BibleChapterDocument() {
           <Text style={styles.loading}>Loading…</Text>
         </View>
       ) : (
-        <DocumentWebView sections={sections} />
+        <DocumentWebView
+          sections={sections}
+          fontSize={fontScaleToPx(preferences.fontScale)}
+          visibleColumns={{
+            english: preferences.visibleLanguages.english,
+            coptic: preferences.visibleLanguages.coptic,
+            arabic: preferences.visibleLanguages.arabic,
+          }}
+          selectText={preferences.selectText}
+        />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: COLORS.black },
+  safeArea: { flex: 1, backgroundColor: COLORS.black },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: TYPOGRAPHY.fsBody },
-  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: TYPOGRAPHY.fsBody },
+  loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
+  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17 },
 });

@@ -1,6 +1,5 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
@@ -21,7 +20,7 @@ interface AppHeaderProps {
   visibleLanguages?: { english: boolean; arabic: boolean };
 }
 
-/** CHC Header — ported 1:1 from Header.js/Header.web.js: generic icon-toolbar chrome shared by every screen. */
+/** CHC Header (web) — ported 1:1 from Header.web.js: no safe-area top inset, CHC_sm_web logo. */
 export default function AppHeader({
   title = 'Coptic Hymns Centre',
   canGoBack = false,
@@ -35,7 +34,6 @@ export default function AppHeader({
   rightAccessibilityLabel = 'Open settings',
   visibleLanguages = { english: true, arabic: true },
 }: AppHeaderProps) {
-  const insets = useSafeAreaInsets();
   const titleParts = typeof title === 'string' ? { english: title, arabic: '' } : title;
   const showEnglish = visibleLanguages.english || !visibleLanguages.arabic;
   const showArabic = visibleLanguages.arabic && Boolean(titleParts.arabic);
@@ -44,14 +42,14 @@ export default function AppHeader({
   const hasRightAction = Boolean(rightIcon && onRightPress);
 
   return (
-    <View style={[styles.container, { paddingTop: SPACING.lg + insets.top }]}>
+    <View style={styles.container}>
       <View style={styles.topRow}>
         {canGoBack ? (
           <Pressable accessibilityLabel="Go back" style={styles.iconButton} onPress={onBack}>
             <Ionicons name="chevron-back" size={24} color={COLORS.gold} />
           </Pressable>
         ) : (
-          <Image source={require('../../../../assets/images/CHC_sm.png')} style={styles.logo} />
+          <Image source={require('../../../../assets/images/CHC_sm_web.png')} style={styles.logo} />
         )}
 
         <View style={styles.titleGroup}>
@@ -103,6 +101,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingBottom: SPACING.md,
     paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.lg,
   },
   topRow: {
     alignItems: 'center',
