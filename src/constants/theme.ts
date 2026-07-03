@@ -32,10 +32,10 @@ export const COLORS = {
   deacon: '#FFFF00',
   reader: '#FFFF00',
   people: '#E28A2E',
-  comment: '#8FD19E',
+  comment: '#47627F',
   silent: '#C5CBD2',
   silentTitle: '#AEB7C0',
-  refrain: '#ffeea1',
+  refrain: '#8FD19E',
 
   // theme.colors.* shape expected by SlideshowContainer/VerseBlock
   text: '#FFFFFF',

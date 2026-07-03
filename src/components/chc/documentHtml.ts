@@ -218,7 +218,7 @@ export function buildDocumentHtml(
       .speaker-label.bishop { color: ${COLORS.bishop}; }
       .speaker-label.people { color: ${COLORS.people}; }
       .speaker-label.deacon, .speaker-label.reader { color: ${COLORS.deacon}; }
-      .speaker-label.refrain { color: ${COLORS.refrain};}
+      .speaker-label.refrain { color: ${COLORS.refrain}; font-style: italic;}
       .section-title {
         color: ${COLORS.gold};
         font-family: Georgia, serif;
@@ -252,8 +252,8 @@ export function buildDocumentHtml(
       .open-button .arabic {
         direction: rtl;
         font-family: "Arial", sans-serif;
-        font-size: ${sectionTitleFontSize}px;
-        line-height: ${sectionTitleLineHeight}px;
+        // font-size: ${sectionTitleFontSize}px;
+        // line-height: ${sectionTitleLineHeight}px;
       }
     </style>
   </head>
