@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { getSeasonShortName } from '@/constants/seasonNames';
 import { useCalendar } from '@/context/CalendarContext';
 import {
   CalendarDay,
@@ -47,6 +48,17 @@ export default function CalendarScreen() {
   // toggle communicates that content is now for the evening.
   const selectedIso = rawDate.toISOString().slice(0, 10);
   const todayIso = new Date().toISOString().slice(0, 10);
+
+  // Keeps the visible month grid following `rawDate` when it changes from
+  // outside this screen (e.g. teleporting here via the season selector, which
+  // pops back to this same still-mounted screen instance rather than
+  // remounting it, so the initial useState seed above never re-runs).
+  useEffect(() => {
+    setGregorianYear(rawDate.getUTCFullYear());
+    setGregorianMonth(rawDate.getUTCMonth() + 1);
+    setCopticYear(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the timestamp, not the Date instance
+  }, [rawDate.getTime()]);
 
   useEffect(() => {
     if (mode !== 'coptic' || copticYear !== null) return;
@@ -144,7 +156,7 @@ export default function CalendarScreen() {
           )}
           <Pressable accessibilityLabel="Open season selector" style={styles.seasonSummary} onPress={() => router.push('/season-selector')}>
             <Text numberOfLines={1} style={styles.summaryText}>
-              {activeSeason ? activeSeason.activeSeason : 'Seasons'}
+              {activeSeason ? getSeasonShortName(activeSeason.rangeKey, activeSeason.activeSeason) : 'Seasons'}
             </Text>
             <Ionicons name="chevron-forward" size={22} color={COLORS.white} />
           </Pressable>

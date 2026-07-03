@@ -1,6 +1,6 @@
 /**
  * CHC main-menu + submenu manifest. The six top-level categories match the
- * six icon files provided in assets/images/CHC App Symbols (psalmody,
+ * six icon files provided in assets/images/chc-app-symbols (psalmody,
  * liturgy, veneration, lectionary, agpeya, bible) — that icon set is the
  * source of truth for what belongs on the main menu.
  */
@@ -45,7 +45,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Psalmody',
     arabic: 'الإبصلمودية',
     meta: 'Vespers · Midnight · Morning',
-    icon: require('../../assets/images/CHC App Symbols/psalmody.png'),
+    icon: require('../../assets/images/chc-app-symbols/psalmody.png'),
     kind: 'submenu',
     schema: 'psalmody',
   },
@@ -54,7 +54,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Liturgy',
     arabic: 'القداس',
     meta: 'Raising of Incense · Divine Liturgy',
-    icon: require('../../assets/images/CHC App Symbols/liturgy.png'),
+    icon: require('../../assets/images/chc-app-symbols/liturgy.png'),
     kind: 'submenu',
     schema: 'liturgy',
   },
@@ -63,7 +63,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Veneration',
     arabic: 'تمجيد',
     meta: 'Doxologies of the saints',
-    icon: require('../../assets/images/CHC App Symbols/veneration.png'),
+    icon: require('../../assets/images/chc-app-symbols/veneration.png'),
     kind: 'direct',
     schema: 'veneration',
     table: 'veneration',
@@ -73,7 +73,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Lectionary',
     arabic: 'القطمارس',
     meta: "Today's readings",
-    icon: require('../../assets/images/CHC App Symbols/lectionary.png'),
+    icon: require('../../assets/images/chc-app-symbols/lectionary.png'),
     kind: 'lectionary',
   },
   {
@@ -81,7 +81,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Agpeya',
     arabic: 'الأجبية',
     meta: 'The book of the seven hours',
-    icon: require('../../assets/images/CHC App Symbols/agpeya.png'),
+    icon: require('../../assets/images/chc-app-symbols/agpeya.png'),
     kind: 'submenu',
     schema: 'agpeya',
   },
@@ -90,7 +90,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Bible',
     arabic: 'الكتاب المقدس',
     meta: 'Old & New Testament',
-    icon: require('../../assets/images/CHC App Symbols/bible.png'),
+    icon: require('../../assets/images/chc-app-symbols/bible.png'),
     kind: 'bible',
   },
 ];

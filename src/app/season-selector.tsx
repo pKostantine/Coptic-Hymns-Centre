@@ -6,13 +6,13 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { getEventFormalName, getSeasonFormalName } from '@/constants/seasonNames';
 import { useCalendar } from '@/context/CalendarContext';
 import {
   getCopticYearForDate,
   getGregorianRangeForCopticYear,
   getSeasonRanges,
   getSingleDayEventsForCopticYear,
-  SeasonRange,
 } from '@/utils/calendarService';
 import { goBack } from '@/utils/navigation';
 
@@ -20,34 +20,48 @@ function formatCopticYear(year: number) {
   return `${year} AM`;
 }
 
-type SelectorItem =
-  | { type: 'period'; key: string; title: string; subtitle: string; startDate: string; endDate: string }
-  | { type: 'day'; key: string; title: string; date: string };
-
-function itemStart(item: SelectorItem) {
-  return item.type === 'period' ? item.startDate : item.date;
-}
-function itemEnd(item: SelectorItem) {
-  return item.type === 'period' ? item.endDate : item.date;
+interface ChildRow {
+  key: string;
+  title: string;
+  arabic: string;
+  date: string;
 }
 
-/**
- * Season selector — ported from SeasonSelector.js's chrome (year nav, live
- * badge, item cards), merging period ranges (`calendar.season_ranges`) with
- * named single-day feasts into one chronological list. The old app's nested
- * per-Sunday children came from a static local dataset with no live-DB
- * equivalent, so this renders a flat list instead of a tree — but the "Live"
- * indicator is implemented in full: a whole block/day is highlighted red
- * when today falls exactly within it, otherwise a red "Live" line is drawn
- * between the two items today falls between.
- */
+interface SeasonRow {
+  type: 'season';
+  key: string;
+  title: string;
+  arabic: string;
+  subtitle: string;
+  startDate: string;
+  endDate: string;
+  children: ChildRow[];
+}
+
+interface DayRow {
+  type: 'day';
+  key: string;
+  title: string;
+  arabic: string;
+  date: string;
+}
+
+type TopRow = SeasonRow | DayRow;
+
+function rowStart(row: TopRow) {
+  return row.type === 'season' ? row.startDate : row.date;
+}
+function rowEnd(row: TopRow) {
+  return row.type === 'season' ? row.endDate : row.date;
+}
+
 export default function SeasonSelectorScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
   const { selectDate } = useCalendar();
   const [year, setYear] = useState<number | null>(null);
   const [currentCopticYear, setCurrentCopticYear] = useState<number | null>(null);
-  const [items, setItems] = useState<SelectorItem[] | null>(null);
+  const [rows, setRows] = useState<TopRow[] | null>(null);
   const [yearRange, setYearRange] = useState<{ startDate: string; endDate: string } | null>(null);
 
   useEffect(() => {
@@ -60,7 +74,7 @@ export default function SeasonSelectorScreen() {
   useEffect(() => {
     if (year === null) return;
     let cancelled = false;
-    setItems(null);
+    setRows(null);
     setYearRange(null);
 
     getGregorianRangeForCopticYear(year).then(async ({ startDate, endDate }) => {
@@ -69,22 +83,48 @@ export default function SeasonSelectorScreen() {
       const singleDayEvents = await getSingleDayEventsForCopticYear(year, periods);
       if (cancelled) return;
 
-      const periodItems: SelectorItem[] = periods
+      const seasonRows: SeasonRow[] = periods
         .filter((row) => row.startDate >= startDate && row.startDate < endDate)
-        .map((row) => ({
-          type: 'period',
-          key: row.rangeKey,
-          title: row.activeSeason,
-          subtitle: `${row.startEvent} → ${row.endEvent}`,
-          startDate: row.startDate,
-          endDate: row.endDate,
-        }));
-      const dayItems: SelectorItem[] = singleDayEvents
-        .filter((event) => event.date >= startDate && event.date < endDate)
-        .map((event) => ({ type: 'day', key: event.key, title: event.title, date: event.date }));
+        .map((row) => {
+          const formal = getSeasonFormalName(row.rangeKey, row.activeSeason);
+          return {
+            type: 'season',
+            key: row.rangeKey,
+            title: formal.english,
+            arabic: formal.arabic,
+            subtitle: `${row.startEvent} → ${row.endEvent}`,
+            startDate: row.startDate,
+            endDate: row.endDate,
+            children: [],
+          };
+        });
 
-      const merged = [...periodItems, ...dayItems].sort((a, b) => itemStart(a).localeCompare(itemStart(b)));
-      setItems(merged);
+      const looseDays: DayRow[] = [];
+      for (const event of singleDayEvents.filter((e) => e.date >= startDate && e.date < endDate)) {
+        // A day that exactly completes a season (its endDate) belongs to that
+        // season, even if it also happens to be the next season's startDate
+        // (e.g. Resurrection ends Holy Week and begins Holy 50 Days).
+        const assigned =
+          seasonRows.find((s) => event.date === s.endDate) ||
+          seasonRows.find((s) => event.date > s.startDate && event.date < s.endDate) ||
+          seasonRows.find((s) => event.date === s.startDate);
+
+        const formal = getEventFormalName(event.key, event.title);
+        const child: ChildRow = { key: event.key, title: formal.english, arabic: formal.arabic, date: event.date };
+
+        if (assigned) {
+          assigned.children.push(child);
+        } else {
+          looseDays.push({ type: 'day', key: event.key, title: formal.english, arabic: formal.arabic, date: event.date });
+        }
+      }
+      seasonRows.forEach((s) => s.children.sort((a, b) => a.date.localeCompare(b.date)));
+
+      const merged: TopRow[] = [...seasonRows, ...looseDays].sort(
+        (a, b) => rowStart(a).localeCompare(rowStart(b)) || rowEnd(a).localeCompare(rowEnd(b)),
+      );
+
+      setRows(merged);
       setYearRange({ startDate, endDate });
     });
 
@@ -96,20 +136,29 @@ export default function SeasonSelectorScreen() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const todayInViewedYear = Boolean(yearRange && todayIso >= yearRange.startDate && todayIso < yearRange.endDate);
 
-  const { liveKeys, lineAfterKey } = useMemo(() => {
-    if (!items || !todayInViewedYear) return { liveKeys: new Set<string>(), lineAfterKey: null as string | null };
-
-    const matching = items.filter((item) => itemStart(item) <= todayIso && itemEnd(item) >= todayIso);
-    if (matching.length) {
-      return { liveKeys: new Set(matching.map((item) => item.key)), lineAfterKey: null as string | null };
+  const { liveTopKey, liveChildKey, lineAfterKey } = useMemo(() => {
+    if (!rows || !todayInViewedYear) {
+      return { liveTopKey: null as string | null, liveChildKey: null as string | null, lineAfterKey: null as string | null };
     }
 
-    const before = [...items].filter((item) => itemEnd(item) < todayIso).sort((a, b) => itemEnd(a).localeCompare(itemEnd(b))).pop();
-    return { liveKeys: new Set<string>(), lineAfterKey: before?.key ?? '__start__' };
-  }, [items, todayInViewedYear, todayIso]);
+    for (const row of rows) {
+      if (row.type === 'season') {
+        const child = row.children.find((c) => c.date === todayIso);
+        if (child) return { liveTopKey: null, liveChildKey: child.key, lineAfterKey: null };
+        if (todayIso >= row.startDate && todayIso <= row.endDate) {
+          return { liveTopKey: row.key, liveChildKey: null, lineAfterKey: null };
+        }
+      } else if (row.date === todayIso) {
+        return { liveTopKey: row.key, liveChildKey: null, lineAfterKey: null };
+      }
+    }
 
-  function selectItem(item: SelectorItem) {
-    selectDate(new Date(`${itemStart(item)}T00:00:00Z`));
+    const before = [...rows].filter((row) => rowEnd(row) < todayIso).sort((a, b) => rowEnd(a).localeCompare(rowEnd(b))).pop();
+    return { liveTopKey: null, liveChildKey: null, lineAfterKey: before?.key ?? '__start__' };
+  }, [rows, todayInViewedYear, todayIso]);
+
+  function selectDay(date: string) {
+    selectDate(new Date(`${date}T00:00:00Z`));
     goBack(router, '/calendar');
   }
 
@@ -143,35 +192,60 @@ export default function SeasonSelectorScreen() {
             </Pressable>
           </View>
 
-          {!items ? (
+          {!rows ? (
             <ActivityIndicator color={COLORS.gold} style={{ marginTop: SPACING.xl }} />
           ) : (
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
               {lineAfterKey === '__start__' ? <LiveLine /> : null}
-              {items.map((item) => {
-                const isLive = liveKeys.has(item.key);
-                const isDay = item.type === 'day';
+              {rows.map((row) => {
+                if (row.type === 'day') {
+                  const isLive = liveTopKey === row.key;
+                  return (
+                    <View key={row.key}>
+                      <DayCard title={row.title} arabic={row.arabic} isLive={isLive} onPress={() => selectDay(row.date)} />
+                      {lineAfterKey === row.key ? <LiveLine /> : null}
+                    </View>
+                  );
+                }
+
+                const isLive = liveTopKey === row.key;
                 return (
-                  <View key={item.key}>
+                  <View key={row.key}>
                     <Pressable
-                      accessibilityLabel={`Select ${item.title}`}
+                      accessibilityLabel={`Select ${row.title}`}
                       style={[
-                        isDay ? styles.dayItem : styles.item,
-                        isLive && styles.liveItem,
+                        styles.seasonItem,
                         {
-                          backgroundColor: isLive ? 'rgba(220, 38, 38, 0.22)' : isDay ? COLORS.surface : COLORS.surfaceSoft,
-                          borderColor: isLive ? '#EF4444' : isDay ? COLORS.border : COLORS.gold,
+                          backgroundColor: isLive ? 'rgba(220, 38, 38, 0.22)' : COLORS.surfaceSoft,
+                          borderColor: isLive ? '#EF4444' : COLORS.gold,
+                          borderWidth: isLive ? 2 : 1,
                         },
                       ]}
-                      onPress={() => selectItem(item)}
+                      onPress={() => selectDay(row.startDate)}
                     >
                       <View style={styles.itemTextGroup}>
-                        <Text style={isDay ? styles.dayItemTitle : styles.itemTitle}>{item.title}</Text>
-                        {item.type === 'period' ? <Text style={styles.itemSubtitle}>{item.subtitle}</Text> : null}
+                        <Text style={styles.seasonTitle}>{row.title}</Text>
+                        {row.arabic ? <Text style={styles.seasonArabic}>{row.arabic}</Text> : null}
+                        <Text style={styles.itemSubtitle}>{row.subtitle}</Text>
                       </View>
                       {isLive ? <Text style={styles.livePill}>Live</Text> : null}
                     </Pressable>
-                    {lineAfterKey === item.key ? <LiveLine /> : null}
+
+                    {row.children.length ? (
+                      <View style={styles.childrenWrapper}>
+                        {row.children.map((child) => (
+                          <DayCard
+                            key={child.key}
+                            title={child.title}
+                            arabic={child.arabic}
+                            isLive={liveChildKey === child.key}
+                            onPress={() => selectDay(child.date)}
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {lineAfterKey === row.key ? <LiveLine /> : null}
                   </View>
                 );
               })}
@@ -180,6 +254,29 @@ export default function SeasonSelectorScreen() {
         </>
       )}
     </SafeAreaView>
+  );
+}
+
+function DayCard({ title, arabic, isLive, onPress }: { title: string; arabic: string; isLive: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityLabel={`Select ${title}`}
+      style={[
+        styles.dayItem,
+        {
+          backgroundColor: isLive ? 'rgba(220, 38, 38, 0.22)' : COLORS.surface,
+          borderColor: isLive ? '#EF4444' : COLORS.border,
+          borderWidth: isLive ? 2 : 1,
+        },
+      ]}
+      onPress={onPress}
+    >
+      <View style={styles.itemTextGroup}>
+        <Text style={styles.dayItemTitle}>{title}</Text>
+        {arabic ? <Text style={styles.dayItemArabic}>{arabic}</Text> : null}
+      </View>
+      {isLive ? <Text style={styles.livePill}>Live</Text> : null}
+    </Pressable>
   );
 }
 
@@ -195,85 +292,26 @@ function LiveLine() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
-  header: {
-    alignItems: 'center',
-    backgroundColor: COLORS.navy,
-    flexDirection: 'row',
-    minHeight: 56,
-    paddingHorizontal: SPACING.sm,
-  },
+  header: { alignItems: 'center', backgroundColor: COLORS.navy, flexDirection: 'row', minHeight: 56, paddingHorizontal: SPACING.sm },
   headerButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
-  headerTitle: {
-    color: COLORS.white,
-    flex: 1,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  yearRow: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderColor: COLORS.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
+  headerTitle: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  yearRow: { alignItems: 'center', borderBottomWidth: 1, borderColor: COLORS.border, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
   yearButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 56 },
   yearLabel: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: SPACING.sm, justifyContent: 'center' },
   currentYearDot: { backgroundColor: '#EF4444', borderRadius: 5, height: 10, width: 10 },
   yearText: { fontSize: 24, fontWeight: '800', color: COLORS.white },
   listContent: { gap: SPACING.sm, padding: SPACING.md, paddingBottom: SPACING.xl },
-  item: {
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: SPACING.md,
-    justifyContent: 'space-between',
-    minHeight: 76,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  dayItem: {
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: SPACING.md,
-    justifyContent: 'space-between',
-    minHeight: 56,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  liveItem: { borderWidth: 2 },
+  seasonItem: { alignItems: 'center', borderRadius: 10, flexDirection: 'row', gap: SPACING.md, justifyContent: 'space-between', minHeight: 76, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+  dayItem: { alignItems: 'center', borderRadius: 8, flexDirection: 'row', gap: SPACING.md, justifyContent: 'space-between', minHeight: 64, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+  childrenWrapper: { borderLeftWidth: 2, borderColor: COLORS.gold, gap: SPACING.sm, marginLeft: SPACING.md, marginTop: SPACING.sm, paddingLeft: SPACING.md },
   itemTextGroup: { flex: 1 },
-  itemTitle: { fontSize: 18, fontWeight: '800', color: COLORS.white },
-  dayItemTitle: { fontSize: 16, fontWeight: '700', color: COLORS.white },
+  seasonTitle: { fontSize: 18, fontWeight: '800', color: COLORS.white },
+  seasonArabic: { color: COLORS.white, fontFamily: 'Arial', fontSize: 16, fontWeight: '700', marginTop: SPACING.xs, textAlign: 'right', writingDirection: 'rtl' },
   itemSubtitle: { fontSize: 15, marginTop: SPACING.xs, color: COLORS.muted },
-  livePill: {
-    backgroundColor: '#EF4444',
-    borderRadius: 999,
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    overflow: 'hidden',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    textTransform: 'uppercase',
-  },
-  liveLineRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.xs,
-  },
+  dayItemTitle: { fontSize: 16, fontWeight: '700', color: COLORS.white },
+  dayItemArabic: { color: COLORS.white, fontFamily: 'Arial', fontSize: 15, fontWeight: '700', marginTop: 2, textAlign: 'right', writingDirection: 'rtl' },
+  livePill: { backgroundColor: '#EF4444', borderRadius: 999, color: '#FFFFFF', fontSize: 12, fontWeight: '900', overflow: 'hidden', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, textTransform: 'uppercase' },
+  liveLineRow: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.xs },
   liveLine: { backgroundColor: '#EF4444', flex: 1, height: 2 },
-  liveLineText: {
-    color: '#EF4444',
-    fontSize: 13,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
+  liveLineText: { color: '#EF4444', fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
 });

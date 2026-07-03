@@ -28,9 +28,8 @@ interface ServiceDocumentProps {
 }
 
 interface SubdocumentModalTarget {
-  schema: string;
-  table: string;
   title: { english: string; arabic: string };
+  sections: DocumentSection[];
 }
 
 const isMobileDocument = Platform.OS !== 'web';
@@ -60,7 +59,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
   const [subdocumentModal, setSubdocumentModal] = useState<SubdocumentModalTarget | null>(null);
-  const [antiphonaryOpen, setAntiphonaryOpen] = useState(false);
+  const [antiphonarySections, setAntiphonarySections] = useState<DocumentSection[] | null>(null);
   const documentRef = useRef<DocumentWebViewHandle>(null);
 
   const bookmarkId = `${schema}:${table}`;
@@ -93,20 +92,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const handleAction = (action: DocumentAction) => {
     if (!sections) return;
 
+    const triggerSection = sections.find((s) => s.id === action.sectionId);
+    if (!triggerSection?.subdocumentSections) return;
+
     if (action.type === 'openAntiphonary') {
-      setAntiphonaryOpen(true);
+      setAntiphonarySections(triggerSection.subdocumentSections);
       return;
     }
 
     if (action.type === 'openSubdocument') {
-      const triggerSection = sections.find((s) => s.id === action.sectionId);
-      if (triggerSection?.subdocumentTarget) {
-        setSubdocumentModal({
-          schema: triggerSection.subdocumentTarget.schema,
-          table: triggerSection.subdocumentTarget.table,
-          title: triggerSection.title,
-        });
-      }
+      setSubdocumentModal({ title: triggerSection.title, sections: triggerSection.subdocumentSections });
     }
   };
 
@@ -197,12 +192,15 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           />
           <SubdocumentModal
             visible={Boolean(subdocumentModal)}
-            schema={subdocumentModal?.schema ?? null}
-            table={subdocumentModal?.table ?? null}
             title={subdocumentModal?.title ?? null}
+            sections={subdocumentModal?.sections ?? null}
             onClose={() => setSubdocumentModal(null)}
           />
-          <AntiphonaryModal visible={antiphonaryOpen} onClose={() => setAntiphonaryOpen(false)} />
+          <AntiphonaryModal
+            visible={Boolean(antiphonarySections)}
+            sections={antiphonarySections}
+            onClose={() => setAntiphonarySections(null)}
+          />
         </>
       )}
     </SafeAreaView>

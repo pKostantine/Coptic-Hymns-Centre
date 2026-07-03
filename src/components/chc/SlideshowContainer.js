@@ -553,7 +553,11 @@ function flattenSections(sections) {
     return [
       {
         id: `${section.id}-title`,
-        isCollapsed: Boolean(section.slideshowCollapsed),
+        // A Minimizable/Minimized hymn doesn't get its own slide break in
+        // the slideshow (there's no collapse/expand affordance there) — it
+        // just doesn't force a fresh slide the way a normal section title
+        // does, matching how it reads as a minor/compact addendum.
+        isCollapsed: Boolean(section.collapsible),
         sectionId: section.id,
         type: "title",
         title: section.title,
@@ -567,7 +571,10 @@ function flattenSections(sections) {
         suppressSpeakerLabel:
           Boolean(verse.suppressSpeakerLabel) ||
           shouldSuppressSpeakerLabel(verses, verseIndex),
-        isRecitedPrayer: Boolean(section.isRecitedPrayer),
+        // Recited Prayer is a per-verse type (a verse's own effective type
+        // after inheritance — see resolveEffectiveVerseType), not a
+        // whole-section flag.
+        isRecitedPrayer: verse.type === "recitedPrayer",
         isReading: Boolean(section.isReading),
         forceWhiteVerses: Boolean(section.forceWhiteVerses),
         verseIndex: sectionIndex + verseIndex,
@@ -617,6 +624,7 @@ function getEffectiveAlternatingVerseIndex(section, index) {
     .filter((verse) =>
       verse.type !== "refrainLabel" &&
       verse.type !== "refrain" &&
+      verse.type !== "comment" &&
       !verse.forceWhiteText
     )
     .length - 1;

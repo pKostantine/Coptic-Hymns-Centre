@@ -91,6 +91,16 @@ const SERVICE_TEXT_FIELDS =
 const SERVICE_TEXT_FIELDS_NO_ITEM_TYPE =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition";
 const SCHEMAS_WITHOUT_TEXT_ITEM_TYPE = new Set(["agpeya"]);
+// These schemas only have their own order table + hymn_texts — no
+// hymn_titles table at all (confirmed against the live schema) — so every
+// hymn_key in them is titleless by construction. Skip the fetch entirely
+// rather than 404ing and crashing the whole recursive hydration chain.
+const SCHEMAS_WITHOUT_HYMN_TITLES = new Set([
+  "gospel_responses",
+  "hymn_of_the_intercessions",
+  "praxis_response",
+  "verses_of_the_cymbals",
+]);
 
 export async function fetchServiceRows(schema, table) {
   const orderRows = await fetchOrderRows(schema, table);
@@ -130,7 +140,7 @@ function chunk(values, size) {
 }
 
 async function fetchSchemaTitlesByKeys(schema, hymnKeys) {
-  if (!hymnKeys.length) return [];
+  if (!hymnKeys.length || SCHEMAS_WITHOUT_HYMN_TITLES.has(schema)) return [];
   const results = await Promise.all(
     chunk(hymnKeys, HYMN_KEY_CHUNK_SIZE).map(async (batch) => {
       const { data, error } = await supabase
@@ -376,6 +386,19 @@ export async function hydrateSupabaseServiceHymn(schema, table, date, extraConte
   return hydrateWithFlags(schema, table, flags, depth);
 }
 
+// A single misconfigured or inaccessible nested schema (e.g. one not yet
+// added to Supabase's exposed-schemas list) must not take down an entire
+// parent document just because it references that schema somewhere — log
+// and degrade gracefully to "no nested content" instead.
+async function safeHydrateNested(schema, table, flags, depth) {
+  try {
+    return await hydrateWithFlags(schema, table, flags, depth);
+  } catch (error) {
+    console.warn(`Failed to load nested content ${schema}.${table}: ${error?.message || error}`);
+    return [];
+  }
+}
+
 async function hydrateWithFlags(schema, table, flags, depth) {
   const rawRows = await fetchServiceRows(schema, table);
   const sections = assembleServiceSections(rawRows);
@@ -396,7 +419,7 @@ async function hydrateWithFlags(schema, table, flags, depth) {
       // calling schema's hymn_titles (public fallback), falling back to the
       // sentinel key itself when no title is defined.
       const label = section.title.english || section.hymn_key;
-      const subdocumentSections = await hydrateWithFlags(target.schema, target.table, flags, depth + 1);
+      const subdocumentSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1);
 
       if (section.hymn_key === "ANTIPHONARY") {
         hydrated.push({
@@ -421,6 +444,20 @@ async function hydrateWithFlags(schema, table, flags, depth) {
         alternateEvery: null,
         forceWhiteVerses: true,
       });
+      continue;
+    }
+
+    if (section.isInlinePlacement) {
+      // An order-table-level Inline placeholder (item_type = "Inline" on the
+      // order row itself, hymn_key an all-caps sentinel like GOSPEL_RITE or
+      // CANONS) is structurally identical to a Subdocument placeholder — it
+      // always references another whole type-3 table — except it splices
+      // that table's sections directly into this document instead of
+      // becoming a button.
+      const target = resolveWholeTableInlineTarget(section.hymn_key);
+      if (!target || depth >= 3) continue;
+      const nestedSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1);
+      hydrated.push(...nestedSections);
       continue;
     }
 
@@ -455,7 +492,7 @@ async function hydrateWithFlags(schema, table, flags, depth) {
         const wholeTableTarget = resolveWholeTableInlineTarget(verse.inlineHymnKey);
         if (wholeTableTarget) {
           flushVerses();
-          const nestedSections = await hydrateWithFlags(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1);
+          const nestedSections = await safeHydrateNested(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1);
           hydrated.push(...nestedSections);
           pushedAnything = true;
           continue;

@@ -231,12 +231,15 @@ export async function getSingleDayEventsForCopticYear(copticYear: number, period
   );
 
   const movable: (SingleDayEvent | null)[] = [
+    holyWeek ? { key: 'lazarus-saturday', title: 'Lazarus Saturday', date: holyWeek.startDate } : null,
     holyWeek ? { key: 'palm-sunday', title: 'Palm Sunday', date: addDaysIso(holyWeek.startDate, 1) } : null,
     holy50Days ? { key: 'holy-thursday', title: 'Holy Thursday', date: addDaysIso(holy50Days.startDate, -3) } : null,
     holy50Days ? { key: 'good-friday', title: 'Good Friday', date: addDaysIso(holy50Days.startDate, -2) } : null,
+    holyWeek ? { key: 'resurrection', title: 'Glorious Feast of the Resurrection', date: holyWeek.endDate } : null,
     holy50Days ? { key: 'bright-saturday', title: 'Bright Saturday', date: addDaysIso(holy50Days.startDate, 1) } : null,
     holy50Days ? { key: 'thomas-sunday', title: "Thomas Sunday", date: addDaysIso(holy50Days.startDate, 7) } : null,
     holy50Days ? { key: 'ascension', title: 'Ascension', date: addDaysIso(holy50Days.startDate, 39) } : null,
+    holy50Days ? { key: 'pentecost', title: 'Feast of Pentecost', date: holy50Days.endDate } : null,
     greatFast ? { key: 'last-friday-of-lent', title: 'Last Friday of Lent', date: greatFast.endDate } : null,
     jonahsFast ? { key: 'jonahs-feast', title: "Jonah's Feast", date: addDaysIso(jonahsFast.endDate, 1) } : null,
     apostlesFast ? { key: 'apostles-feast', title: "Apostles' Feast", date: addDaysIso(apostlesFast.endDate, 1) } : null,

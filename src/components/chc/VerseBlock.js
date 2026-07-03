@@ -166,7 +166,7 @@ export default function VerseBlock({
                 color: rowTextColor,
                 fontFamily: language.fontFamily,
                 fontSize: language.fontSize,
-                fontStyle: isComment || verse.italic ? "italic" : "normal",
+                fontStyle: isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal",
                 fontWeight: isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400",
                 letterSpacing: 0,
                 lineHeight: language.lineHeight,

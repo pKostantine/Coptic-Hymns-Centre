@@ -36,7 +36,11 @@ export default function ContentSelectorDrawer({
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
   const isLandscapeViewport = screenWidth > screenHeight;
-  const selectorPanelWidth = Math.round(screenWidth * (isMobileDocument && !isLandscapeViewport ? 0.75 : 0.5));
+  // Mobile uses depth (a full-screen slide-in, like opening another document)
+  // rather than web's side panel — there's no room for a side drawer to feel
+  // native on a phone, and it matches how subdocument/Antiphonary modals
+  // already present on mobile.
+  const selectorPanelWidth = isMobileDocument ? screenWidth : Math.round(screenWidth * 0.5);
 
   const [slide] = useState(() => new Animated.Value(0));
 
@@ -71,8 +75,14 @@ export default function ContentSelectorDrawer({
             },
           ]}
         >
-          <View style={styles.selectorHeader}>
+          <View style={[styles.selectorHeader, isMobileDocument && styles.selectorHeaderMobile]}>
+            {isMobileDocument ? (
+              <Pressable accessibilityLabel="Close content list" style={styles.selectorBackButton} onPress={onClose}>
+                <Ionicons name="chevron-back" size={24} color={COLORS.gold} />
+              </Pressable>
+            ) : null}
             <Text style={styles.actionLabel}>Content</Text>
+            {isMobileDocument ? <View style={styles.selectorBackButton} /> : null}
           </View>
 
           <ScrollView style={styles.selectorList}>
@@ -181,6 +191,18 @@ const styles = StyleSheet.create({
     minHeight: 62,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
+  },
+  selectorHeaderMobile: {
+    justifyContent: 'space-between',
+  },
+  selectorBackButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(201, 162, 39, 0.45)',
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   actionLabel: {
     color: COLORS.gold,

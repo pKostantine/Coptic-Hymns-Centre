@@ -252,8 +252,8 @@ export function buildDocumentHtml(
       .open-button .arabic {
         direction: rtl;
         font-family: "Arial", sans-serif;
-        // font-size: ${sectionTitleFontSize}px;
-        // line-height: ${sectionTitleLineHeight}px;
+        font-size: ${sectionTitleFontSize}px;
+        line-height: ${sectionTitleLineHeight}px;
       }
     </style>
   </head>
@@ -529,7 +529,7 @@ function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number): n
 function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection) {
   if (verse.type === 'comment') return { color: COLORS.comment, italic: true };
   if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
-  if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: false };
+  if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: true };
   if (verse.type === 'readingReference') return { color: COLORS.gold, italic: false };
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 
