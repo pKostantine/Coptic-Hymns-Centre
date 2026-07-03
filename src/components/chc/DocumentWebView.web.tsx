@@ -1,14 +1,15 @@
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { COLORS } from '../../constants/theme';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
-import { buildDocumentHtml, DocumentSection, VisibleColumns } from './documentHtml';
+import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns } from './documentHtml';
 
-export type { DocumentSection, DocumentVerse } from './documentHtml';
+export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
 
 export interface DocumentWebViewHandle {
   scrollToSection: (id: string) => void;
+  scrollToTune: (tune: string) => void;
 }
 
 interface DocumentWebViewProps {
@@ -19,6 +20,8 @@ interface DocumentWebViewProps {
   displayComments?: boolean;
   displaySilentPrayers?: boolean;
   bishopPresent?: boolean;
+  copticRecitedPrayers?: boolean;
+  onAction?: (action: DocumentAction) => void;
 }
 
 /**
@@ -30,7 +33,17 @@ interface DocumentWebViewProps {
  */
 const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
   (
-    { sections, fontSize = 18, visibleColumns, selectText = false, displayComments = false, displaySilentPrayers = false, bishopPresent = false },
+    {
+      sections,
+      fontSize = 18,
+      visibleColumns,
+      selectText = false,
+      displayComments = false,
+      displaySilentPrayers = false,
+      bishopPresent = false,
+      copticRecitedPrayers = true,
+      onAction,
+    },
     ref,
   ) => {
     const copticFontDataUri = useCopticFontDataUri();
@@ -41,7 +54,27 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         const win = iframeRef.current?.contentWindow as (Window & { scrollToSection?: (id: string) => void }) | null | undefined;
         win?.scrollToSection?.(id);
       },
+      scrollToTune: (tune: string) => {
+        const win = iframeRef.current?.contentWindow as (Window & { scrollToTune?: (tune: string) => void }) | null | undefined;
+        win?.scrollToTune?.(tune);
+      },
     }));
+
+    useEffect(() => {
+      if (!onAction) return undefined;
+
+      const handleMessage = (event: MessageEvent) => {
+        if (event.source !== iframeRef.current?.contentWindow) return;
+        try {
+          onAction(JSON.parse(event.data));
+        } catch {
+          // Malformed message from the HTML content — ignore.
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }, [onAction]);
 
     const html = useMemo(
       () =>
@@ -54,9 +87,20 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               displayComments,
               displaySilentPrayers,
               bishopPresent,
+              copticRecitedPrayers,
             })
           : null,
-      [sections, copticFontDataUri, fontSize, visibleColumns, selectText, displayComments, displaySilentPrayers, bishopPresent],
+      [
+        sections,
+        copticFontDataUri,
+        fontSize,
+        visibleColumns,
+        selectText,
+        displayComments,
+        displaySilentPrayers,
+        bishopPresent,
+        copticRecitedPrayers,
+      ],
     );
 
     if (!html) {

@@ -35,7 +35,7 @@ export const COLORS = {
   comment: '#8FD19E',
   silent: '#C5CBD2',
   silentTitle: '#AEB7C0',
-  refrain: '#8EEAFF',
+  refrain: '#ffeea1',
 
   // theme.colors.* shape expected by SlideshowContainer/VerseBlock
   text: '#FFFFFF',

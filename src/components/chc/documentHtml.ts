@@ -6,6 +6,8 @@ export interface DocumentVerse {
   arabic: string;
   type: string;
   prayerType?: string | null;
+  /** Antiphonary only: "adam" | "vatos" — which tune this verse is chanted in. */
+  tune?: string | null;
 }
 
 export interface DocumentSection {
@@ -19,12 +21,28 @@ export interface DocumentSection {
   /** order table `minimization` column: null = normal, "Minimizable" = collapsible-but-open, "Minimized" = collapsible-and-closed. */
   collapsible?: boolean;
   defaultCollapsed?: boolean;
+  /** order table hymn_key this section was assembled from — used to exclude specific hymns (e.g. "ourFather") from the content selector. */
+  hymnKey?: string;
+  /** A Subdocument placeholder rendered as a button that opens the nested document in a full-screen modal, instead of being expanded inline. */
+  isSubdocumentButton?: boolean;
+  subdocumentKey?: string;
+  subdocumentTarget?: { schema: string; table: string };
+  /** The Antiphonary subdocument gets its own special button/modal (Adam/Vatos tune navigation) rather than the generic subdocument flow. */
+  isAntiphonaryButton?: boolean;
+  /** Prefetched during the parent document's own hydration, so opening the button's modal is a local render, never a fresh fetch. */
+  subdocumentSections?: DocumentSection[];
 }
 
 export interface VisibleColumns {
   english: boolean;
   coptic: boolean;
   arabic: boolean;
+}
+
+/** A message posted from inside the generated HTML (via `postAction`) up to the host app. */
+export interface DocumentAction {
+  type: string;
+  sectionId?: string;
 }
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, coptic: true, arabic: true };
@@ -67,6 +85,7 @@ export function buildDocumentHtml(
     displayComments = false,
     displaySilentPrayers = false,
     bishopPresent = false,
+    copticRecitedPrayers = true,
   }: {
     copticFontDataUri: string;
     fontSize: number;
@@ -75,6 +94,7 @@ export function buildDocumentHtml(
     displayComments?: boolean;
     displaySilentPrayers?: boolean;
     bishopPresent?: boolean;
+    copticRecitedPrayers?: boolean;
   },
 ) {
   const sectionTitleFontSize = Math.max(Math.round(fontSize * 0.5), 14);
@@ -87,7 +107,9 @@ export function buildDocumentHtml(
     (section) => displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer',
   );
   const htmlSections = visibleSections
-    .map((section) => renderSection(section, { fontSize, visibleColumns, displayComments, displaySilentPrayers, bishopPresent }))
+    .map((section) =>
+      renderSection(section, { fontSize, visibleColumns, displayComments, displaySilentPrayers, bishopPresent, copticRecitedPrayers }),
+    )
     .join('');
 
   return `<!doctype html>
@@ -145,14 +167,21 @@ export function buildDocumentHtml(
         align-items: center;
         background: transparent;
         border: 0;
-        color: ${COLORS.gold};
         cursor: pointer;
         display: flex;
-        font-size: ${sectionTitleFontSize}px;
         height: 40px;
         justify-content: center;
         padding: 0;
         width: 40px;
+      }
+      .collapse-button svg {
+        display: block;
+      }
+      .collapse-button .collapse-plus-bar {
+        display: none;
+      }
+      .collapse-button.is-collapsed .collapse-plus-bar {
+        display: block;
       }
       .section.collapsed .section-content {
         display: none !important;
@@ -180,19 +209,16 @@ export function buildDocumentHtml(
       }
       .arabic {
         direction: rtl;
-        font-family: "Amiri", serif !important;
+        font-family: "Arial", sans-serif !important;
         font-size: ${arabicFontSize}px;
         line-height: ${verseLineHeight}px;
       }
       .centered { text-align: center; }
-      .speaker-label {
-        font-size: 50%;
-      }
       .speaker-label.priest { color: ${COLORS.priest}; }
       .speaker-label.bishop { color: ${COLORS.bishop}; }
       .speaker-label.people { color: ${COLORS.people}; }
       .speaker-label.deacon, .speaker-label.reader { color: ${COLORS.deacon}; }
-      .speaker-label.refrain { color: ${COLORS.refrain}; text-decoration: underline; }
+      .speaker-label.refrain { color: ${COLORS.refrain};}
       .section-title {
         color: ${COLORS.gold};
         font-family: Georgia, serif;
@@ -202,14 +228,46 @@ export function buildDocumentHtml(
         margin: 0;
       }
       .section-title.arabic {
-        font-family: "Amiri", serif;
+        font-family: "Arial", sans-serif;
         text-align: right;
+      }
+      .open-button {
+        align-items: center;
+        background: ${COLORS.surface};
+        border: 1px solid ${COLORS.gold};
+        border-radius: 8px;
+        color: ${COLORS.white};
+        display: flex;
+        flex-direction: column;
+        gap: ${SPACING.xs}px;
+        font-family: Georgia, serif;
+        font-size: ${sectionTitleFontSize}px;
+        font-weight: 800;
+        min-height: 120px;
+        justify-content: center;
+        margin: 0 auto;
+        max-width: 320px;
+        width: 72%;
+      }
+      .open-button .arabic {
+        direction: rtl;
+        font-family: "Arial", sans-serif;
+        font-size: ${sectionTitleFontSize}px;
+        line-height: ${sectionTitleLineHeight}px;
       }
     </style>
   </head>
   <body>
     <main class="document">${htmlSections}</main>
     <script>
+      function postAction(type, payload) {
+        var message = JSON.stringify(Object.assign({ type: type }, payload || {}));
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(message);
+        } else if (window.parent) {
+          window.parent.postMessage(message, '*');
+        }
+      }
       window.scrollToSection = function (sectionId) {
         var element = document.getElementById(sectionId);
         if (element) {
@@ -217,13 +275,20 @@ export function buildDocumentHtml(
           window.scrollTo({ top: Math.max(top - 1, 0), behavior: 'auto' });
         }
       };
+      window.scrollToTune = function (tune) {
+        var element = document.querySelector('[data-tune="' + tune + '"]');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
       document.addEventListener('click', function (event) {
         var button = event.target.closest('[data-collapse-button]');
         if (!button) return;
         var section = button.closest('.section');
         if (!section) return;
-        section.classList.toggle('collapsed');
-        button.textContent = section.classList.contains('collapsed') ? '▸' : '▾';
+        var collapsed = section.classList.toggle('collapsed');
+        button.classList.toggle('is-collapsed', collapsed);
+        button.setAttribute('aria-label', collapsed ? 'Expand section' : 'Collapse section');
       });
     </script>
   </body>
@@ -238,9 +303,15 @@ function renderSection(
     displayComments: boolean;
     displaySilentPrayers: boolean;
     bishopPresent: boolean;
+    copticRecitedPrayers: boolean;
   },
 ) {
   const { visibleColumns, displayComments, displaySilentPrayers, bishopPresent } = opts;
+
+  if (section.isSubdocumentButton || section.isAntiphonaryButton) {
+    return renderDocumentButtonSection(section, visibleColumns);
+  }
+
   const isCollapsed = Boolean(section.collapsible && section.defaultCollapsed);
   const titleHtml = renderSectionTitle(section, visibleColumns, isCollapsed);
 
@@ -255,7 +326,13 @@ function renderSection(
   const versesHtml = section.verses
     .map((verse, index) => ({ verse, index }))
     .filter(({ verse }) => displayComments || verse.type !== 'comment')
-    .filter(({ verse }) => displaySilentPrayers || verse.type !== 'silentPrayer')
+    .filter(({ verse, index }) => {
+      // A comment always renders (subject to displayComments above) *except*
+      // when it sits inside a silent prayer — there its visibility is tied
+      // to displaySilentPrayers too, same as the silent prayer around it.
+      if (verse.type === 'comment' && isWithinSilentPrayer(section, index)) return displaySilentPrayers;
+      return displaySilentPrayers || verse.type !== 'silentPrayer';
+    })
     .map(({ verse, index }) => renderVerse(verse, index, section, suppressFlags[index], opts))
     .join('');
 
@@ -263,6 +340,43 @@ function renderSection(
     <section class="section ${isCollapsed ? 'collapsed' : ''}" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
       ${titleHtml}
       <div class="section-content">${versesHtml}</div>
+    </section>
+  `;
+}
+
+/** A section titled Silent Prayer overall, or a comment directly adjacent to explicit silentPrayer verses, counts as "within" the silent prayer for visibility purposes. */
+function isWithinSilentPrayer(section: DocumentSection, index: number): boolean {
+  if (section.titlePrayerType === 'Silent Prayer') return true;
+  const verses = section.verses;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (verses[i].type === 'comment') continue;
+    return verses[i].type === 'silentPrayer';
+  }
+  for (let i = index + 1; i < verses.length; i += 1) {
+    if (verses[i].type === 'comment') continue;
+    return verses[i].type === 'silentPrayer';
+  }
+  return false;
+}
+
+/**
+ * A Subdocument or Antiphonary placeholder renders as a full-width card
+ * button instead of hymn text. Tapping it posts a message to the host app
+ * (`openSubdocument`/`openAntiphonary`) which opens the nested document in a
+ * full-screen modal.
+ */
+function renderDocumentButtonSection(section: DocumentSection, visibleColumns: VisibleColumns) {
+  const action = section.isAntiphonaryButton ? 'openAntiphonary' : 'openSubdocument';
+  const label = section.title?.english || section.subdocumentKey || 'Open';
+  const arabicLabel = section.title?.arabic || '';
+  const onclick = `postAction(${JSON.stringify(action)}, { sectionId: ${JSON.stringify(section.id)} })`;
+
+  return `
+    <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
+      <button class="open-button" onclick="${escapeAttribute(onclick)}">
+        ${visibleColumns.english ? `<span>${escapeHtml(label)}</span>` : ''}
+        ${visibleColumns.arabic && arabicLabel ? `<span class="arabic">${escapeHtml(arabicLabel)}</span>` : ''}
+      </button>
     </section>
   `;
 }
@@ -312,7 +426,13 @@ function renderSectionTitle(section: DocumentSection, visibleColumns: VisibleCol
     .join('');
 
   const collapseButtonHtml = section.collapsible
-    ? `<button class="collapse-button" data-collapse-button="${escapeAttribute(section.id)}" aria-label="Toggle section">${isCollapsed ? '▸' : '▾'}</button>`
+    ? `<button class="collapse-button${isCollapsed ? ' is-collapsed' : ''}" data-collapse-button="${escapeAttribute(section.id)}" aria-label="${isCollapsed ? 'Expand section' : 'Collapse section'}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="${COLORS.gold}" stroke-width="1.5" />
+          <line x1="7" y1="12" x2="17" y2="12" stroke="${COLORS.gold}" stroke-width="1.5" stroke-linecap="round" />
+          <line class="collapse-plus-bar" x1="12" y1="7" x2="12" y2="17" stroke="${COLORS.gold}" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+      </button>`
     : '';
   const titleRowClass = section.collapsible ? 'title-row has-collapse-button' : 'title-row';
 
@@ -331,19 +451,27 @@ function renderVerse(
   index: number,
   section: DocumentSection,
   suppressSpeakerLabel: boolean,
-  { visibleColumns, bishopPresent }: { fontSize: number; visibleColumns: VisibleColumns; bishopPresent: boolean },
+  {
+    visibleColumns,
+    bishopPresent,
+    copticRecitedPrayers,
+  }: { fontSize: number; visibleColumns: VisibleColumns; bishopPresent: boolean; copticRecitedPrayers: boolean },
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveRubricKey(verse.type, bishopPresent)];
-  const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference' || verse.type === 'inlineTitle';
-  const isBold = verse.type === 'inlineTitle';
+  const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
+  // "Coptic Recited Prayers" hides just this verse's Coptic text when the
+  // verse is a Recited Prayer — combined with the verse-by-verse column
+  // collapse below, that verse's Coptic column disappears for that row only,
+  // filling the freed width into whatever columns remain for that verse.
+  const copticText = verse.type === 'recitedPrayer' && !copticRecitedPrayers ? '' : verse.coptic || '';
 
   const languages: { className: string; key: keyof VisibleColumns; text: string; speakerLabel?: string; speakerClass?: string }[] = [
     { className: 'english', key: 'english' as const, text: verse.english || '', speakerLabel: rubric?.english, speakerClass: rubric?.class },
     {
       className: 'coptic',
       key: 'coptic' as const,
-      text: verse.coptic || '',
+      text: copticText,
       speakerLabel: rubric?.coptic,
       speakerClass: rubric?.class,
     },
@@ -354,10 +482,14 @@ function renderVerse(
       speakerLabel: rubric?.arabic,
       speakerClass: rubric?.class,
     },
-  ].filter((language) => visibleColumns[language.key]);
+    // A language column collapses per verse (not per whole hymn) whenever
+    // this specific verse has no text in it and no speaker label to show —
+    // e.g. the Orthodox Creed's Recited Prayer verses lose their Coptic
+    // column individually while its one Chanted Prayer verse keeps all three.
+  ].filter((language) => visibleColumns[language.key] && (Boolean(language.text.trim()) || Boolean(language.speakerLabel)));
 
   const gridTemplateColumns = `repeat(${Math.max(languages.length, 1)}, minmax(0, 1fr))`;
-  const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'}; font-weight:${isBold ? 700 : 400};`;
+  const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;
 
   const cells = languages
     .map(
@@ -371,17 +503,38 @@ function renderVerse(
     )
     .join('');
 
-  return `<div class="verse-row" style="grid-template-columns: ${gridTemplateColumns};">${cells}</div>`;
+  const tuneAttribute = verse.tune ? ` data-tune="${escapeAttribute(verse.tune)}"` : '';
+
+  return `<div class="verse-row" style="grid-template-columns: ${gridTemplateColumns};"${tuneAttribute}>${cells}</div>`;
+}
+
+/** Verse types that never take part in Single/Double/Quadruple Alternating — kept in sync with resolveVerseColor's early returns below. */
+const NON_ALTERNATING_TYPES = new Set(['comment', 'silentPrayer', 'refrain', 'refrainLabel', 'readingReference']);
+
+/**
+ * The alternating color parity only ticks for verses that are actually
+ * rendered as alternating participants — Refrain/Comment/etc. rows
+ * (frequently conditional, e.g. Kiahk-only refrains) don't consume a
+ * parity slot, so the sequence seen by the alternation is "verse 1 / verse
+ * 2 / verse 3..." regardless of what non-participant rows are interleaved.
+ */
+function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number): number {
+  let count = -1;
+  for (let i = 0; i <= index; i += 1) {
+    if (!NON_ALTERNATING_TYPES.has(verses[i].type)) count += 1;
+  }
+  return count;
 }
 
 function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection) {
   if (verse.type === 'comment') return { color: COLORS.comment, italic: true };
   if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
   if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: false };
-  if (verse.type === 'readingReference' || verse.type === 'inlineTitle') return { color: COLORS.gold, italic: false };
+  if (verse.type === 'readingReference') return { color: COLORS.gold, italic: false };
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 
-  const colorIndex = Math.floor(index / section.alternateEvery) % 2;
+  const effectiveIndex = getEffectiveAlternatingIndex(section.verses, index);
+  const colorIndex = Math.floor(effectiveIndex / section.alternateEvery) % 2;
   return { color: colorIndex === 0 ? COLORS.white : COLORS.rowBlue, italic: false };
 }
 

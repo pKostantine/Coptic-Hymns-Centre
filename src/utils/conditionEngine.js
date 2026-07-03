@@ -53,10 +53,7 @@ const SEASON_TOKEN_MAP = {
   "Holy 50 Days": ["PentecostPeriod"],
 };
 
-export async function getContextFlags(date, extraContext = {}) {
-  const isoDate = toIsoDate(date);
-  const flags = {};
-
+async function fetchCopticDateConversion(isoDate) {
   const { data: conv, error: convError } = await supabase
     .schema("calendar")
     .from("coptic_date_conversions")
@@ -68,16 +65,44 @@ export async function getContextFlags(date, extraContext = {}) {
 
   if (convError) throw new Error(`Unable to load calendar context: ${convError.message}`);
   if (!conv) throw new Error(`No calendar.coptic_date_conversions row for ${isoDate}`);
+  return conv;
+}
 
-  flags[`${conv.weekday}s`] = true;
-  flags[conv.weekday] = true;
-  if (conv.weekday === "Saturday" || conv.weekday === "Sunday") {
+/**
+ * @param {Date|string} date - the "fixed" liturgical date: drives fixed-day
+ *   commemorations, seasons, and the MonthName.Day/29th/ordinal-week tokens.
+ * @param {Object} extraContext
+ * @param {Date|string} [weekdayDate] - overrides which date's weekday
+ *   (Sunday/Monday/.../AdamDays/VatosDays) is used, independent of `date`.
+ *   Vespers services pass the un-rolled "today" here after the 5pm boundary
+ *   flips `date` forward, since Saturday-evening Vespers Praises still chant
+ *   in Saturday's (Vatos) tune even though the fixed commemorations already
+ *   belong to Sunday.
+ */
+export async function getContextFlags(date, extraContext = {}, weekdayDate) {
+  const isoDate = toIsoDate(date);
+  const weekdayIsoDate = weekdayDate ? toIsoDate(weekdayDate) : isoDate;
+  const flags = {};
+
+  const [conv, weekdayConv] = await Promise.all([
+    fetchCopticDateConversion(isoDate),
+    weekdayIsoDate === isoDate ? Promise.resolve(null) : fetchCopticDateConversion(weekdayIsoDate),
+  ]);
+  const weekdaySource = weekdayConv || conv;
+
+  flags[`${weekdaySource.weekday}s`] = true;
+  flags[weekdaySource.weekday] = true;
+  if (weekdaySource.weekday === "Saturday" || weekdaySource.weekday === "Sunday") {
     flags.Weekend = true;
     flags.Weekends = true;
   } else {
     flags.Weekday = true;
     flags.Weekdays = true;
   }
+
+  const isAdamDay = ["Sunday", "Monday", "Tuesday"].includes(weekdaySource.weekday);
+  flags.AdamDays = isAdamDay;
+  flags.VatosDays = !isAdamDay;
 
   flags[`${conv.coptic_month_name}.${conv.coptic_day}`] = true;
 

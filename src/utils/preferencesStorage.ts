@@ -4,7 +4,6 @@ export interface VisibleLanguages {
   english: boolean;
   coptic: boolean;
   copticRecitedPrayers: boolean;
-  copticReadings: boolean;
   arabic: boolean;
 }
 
@@ -27,7 +26,6 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
     english: true,
     coptic: true,
     copticRecitedPrayers: true,
-    copticReadings: true,
     arabic: true,
   },
   fontScale: 1,
@@ -41,8 +39,8 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
 
 // Old app's getRenderedFontSize clamps to roughly a 20-41px range on a typical
 // ~390px-wide mobile viewport; we approximate that with a simple linear map.
-const MIN_FONT_SIZE = 20;
-const MAX_FONT_SIZE = 41;
+const MIN_FONT_SIZE = 25;
+const MAX_FONT_SIZE = 61;
 
 /** Maps the old app's 1-10 integer font scale onto a pixel size for the document WebView. */
 export function fontScaleToPx(fontScale: number) {

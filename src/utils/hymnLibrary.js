@@ -32,6 +32,22 @@ export const SUBDOCUMENT_MAP = {
   VENERATION_MELODIES: null, // target table unclear, see project memory
 };
 
+const ALL_CAPS_KEY_REGEX = /^[A-Z][A-Z0-9_]*$/;
+
+/**
+ * Any Subdocument OR Inline item_type in an order table referencing an
+ * all-caps hymn_key always points at *another entire type-3 order table*
+ * from a different schema, resolved via SUBDOCUMENT_MAP — e.g. the
+ * VERSES_OF_THE_CYMBALS inline in matins/vespers references the whole
+ * verses_of_the_cymbals.verses_of_the_cymbals table, and GOSPEL_RITE
+ * references the whole gospel_rite.gospel_rite table. This is NOT a
+ * hymn_key lookup within that schema's hymn_texts (that key doesn't exist
+ * as a row there) — it must be recursively hydrated like a Subdocument.
+ */
+function resolveWholeTableInlineTarget(hymnKey) {
+  return ALL_CAPS_KEY_REGEX.test(hymnKey) ? SUBDOCUMENT_MAP[hymnKey] || null : null;
+}
+
 // Sentinels that resolve through the Lectionary/Bible reading flow rather
 // than a schema.table — kept separate so callers can branch before treating
 // an unmapped Subdocument as "not built yet".
@@ -263,6 +279,10 @@ export function assembleServiceSections(rawRows) {
         inlineHymnKey: row.inline_hymn_key,
         inlineItemType: normalizeText(row.line_item_type),
         condition: normalizeText(row.line_condition),
+        // The destination line's own person_type/prayer_type (if any)
+        // override whatever the imported hymn's own lines carry.
+        overridePersonType: row.person_type || null,
+        overridePrayerType: row.prayer_type || null,
         english: "",
         coptic: "",
         arabic: "",
@@ -276,7 +296,7 @@ export function assembleServiceSections(rawRows) {
         coptic: row.coptic || "",
         arabic: row.arabic || "",
         condition: normalizeText(row.line_condition),
-        type: getServiceVerseType(row.person_type, row.prayer_type),
+        type: resolveEffectiveVerseType(row.person_type, row.prayer_type, row.title_prayer_type),
         prayerType: row.prayer_type || null,
       });
     }
@@ -286,8 +306,15 @@ export function assembleServiceSections(rawRows) {
   for (const section of sections) {
     if (section.isSubdocumentPlaceholder) continue;
 
+    // The hymn's own declared prayer_type (hymn_titles.prayer_type) always
+    // wins for the section's overall alternation scheme — a single Refrain
+    // or Silent Prayer verse mixed into an otherwise "Single Alternating"
+    // hymn must not hijack the whole section into forceWhiteVerses just
+    // because it happens to be the first verse with any line-level
+    // prayer_type set. Only fall back to scanning verses when the hymn has
+    // no title-level prayer_type of its own.
     const dominantPrayerType =
-      section.verses.find((v) => v.prayerType)?.prayerType || section.titlePrayerType || null;
+      section.titlePrayerType || section.verses.find((v) => v.prayerType)?.prayerType || null;
     section.prayerType = dominantPrayerType;
 
     if (dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)) {
@@ -322,6 +349,21 @@ export function getServiceVerseType(personType, prayerType) {
   return "text";
 }
 
+/**
+ * A verse without its own prayer_type inherits the hymn's overall
+ * prayer_type (e.g. a whole hymn titled "Silent Prayer" or "Recited Prayer")
+ * — but only when the verse doesn't give its own prayer_type ("any verses
+ * that give a specific prayer type to override it" keep their own). Comment
+ * lines are exempt from inheriting: a comment is always styled as a comment
+ * regardless of the hymn it sits inside (its *visibility* is separately
+ * gated by whether the section counts as a silent prayer — see
+ * isCommentWithinSilentPrayer in documentHtml.ts).
+ */
+function resolveEffectiveVerseType(personType, prayerType, sectionTitlePrayerType) {
+  const effectivePrayerType = prayerType || (personType === "Comment" ? "" : sectionTitlePrayerType) || "";
+  return getServiceVerseType(personType, effectivePrayerType);
+}
+
 // ─── hydrateSupabaseServiceHymn ────────────────────────────────────────────
 // The piece stuff for claude/slideshowData.js referenced but didn't include.
 // Fetches + assembles a service, resolves today's condition flags, filters
@@ -329,8 +371,8 @@ export function getServiceVerseType(personType, prayerType) {
 // and Inline placeholders. depth guards against runaway recursion the same
 // way the Postgres get_service RPC does (see project_condition_engine.md).
 
-export async function hydrateSupabaseServiceHymn(schema, table, date, extraContext = {}, depth = 0) {
-  const flags = await getContextFlags(date, extraContext);
+export async function hydrateSupabaseServiceHymn(schema, table, date, extraContext = {}, weekdayDate, depth = 0) {
+  const flags = await getContextFlags(date, extraContext, weekdayDate);
   return hydrateWithFlags(schema, table, flags, depth);
 }
 
@@ -343,56 +385,99 @@ async function hydrateWithFlags(schema, table, flags, depth) {
   const hydrated = [];
   for (const section of visibleSections) {
     if (section.isSubdocumentPlaceholder) {
-      if (depth >= 3) continue;
       const target = SUBDOCUMENT_MAP[section.hymn_key];
-      if (!target) continue; // not-yet-built or reading-sentinel; handled elsewhere
-      // The placeholder's own title (resolved from the calling schema's
-      // hymn_titles, with public fallback, keyed by the sentinel hymn_key)
-      // is only shown if the calling schema actually defined one for this
-      // sentinel — otherwise the nested content flows in with no heading.
-      if (section.title.english || section.title.arabic) {
+      if (!target || depth >= 3) continue; // not-yet-built or reading-sentinel; handled elsewhere
+      // Subdocuments render as a button in the parent document — tapping it
+      // opens a full-screen modal with the nested document, rather than
+      // splicing the nested content inline. The nested content is prefetched
+      // right here (during the parent's own hydration) and stashed on the
+      // button, so opening the modal is a local filter/render, never a fresh
+      // Supabase round-trip. The button's own label is resolved from the
+      // calling schema's hymn_titles (public fallback), falling back to the
+      // sentinel key itself when no title is defined.
+      const label = section.title.english || section.hymn_key;
+      const subdocumentSections = await hydrateWithFlags(target.schema, target.table, flags, depth + 1);
+
+      if (section.hymn_key === "ANTIPHONARY") {
         hydrated.push({
           id: section.id,
-          title: section.title,
+          title: { english: label, arabic: section.title.arabic },
           verses: [],
+          isAntiphonaryButton: true,
+          subdocumentSections: addTuneMarkersToAntiphonarySections(subdocumentSections),
           alternateEvery: null,
           forceWhiteVerses: true,
-          titlePrayerType: null,
         });
+        continue;
       }
-      const nested = await hydrateWithFlags(target.schema, target.table, flags, depth + 1);
-      hydrated.push(...nested);
+      hydrated.push({
+        id: section.id,
+        title: { english: label, arabic: section.title.arabic },
+        verses: [],
+        isSubdocumentButton: true,
+        subdocumentKey: section.hymn_key,
+        subdocumentTarget: target,
+        subdocumentSections,
+        alternateEvery: null,
+        forceWhiteVerses: true,
+      });
       continue;
     }
 
-    const verses = [];
+    // A section's verses can be interrupted by a whole-table Inline
+    // reference (an all-caps key), which splices in *other sections* rather
+    // than more verses of this one — so a section can split into several
+    // pushed entries around each such reference. Never push a redundant
+    // empty/title-repeating chunk once something has already been shown for
+    // this section.
+    let verses = [];
+    let splitIndex = 0;
+    let pushedAnything = false;
+
+    const flushVerses = () => {
+      if (!verses.length && pushedAnything) {
+        verses = [];
+        return;
+      }
+      const id = splitIndex === 0 ? section.id : `${section.id}-cont${splitIndex}`;
+      hydrated.push(applyCopticCaseToSection({ ...section, id, hymnKey: section.hymn_key, verses }));
+      splitIndex += 1;
+      pushedAnything = true;
+      verses = [];
+    };
+
     for (const verse of section.verses) {
       if (!evaluateCondition(verse.condition, flags)) continue;
 
       if (verse.type === "inlinePlaceholder") {
         if (depth >= 3) continue;
-        const [inlineTitle, inlineVerses] = await Promise.all([
-          fetchInlineHymnTitle(schema, verse.inlineHymnKey),
-          fetchInlineHymnVerses(schema, verse.inlineHymnKey),
-        ]);
-        if (inlineTitle?.title_english || inlineTitle?.title_arabic) {
-          verses.push({
-            english: inlineTitle.title_english || "",
-            coptic: "",
-            arabic: inlineTitle.title_arabic || "",
-            type: "inlineTitle",
-            prayerType: null,
-          });
+
+        const wholeTableTarget = resolveWholeTableInlineTarget(verse.inlineHymnKey);
+        if (wholeTableTarget) {
+          flushVerses();
+          const nestedSections = await hydrateWithFlags(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1);
+          hydrated.push(...nestedSections);
+          pushedAnything = true;
+          continue;
         }
+
+        // Regular single-hymn-key inline splice: pull in that hymn's verses
+        // only — never its own title (an imported hymn's title is always
+        // dropped when it's brought in as inline verses of another hymn) —
+        // with the destination line's own person_type/prayer_type
+        // overriding the source, per resolveEffectiveVerseType's cascade.
+        const inlineVerses = await fetchInlineHymnVerses(schema, verse.inlineHymnKey);
         inlineVerses
           .filter((row) => evaluateCondition(row.condition, flags))
           .forEach((row) => {
+            const effectivePersonType = verse.overridePersonType || row.person_type || "";
+            const effectivePrayerType = verse.overridePrayerType || row.prayer_type || "";
             verses.push({
               english: row.english || "",
               coptic: row.coptic || "",
               arabic: row.arabic || "",
-              type: getServiceVerseType(row.person_type, row.prayer_type),
-              prayerType: row.prayer_type || null,
+              type: resolveEffectiveVerseType(effectivePersonType, effectivePrayerType, section.titlePrayerType),
+              prayerType: effectivePrayerType || null,
             });
           });
         continue;
@@ -401,10 +486,35 @@ async function hydrateWithFlags(schema, table, flags, depth) {
       verses.push(verse);
     }
 
-    hydrated.push(applyCopticCaseToSection({ ...section, verses }));
+    flushVerses();
   }
 
   return hydrated;
+}
+
+// ─── Antiphonary tune markers ──────────────────────────────────────────────
+// Each day's antiphon is chanted first in the Adam tune, then switches to
+// the Vatos tune partway through (typically at the "through the
+// intercessions/prayers of..." refrain). Ported from the old app's
+// addTuneMarkersToAntiphonary — the DB has no "tune" column, so this is
+// computed client-side by phrase-matching, same as before.
+const SWITCH_TO_VATOS_REGEX =
+  /\bthrough\s+((the\s+)?intercessions?|his\s+intercessions?|her\s+intercessions?|their\s+intercessions?|the\s+prayers?|his\s+prayers?|her\s+prayers?|their\s+prayers?)\b/i;
+
+/** Mutates nothing — returns new section objects with verse.tune set to "adam"/"vatos". The Introduction section is left untouched (it's structured by day-type condition, not tune). */
+export function addTuneMarkersToAntiphonarySections(sections) {
+  return sections.map((section) => {
+    if (/^introduction$/i.test(section.title?.english || "")) return section;
+
+    const verses = section.verses || [];
+    const switchIndex = verses.findIndex((verse) => SWITCH_TO_VATOS_REGEX.test(verse.english || ""));
+    if (switchIndex === -1) return section;
+
+    return {
+      ...section,
+      verses: verses.map((verse, index) => ({ ...verse, tune: index <= switchIndex ? "adam" : "vatos" })),
+    };
+  });
 }
 
 // ─── Coptic case normalization ──────────────────────────────────────────────
@@ -438,30 +548,6 @@ function uppercaseFirstCopticChar(text) {
   const index = text.search(COPTIC_CHAR_PATTERN);
   if (index === -1) return text;
   return text.slice(0, index) + text[index].toLocaleUpperCase() + text.slice(index + 1);
-}
-
-const INLINE_TITLE_FIELDS = "hymn_key, title_english, title_arabic";
-
-async function fetchInlineHymnTitle(schema, hymnKey) {
-  const { data: nativeRow, error: nativeError } = await supabase
-    .schema(schema)
-    .from("hymn_titles")
-    .select(INLINE_TITLE_FIELDS)
-    .eq("hymn_key", hymnKey)
-    .maybeSingle();
-  if (nativeError) throw createReadableSupabaseError(nativeError, `${schema}.hymn_titles`);
-  if (nativeRow) return nativeRow;
-
-  if (schema === "public") return null;
-
-  const { data: publicRow, error: publicError } = await supabase
-    .schema("public")
-    .from("hymn_titles")
-    .select(INLINE_TITLE_FIELDS)
-    .eq("hymn_key", hymnKey)
-    .maybeSingle();
-  if (publicError) throw createReadableSupabaseError(publicError, "public.hymn_titles");
-  return publicRow || null;
 }
 
 const INLINE_TEXT_FIELDS =

@@ -15,7 +15,6 @@ const LANGUAGE_OPTIONS: { key: keyof VisibleLanguages; label: string }[] = [
   { key: 'english', label: 'English' },
   { key: 'coptic', label: 'Coptic' },
   { key: 'copticRecitedPrayers', label: 'Coptic Recited Prayers' },
-  { key: 'copticReadings', label: 'Coptic Readings' },
   { key: 'arabic', label: 'Arabic' },
 ];
 

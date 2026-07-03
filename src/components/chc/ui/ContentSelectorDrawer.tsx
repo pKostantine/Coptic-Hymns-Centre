@@ -49,7 +49,14 @@ export default function ContentSelectorDrawer({
     }).start();
   }, [visible, slide]);
 
-  const listable = sections.filter((section) => section.title?.english || section.title?.arabic);
+  const listable = sections.filter((section) => {
+    // "Our Father" always has a title but should never clutter the jump-to list.
+    if (section.hymnKey === 'ourFather') return false;
+    // Subdocument/Antiphonary buttons are a real UI action, not hymn text —
+    // they must survive even though they carry no verses.
+    if (section.isSubdocumentButton || section.isAntiphonaryButton) return true;
+    return Boolean(section.title?.english || section.title?.arabic);
+  });
 
   return (
     <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>

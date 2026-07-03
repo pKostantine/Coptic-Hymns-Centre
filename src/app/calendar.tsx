@@ -31,30 +31,32 @@ type Mode = 'gregorian' | 'coptic';
 export default function CalendarScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
-  const { effectiveDate, isLive, selectDate, goLive } = useCalendar();
+  const { rawDate, isLive, selectDate, goLive, liturgicalDayPeriod, setLiturgicalDayPeriod } = useCalendar();
 
   const [mode, setMode] = useState<Mode>('gregorian');
-  const [liturgicalDayPeriod, setLiturgicalDayPeriod] = useState<'morning' | 'evening'>('morning');
-  const [gregorianYear, setGregorianYear] = useState(effectiveDate.getUTCFullYear());
-  const [gregorianMonth, setGregorianMonth] = useState(effectiveDate.getUTCMonth() + 1);
+  const [gregorianYear, setGregorianYear] = useState(rawDate.getUTCFullYear());
+  const [gregorianMonth, setGregorianMonth] = useState(rawDate.getUTCMonth() + 1);
   const [copticYear, setCopticYear] = useState<number | null>(null);
   const [copticMonth, setCopticMonth] = useState<number | null>(null);
   const [copticMonthName, setCopticMonthName] = useState('');
   const [days, setDays] = useState<CalendarDay[] | null>(null);
   const [seasons, setSeasons] = useState<SeasonRange[]>([]);
 
-  const selectedIso = effectiveDate.toISOString().slice(0, 10);
+  // The grid highlight always tracks the literal calendar day, even after
+  // the liturgical day has rolled forward past 5pm — only the day/night
+  // toggle communicates that content is now for the evening.
+  const selectedIso = rawDate.toISOString().slice(0, 10);
   const todayIso = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     if (mode !== 'coptic' || copticYear !== null) return;
-    getCopticMonthForDate(effectiveDate).then((result) => {
+    getCopticMonthForDate(rawDate).then((result) => {
       if (!result) return;
       setCopticYear(result.coptic_year);
       setCopticMonth(result.coptic_month);
       setCopticMonthName(result.coptic_month_name);
     });
-  }, [mode, copticYear, effectiveDate]);
+  }, [mode, copticYear, rawDate]);
 
   const loadMonth = useCallback(async () => {
     setDays(null);
@@ -152,7 +154,7 @@ export default function CalendarScreen() {
               styles.periodToggle,
               { backgroundColor: liturgicalDayPeriod === 'evening' ? 'rgba(142, 197, 255, 0.22)' : 'rgba(255, 255, 255, 0.08)' },
             ]}
-            onPress={() => setLiturgicalDayPeriod((p) => (p === 'morning' ? 'evening' : 'morning'))}
+            onPress={() => setLiturgicalDayPeriod(liturgicalDayPeriod === 'morning' ? 'evening' : 'morning')}
           >
             <Ionicons
               name={liturgicalDayPeriod === 'morning' ? 'sunny' : 'moon'}

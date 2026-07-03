@@ -47,7 +47,6 @@ export default function SlideshowContainer({
         visibleLanguages.english,
         visibleLanguages.coptic,
         visibleLanguages.copticRecitedPrayers,
-        visibleLanguages.copticReadings,
         visibleLanguages.arabic,
         Math.round(viewportHeight || 0),
         Math.round(viewportWidth || 0),
@@ -1103,11 +1102,6 @@ function getVisibleVerseLanguages(item, visibleLanguages = {}) {
       (
         !item.isRecitedPrayer ||
         visibleLanguages.copticRecitedPrayers ||
-        verse.forceCopticVisible
-      ) &&
-      (
-        !item.isReading ||
-        visibleLanguages.copticReadings ||
         verse.forceCopticVisible
       );
   });

@@ -6,13 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
-import DocumentWebView, { DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
+import DocumentSurface from '../DocumentSurface';
+import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
+import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useCalendar } from '../../../context/CalendarContext';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
-import { fontScaleToPx } from '../../../utils/preferencesStorage';
 import { goBack } from '../../../utils/navigation';
 
 interface ServiceDocumentProps {
@@ -24,6 +25,12 @@ interface ServiceDocumentProps {
   extraContext?: Record<string, boolean>;
   /** Where "back" should land when there's no navigation history to pop (direct deep link, page reload). */
   backHref: Href;
+}
+
+interface SubdocumentModalTarget {
+  schema: string;
+  table: string;
+  title: { english: string; arabic: string };
 }
 
 const isMobileDocument = Platform.OS !== 'web';
@@ -38,12 +45,22 @@ const isMobileDocument = Platform.OS !== 'web';
 export default function ServiceDocument({ schema, table, title, arabic, extraContext, backHref }: ServiceDocumentProps) {
   const router = useRouter();
   const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent } = useReadingPreferences();
-  const { effectiveDate } = useCalendar();
+  const { effectiveDate, vespersEffectiveDate } = useCalendar();
+  // Saturday-evening Vespers Praises and Vespers still chant in Saturday's
+  // (Vatos) weekday tune even after the liturgical day rolls to Sunday for
+  // every other service — see CalendarContext's vespersEffectiveDate.
+  const isVespersService =
+    (schema === 'psalmody' && table === 'vespers_praises') ||
+    (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true);
   const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
   const { width: screenWidth } = useWindowDimensions();
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
+  const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
+  const [subdocumentModal, setSubdocumentModal] = useState<SubdocumentModalTarget | null>(null);
+  const [antiphonaryOpen, setAntiphonaryOpen] = useState(false);
   const documentRef = useRef<DocumentWebViewHandle>(null);
 
   const bookmarkId = `${schema}:${table}`;
@@ -54,7 +71,13 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     setSections(null);
     setError(null);
 
-    hydrateSupabaseServiceHymn(schema, table, effectiveDate, { BishopPresent: preferences.bishopPresent, ...extraContext })
+    hydrateSupabaseServiceHymn(
+      schema,
+      table,
+      effectiveDate,
+      { BishopPresent: preferences.bishopPresent, ...extraContext },
+      isVespersService ? vespersEffectiveDate : undefined,
+    )
       .then((result) => {
         if (!cancelled) setSections(result as DocumentSection[]);
       })
@@ -65,7 +88,27 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, preferences.bishopPresent, extraContext]);
+  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, preferences.bishopPresent, extraContext]);
+
+  const handleAction = (action: DocumentAction) => {
+    if (!sections) return;
+
+    if (action.type === 'openAntiphonary') {
+      setAntiphonaryOpen(true);
+      return;
+    }
+
+    if (action.type === 'openSubdocument') {
+      const triggerSection = sections.find((s) => s.id === action.sectionId);
+      if (triggerSection?.subdocumentTarget) {
+        setSubdocumentModal({
+          schema: triggerSection.subdocumentTarget.schema,
+          table: triggerSection.subdocumentTarget.table,
+          title: triggerSection.title,
+        });
+      }
+    }
+  };
 
   const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
   const selectorSwipeStartX = Math.max(screenWidth - selectorEdgeWidth, 0);
@@ -124,25 +167,27 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         </View>
       ) : (
         <>
-          <DocumentWebView
+          <DocumentSurface
             ref={documentRef}
             sections={sections}
-            fontSize={fontScaleToPx(preferences.fontScale)}
-            visibleColumns={{
-              english: preferences.visibleLanguages.english,
-              coptic: preferences.visibleLanguages.coptic,
-              arabic: preferences.visibleLanguages.arabic,
-            }}
-            selectText={preferences.selectText}
-            displayComments={preferences.displayComments}
-            displaySilentPrayers={preferences.displaySilentPrayers}
-            bishopPresent={preferences.bishopPresent}
+            preferences={preferences}
+            onAction={handleAction}
+            selectedSectionId={selectedSlideSectionId}
+            onCurrentSectionChange={setCurrentSectionId}
+            onOpenSelector={() => setSelectorOpen(true)}
           />
           <ContentSelectorDrawer
             visible={selectorOpen}
             sections={sections}
+            currentSectionId={currentSectionId}
             onClose={() => setSelectorOpen(false)}
-            onSelectSection={(id) => documentRef.current?.scrollToSection(id)}
+            onSelectSection={(id) => {
+              if (preferences.slideshowMode) {
+                setSelectedSlideSectionId(id);
+              } else {
+                documentRef.current?.scrollToSection(id);
+              }
+            }}
             bookmarked={bookmarked}
             onToggleBookmark={() => toggleBookmark(bookmarkId)}
             onOpenCalendar={() => router.push('/calendar')}
@@ -150,6 +195,14 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             bishopPresent={preferences.bishopPresent}
             onToggleBishopPresent={toggleBishopPresent}
           />
+          <SubdocumentModal
+            visible={Boolean(subdocumentModal)}
+            schema={subdocumentModal?.schema ?? null}
+            table={subdocumentModal?.table ?? null}
+            title={subdocumentModal?.title ?? null}
+            onClose={() => setSubdocumentModal(null)}
+          />
+          <AntiphonaryModal visible={antiphonaryOpen} onClose={() => setAntiphonaryOpen(false)} />
         </>
       )}
     </SafeAreaView>

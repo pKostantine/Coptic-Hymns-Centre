@@ -3,7 +3,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
 
-const REFRAIN_TAN = "#8EEAFF";
+const REFRAIN_TAN = "#9FFFD0";
 const COMMENT_GREEN = "#8FD19E";
 const LIGHT_YELLOW = "#FFFF00";
 const SILENT_PRAYER_GRAY = "#C5CBD2";
@@ -128,11 +128,6 @@ export default function VerseBlock({
         !isRecitedPrayer ||
         language.key !== "coptic" ||
         visibleLanguages.copticRecitedPrayers ||
-        verse.forceCopticVisible) &&
-      (verse.invincibleCoptic ||
-        !isReading ||
-        language.key !== "coptic" ||
-        visibleLanguages.copticReadings ||
         verse.forceCopticVisible) &&
       (hasText || shouldKeepColumn);
     },
