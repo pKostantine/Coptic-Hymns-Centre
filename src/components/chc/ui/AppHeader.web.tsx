@@ -46,7 +46,7 @@ export default function AppHeader({
       <View style={styles.topRow}>
         {canGoBack ? (
           <Pressable accessibilityLabel="Go back" style={styles.iconButton} onPress={onBack}>
-            <Ionicons name="chevron-back" size={24} color={COLORS.gold} />
+            <Ionicons name="chevron-back" size={28} color={COLORS.gold} />
           </Pressable>
         ) : (
           <Image source={require('../../../../assets/images/CHC_sm_web.png')} style={styles.logo} />
@@ -74,15 +74,15 @@ export default function AppHeader({
                 onPress={onRightLeadingPress}
               >
                 {rightLeadingIconFamily === 'material' ? (
-                  <MaterialIcons name={rightLeadingIcon as keyof typeof MaterialIcons.glyphMap} size={24} color={COLORS.gold} />
+                  <MaterialIcons name={rightLeadingIcon as keyof typeof MaterialIcons.glyphMap} size={26} color={COLORS.gold} />
                 ) : (
-                  <Ionicons name={rightLeadingIcon as keyof typeof Ionicons.glyphMap} size={23} color={COLORS.gold} />
+                  <Ionicons name={rightLeadingIcon as keyof typeof Ionicons.glyphMap} size={26} color={COLORS.gold} />
                 )}
               </Pressable>
             ) : null}
             {hasRightAction ? (
               <Pressable accessibilityLabel={rightAccessibilityLabel} style={styles.iconButton} onPress={onRightPress}>
-                <Ionicons name={rightIcon as keyof typeof Ionicons.glyphMap} size={23} color={COLORS.gold} />
+                <Ionicons name={rightIcon as keyof typeof Ionicons.glyphMap} size={26} color={COLORS.gold} />
               </Pressable>
             ) : null}
           </View>
@@ -99,9 +99,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.navy,
     borderBottomColor: COLORS.gold,
     borderBottomWidth: 1,
-    paddingBottom: SPACING.md,
+    paddingBottom: SPACING.md + 4,
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.lg + 4,
   },
   topRow: {
     alignItems: 'center',
@@ -111,20 +111,20 @@ const styles = StyleSheet.create({
   iconButton: {
     alignItems: 'center',
     borderColor: 'rgba(201, 162, 39, 0.45)',
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    height: 40,
+    height: 48,
     justifyContent: 'center',
-    width: 40,
+    width: 48,
   },
   logo: {
-    height: 44,
-    width: 44,
+    height: 48,
+    width: 48,
     resizeMode: 'contain',
   },
   iconSpacer: {
-    height: 40,
-    width: 40,
+    height: 48,
+    width: 48,
   },
   rightActions: {
     flexDirection: 'row',
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: TYPOGRAPHY.title,
     flex: 1,
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '700',
     letterSpacing: 0,
   },

@@ -35,16 +35,16 @@ export default function MainMenuWeb() {
         </View>
         <View style={styles.toolbar}>
           <Pressable accessibilityLabel="Toggle full screen" style={styles.toolbarButton} onPress={toggleFullscreen}>
-            <MaterialIcons name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={22} color={COLORS.gold} />
+            <MaterialIcons name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={26} color={COLORS.gold} />
           </Pressable>
           <Pressable accessibilityLabel="Open bookmarks" style={styles.toolbarButton} onPress={() => router.push('/bookmarks')}>
-            <Ionicons name="bookmark-outline" size={22} color={COLORS.gold} />
+            <Ionicons name="bookmark-outline" size={26} color={COLORS.gold} />
           </Pressable>
           <Pressable accessibilityLabel="Open calendar" style={styles.toolbarButton} onPress={() => router.push('/calendar')}>
-            <Ionicons name="calendar-outline" size={22} color={COLORS.gold} />
+            <Ionicons name="calendar-outline" size={26} color={COLORS.gold} />
           </Pressable>
           <Pressable accessibilityLabel="Open settings" style={styles.toolbarButton} onPress={() => router.push('/settings')}>
-            <Ionicons name="settings-outline" size={22} color={COLORS.gold} />
+            <Ionicons name="settings-outline" size={26} color={COLORS.gold} />
           </Pressable>
         </View>
       </View>
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingVertical: SPACING.md + 4,
   },
   brand: {
     alignItems: 'center',
@@ -88,14 +88,14 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   logo: {
-    height: 40,
-    width: 40,
+    height: 48,
+    width: 48,
     resizeMode: 'contain',
   },
   brandText: {
     color: COLORS.white,
     fontFamily: TYPOGRAPHY.title,
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '700',
     letterSpacing: 0,
   },
@@ -106,11 +106,11 @@ const styles = StyleSheet.create({
   toolbarButton: {
     alignItems: 'center',
     borderColor: 'rgba(201, 162, 39, 0.45)',
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    height: 40,
+    height: 48,
     justifyContent: 'center',
-    width: 40,
+    width: 48,
   },
   notLiveBanner: {
     alignItems: 'center',
@@ -127,15 +127,12 @@ const styles = StyleSheet.create({
   },
   notLiveText: {
     fontFamily: TYPOGRAPHY.body,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.gold,
   },
   listContent: {
     padding: SPACING.lg,
     paddingBottom: SPACING.xl,
-    maxWidth: 900,
-    width: '100%',
-    alignSelf: 'center',
   },
 });

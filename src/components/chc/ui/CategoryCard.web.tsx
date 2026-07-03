@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
@@ -23,6 +23,9 @@ interface CategoryCardProps {
 export default function CategoryCard({ title, arabic, onPress }: CategoryCardProps) {
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
+      <View style={styles.iconWrap}>
+        <Ionicons name="library-outline" size={26} color={COLORS.gold} />
+      </View>
       <Text style={styles.title} numberOfLines={1}>
         {formatEnglishDisplayText(title)}
       </Text>
@@ -31,7 +34,7 @@ export default function CategoryCard({ title, arabic, onPress }: CategoryCardPro
           {formatArabicNumbers(arabic)}
         </Text>
       ) : null}
-      <Ionicons name="chevron-forward" size={20} color={COLORS.gold} style={styles.chevron} />
+      <Ionicons name="chevron-forward" size={24} color={COLORS.gold} style={styles.chevron} />
     </Pressable>
   );
 }
@@ -41,22 +44,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.surface,
     borderColor: COLORS.border,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
-    marginBottom: SPACING.sm,
-    minHeight: 64,
+    marginBottom: SPACING.md,
+    minHeight: 80,
     paddingHorizontal: SPACING.lg,
   },
   rowPressed: {
     backgroundColor: COLORS.surfaceSoft,
     borderColor: COLORS.goldLine,
   },
+  iconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(201, 162, 39, 0.13)',
+    borderRadius: 16,
+    height: 52,
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+    width: 52,
+  },
   title: {
     color: COLORS.white,
     flex: 1,
     fontFamily: TYPOGRAPHY.title,
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
     letterSpacing: 0,
     textAlign: 'left',
@@ -65,7 +77,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     flex: 1,
     fontFamily: 'Arial',
-    fontSize: 17,
+    fontSize: 21,
     fontWeight: '700',
     marginRight: SPACING.md,
     textAlign: 'right',
