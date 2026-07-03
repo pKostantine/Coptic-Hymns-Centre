@@ -30,7 +30,6 @@ export default function VerseBlock({
   const isComment = isCommentVerseType(verse.type);
   const isSilentPrayer = isSilentPrayerVerse(verse);
   const isSeasonalHoosVerse = Boolean(verse.seasonalHoosVersePrefix);
-  const forcedLanguageKeys = new Set(verse.slideshowLanguageKeys || []);
   const rowTextColor =
     isComment
       ? COMMENT_GREEN
@@ -117,24 +116,25 @@ export default function VerseBlock({
           textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
         },
       ]).filter(
-    (language) => {
-      const hasText = String(language.text || "").trim();
-      const shouldKeepColumn = forcedLanguageKeys.has(language.key);
-
-      return (verse.invincibleCoptic ||
+    // A toggled-on language always keeps its column, even when this specific
+    // verse has no text in it — the column just renders blank. Collapsing a
+    // column per-verse (the old behavior) made adjacent rows use different
+    // column counts/widths whenever one row's Coptic or Arabic happened to be
+    // empty, so the Arabic column's left edge would jump left/right between
+    // rows, reading as a stray gap or "imaginary extra column". Documents
+    // should read like a fixed-column table — see documentHtml.ts, which
+    // applies the same fixed-column philosophy to the WebView reader.
+    (language) =>
+      (verse.invincibleCoptic ||
         visibleLanguages[language.key] ||
         (language.key === "coptic" && verse.forceCopticVisible)) &&
       (verse.invincibleCoptic ||
         !isRecitedPrayer ||
         language.key !== "coptic" ||
         visibleLanguages.copticRecitedPrayers ||
-        verse.forceCopticVisible) &&
-      (hasText || shouldKeepColumn);
-    },
+        verse.forceCopticVisible),
   );
-  const rowColumnWidth =
-    (tableWidth || columnWidth * Math.max(rowLanguages.length, 1)) /
-    Math.max(rowLanguages.length, 1);
+  const rowColumnWidth = tableWidth / Math.max(rowLanguages.length, 1);
   const isCenteredAcrossPage = Boolean(verse.centeredAcrossPage);
   const hasSpeakerLabel = rowLanguages.some((language) => language.speakerLabel);
 

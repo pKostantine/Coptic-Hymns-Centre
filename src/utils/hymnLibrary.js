@@ -28,6 +28,9 @@ export const SUBDOCUMENT_MAP = {
   TWELFTH_HOUR: { schema: "agpeya", table: "twelfth_hour" },
   PRAYER_OF_THE_VEIL: { schema: "agpeya", table: "prayer_of_the_veil" },
   INTRODUCTION_TO_EVERY_HOUR: { schema: "agpeya", table: "introduction_to_every_hour" },
+  FIRST_HOUR: { schema: "agpeya", table: "first_hour" },
+  MIDNIGHT_HOUR: { schema: "agpeya", table: "midnight_hour" },
+  OTHER_PRAYERS: { schema: "agpeya", table: "other_prayers" },
   PROCESSION_OF_THE_CROSS: null, // not yet in database
   VENERATION_MELODIES: null, // target table unclear, see project memory
 };

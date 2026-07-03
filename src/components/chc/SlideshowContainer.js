@@ -18,6 +18,7 @@ export default function SlideshowContainer({
   onCurrentSectionChange,
   onOpenSelector,
   viewportHeightOverride,
+  onToggleCollapse,
 }) {
   const safeAreaInsets = useSafeAreaInsets();
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -335,6 +336,7 @@ export default function SlideshowContainer({
               onLanguageMeasured={(language, metric, signature) =>
                 queueMeasuredLanguage(item.id, language, metric, signature)
               }
+              onToggleCollapse={onToggleCollapse}
             />
           ))}
         </View>
@@ -349,12 +351,18 @@ export default function SlideshowContainer({
         tableWidth={slideTableWidth}
         titleHelpers={titleHelpers}
         slidePadding={slidePadding}
+        onToggleCollapse={onToggleCollapse}
       />
 
       <NavigationOverlay
         onPrevious={goToPreviousSlide}
         onNext={goToNextSlide}
         onOpenSelector={onOpenSelector}
+        topReserved={
+          (slides[currentSlideIndex] || [])[0]?.type === "title" && (slides[currentSlideIndex] || [])[0]?.collapsible
+            ? slidePadding.top + TITLE_ROW_TOUCH_RESERVE
+            : 0
+        }
       />
     </View>
   );
@@ -369,10 +377,10 @@ export function SlideView({
   tableWidth,
   titleHelpers,
   slidePadding,
+  onToggleCollapse,
 }) {
   return (
     <View
-      pointerEvents="none"
       style={[
         styles.slide,
         {
@@ -392,16 +400,26 @@ export function SlideView({
           columnWidth={columnWidth}
           tableWidth={tableWidth}
           titleHelpers={titleHelpers}
+          onToggleCollapse={onToggleCollapse}
         />
       ))}
     </View>
   );
 }
 
+// Height reserved at the top of the slide for the title row (and its
+// collapse button, when present) so the full-screen swipe/tap navigation
+// layer doesn't sit on top of and swallow taps meant for the button —
+// NavigationOverlay is a sibling rendered after SlideView, so without this
+// gap its Pressables would always win the touch over anything SlideView
+// renders underneath them.
+const TITLE_ROW_TOUCH_RESERVE = 64;
+
 export function NavigationOverlay({
   onPrevious,
   onNext,
   onOpenSelector,
+  topReserved = 0,
 }) {
   const { width: screenWidth } = useWindowDimensions();
   const selectorEdgeWidth = Math.min(240, Math.max(128, (screenWidth || 0) * 0.18));
@@ -439,7 +457,7 @@ export function NavigationOverlay({
 
   return (
     <View
-      style={styles.navigationLayer}
+      style={[styles.navigationLayer, { top: topReserved }]}
       pointerEvents="auto"
       {...panResponder.panHandlers}
     >
@@ -457,6 +475,28 @@ export function NavigationOverlay({
   );
 }
 
+const COLLAPSE_BUTTON_SIZE = 40;
+const COLLAPSE_BUTTON_CIRCLE = 22;
+
+/** Gold outlined circle with a minus bar always, plus a vertical bar (making a plus) only when collapsed — matches the old app's collapse-button-icon ::before/::after CSS bars. */
+function CollapseButton({ collapsed, onPress }) {
+  return (
+    <Pressable
+      accessibilityLabel={collapsed ? "Expand section" : "Collapse section"}
+      onPress={onPress}
+      style={styles.collapseButton}
+      hitSlop={8}
+    >
+      <View style={[styles.collapseButtonCircle, { borderColor: "#C9A227" }]}>
+        <View style={[styles.collapseBar, styles.collapseBarHorizontal, { backgroundColor: "#C9A227" }]} />
+        {collapsed ? (
+          <View style={[styles.collapseBar, styles.collapseBarVertical, { backgroundColor: "#C9A227" }]} />
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 function SlideItem({
   item,
   visibleLanguages,
@@ -468,53 +508,64 @@ function SlideItem({
   onMeasured,
   onLanguageMeasured,
   measurementSignature,
+  onToggleCollapse,
 }) {
   if (item.type === "title") {
+    const hasButton = Boolean(item.collapsible && onToggleCollapse);
+    const titleTableWidth = hasButton ? Math.max(tableWidth - COLLAPSE_BUTTON_SIZE, 1) : tableWidth;
     const titleLanguages = buildTitleLanguages(
       item.title,
       visibleLanguages,
       titleHelpers,
     );
-    const titleColumnWidth = tableWidth / Math.max(titleLanguages.length, 1);
+    const titleColumnWidth = titleTableWidth / Math.max(titleLanguages.length, 1);
 
     return (
       <View
-        style={[styles.titleTable, { width: tableWidth }]}
+        style={styles.titleRow}
         onLayout={(event) =>
           onMeasured?.(event.nativeEvent.layout.height, measurementSignature)
         }
       >
-        {titleLanguages.map(
-          (language) => (
-            <View
-              key={language.key}
-              style={[
-                styles.titleCell,
-                {
-                  flexBasis: titleColumnWidth,
-                  maxWidth: titleColumnWidth,
-                },
-              ]}
-            >
-              {language.text ? (
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    language.key === "arabic" && styles.sectionTitleArabic,
-                    {
-                      color: theme.colors.gold,
-                      fontSize: Math.max(Math.round(fontSize * 0.5), 14),
-                      lineHeight: Math.max(Math.round(fontSize * 0.62), 18),
-                      textAlign: language.align,
-                    },
-                  ]}
-                >
-                  {language.text}
-                </Text>
-              ) : null}
-            </View>
-          ),
-        )}
+        <View style={[styles.titleTable, { width: titleTableWidth }]}>
+          {titleLanguages.map(
+            (language) => (
+              <View
+                key={language.key}
+                style={[
+                  styles.titleCell,
+                  {
+                    flexBasis: titleColumnWidth,
+                    maxWidth: titleColumnWidth,
+                  },
+                ]}
+              >
+                {language.text ? (
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      language.key === "arabic" && styles.sectionTitleArabic,
+                      {
+                        color: theme.colors.gold,
+                        fontSize: Math.max(Math.round(fontSize * 0.5), 14),
+                        lineHeight: Math.max(Math.round(fontSize * 0.62), 18),
+                        textAlign: language.align,
+                      },
+                    ]}
+                  >
+                    {language.text}
+                  </Text>
+                ) : null}
+              </View>
+            ),
+          )}
+        </View>
+        {hasButton ? (
+          <CollapseButton
+            collapsed={Boolean(item.currentlyCollapsed)}
+            onPress={() => onToggleCollapse(item.sectionId)}
+          />
+        ) : null}
       </View>
     );
   }
@@ -554,13 +605,16 @@ function flattenSections(sections) {
       {
         id: `${section.id}-title`,
         // A Minimizable/Minimized hymn doesn't get its own slide break in
-        // the slideshow (there's no collapse/expand affordance there) — it
-        // just doesn't force a fresh slide the way a normal section title
-        // does, matching how it reads as a minor/compact addendum.
+        // the slideshow — it just doesn't force a fresh slide the way a
+        // normal section title does, matching how it reads as a minor/compact
+        // addendum. This is separate from collapsible/currentlyCollapsed
+        // below, which control the gold circle minus/plus button.
         isCollapsed: Boolean(section.collapsible),
         sectionId: section.id,
         type: "title",
         title: section.title,
+        collapsible: Boolean(section.collapsible),
+        currentlyCollapsed: Boolean(section.currentlyCollapsed),
       },
       ...verses.map((verse, verseIndex) => ({
         id: `${section.id}-${verseIndex}`,
@@ -1325,6 +1379,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-end",
     zIndex: 10,
+  },
+  titleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+  },
+  collapseButton: {
+    alignItems: "center",
+    height: COLLAPSE_BUTTON_SIZE,
+    justifyContent: "center",
+    width: COLLAPSE_BUTTON_SIZE,
+    zIndex: 20,
+  },
+  collapseButtonCircle: {
+    alignItems: "center",
+    borderRadius: COLLAPSE_BUTTON_CIRCLE / 2,
+    borderWidth: 1.5,
+    height: COLLAPSE_BUTTON_CIRCLE,
+    justifyContent: "center",
+    width: COLLAPSE_BUTTON_CIRCLE,
+  },
+  collapseBar: {
+    position: "absolute",
+  },
+  collapseBarHorizontal: {
+    borderRadius: 1,
+    height: 1.5,
+    width: 12,
+  },
+  collapseBarVertical: {
+    borderRadius: 1,
+    height: 12,
+    width: 1.5,
   },
   sectionTitle: {
     flexShrink: 1,

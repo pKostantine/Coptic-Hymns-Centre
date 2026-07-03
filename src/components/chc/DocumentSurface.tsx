@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from 'react';
+import { forwardRef, useMemo, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import SlideshowContainer from './SlideshowContainer';
@@ -15,6 +15,55 @@ interface DocumentSurfaceProps {
   onOpenSelector?: () => void;
 }
 
+/** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
+function isCommentWithinSilentPrayer(section: DocumentSection, index: number): boolean {
+  if (section.titlePrayerType === 'Silent Prayer') return true;
+  const verses = section.verses;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (verses[i].type === 'comment') continue;
+    return verses[i].type === 'silentPrayer';
+  }
+  for (let i = index + 1; i < verses.length; i += 1) {
+    if (verses[i].type === 'comment') continue;
+    return verses[i].type === 'silentPrayer';
+  }
+  return false;
+}
+
+/**
+ * Applies the same displayComments/displaySilentPrayers filtering documentHtml.ts
+ * does for the WebView reader (a whole section is dropped if it's titled
+ * Silent Prayer and silent prayers are hidden; comment/silentPrayer verses
+ * are filtered individually otherwise), and empties a section's verses when
+ * it's currently minimized — SlideshowContainer's flattenSections always
+ * still emits the title item (as a slide), it just never sees the excluded
+ * verses, so pagination rebuilds around them automatically.
+ */
+function buildSlideshowSections(
+  sections: DocumentSection[],
+  { displayComments, displaySilentPrayers }: { displayComments: boolean; displaySilentPrayers: boolean },
+  collapsedSectionIds: Record<string, boolean>,
+): DocumentSection[] {
+  return sections
+    .filter((section) => displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer')
+    .map((section) => {
+      const currentlyCollapsed = section.collapsible
+        ? (collapsedSectionIds[section.id] ?? Boolean(section.defaultCollapsed))
+        : false;
+
+      const verses = currentlyCollapsed
+        ? []
+        : section.verses.filter((verse, index) => {
+            if (verse.type === 'comment') {
+              return isCommentWithinSilentPrayer(section, index) ? displaySilentPrayers : displayComments;
+            }
+            return displaySilentPrayers || verse.type !== 'silentPrayer';
+          });
+
+      return { ...section, verses, currentlyCollapsed };
+    });
+}
+
 /**
  * Renders a hydrated document either as the scrolling WebView reader or, when
  * Slideshow Mode is on, as paginated slides (SlideshowContainer). Shared by
@@ -26,6 +75,10 @@ interface DocumentSurfaceProps {
 const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
   ({ sections, preferences, onAction, selectedSectionId, onCurrentSectionChange, onOpenSelector }, ref) => {
     const { width: screenWidth } = useWindowDimensions();
+    // Keyed by section.id, same model as the old app's collapsedContentIds: a
+    // missing entry falls back to the section's own defaultCollapsed, an
+    // explicit entry (set by tapping the slideshow's collapse button) wins.
+    const [collapsedSectionIds, setCollapsedSectionIds] = useState<Record<string, boolean>>({});
 
     const titleHelpers = useMemo(
       () => ({
@@ -38,10 +91,20 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       [preferences.visibleLanguages.english, preferences.visibleLanguages.arabic],
     );
 
+    const slideshowSections = useMemo(
+      () =>
+        buildSlideshowSections(
+          sections,
+          { displayComments: preferences.displayComments, displaySilentPrayers: preferences.displaySilentPrayers },
+          collapsedSectionIds,
+        ),
+      [sections, preferences.displayComments, preferences.displaySilentPrayers, collapsedSectionIds],
+    );
+
     if (preferences.slideshowMode) {
       return (
         <SlideshowContainer
-          sections={sections}
+          sections={slideshowSections}
           visibleLanguages={preferences.visibleLanguages}
           fontSize={fontScaleToPx(preferences.fontScale)}
           theme={CHC_SLIDESHOW_THEME}
@@ -52,6 +115,12 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           onCurrentSectionChange={onCurrentSectionChange}
           onOpenSelector={onOpenSelector}
           viewportHeightOverride={undefined}
+          onToggleCollapse={(sectionId: string) =>
+            setCollapsedSectionIds((current) => ({
+              ...current,
+              [sectionId]: !(current[sectionId] ?? sections.find((s) => s.id === sectionId)?.defaultCollapsed ?? false),
+            }))
+          }
         />
       );
     }

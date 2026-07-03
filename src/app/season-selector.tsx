@@ -20,6 +20,30 @@ function formatCopticYear(year: number) {
   return `${year} AM`;
 }
 
+/** ISO date -> "Mar 2, 2026", using the Gregorian calendar (not the DB row's Coptic breakdown). */
+function formatGregorianDate(isoDate: string) {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/** A season's date range as "Mar 2 – Apr 18, 2026" (endDate is exclusive, so the displayed end is one day earlier), or a single date if start === displayed end. */
+function formatDateRange(startDate: string, endDateExclusive: string) {
+  const displayEnd = new Date(`${endDateExclusive}T00:00:00Z`);
+  displayEnd.setUTCDate(displayEnd.getUTCDate() - 1);
+  const endIso = displayEnd.toISOString().slice(0, 10);
+  if (endIso <= startDate) return formatGregorianDate(startDate);
+
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const sameYear = start.getUTCFullYear() === displayEnd.getUTCFullYear();
+  const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const endLabel = formatGregorianDate(endIso);
+  return sameYear ? `${startLabel} – ${endLabel}` : `${formatGregorianDate(startDate)} – ${endLabel}`;
+}
+
 interface ChildRow {
   key: string;
   title: string;
@@ -92,7 +116,7 @@ export default function SeasonSelectorScreen() {
             key: row.rangeKey,
             title: formal.english,
             arabic: formal.arabic,
-            subtitle: `${row.startEvent} → ${row.endEvent}`,
+            subtitle: formatDateRange(row.startDate, row.endDate),
             startDate: row.startDate,
             endDate: row.endDate,
             children: [],
@@ -202,7 +226,7 @@ export default function SeasonSelectorScreen() {
                   const isLive = liveTopKey === row.key;
                   return (
                     <View key={row.key}>
-                      <DayCard title={row.title} arabic={row.arabic} isLive={isLive} onPress={() => selectDay(row.date)} />
+                      <DayCard title={row.title} arabic={row.arabic} date={row.date} isLive={isLive} onPress={() => selectDay(row.date)} />
                       {lineAfterKey === row.key ? <LiveLine /> : null}
                     </View>
                   );
@@ -238,6 +262,7 @@ export default function SeasonSelectorScreen() {
                             key={child.key}
                             title={child.title}
                             arabic={child.arabic}
+                            date={child.date}
                             isLive={liveChildKey === child.key}
                             onPress={() => selectDay(child.date)}
                           />
@@ -257,7 +282,19 @@ export default function SeasonSelectorScreen() {
   );
 }
 
-function DayCard({ title, arabic, isLive, onPress }: { title: string; arabic: string; isLive: boolean; onPress: () => void }) {
+function DayCard({
+  title,
+  arabic,
+  date,
+  isLive,
+  onPress,
+}: {
+  title: string;
+  arabic: string;
+  date: string;
+  isLive: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityLabel={`Select ${title}`}
@@ -274,6 +311,7 @@ function DayCard({ title, arabic, isLive, onPress }: { title: string; arabic: st
       <View style={styles.itemTextGroup}>
         <Text style={styles.dayItemTitle}>{title}</Text>
         {arabic ? <Text style={styles.dayItemArabic}>{arabic}</Text> : null}
+        <Text style={styles.itemSubtitle}>{formatGregorianDate(date)}</Text>
       </View>
       {isLive ? <Text style={styles.livePill}>Live</Text> : null}
     </Pressable>
