@@ -68,9 +68,9 @@ function buildSlideshowSections(
  * Renders a hydrated document either as the scrolling WebView reader or, when
  * Slideshow Mode is on, as paginated slides (SlideshowContainer). Shared by
  * the main document screen and the subdocument/Antiphonary modals so both
- * get slideshow support for free. Slideshow mode has no equivalent to
- * subdocument/Antiphonary buttons (SlideshowContainer only knows titles and
- * verses) — a button section shows as a plain title slide there, non-tappable.
+ * get slideshow support for free. Subdocument/Antiphonary sections render as
+ * their own dedicated open-button slide in Slideshow Mode too, wired to the
+ * same onAction handler as the WebView reader.
  */
 const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
   ({ sections, preferences, onAction, selectedSectionId, onCurrentSectionChange, onOpenSelector }, ref) => {
@@ -115,6 +115,8 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           onCurrentSectionChange={onCurrentSectionChange}
           onOpenSelector={onOpenSelector}
           viewportHeightOverride={undefined}
+          bishopPresent={preferences.bishopPresent}
+          onAction={onAction}
           onToggleCollapse={(sectionId: string) =>
             setCollapsedSectionIds((current) => ({
               ...current,

@@ -1,4 +1,5 @@
 import { COLORS, SPACING } from '../../constants/theme';
+import { resolveRubricKey, computeSuppressSpeakerLabelFlags } from '../../utils/verseRubric';
 
 export interface DocumentVerse {
   english: string;
@@ -61,12 +62,6 @@ const RUBRIC: Record<string, { color: string; english: string; arabic: string; c
   people: { color: COLORS.people, english: 'People:', arabic: 'الشعب:', coptic: BLANK_COPTIC_LABEL, class: 'people' },
   refrain: { color: COLORS.refrain, english: 'Refrain:', arabic: 'قرار:', coptic: BLANK_COPTIC_LABEL, class: 'refrain' },
 };
-
-/** "Bishop/Priest" resolves to "bishop" or "priest" at render time based on the Bishop Present toggle. */
-function resolveRubricKey(verseType: string, bishopPresent: boolean) {
-  if (verseType === 'bishopOrPriest') return bishopPresent ? 'bishop' : 'priest';
-  return verseType;
-}
 
 /**
  * Builds the trilingual liturgical document HTML shared by the native
@@ -290,6 +285,41 @@ export function buildDocumentHtml(
         button.classList.toggle('is-collapsed', collapsed);
         button.setAttribute('aria-label', collapsed ? 'Expand section' : 'Collapse section');
       });
+      (function () {
+        // Reports whichever section currently straddles a fixed "reading
+        // line" near the top of the viewport, so the host app always knows
+        // where the user actually is — used to keep the content selector
+        // scrolled to the right spot and to jump back to the same place
+        // after a settings change forces this document to reload.
+        var sections = Array.prototype.slice.call(document.querySelectorAll('.section[data-section-id]'));
+        var lastReported = null;
+        var pending = false;
+        function reportCurrentSection() {
+          pending = false;
+          if (!sections.length) return;
+          var threshold = 96;
+          var current = sections[0];
+          for (var i = 0; i < sections.length; i += 1) {
+            if (sections[i].getBoundingClientRect().top <= threshold) {
+              current = sections[i];
+            } else {
+              break;
+            }
+          }
+          var sectionId = current.getAttribute('data-section-id');
+          if (sectionId && sectionId !== lastReported) {
+            lastReported = sectionId;
+            postAction('currentSection', { sectionId: sectionId });
+          }
+        }
+        function scheduleReport() {
+          if (pending) return;
+          pending = true;
+          requestAnimationFrame(reportCurrentSection);
+        }
+        window.addEventListener('scroll', scheduleReport, { passive: true });
+        scheduleReport();
+      })();
     </script>
   </body>
 </html>`;
@@ -381,19 +411,6 @@ function renderDocumentButtonSection(section: DocumentSection, visibleColumns: V
   `;
 }
 
-/** A verse's speaker label is suppressed if the nearest preceding non-comment verse resolves to the same speaker/type. */
-function computeSuppressSpeakerLabelFlags(verses: DocumentVerse[], bishopPresent: boolean): boolean[] {
-  const resolvedTypes = verses.map((verse) => resolveRubricKey(verse.type, bishopPresent));
-  return verses.map((verse, index) => {
-    const resolved = resolvedTypes[index];
-    if (!RUBRIC[resolved]) return false;
-    for (let i = index - 1; i >= 0; i -= 1) {
-      if (verses[i].type === 'comment') continue;
-      return resolvedTypes[i] === resolved;
-    }
-    return false;
-  });
-}
 
 function renderSectionTitle(section: DocumentSection, visibleColumns: VisibleColumns, isCollapsed: boolean) {
   const titleEn = section.title?.english || '';

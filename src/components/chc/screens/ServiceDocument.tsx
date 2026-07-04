@@ -92,6 +92,11 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const handleAction = (action: DocumentAction) => {
     if (!sections) return;
 
+    if (action.type === 'currentSection') {
+      if (action.sectionId) setCurrentSectionId(action.sectionId);
+      return;
+    }
+
     const triggerSection = sections.find((s) => s.id === action.sectionId);
     if (!triggerSection?.subdocumentSections) return;
 

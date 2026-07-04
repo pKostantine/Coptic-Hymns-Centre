@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
+import { resolveRubricKey, computeSuppressSpeakerLabelFlags } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 
 export default function SlideshowContainer({
@@ -19,6 +20,8 @@ export default function SlideshowContainer({
   onOpenSelector,
   viewportHeightOverride,
   onToggleCollapse,
+  bishopPresent,
+  onAction,
 }) {
   const safeAreaInsets = useSafeAreaInsets();
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -26,13 +29,32 @@ export default function SlideshowContainer({
   const [measuredHeights, setMeasuredHeights] = useState({});
   const [measuredLanguageHeights, setMeasuredLanguageHeights] = useState({});
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  // Collapsible title rows and Subdocument/Antiphonary open-buttons can land
+  // anywhere within a slide (collapsible titles deliberately don't force a
+  // fresh slide break — see flattenSections), so neither can rely on "the top
+  // of the slide" the way the old topReserved gap assumed. Instead each one
+  // reports its own y offset here, and a dedicated overlay (rendered after,
+  // i.e. on top of, NavigationOverlay) places a real tappable control exactly
+  // there — RN has no cross-subtree z-index, so "render on top" is the only
+  // way for a control anywhere in the slide to ever receive a touch over the
+  // full-screen swipe layer.
+  const [collapsibleTitleLayouts, setCollapsibleTitleLayouts] = useState({});
+  const [buttonLayouts, setButtonLayouts] = useState({});
   const measurementSignatureRef = useRef("");
   const lastAppliedSelectedSectionId = useRef(null);
   const pendingHeightsRef = useRef({});
   const pendingLanguageHeightsRef = useRef({});
   const pendingMeasurementFrameRef = useRef(null);
+  // Whatever section the user is actually looking at right now, kept up to
+  // date by the onCurrentSectionChange effect below. A settings change
+  // (font size, a language toggle, minimizing a hymn, Bishop Present, ...)
+  // forces a full repagination — without remembering this, the reset effect
+  // below used to always snap back to slide 0, sending the user back to the
+  // very start of the document every time they changed anything.
+  const preservedSectionIdRef = useRef(null);
+  const pendingRestoreSectionIdRef = useRef(null);
 
-  const items = useMemo(() => flattenSections(sections), [sections]);
+  const items = useMemo(() => flattenSections(sections, bishopPresent), [sections, bishopPresent]);
   const itemsSignature = useMemo(
     () => items.map(getItemSignature).join("|"),
     [items],
@@ -78,6 +100,7 @@ export default function SlideshowContainer({
       cancelMeasurementFrame(pendingMeasurementFrameRef.current);
       pendingMeasurementFrameRef.current = null;
     }
+    pendingRestoreSectionIdRef.current = preservedSectionIdRef.current;
     setMeasuredHeights({});
     setMeasuredLanguageHeights({});
     setCurrentSlideIndex(0);
@@ -246,20 +269,29 @@ export default function SlideshowContainer({
   }, [slides.length]);
 
   useEffect(() => {
+    // An explicit content-selector jump (selectedSectionId) takes priority;
+    // otherwise, if a settings/minimization change just forced a repagination,
+    // fall back to jumping back to wherever the user was previously looking
+    // (pendingRestoreSectionIdRef, set by the measuredKey reset effect above).
+    const targetSectionId = selectedSectionId || pendingRestoreSectionIdRef.current;
+
     if (
-      !selectedSectionId ||
-      lastAppliedSelectedSectionId.current === selectedSectionId
+      !targetSectionId ||
+      lastAppliedSelectedSectionId.current === targetSectionId
     ) {
       return;
     }
 
     const nextSlideIndex = slides.findIndex((slide) =>
-      slide.some((item) => item.id === `${selectedSectionId}-title`),
+      slide.some((item) => item.id === `${targetSectionId}-title`),
     );
 
     if (nextSlideIndex >= 0) {
       setCurrentSlideIndex(nextSlideIndex);
-      lastAppliedSelectedSectionId.current = selectedSectionId;
+      lastAppliedSelectedSectionId.current = targetSectionId;
+      if (!selectedSectionId) {
+        pendingRestoreSectionIdRef.current = null;
+      }
     }
   }, [selectedSectionId, slides]);
 
@@ -267,6 +299,7 @@ export default function SlideshowContainer({
     const currentSectionId = findSlideSectionId(slides[currentSlideIndex]);
 
     if (currentSectionId) {
+      preservedSectionIdRef.current = currentSectionId;
       onCurrentSectionChange?.(currentSectionId);
     }
   }, [currentSlideIndex, onCurrentSectionChange, slides]);
@@ -352,18 +385,63 @@ export default function SlideshowContainer({
         titleHelpers={titleHelpers}
         slidePadding={slidePadding}
         onToggleCollapse={onToggleCollapse}
+        onAction={onAction}
+        onTitleLayout={(sectionId, y, height) =>
+          setCollapsibleTitleLayouts((current) =>
+            current[sectionId]?.y === y && current[sectionId]?.height === height
+              ? current
+              : { ...current, [sectionId]: { y, height } }
+          )
+        }
+        onButtonLayout={(sectionId, y, height) =>
+          setButtonLayouts((current) =>
+            current[sectionId]?.y === y && current[sectionId]?.height === height
+              ? current
+              : { ...current, [sectionId]: { y, height } }
+          )
+        }
       />
 
       <NavigationOverlay
         onPrevious={goToPreviousSlide}
         onNext={goToNextSlide}
         onOpenSelector={onOpenSelector}
-        topReserved={
-          (slides[currentSlideIndex] || [])[0]?.type === "title" && (slides[currentSlideIndex] || [])[0]?.collapsible
-            ? slidePadding.top + TITLE_ROW_TOUCH_RESERVE
-            : 0
-        }
       />
+
+      {onAction
+        ? (slides[currentSlideIndex] || [])
+            .filter((item) => item.type === "button" && buttonLayouts[item.sectionId])
+            .map((item) => {
+              const layout = buttonLayouts[item.sectionId];
+              return (
+                <Pressable
+                  key={item.sectionId}
+                  style={[styles.openButtonOverlay, { top: layout.y, height: layout.height }]}
+                  onPress={() => onAction({ type: item.buttonAction, sectionId: item.sectionId })}
+                />
+              );
+            })
+        : null}
+
+      {onToggleCollapse
+        ? (slides[currentSlideIndex] || [])
+            .filter((item) => item.type === "title" && item.collapsible && collapsibleTitleLayouts[item.sectionId])
+            .map((item) => {
+              const layout = collapsibleTitleLayouts[item.sectionId];
+              return (
+                <View
+                  key={item.sectionId}
+                  pointerEvents="box-none"
+                  style={[styles.collapseButtonOverlay, { top: layout.y, height: layout.height }]}
+                >
+                  <CollapseButton
+                    collapsed={Boolean(item.currentlyCollapsed)}
+                    onPress={() => onToggleCollapse(item.sectionId)}
+                  />
+                </View>
+              );
+            })
+        : null}
     </View>
   );
 }
@@ -378,6 +456,9 @@ export function SlideView({
   titleHelpers,
   slidePadding,
   onToggleCollapse,
+  onTitleLayout,
+  onButtonLayout,
+  onAction,
 }) {
   return (
     <View
@@ -401,25 +482,19 @@ export function SlideView({
           tableWidth={tableWidth}
           titleHelpers={titleHelpers}
           onToggleCollapse={onToggleCollapse}
+          onTitleLayout={onTitleLayout}
+          onButtonLayout={onButtonLayout}
+          onAction={onAction}
         />
       ))}
     </View>
   );
 }
 
-// Height reserved at the top of the slide for the title row (and its
-// collapse button, when present) so the full-screen swipe/tap navigation
-// layer doesn't sit on top of and swallow taps meant for the button —
-// NavigationOverlay is a sibling rendered after SlideView, so without this
-// gap its Pressables would always win the touch over anything SlideView
-// renders underneath them.
-const TITLE_ROW_TOUCH_RESERVE = 64;
-
 export function NavigationOverlay({
   onPrevious,
   onNext,
   onOpenSelector,
-  topReserved = 0,
 }) {
   const { width: screenWidth } = useWindowDimensions();
   const selectorEdgeWidth = Math.min(240, Math.max(128, (screenWidth || 0) * 0.18));
@@ -457,7 +532,7 @@ export function NavigationOverlay({
 
   return (
     <View
-      style={[styles.navigationLayer, { top: topReserved }]}
+      style={styles.navigationLayer}
       pointerEvents="auto"
       {...panResponder.panHandlers}
     >
@@ -509,7 +584,48 @@ function SlideItem({
   onLanguageMeasured,
   measurementSignature,
   onToggleCollapse,
+  onTitleLayout,
+  onButtonLayout,
+  onAction,
 }) {
+  if (item.type === "button") {
+    const label = titleHelpers.shouldShowEnglishTitle() ? titleHelpers.getTitleText(item.title) : "";
+    const arabicLabel =
+      titleHelpers.shouldShowArabicTitle(item.title) ? item.title?.arabic || "" : "";
+
+    return (
+      <View
+        style={styles.openButtonRow}
+        onLayout={(event) => {
+          onMeasured?.(event.nativeEvent.layout.height, measurementSignature);
+          onButtonLayout?.(item.sectionId, event.nativeEvent.layout.y, event.nativeEvent.layout.height);
+        }}
+      >
+        <Pressable
+          style={styles.openButton}
+          onPress={() => onAction?.({ type: item.buttonAction, sectionId: item.sectionId })}
+        >
+          {label ? (
+            <Text style={[styles.openButtonText, { color: theme.colors.text, fontSize: Math.round(fontSize * 0.65) }]}>
+              {label}
+            </Text>
+          ) : null}
+          {arabicLabel ? (
+            <Text
+              style={[
+                styles.openButtonText,
+                styles.openButtonTextArabic,
+                { color: theme.colors.text, fontSize: Math.round(fontSize * 0.65) },
+              ]}
+            >
+              {arabicLabel}
+            </Text>
+          ) : null}
+        </Pressable>
+      </View>
+    );
+  }
+
   if (item.type === "title") {
     const hasButton = Boolean(item.collapsible && onToggleCollapse);
     const titleTableWidth = hasButton ? Math.max(tableWidth - COLLAPSE_BUTTON_SIZE, 1) : tableWidth;
@@ -523,9 +639,12 @@ function SlideItem({
     return (
       <View
         style={styles.titleRow}
-        onLayout={(event) =>
-          onMeasured?.(event.nativeEvent.layout.height, measurementSignature)
-        }
+        onLayout={(event) => {
+          onMeasured?.(event.nativeEvent.layout.height, measurementSignature);
+          if (hasButton) {
+            onTitleLayout?.(item.sectionId, event.nativeEvent.layout.y, event.nativeEvent.layout.height);
+          }
+        }}
       >
         <View style={[styles.titleTable, { width: titleTableWidth }]}>
           {titleLanguages.map(
@@ -589,6 +708,7 @@ function SlideItem({
         forceWhiteText={Boolean(item.forceWhiteVerses || item.verse?.forceWhiteText)}
         colorIndex={item.colorIndex}
         suppressSpeakerLabel={Boolean(item.suppressSpeakerLabel)}
+        bishopPresent={item.bishopPresent}
         onLanguageLayout={(language, metric) =>
           onLanguageMeasured?.(language, metric, measurementSignature)
         }
@@ -597,9 +717,26 @@ function SlideItem({
   );
 }
 
-function flattenSections(sections) {
+// A hymn's own verse list (one section = one hymn) never changes speaker
+// mid-flight from what the WebView reader would show — computeSuppressSpeakerLabelFlags
+// is the exact same function documentHtml.ts uses, so the two renderers can
+// never diverge on "does this verse show its Priest:/Deacon:/etc. indicator".
+function flattenSections(sections, bishopPresent) {
   return sections.flatMap((section, sectionIndex) => {
+    if (section.isSubdocumentButton || section.isAntiphonaryButton) {
+      return [
+        {
+          id: `${section.id}-button`,
+          sectionId: section.id,
+          type: "button",
+          title: section.title,
+          buttonAction: section.isAntiphonaryButton ? "openAntiphonary" : "openSubdocument",
+        },
+      ];
+    }
+
     const verses = section.verses || [];
+    const suppressFlags = computeSuppressSpeakerLabelFlags(verses, bishopPresent);
 
     return [
       {
@@ -621,10 +758,9 @@ function flattenSections(sections) {
         sectionId: section.id,
         type: "verse",
         verse,
-        colorIndex: getVerseColorIndex(section, verseIndex),
-        suppressSpeakerLabel:
-          Boolean(verse.suppressSpeakerLabel) ||
-          shouldSuppressSpeakerLabel(verses, verseIndex),
+        colorIndex: getVerseColorIndex(section, verseIndex, bishopPresent),
+        suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || suppressFlags[verseIndex],
+        bishopPresent,
         // Recited Prayer is a per-verse type (a verse's own effective type
         // after inheritance — see resolveEffectiveVerseType), not a
         // whole-section flag.
@@ -637,7 +773,7 @@ function flattenSections(sections) {
   });
 }
 
-function getVerseColorIndex(section, index) {
+function getVerseColorIndex(section, index, bishopPresent) {
   const title = typeof section.title === "string" ? section.title : section.title?.english || "";
   const effectiveIndex = getEffectiveAlternatingVerseIndex(section, index);
 
@@ -655,7 +791,7 @@ function getVerseColorIndex(section, index) {
     section.isPsali ||
     /psali|aripsaleen/i.test(title) ||
     isPsaliLikeTwoVerseSectionTitle(title) ||
-    (section.verses || []).some((verse) => Boolean(getSpeakerRole(verse.type)));
+    (section.verses || []).some((verse) => Boolean(getSpeakerRole(verse.type, bishopPresent)));
 
   if (!shouldUsePairing) {
     return effectiveIndex;
@@ -665,7 +801,7 @@ function getVerseColorIndex(section, index) {
     return effectiveIndex;
   }
 
-  if (getSpeakerRole(section.verses?.[0]?.type) === "priest") {
+  if (getSpeakerRole(section.verses?.[0]?.type, bishopPresent) === "priest") {
     return effectiveIndex <= 2 ? 0 : 1 + Math.floor((effectiveIndex - 3) / 2);
   }
 
@@ -689,45 +825,16 @@ function isPsaliLikeTwoVerseSectionTitle(title) {
     .test(String(title || "").trim());
 }
 
-function shouldSuppressSpeakerLabel(verses = [], index = 0) {
-  const currentType = getSpeakerType(verses[index]);
-
-  if (!currentType) {
-    return false;
+// Used only by the psali/pairing color-alternation heuristic in
+// getVerseColorIndex above — actual speaker-label suppression is
+// computeSuppressSpeakerLabelFlags from utils/verseRubric.js (shared with
+// the WebView reader), not this. Resolves "bishopOrPriest" via the same
+// shared resolveRubricKey so this heuristic doesn't diverge either.
+function getSpeakerRole(type, bishopPresent) {
+  const resolved = resolveRubricKey(type, bishopPresent);
+  if (resolved === "priest" || resolved === "bishop" || resolved === "people" || resolved === "deacon" || resolved === "reader") {
+    return resolved === "bishop" ? "priest" : resolved;
   }
-
-  for (let previousIndex = index - 1; previousIndex >= 0; previousIndex -= 1) {
-    const previousVerse = verses[previousIndex];
-    const previousType = getSpeakerType(previousVerse);
-
-    if (previousType) {
-      return previousType === currentType;
-    }
-
-    if (
-      String(previousVerse?.english || "").trim() ||
-      String(previousVerse?.coptic || "").trim() ||
-      String(previousVerse?.arabic || "").trim()
-    ) {
-      return false;
-    }
-  }
-
-  return false;
-}
-
-function getSpeakerType(verse) {
-  return getSpeakerRole(verse?.type);
-}
-
-function getSpeakerRole(type) {
-  const normalizedType = String(type || "").toLowerCase();
-
-  if (normalizedType.startsWith("priest")) return "priest";
-  if (normalizedType.startsWith("people")) return "people";
-  if (normalizedType.startsWith("deacon")) return "deacon";
-  if (normalizedType.startsWith("reader")) return "reader";
-
   return "";
 }
 
@@ -742,6 +849,11 @@ function getItemSignature(item) {
       : [item.title?.english, item.title?.arabic].filter(Boolean).join("/");
 
     return `${item.id}:title:${title.length}:${item.isCollapsed ? "collapsed" : "open"}`;
+  }
+
+  if (item.type === "button") {
+    const title = [item.title?.english, item.title?.arabic].filter(Boolean).join("/");
+    return `${item.id}:button:${title.length}`;
   }
 
   const verse = item.verse || {};
@@ -821,7 +933,10 @@ function paginateItems(
 
   for (let index = 0; index < items.length; index += 1) {
     const item = items[index];
-    if (item.type === "title" && currentSlide.length && !item.isCollapsed) {
+    if (
+      currentSlide.length &&
+      ((item.type === "title" && !item.isCollapsed) || item.type === "button")
+    ) {
       slides.push(currentSlide);
       currentSlide = [];
       currentHeight = 0;
@@ -970,10 +1085,10 @@ function getLineCapacitiesForHeight(state, height, fontSize, item) {
     return {};
   }
 
-  return state.languages
+  const capacities = state.languages
     .filter((entry) => entry.offset < entry.lines.length)
-    .reduce((capacities, entry) => {
-      capacities[entry.language] = Math.max(
+    .reduce((acc, entry) => {
+      acc[entry.language] = Math.max(
         0,
         Math.floor(
           (usableHeight - getLanguageExtraTopPadding(entry.language, item, fontSize)) /
@@ -981,8 +1096,24 @@ function getLineCapacitiesForHeight(state, height, fontSize, item) {
         ),
       );
 
-      return capacities;
+      return acc;
     }, {});
+
+  // A language that still has lines left must never sit out a segment while
+  // a sibling language gets to render text — that reads as a spurious blank
+  // column (e.g. Coptic vanishing for one slide then reappearing on the
+  // next), even though Coptic isn't actually finished, just squeezed to 0 by
+  // this particular segment's remaining height. Once anything in the segment
+  // has room, guarantee every not-yet-finished language at least one line.
+  if (hasPositiveLineCapacity(capacities)) {
+    Object.keys(capacities).forEach((language) => {
+      if (capacities[language] === 0) {
+        capacities[language] = 1;
+      }
+    });
+  }
+
+  return capacities;
 }
 
 function hasPositiveLineCapacity(lineCapacities = {}) {
@@ -1077,6 +1208,10 @@ function getMinimumFollowingVerseHeight(item, languageHeights, fontSize) {
 function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
   if (item.type === "title") {
     return Math.max(Math.round(fontSize * 0.8), 20) + SPACING.sm * 2;
+  }
+
+  if (item.type === "button") {
+    return 96 + SPACING.md * 2;
   }
 
   const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
@@ -1392,6 +1527,18 @@ const styles = StyleSheet.create({
     width: COLLAPSE_BUTTON_SIZE,
     zIndex: 20,
   },
+  // Rendered as a sibling AFTER NavigationOverlay (higher in the stack), at
+  // the exact y/height the title row reported via onTitleLayout, right-
+  // aligned to match where the (otherwise untappable) inline button sits.
+  collapseButtonOverlay: {
+    position: "absolute",
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    width: COLLAPSE_BUTTON_SIZE,
+    zIndex: 30,
+    elevation: 20,
+  },
   collapseButtonCircle: {
     alignItems: "center",
     borderRadius: COLLAPSE_BUTTON_CIRCLE / 2,
@@ -1412,6 +1559,46 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     height: 12,
     width: 1.5,
+  },
+  openButtonRow: {
+    alignItems: "center",
+    flexShrink: 0,
+    paddingVertical: SPACING.md,
+  },
+  openButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "#C9A227",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: SPACING.xs,
+    justifyContent: "center",
+    maxWidth: 320,
+    minHeight: 96,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    width: "72%",
+  },
+  openButtonText: {
+    fontFamily: "Georgia",
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  openButtonTextArabic: {
+    fontFamily: "Arial",
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  // Rendered as a sibling AFTER NavigationOverlay (same reasoning as
+  // collapseButtonOverlay above) so the Subdocument/Antiphonary open-button
+  // is actually tappable instead of losing every touch to the full-screen
+  // swipe layer.
+  openButtonOverlay: {
+    left: 0,
+    position: "absolute",
+    width: "100%",
+    zIndex: 30,
+    elevation: 20,
   },
   sectionTitle: {
     flexShrink: 1,

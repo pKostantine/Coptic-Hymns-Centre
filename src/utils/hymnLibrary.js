@@ -77,6 +77,108 @@ export const READING_SENTINELS = new Set([
   "VESPERS_PSALM_WITHOUT_COPTIC",
 ]);
 
+// Maps each reading sentinel to the (service, reading_type) pair it needs
+// out of calendar.reading_rules (via the public.get_readings_for_date RPC),
+// and whether Coptic text should be kept. SYNAXARIUM and PSALM_RESPONSES/
+// COPTIC_READINGS have no known reading_rules mapping yet (see project
+// memory project_subdocument_registry.md) and are left unmapped — they
+// resolve to nothing rather than guessing wrong.
+const READING_SENTINEL_MAP = {
+  PROPHECIES: { service: "Matins", readingType: "Prophecy", withCoptic: true },
+  CATHOLIC_EPISTLE: { service: "Catholic", readingType: "Catholic Epistle", withCoptic: true },
+  COPTIC_CATHOLIC_EPISTLE: { service: "Catholic", readingType: "Catholic Epistle", withCoptic: true },
+  COPTIC_PAULINE_EPISTLE: { service: "Pauline", readingType: "Pauline Epistle", withCoptic: true },
+  PAULINE_EPISTLE: { service: "Pauline", readingType: "Pauline Epistle", withCoptic: true },
+  COPTIC_PRAXIS: { service: "Praxis", readingType: "Praxis", withCoptic: true },
+  PRAXIS: { service: "Praxis", readingType: "Praxis", withCoptic: true },
+  LITURGY_PSALM_WITH_COPTIC: { service: "Liturgy", readingType: "Psalm", withCoptic: true },
+  LITURGY_PSALM_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Psalm", withCoptic: false },
+  MATINS_GOSPEL_WITH_COPTIC: { service: "Matins", readingType: "Gospel", withCoptic: true },
+  MATINS_GOSPEL_WITHOUT_COPTIC: { service: "Matins", readingType: "Gospel", withCoptic: false },
+  MATINS_PSALM_WITH_COPTIC: { service: "Matins", readingType: "Psalm", withCoptic: true },
+  MATINS_PSALM_WITHOUT_COPTIC: { service: "Matins", readingType: "Psalm", withCoptic: false },
+  VESPERS_GOSPEL_WITH_COPTIC: { service: "Vespers", readingType: "Gospel", withCoptic: true },
+  VESPERS_GOSPEL_WITHOUT_COPTIC: { service: "Vespers", readingType: "Gospel", withCoptic: false },
+  VESPERS_PSALM_WITH_COPTIC: { service: "Vespers", readingType: "Psalm", withCoptic: true },
+  VESPERS_PSALM_WITHOUT_COPTIC: { service: "Vespers", readingType: "Psalm", withCoptic: false },
+};
+
+let readingsForDateCache = null; // { isoDate, promise }
+
+function getReadingsForDate(isoDate) {
+  if (readingsForDateCache?.isoDate === isoDate) return readingsForDateCache.promise;
+  const promise = supabase
+    .rpc("get_readings_for_date", { p_date: isoDate })
+    .then(({ data, error }) => {
+      if (error) throw new Error(`Unable to load readings for ${isoDate}: ${error.message}`);
+      return data || [];
+    });
+  readingsForDateCache = { isoDate, promise };
+  return promise;
+}
+
+/** Flattens a get_readings_for_date entry's resolved_verses into plain verse objects, dropping Coptic text for the "WithoutCoptic" variants. */
+function buildReadingVerses(readingRow, withCoptic) {
+  if (!readingRow) return [];
+  return (readingRow.resolved_verses || []).flatMap((segment) =>
+    (segment.verses || []).map((v) => ({
+      english: `${v.chapter_number}:${v.verse_number} ${v.english || ""}`.trim(),
+      coptic: withCoptic ? v.coptic || "" : "",
+      arabic: v.arabic || "",
+      type: "text",
+    })),
+  );
+}
+
+async function resolveReadingSentinelVerses(sentinel, isoDate) {
+  const mapping = READING_SENTINEL_MAP[sentinel];
+  if (!mapping) return [];
+  const readings = await getReadingsForDate(isoDate);
+  const match = readings.find((r) => r.service === mapping.service && r.reading_type === mapping.readingType);
+  return buildReadingVerses(match, mapping.withCoptic);
+}
+
+/** Same as resolveReadingSentinelVerses but wraps the result as a titled section (for Subdocument/order-table-level Inline placements, which need a section object, not a bare verse list). */
+async function resolveReadingSentinelSection(section, isoDate) {
+  const verses = await resolveReadingSentinelVerses(section.hymn_key, isoDate);
+  if (!verses.length) return null;
+  return applyCopticCaseToSection({
+    id: section.id,
+    hymn_key: section.hymn_key,
+    title: section.title,
+    titlePrayerType: section.titlePrayerType,
+    collapsible: Boolean(section.collapsible),
+    defaultCollapsed: Boolean(section.defaultCollapsed),
+    verses,
+    prayerType: null,
+    alternateEvery: null,
+    forceWhiteVerses: true,
+  });
+}
+
+/** Merges every nested section's verses into ONE flat list under the calling section's own title/prayer_type — see the isInlinePlacement branch in hydrateWithFlags for why. */
+function mergeNestedSectionsAsOneHymn(callingSection, nestedSections) {
+  const verses = nestedSections.flatMap((s) => s.verses || []);
+  const titlePrayerType = callingSection.titlePrayerType || null;
+  const dominantPrayerType = titlePrayerType || verses.find((v) => v.prayerType)?.prayerType || null;
+  const alternateEvery =
+    dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)
+      ? ALTERNATE_EVERY[dominantPrayerType]
+      : null;
+  return {
+    id: callingSection.id,
+    hymn_key: callingSection.hymn_key,
+    title: callingSection.title,
+    titlePrayerType,
+    collapsible: Boolean(callingSection.collapsible),
+    defaultCollapsed: Boolean(callingSection.defaultCollapsed),
+    verses,
+    prayerType: dominantPrayerType,
+    alternateEvery,
+    forceWhiteVerses: !alternateEvery,
+  };
+}
+
 // ─── Raw row fetch (ported from stuff for claude/slideshowData.js) ──────────
 
 const ORDER_FIELDS = "item_order, hymn_key, condition, minimization, item_type";
@@ -386,23 +488,30 @@ function resolveEffectiveVerseType(personType, prayerType, sectionTitlePrayerTyp
 
 export async function hydrateSupabaseServiceHymn(schema, table, date, extraContext = {}, weekdayDate, depth = 0) {
   const flags = await getContextFlags(date, extraContext, weekdayDate);
-  return hydrateWithFlags(schema, table, flags, depth);
+  const isoDate = toIsoDateString(date);
+  return hydrateWithFlags(schema, table, flags, depth, isoDate);
+}
+
+function toIsoDateString(date) {
+  if (typeof date === "string") return date;
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toISOString().slice(0, 10);
 }
 
 // A single misconfigured or inaccessible nested schema (e.g. one not yet
 // added to Supabase's exposed-schemas list) must not take down an entire
 // parent document just because it references that schema somewhere — log
 // and degrade gracefully to "no nested content" instead.
-async function safeHydrateNested(schema, table, flags, depth) {
+async function safeHydrateNested(schema, table, flags, depth, isoDate) {
   try {
-    return await hydrateWithFlags(schema, table, flags, depth);
+    return await hydrateWithFlags(schema, table, flags, depth, isoDate);
   } catch (error) {
     console.warn(`Failed to load nested content ${schema}.${table}: ${error?.message || error}`);
     return [];
   }
 }
 
-async function hydrateWithFlags(schema, table, flags, depth) {
+async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
   const rawRows = await fetchServiceRows(schema, table);
   const sections = assembleServiceSections(rawRows);
 
@@ -412,7 +521,14 @@ async function hydrateWithFlags(schema, table, flags, depth) {
   for (const section of visibleSections) {
     if (section.isSubdocumentPlaceholder) {
       const target = SUBDOCUMENT_MAP[section.hymn_key];
-      if (!target || depth >= 3) continue; // not-yet-built or reading-sentinel; handled elsewhere
+      if (!target) {
+        if (READING_SENTINELS.has(section.hymn_key) && isoDate) {
+          const readingSection = await resolveReadingSentinelSection(section, isoDate);
+          if (readingSection) hydrated.push(readingSection);
+        }
+        continue; // not-yet-built, or a reading sentinel with no live mapping/data
+      }
+      if (depth >= 3) continue;
       // Subdocuments render as a button in the parent document — tapping it
       // opens a full-screen modal with the nested document, rather than
       // splicing the nested content inline. The nested content is prefetched
@@ -422,7 +538,7 @@ async function hydrateWithFlags(schema, table, flags, depth) {
       // calling schema's hymn_titles (public fallback), falling back to the
       // sentinel key itself when no title is defined.
       const label = section.title.english || section.hymn_key;
-      const subdocumentSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1);
+      const subdocumentSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1, isoDate);
 
       if (section.hymn_key === "ANTIPHONARY") {
         hydrated.push({
@@ -455,12 +571,25 @@ async function hydrateWithFlags(schema, table, flags, depth) {
       // order row itself, hymn_key an all-caps sentinel like GOSPEL_RITE or
       // CANONS) is structurally identical to a Subdocument placeholder — it
       // always references another whole type-3 table — except it splices
-      // that table's sections directly into this document instead of
-      // becoming a button.
+      // that table's content directly into this document instead of
+      // becoming a button. The WHOLE imported schema is treated as ONE
+      // hymn using the calling row's own title/prayer_type (e.g.
+      // VERSES_OF_THE_CYMBALS imported into raising_of_incense has its own
+      // title "Verses of the Cymbals" and prayer type "Single Alternating"
+      // in liturgy.hymn_titles) — every verse from every nested hymn_key is
+      // merged into one flat verse list so the person-type indicator only
+      // restarts once, at the very first verse, exactly as if this were a
+      // single hymn rather than several spliced together.
       const target = resolveWholeTableInlineTarget(section.hymn_key);
-      if (!target || depth >= 3) continue;
-      const nestedSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1);
-      hydrated.push(...nestedSections);
+      if (target && depth < 3) {
+        const nestedSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1, isoDate);
+        hydrated.push(applyCopticCaseToSection(mergeNestedSectionsAsOneHymn(section, nestedSections)));
+        continue;
+      }
+      if (!target && READING_SENTINELS.has(section.hymn_key) && isoDate) {
+        const readingSection = await resolveReadingSentinelSection(section, isoDate);
+        if (readingSection) hydrated.push(readingSection);
+      }
       continue;
     }
 
@@ -494,32 +623,77 @@ async function hydrateWithFlags(schema, table, flags, depth) {
 
         const wholeTableTarget = resolveWholeTableInlineTarget(verse.inlineHymnKey);
         if (wholeTableTarget) {
-          flushVerses();
-          const nestedSections = await safeHydrateNested(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1);
-          hydrated.push(...nestedSections);
-          pushedAnything = true;
+          // Spliced as plain continuation verses of the CURRENT hymn (not
+          // separate sections) — "treated as one hymn" applies here too,
+          // even though the whole-table reference is injected mid-verse-list
+          // rather than at the order-table level.
+          const nestedSections = await safeHydrateNested(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1, isoDate);
+          verses.push(...nestedSections.flatMap((s) => s.verses || []));
           continue;
         }
 
-        // Regular single-hymn-key inline splice: pull in that hymn's verses
-        // only — never its own title (an imported hymn's title is always
-        // dropped when it's brought in as inline verses of another hymn) —
-        // with the destination line's own person_type/prayer_type
-        // overriding the source, per resolveEffectiveVerseType's cascade.
+        if (READING_SENTINELS.has(verse.inlineHymnKey) && isoDate) {
+          const readingVerses = await resolveReadingSentinelVerses(verse.inlineHymnKey, isoDate);
+          verses.push(...readingVerses);
+          continue;
+        }
+
+        // Regular single-hymn-key inline splice. Two distinct behaviors,
+        // decided by whether the inline hymn has its own row in its schema's
+        // hymn_titles (public fallback, same as everywhere else): if it does,
+        // it's treated as its OWN hymn — flush whatever the parent had so
+        // far, push a standalone section with that title, its own
+        // prayer-type-driven color alternation, and (since suppression/
+        // rubric restart operates per-section) a fresh restart of the
+        // person-type indicators — then keep accumulating the parent's
+        // remaining verses in a new chunk afterward. If it has no title,
+        // it's just a content splice: pull in its verses only, with the
+        // destination line's own person_type/prayer_type overriding the
+        // source, per resolveEffectiveVerseType's cascade, and no restart.
+        const inlineTitle = await fetchInlineHymnTitle(schema, verse.inlineHymnKey);
+        const hasOwnTitle = Boolean(inlineTitle?.title_english || inlineTitle?.title_arabic);
+        const inlineTitlePrayerType = hasOwnTitle ? inlineTitle.prayer_type || null : section.titlePrayerType;
+
         const inlineVerses = await fetchInlineHymnVerses(schema, verse.inlineHymnKey);
-        inlineVerses
+        const builtVerses = inlineVerses
           .filter((row) => evaluateCondition(row.condition, flags))
-          .forEach((row) => {
+          .map((row) => {
             const effectivePersonType = verse.overridePersonType || row.person_type || "";
             const effectivePrayerType = verse.overridePrayerType || row.prayer_type || "";
-            verses.push({
+            return {
               english: row.english || "",
               coptic: row.coptic || "",
               arabic: row.arabic || "",
-              type: resolveEffectiveVerseType(effectivePersonType, effectivePrayerType, section.titlePrayerType),
+              type: resolveEffectiveVerseType(effectivePersonType, effectivePrayerType, inlineTitlePrayerType),
               prayerType: effectivePrayerType || null,
-            });
+            };
           });
+
+        if (hasOwnTitle) {
+          flushVerses();
+          const dominantPrayerType = inlineTitlePrayerType || builtVerses.find((v) => v.prayerType)?.prayerType || null;
+          const alternateEvery =
+            dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)
+              ? ALTERNATE_EVERY[dominantPrayerType]
+              : null;
+          hydrated.push(
+            applyCopticCaseToSection({
+              id: `${section.id}-inline-${verse.inlineHymnKey}`,
+              hymn_key: verse.inlineHymnKey,
+              title: { english: inlineTitle.title_english || "", arabic: inlineTitle.title_arabic || "" },
+              titlePrayerType: inlineTitlePrayerType,
+              collapsible: false,
+              defaultCollapsed: false,
+              verses: builtVerses,
+              prayerType: dominantPrayerType,
+              alternateEvery,
+              forceWhiteVerses: !alternateEvery,
+            }),
+          );
+          pushedAnything = true;
+        } else {
+          verses.push(...builtVerses);
+        }
         continue;
       }
 
@@ -593,6 +767,12 @@ function uppercaseFirstCopticChar(text) {
 const INLINE_TEXT_FIELDS =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition";
 
+// Hymn-key lookups (inline splices, whole-table references) search the
+// calling schema first, then this fixed fallback order — public (the
+// shared cross-schema hymn pool), then liturgy, agpeya, psalmody, veneration
+// — stopping at the first schema that actually has the key.
+const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "agpeya", "psalmody", "veneration"];
+
 async function fetchInlineHymnVerses(schema, hymnKey) {
   const { data: nativeRows, error: nativeError } = await supabase
     .schema(schema)
@@ -603,16 +783,49 @@ async function fetchInlineHymnVerses(schema, hymnKey) {
   if (nativeError) throw createReadableSupabaseError(nativeError, `${schema}.hymn_texts`);
   if (nativeRows?.length) return nativeRows;
 
-  if (schema === "public") return [];
+  for (const fallbackSchema of HYMN_KEY_FALLBACK_SCHEMAS) {
+    if (fallbackSchema === schema) continue;
+    const { data, error } = await supabase
+      .schema(fallbackSchema)
+      .from("hymn_texts")
+      .select(INLINE_TEXT_FIELDS)
+      .eq("hymn_key", hymnKey)
+      .order("line_order", { ascending: true });
+    if (error) throw createReadableSupabaseError(error, `${fallbackSchema}.hymn_texts`);
+    if (data?.length) return data;
+  }
 
-  const { data: publicRows, error: publicError } = await supabase
-    .schema("public")
-    .from("hymn_texts")
-    .select(INLINE_TEXT_FIELDS)
-    .eq("hymn_key", hymnKey)
-    .order("line_order", { ascending: true });
-  if (publicError) throw createReadableSupabaseError(publicError, "public.hymn_texts");
-  return publicRows || [];
+  return [];
+}
+
+const INLINE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, prayer_type";
+
+/** Whether an inline-spliced hymn should be treated as its own hymn (own title, own alternation, restarted person-type indicators) hinges entirely on whether it has a row in hymn_titles — same schema search order as fetchInlineHymnVerses. Returns null if no title row exists anywhere. */
+async function fetchInlineHymnTitle(schema, hymnKey) {
+  if (!SCHEMAS_WITHOUT_HYMN_TITLES.has(schema)) {
+    const { data, error } = await supabase
+      .schema(schema)
+      .from("hymn_titles")
+      .select(INLINE_TITLE_FIELDS)
+      .eq("hymn_key", hymnKey)
+      .maybeSingle();
+    if (error) throw createReadableSupabaseError(error, `${schema}.hymn_titles`);
+    if (data) return data;
+  }
+
+  for (const fallbackSchema of HYMN_KEY_FALLBACK_SCHEMAS) {
+    if (fallbackSchema === schema || SCHEMAS_WITHOUT_HYMN_TITLES.has(fallbackSchema)) continue;
+    const { data, error } = await supabase
+      .schema(fallbackSchema)
+      .from("hymn_titles")
+      .select(INLINE_TITLE_FIELDS)
+      .eq("hymn_key", hymnKey)
+      .maybeSingle();
+    if (error) throw createReadableSupabaseError(error, `${fallbackSchema}.hymn_titles`);
+    if (data) return data;
+  }
+
+  return null;
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────

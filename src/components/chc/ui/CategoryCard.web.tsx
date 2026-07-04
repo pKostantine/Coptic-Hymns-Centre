@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
+import { useIsMobileWeb } from '../../../utils/useIsMobileWeb';
 
 const EASTERN_ARABIC_DIGITS: Record<string, string> = {
   '0': '٠', '1': '١', '2': '٢', '3': '٣', '4': '٤',
@@ -19,22 +20,41 @@ interface CategoryCardProps {
   onPress?: () => void;
 }
 
-/** Web main-menu row — wide and shallow, English left / Arabic right / chevron far right, matching the desktop-reader feel (mobile's CategoryCard.tsx is the tall card variant). */
+/**
+ * Web main-menu row — wide and shallow, English left / Arabic right / chevron
+ * far right, matching the desktop-reader feel (mobile's CategoryCard.tsx is
+ * the tall card variant). Below MOBILE_WEB_BREAKPOINT there isn't room for
+ * English and Arabic side by side without truncating either one, so the two
+ * stack instead — same row, just taller.
+ */
 export default function CategoryCard({ title, arabic, onPress }: CategoryCardProps) {
+  const isMobileWeb = useIsMobileWeb();
+
   return (
-    <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
-      <View style={styles.iconWrap}>
-        <Ionicons name="library-outline" size={26} color={COLORS.gold} />
+    <Pressable
+      style={({ pressed }) => [styles.row, isMobileWeb && styles.rowMobile, pressed && styles.rowPressed]}
+      onPress={onPress}
+    >
+      <View style={[styles.iconWrap, isMobileWeb && styles.iconWrapMobile]}>
+        <Ionicons name="library-outline" size={isMobileWeb ? 20 : 26} color={COLORS.gold} />
       </View>
-      <Text style={styles.title} numberOfLines={1}>
-        {formatEnglishDisplayText(title)}
-      </Text>
-      {arabic ? (
-        <Text style={styles.arabicTitle} numberOfLines={1}>
-          {formatArabicNumbers(arabic)}
+      <View style={[styles.titleGroup, isMobileWeb && styles.titleGroupMobile]}>
+        <Text
+          style={[styles.title, isMobileWeb && styles.titleMobile]}
+          numberOfLines={isMobileWeb ? 2 : 1}
+        >
+          {formatEnglishDisplayText(title)}
         </Text>
-      ) : null}
-      <Ionicons name="chevron-forward" size={24} color={COLORS.gold} style={styles.chevron} />
+        {arabic ? (
+          <Text
+            style={[styles.arabicTitle, isMobileWeb && styles.arabicTitleMobile]}
+            numberOfLines={isMobileWeb ? 2 : 1}
+          >
+            {formatArabicNumbers(arabic)}
+          </Text>
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={isMobileWeb ? 20 : 24} color={COLORS.gold} style={styles.chevron} />
     </Pressable>
   );
 }
@@ -51,6 +71,11 @@ const styles = StyleSheet.create({
     minHeight: 80,
     paddingHorizontal: SPACING.lg,
   },
+  rowMobile: {
+    minHeight: 64,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
   rowPressed: {
     backgroundColor: COLORS.surfaceSoft,
     borderColor: COLORS.goldLine,
@@ -64,6 +89,21 @@ const styles = StyleSheet.create({
     marginRight: SPACING.md,
     width: 52,
   },
+  iconWrapMobile: {
+    height: 40,
+    marginRight: SPACING.sm,
+    width: 40,
+  },
+  titleGroup: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+  },
+  titleGroupMobile: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    gap: 2,
+  },
   title: {
     color: COLORS.white,
     flex: 1,
@@ -72,6 +112,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0,
     textAlign: 'left',
+  },
+  titleMobile: {
+    flex: 0,
+    fontSize: 17,
+    width: '100%',
   },
   arabicTitle: {
     color: COLORS.white,
@@ -82,6 +127,12 @@ const styles = StyleSheet.create({
     marginRight: SPACING.md,
     textAlign: 'right',
     writingDirection: 'rtl',
+  },
+  arabicTitleMobile: {
+    flex: 0,
+    fontSize: 16,
+    marginRight: 0,
+    width: '100%',
   },
   chevron: {
     marginLeft: SPACING.sm,

@@ -47,6 +47,13 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
   ) => {
     const copticFontDataUri = useCopticFontDataUri();
     const webviewRef = useRef<WebView>(null);
+    // Whatever section the "currentSection" scroll-tracking script (see
+    // documentHtml.ts) most recently reported. A settings change (font size,
+    // a language toggle, comments/silent-prayers, Bishop Present) rebuilds
+    // the whole HTML document, which reloads the WebView and resets scroll
+    // to the top — restoring to this section on load is what brings the
+    // user back to where they were instead.
+    const preservedSectionIdRef = useRef<string | null>(null);
 
     useImperativeHandle(ref, () => ({
       scrollToSection: (id: string) => {
@@ -59,9 +66,21 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     const handleMessage = (event: WebViewMessageEvent) => {
       try {
-        onAction?.(JSON.parse(event.nativeEvent.data));
+        const action = JSON.parse(event.nativeEvent.data);
+        if (action?.type === 'currentSection' && action.sectionId) {
+          preservedSectionIdRef.current = action.sectionId;
+        }
+        onAction?.(action);
       } catch {
         // Malformed message from the HTML content — ignore.
+      }
+    };
+
+    const handleLoadEnd = () => {
+      if (preservedSectionIdRef.current) {
+        webviewRef.current?.injectJavaScript(
+          `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(preservedSectionIdRef.current)}); } true;`,
+        );
       }
     };
 
@@ -110,6 +129,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         showsVerticalScrollIndicator={false}
         javaScriptEnabled
         onMessage={handleMessage}
+        onLoadEnd={handleLoadEnd}
       />
     );
   },

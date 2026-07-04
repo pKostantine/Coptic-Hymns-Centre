@@ -2,6 +2,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
+import { resolveRubricKey } from "../../utils/verseRubric";
 
 const REFRAIN_TAN = "#9FFFD0";
 const COMMENT_GREEN = "#8FD19E";
@@ -23,6 +24,7 @@ export default function VerseBlock({
   colorIndex,
   suppressSpeakerLabel = false,
   selectableText = false,
+  bishopPresent = false,
 }) {
   const isRefrainLabel = verse.type === "refrainLabel";
   const isReadingReference = verse.type === "readingReference";
@@ -68,7 +70,7 @@ export default function VerseBlock({
     : [
         {
           key: "english",
-          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(verse.type, "english"),
+          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(verse.type, "english", bishopPresent),
           text: formatEnglishDisplayText(verse.english),
           bibleVerseNumber: verse.bibleVerseNumber,
           seasonalHoosVersePrefix: verse.seasonalHoosVersePrefix,
@@ -99,7 +101,7 @@ export default function VerseBlock({
         },
         {
           key: "arabic",
-          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(verse.type, "arabic"),
+          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(verse.type, "arabic", bishopPresent),
           text: formatArabicNumbers(verse.arabic),
           bibleVerseNumber: verse.bibleVerseNumber,
           seasonalHoosVersePrefix: formatArabicNumbers(verse.seasonalHoosVersePrefix),
@@ -192,7 +194,7 @@ export default function VerseBlock({
           >
             {language.speakerLabel ? (
               <>
-                <Text style={{ color: getSpeakerColor(verse.type) }}>
+                <Text style={{ color: getSpeakerColor(verse.type, bishopPresent) }}>
                   {language.speakerLabel}
                 </Text>
                 {"\n"}
@@ -365,8 +367,8 @@ function formatArabicNumbers(text) {
   return String(text || "").replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit);
 }
 
-function getSpeakerLabel(type, language) {
-  const role = getSpeakerRole(type);
+function getSpeakerLabel(type, language, bishopPresent) {
+  const role = getSpeakerRole(type, bishopPresent);
 
   if (!role) {
     return "";
@@ -395,25 +397,27 @@ function getSpeakerLabel(type, language) {
   return "";
 }
 
-function getSpeakerColor(type) {
+function getSpeakerColor(type, bishopPresent) {
   return {
     bishop: "#D64545",
     deacon: LIGHT_YELLOW,
     people: "#E28A2E",
     priest: "#D64545",
     reader: LIGHT_YELLOW,
-  }[getSpeakerRole(type)] || "#E28A2E";
+  }[getSpeakerRole(type, bishopPresent)] || "#E28A2E";
 }
 
-function getSpeakerRole(type) {
-  const normalizedType = String(type || "").toLowerCase();
-
-  if (normalizedType.startsWith("priest")) return "priest";
-  if (normalizedType.startsWith("bishop")) return "bishop";
-  if (normalizedType.startsWith("people")) return "people";
-  if (normalizedType.startsWith("deacon")) return "deacon";
-  if (normalizedType.startsWith("reader")) return "reader";
-
+// "Bishop/Priest" (verse.type === "bishopOrPriest") resolves to "bishop" or
+// "priest" via the shared resolveRubricKey (same logic the WebView reader
+// uses) — see src/utils/verseRubric.js. Every other speaker verse type
+// ("priest", "deacon", "reader", "people") already matches its role exactly,
+// since hymnLibrary.js's getServiceVerseType only ever produces those exact
+// strings — no more prefix-guessing needed.
+function getSpeakerRole(type, bishopPresent) {
+  const resolved = resolveRubricKey(type, bishopPresent);
+  if (resolved === "priest" || resolved === "bishop" || resolved === "people" || resolved === "deacon" || resolved === "reader") {
+    return resolved;
+  }
   return "";
 }
 

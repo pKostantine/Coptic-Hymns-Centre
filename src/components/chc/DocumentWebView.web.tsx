@@ -48,6 +48,13 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
   ) => {
     const copticFontDataUri = useCopticFontDataUri();
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    // Whatever section the "currentSection" scroll-tracking script (see
+    // documentHtml.ts) most recently reported. A settings change (font size,
+    // a language toggle, comments/silent-prayers, Bishop Present) rebuilds
+    // the whole HTML document, which reloads the iframe and resets scroll to
+    // the top — restoring to this section on load is what brings the user
+    // back to where they were instead.
+    const preservedSectionIdRef = useRef<string | null>(null);
 
     useImperativeHandle(ref, () => ({
       scrollToSection: (id: string) => {
@@ -61,12 +68,14 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     }));
 
     useEffect(() => {
-      if (!onAction) return undefined;
-
       const handleMessage = (event: MessageEvent) => {
         if (event.source !== iframeRef.current?.contentWindow) return;
         try {
-          onAction(JSON.parse(event.data));
+          const action = JSON.parse(event.data);
+          if (action?.type === 'currentSection' && action.sectionId) {
+            preservedSectionIdRef.current = action.sectionId;
+          }
+          onAction?.(action);
         } catch {
           // Malformed message from the HTML content — ignore.
         }
@@ -75,6 +84,13 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       window.addEventListener('message', handleMessage);
       return () => window.removeEventListener('message', handleMessage);
     }, [onAction]);
+
+    const handleLoad = () => {
+      if (preservedSectionIdRef.current) {
+        const win = iframeRef.current?.contentWindow as (Window & { scrollToSection?: (id: string) => void }) | null | undefined;
+        win?.scrollToSection?.(preservedSectionIdRef.current);
+      }
+    };
 
     const html = useMemo(
       () =>
@@ -116,6 +132,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         ref={iframeRef}
         sandbox="allow-same-origin allow-scripts"
         srcDoc={html}
+        onLoad={handleLoad}
         style={{ flex: 1, width: '100%', height: '100%', border: 'none', backgroundColor: COLORS.black }}
       />
     );

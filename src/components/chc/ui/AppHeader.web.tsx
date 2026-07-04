@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
+import { useIsMobileWeb } from '../../../utils/useIsMobileWeb';
 
 type IconFamily = 'ionicons' | 'material';
 
@@ -40,26 +41,43 @@ export default function AppHeader({
   const visibleTitleCount = [showEnglish, showArabic].filter(Boolean).length;
   const hasRightLeadingAction = Boolean(rightLeadingIcon && onRightLeadingPress);
   const hasRightAction = Boolean(rightIcon && onRightPress);
+  const isMobileWeb = useIsMobileWeb();
+  const iconButtonStyle = [styles.iconButton, isMobileWeb && styles.iconButtonMobile];
+  const iconSize = isMobileWeb ? 22 : 26;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isMobileWeb && styles.containerMobile]}>
       <View style={styles.topRow}>
         {canGoBack ? (
-          <Pressable accessibilityLabel="Go back" style={styles.iconButton} onPress={onBack}>
-            <Ionicons name="chevron-back" size={28} color={COLORS.gold} />
+          <Pressable accessibilityLabel="Go back" style={iconButtonStyle} onPress={onBack}>
+            <Ionicons name="chevron-back" size={isMobileWeb ? 24 : 28} color={COLORS.gold} />
           </Pressable>
         ) : (
-          <Image source={require('../../../../assets/images/CHC_sm_web.png')} style={styles.logo} />
+          <Image
+            source={require('../../../../assets/images/CHC_sm_web.png')}
+            style={[styles.logo, isMobileWeb && styles.logoMobile]}
+          />
         )}
 
         <View style={styles.titleGroup}>
           {showEnglish ? (
-            <Text style={[styles.title, visibleTitleCount === 1 && styles.centeredTitle]} numberOfLines={1}>
+            <Text
+              style={[styles.title, isMobileWeb && styles.titleMobile, visibleTitleCount === 1 && styles.centeredTitle]}
+              numberOfLines={1}
+            >
               {formatEnglishDisplayText(titleParts.english)}
             </Text>
           ) : null}
           {showArabic ? (
-            <Text style={[styles.title, styles.arabicTitle, visibleTitleCount === 1 && styles.centeredTitle]} numberOfLines={1}>
+            <Text
+              style={[
+                styles.title,
+                isMobileWeb && styles.titleMobile,
+                styles.arabicTitle,
+                visibleTitleCount === 1 && styles.centeredTitle,
+              ]}
+              numberOfLines={1}
+            >
               {titleParts.arabic}
             </Text>
           ) : null}
@@ -70,24 +88,24 @@ export default function AppHeader({
             {hasRightLeadingAction ? (
               <Pressable
                 accessibilityLabel={rightLeadingAccessibilityLabel}
-                style={styles.iconButton}
+                style={iconButtonStyle}
                 onPress={onRightLeadingPress}
               >
                 {rightLeadingIconFamily === 'material' ? (
-                  <MaterialIcons name={rightLeadingIcon as keyof typeof MaterialIcons.glyphMap} size={26} color={COLORS.gold} />
+                  <MaterialIcons name={rightLeadingIcon as keyof typeof MaterialIcons.glyphMap} size={iconSize} color={COLORS.gold} />
                 ) : (
-                  <Ionicons name={rightLeadingIcon as keyof typeof Ionicons.glyphMap} size={26} color={COLORS.gold} />
+                  <Ionicons name={rightLeadingIcon as keyof typeof Ionicons.glyphMap} size={iconSize} color={COLORS.gold} />
                 )}
               </Pressable>
             ) : null}
             {hasRightAction ? (
-              <Pressable accessibilityLabel={rightAccessibilityLabel} style={styles.iconButton} onPress={onRightPress}>
-                <Ionicons name={rightIcon as keyof typeof Ionicons.glyphMap} size={26} color={COLORS.gold} />
+              <Pressable accessibilityLabel={rightAccessibilityLabel} style={iconButtonStyle} onPress={onRightPress}>
+                <Ionicons name={rightIcon as keyof typeof Ionicons.glyphMap} size={iconSize} color={COLORS.gold} />
               </Pressable>
             ) : null}
           </View>
         ) : (
-          <View style={styles.iconSpacer} />
+          <View style={[styles.iconSpacer, isMobileWeb && styles.iconSpacerMobile]} />
         )}
       </View>
     </View>
@@ -103,6 +121,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.lg + 4,
   },
+  containerMobile: {
+    paddingBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingTop: SPACING.sm,
+  },
   topRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -117,14 +140,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
+  iconButtonMobile: {
+    borderRadius: 16,
+    height: 36,
+    width: 36,
+  },
   logo: {
     height: 48,
     width: 48,
     resizeMode: 'contain',
   },
+  logoMobile: {
+    height: 32,
+    width: 32,
+  },
   iconSpacer: {
     height: 48,
     width: 48,
+  },
+  iconSpacerMobile: {
+    height: 36,
+    width: 36,
   },
   rightActions: {
     flexDirection: 'row',
@@ -142,6 +178,9 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '700',
     letterSpacing: 0,
+  },
+  titleMobile: {
+    fontSize: 18,
   },
   arabicTitle: {
     textAlign: 'right',

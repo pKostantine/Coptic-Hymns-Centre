@@ -9,6 +9,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { CATEGORIES } from '@/constants/manifest';
 import { useCalendar } from '@/context/CalendarContext';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
+import { useIsMobileWeb } from '@/utils/useIsMobileWeb';
 
 /**
  * Web home page — wide/horizontal layout: a single full-width header row
@@ -21,6 +22,8 @@ export default function MainMenuWeb() {
   const router = useRouter();
   const { isLive, effectiveDate, goLive } = useCalendar();
   const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
+  const isMobileWeb = useIsMobileWeb();
+  const iconSize = isMobileWeb ? 20 : 26;
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
@@ -28,23 +31,41 @@ export default function MainMenuWeb() {
         <title>Coptic Hymns Centre</title>
       </Head>
 
-      <View style={styles.header}>
+      <View style={[styles.header, isMobileWeb && styles.headerMobile]}>
         <View style={styles.brand}>
-          <Image source={require('../../assets/images/CHC_sm_web.png')} style={styles.logo} />
-          <Text style={styles.brandText}>Coptic Hymns Centre</Text>
+          <Image source={require('../../assets/images/CHC_sm_web.png')} style={[styles.logo, isMobileWeb && styles.logoMobile]} />
+          <Text style={[styles.brandText, isMobileWeb && styles.brandTextMobile]} numberOfLines={1}>
+            Coptic Hymns Centre
+          </Text>
         </View>
         <View style={styles.toolbar}>
-          <Pressable accessibilityLabel="Toggle full screen" style={styles.toolbarButton} onPress={toggleFullscreen}>
-            <MaterialIcons name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={26} color={COLORS.gold} />
+          <Pressable
+            accessibilityLabel="Toggle full screen"
+            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
+            onPress={toggleFullscreen}
+          >
+            <MaterialIcons name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={iconSize} color={COLORS.gold} />
           </Pressable>
-          <Pressable accessibilityLabel="Open bookmarks" style={styles.toolbarButton} onPress={() => router.push('/bookmarks')}>
-            <Ionicons name="bookmark-outline" size={26} color={COLORS.gold} />
+          <Pressable
+            accessibilityLabel="Open bookmarks"
+            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
+            onPress={() => router.push('/bookmarks')}
+          >
+            <Ionicons name="bookmark-outline" size={iconSize} color={COLORS.gold} />
           </Pressable>
-          <Pressable accessibilityLabel="Open calendar" style={styles.toolbarButton} onPress={() => router.push('/calendar')}>
-            <Ionicons name="calendar-outline" size={26} color={COLORS.gold} />
+          <Pressable
+            accessibilityLabel="Open calendar"
+            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
+            onPress={() => router.push('/calendar')}
+          >
+            <Ionicons name="calendar-outline" size={iconSize} color={COLORS.gold} />
           </Pressable>
-          <Pressable accessibilityLabel="Open settings" style={styles.toolbarButton} onPress={() => router.push('/settings')}>
-            <Ionicons name="settings-outline" size={26} color={COLORS.gold} />
+          <Pressable
+            accessibilityLabel="Open settings"
+            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
+            onPress={() => router.push('/settings')}
+          >
+            <Ionicons name="settings-outline" size={iconSize} color={COLORS.gold} />
           </Pressable>
         </View>
       </View>
@@ -59,7 +80,7 @@ export default function MainMenuWeb() {
       ) : null}
 
       <FlatList
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, isMobileWeb && styles.listContentMobile]}
         data={CATEGORIES}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
@@ -82,9 +103,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md + 4,
   },
+  headerMobile: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
   brand: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexShrink: 1,
     gap: SPACING.md,
   },
   logo: {
@@ -92,12 +118,20 @@ const styles = StyleSheet.create({
     width: 48,
     resizeMode: 'contain',
   },
+  logoMobile: {
+    height: 32,
+    width: 32,
+  },
   brandText: {
     color: COLORS.white,
+    flexShrink: 1,
     fontFamily: TYPOGRAPHY.title,
     fontSize: 26,
     fontWeight: '700',
     letterSpacing: 0,
+  },
+  brandTextMobile: {
+    fontSize: 16,
   },
   toolbar: {
     flexDirection: 'row',
@@ -111,6 +145,11 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: 'center',
     width: 48,
+  },
+  toolbarButtonMobile: {
+    borderRadius: 16,
+    height: 36,
+    width: 36,
   },
   notLiveBanner: {
     alignItems: 'center',
@@ -133,6 +172,10 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: SPACING.lg,
+    paddingBottom: SPACING.xl,
+  },
+  listContentMobile: {
+    padding: SPACING.sm,
     paddingBottom: SPACING.xl,
   },
 });

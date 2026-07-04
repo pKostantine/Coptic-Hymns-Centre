@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { DocumentSection } from '../documentHtml';
 
 interface ContentSelectorDrawerProps {
@@ -35,12 +36,16 @@ export default function ContentSelectorDrawer({
 }: ContentSelectorDrawerProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
+  // A narrow browser viewport (phone-sized mobile web) gets the same
+  // full-screen treatment as the native app — a 50%-width side panel would
+  // be too narrow to read on a phone screen.
+  const isCompactSelector = isMobileDocument || screenWidth < MOBILE_WEB_BREAKPOINT;
   const isLandscapeViewport = screenWidth > screenHeight;
   // Mobile uses depth (a full-screen slide-in, like opening another document)
   // rather than web's side panel — there's no room for a side drawer to feel
   // native on a phone, and it matches how subdocument/Antiphonary modals
   // already present on mobile.
-  const selectorPanelWidth = isMobileDocument ? screenWidth : Math.round(screenWidth * 0.5);
+  const selectorPanelWidth = isCompactSelector ? screenWidth : Math.round(screenWidth * 0.5);
 
   const [slide] = useState(() => new Animated.Value(0));
 
@@ -62,6 +67,38 @@ export default function ContentSelectorDrawer({
     return Boolean(section.title?.english || section.title?.arabic);
   });
 
+  // The document's currentSectionId can land on a titleless hymn (e.g. an
+  // inline-spliced continuation) that never made it into `listable` — in
+  // that case, highlight/scroll to the nearest surrounding entry that did:
+  // the previous listable section if there is one, otherwise the next.
+  const resolvedCurrentSectionId = useMemo(() => {
+    if (!currentSectionId) return null;
+    if (listable.some((section) => section.id === currentSectionId)) return currentSectionId;
+    const index = sections.findIndex((section) => section.id === currentSectionId);
+    if (index < 0) return null;
+    for (let i = index - 1; i >= 0; i -= 1) {
+      if (listable.some((section) => section.id === sections[i].id)) return sections[i].id;
+    }
+    for (let i = index + 1; i < sections.length; i += 1) {
+      if (listable.some((section) => section.id === sections[i].id)) return sections[i].id;
+    }
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSectionId, sections]);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [itemLayouts, setItemLayouts] = useState<Record<string, number>>({});
+
+  // Keep the panel scrolled to wherever the user currently is in the
+  // document — on open, and any time that position changes while the panel
+  // is already open (e.g. it was left open while swiping through slides).
+  useEffect(() => {
+    if (!visible || !resolvedCurrentSectionId) return;
+    const y = itemLayouts[resolvedCurrentSectionId];
+    if (y === undefined) return;
+    scrollViewRef.current?.scrollTo({ y: Math.max(y - SPACING.md, 0), animated: false });
+  }, [visible, resolvedCurrentSectionId, itemLayouts]);
+
   return (
     <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
       <View style={styles.selectorOverlay}>
@@ -75,21 +112,25 @@ export default function ContentSelectorDrawer({
             },
           ]}
         >
-          <View style={[styles.selectorHeader, isMobileDocument && styles.selectorHeaderMobile]}>
-            {isMobileDocument ? (
+          <View style={[styles.selectorHeader, isCompactSelector && styles.selectorHeaderMobile]}>
+            {isCompactSelector ? (
               <Pressable accessibilityLabel="Close content list" style={styles.selectorBackButton} onPress={onClose}>
                 <Ionicons name="chevron-back" size={24} color={COLORS.gold} />
               </Pressable>
             ) : null}
             <Text style={styles.actionLabel}>Content</Text>
-            {isMobileDocument ? <View style={styles.selectorBackButton} /> : null}
+            {isCompactSelector ? <View style={styles.selectorBackButton} /> : null}
           </View>
 
-          <ScrollView style={styles.selectorList}>
+          <ScrollView ref={scrollViewRef} style={styles.selectorList}>
             {listable.map((section) => (
               <Pressable
                 key={section.id}
-                style={[styles.selectorItem, section.id === currentSectionId && styles.selectorItemActive]}
+                style={[styles.selectorItem, section.id === resolvedCurrentSectionId && styles.selectorItemActive]}
+                onLayout={(event) => {
+                  const y = event.nativeEvent.layout.y;
+                  setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
+                }}
                 onPress={() => {
                   onSelectSection(section.id);
                   onClose();
