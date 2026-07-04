@@ -39,17 +39,33 @@ export default function MainMenuWeb() {
           </Text>
         </View>
         <View style={styles.toolbar}>
-          <Pressable accessibilityLabel="Toggle full screen" style={styles.toolbarButton} onPress={toggleFullscreen}>
-            <MaterialIcons name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={26} color={COLORS.gold} />
+          <Pressable
+            accessibilityLabel="Toggle full screen"
+            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
+            onPress={toggleFullscreen}
+          >
+            <Icon name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={iconSize} color={COLORS.gold} />
           </Pressable>
-          <Pressable accessibilityLabel="Open bookmarks" style={styles.toolbarButton} onPress={() => router.push('/bookmarks')}>
-            <Ionicons name="bookmark-outline" size={26} color={COLORS.gold} />
+          <Pressable
+            accessibilityLabel="Open bookmarks"
+            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
+            onPress={() => router.push('/bookmarks')}
+          >
+            <Icon name="bookmark-outline" size={iconSize} color={COLORS.gold} />
           </Pressable>
-          <Pressable accessibilityLabel="Open calendar" style={styles.toolbarButton} onPress={() => router.push('/calendar')}>
-            <Ionicons name="calendar-outline" size={26} color={COLORS.gold} />
+          <Pressable
+            accessibilityLabel="Open calendar"
+            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
+            onPress={() => router.push('/calendar')}
+          >
+            <Icon name="calendar-outline" size={iconSize} color={COLORS.gold} />
           </Pressable>
-          <Pressable accessibilityLabel="Open settings" style={styles.toolbarButton} onPress={() => router.push('/settings')}>
-            <Ionicons name="settings-outline" size={26} color={COLORS.gold} />
+          <Pressable
+            accessibilityLabel="Open settings"
+            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
+            onPress={() => router.push('/settings')}
+          >
+            <Icon name="settings-outline" size={iconSize} color={COLORS.gold} />
           </Pressable>
         </View>
       </View>

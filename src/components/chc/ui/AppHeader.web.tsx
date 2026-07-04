@@ -2,8 +2,8 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
-
-type IconFamily = 'ionicons' | 'material';
+import { useIsMobileWeb } from '../../../utils/useIsMobileWeb';
+import Icon, { IconName } from './Icon';
 
 interface AppHeaderProps {
   title: string | { english: string; arabic: string };
@@ -45,8 +45,8 @@ export default function AppHeader({
     <View style={[styles.container, isMobileWeb && styles.containerMobile]}>
       <View style={styles.topRow}>
         {canGoBack ? (
-          <Pressable accessibilityLabel="Go back" style={styles.iconButton} onPress={onBack}>
-            <Ionicons name="chevron-back" size={28} color={COLORS.gold} />
+          <Pressable accessibilityLabel="Go back" style={iconButtonStyle} onPress={onBack}>
+            <Icon name="chevron-back" size={isMobileWeb ? 24 : 28} color={COLORS.gold} />
           </Pressable>
         ) : (
           <Image
@@ -87,16 +87,12 @@ export default function AppHeader({
                 style={iconButtonStyle}
                 onPress={onRightLeadingPress}
               >
-                {rightLeadingIconFamily === 'material' ? (
-                  <MaterialIcons name={rightLeadingIcon as keyof typeof MaterialIcons.glyphMap} size={26} color={COLORS.gold} />
-                ) : (
-                  <Ionicons name={rightLeadingIcon as keyof typeof Ionicons.glyphMap} size={26} color={COLORS.gold} />
-                )}
+                <Icon name={rightLeadingIcon as IconName} size={iconSize} color={COLORS.gold} />
               </Pressable>
             ) : null}
             {hasRightAction ? (
-              <Pressable accessibilityLabel={rightAccessibilityLabel} style={styles.iconButton} onPress={onRightPress}>
-                <Ionicons name={rightIcon as keyof typeof Ionicons.glyphMap} size={26} color={COLORS.gold} />
+              <Pressable accessibilityLabel={rightAccessibilityLabel} style={iconButtonStyle} onPress={onRightPress}>
+                <Icon name={rightIcon as IconName} size={iconSize} color={COLORS.gold} />
               </Pressable>
             ) : null}
           </View>

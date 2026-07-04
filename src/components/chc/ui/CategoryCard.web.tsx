@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { useIsMobileWeb } from '../../../utils/useIsMobileWeb';
+import Icon from './Icon';
 
 const EASTERN_ARABIC_DIGITS: Record<string, string> = {
   '0': '٠', '1': '١', '2': '٢', '3': '٣', '4': '٤',
@@ -30,19 +31,30 @@ export default function CategoryCard({ title, arabic, onPress }: CategoryCardPro
   const isMobileWeb = useIsMobileWeb();
 
   return (
-    <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
-      <View style={styles.iconWrap}>
-        <Ionicons name="library-outline" size={26} color={COLORS.gold} />
+    <Pressable
+      style={({ pressed }) => [styles.row, isMobileWeb && styles.rowMobile, pressed && styles.rowPressed]}
+      onPress={onPress}
+    >
+      <View style={[styles.iconWrap, isMobileWeb && styles.iconWrapMobile]}>
+        <Icon name="library-outline" size={isMobileWeb ? 20 : 26} color={COLORS.gold} />
       </View>
-      <Text style={styles.title} numberOfLines={1}>
-        {formatEnglishDisplayText(title)}
-      </Text>
-      {arabic ? (
-        <Text style={styles.arabicTitle} numberOfLines={1}>
-          {formatArabicNumbers(arabic)}
+      <View style={[styles.titleGroup, isMobileWeb && styles.titleGroupMobile]}>
+        <Text
+          style={[styles.title, isMobileWeb && styles.titleMobile]}
+          numberOfLines={isMobileWeb ? 2 : 1}
+        >
+          {formatEnglishDisplayText(title)}
         </Text>
-      ) : null}
-      <Ionicons name="chevron-forward" size={24} color={COLORS.gold} style={styles.chevron} />
+        {arabic ? (
+          <Text
+            style={[styles.arabicTitle, isMobileWeb && styles.arabicTitleMobile]}
+            numberOfLines={isMobileWeb ? 2 : 1}
+          >
+            {formatArabicNumbers(arabic)}
+          </Text>
+        ) : null}
+      </View>
+      <Icon name="chevron-forward" size={isMobileWeb ? 20 : 24} color={COLORS.gold} style={styles.chevron} />
     </Pressable>
   );
 }
