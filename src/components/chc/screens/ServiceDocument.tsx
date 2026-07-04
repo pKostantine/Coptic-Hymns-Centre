@@ -14,6 +14,7 @@ import { useReadingPreferences } from '../../../context/ReadingPreferencesContex
 import { useCalendar } from '../../../context/CalendarContext';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
+import { getLastDocumentPosition, setLastDocumentPosition } from '../../../utils/lastDocumentPosition';
 import { goBack } from '../../../utils/navigation';
 
 interface ServiceDocumentProps {
@@ -53,6 +54,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true);
   const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
   const { width: screenWidth } = useWindowDimensions();
+  const bookmarkId = `${schema}:${table}`;
+  // Navigating to Settings and back unmounts this screen (React Navigation
+  // doesn't keep off-screen web routes mounted), which would otherwise wipe
+  // currentSectionId/selectedSlideSectionId right when "bring me back to
+  // where I was" matters most — so the last-known position for this exact
+  // document is also kept in a plain module-level store that survives the
+  // remount, keyed on whichever forced condition flags select this entry
+  // point (e.g. Vespers vs. Matins both open raising_of_incense).
+  const documentPositionKey = `${bookmarkId}:${JSON.stringify(extraContext || {})}`;
+
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // In-document toggle button (rendered wherever GOSPEL_RITE is spliced in) —
@@ -60,18 +71,27 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const [copticGospelRite, setCopticGospelRite] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
-  const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
+  // Seeded synchronously (not via an effect) from the module-level store: a
+  // child effect inside SlideshowContainer reports "slide 0" the instant it
+  // mounts, which — if this started out undefined and only got set a render
+  // later by an effect here — would race ahead and persist that wrong "slide
+  // 0" over the real remembered position before this ever got a chance to
+  // apply it.
+  const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>(() =>
+    getLastDocumentPosition(documentPositionKey),
+  );
   const [subdocumentModal, setSubdocumentModal] = useState<SubdocumentModalTarget | null>(null);
   const [antiphonarySections, setAntiphonarySections] = useState<DocumentSection[] | null>(null);
   const documentRef = useRef<DocumentWebViewHandle>(null);
+  const hasRestoredScrollPositionRef = useRef(false);
 
-  const bookmarkId = `${schema}:${table}`;
   const bookmarked = isBookmarked(bookmarkId);
 
   useEffect(() => {
     let cancelled = false;
     setSections(null);
     setError(null);
+    hasRestoredScrollPositionRef.current = false;
 
     hydrateSupabaseServiceHymn(
       schema,
@@ -92,6 +112,19 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     };
   }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, preferences.bishopPresent, copticGospelRite, extraContext]);
 
+  // The scrolling WebView reader has no equivalent "seed the initial prop"
+  // option (scrollToSection is imperative and needs the WebView mounted
+  // first), so it still restores via an effect once a freshly (re)hydrated
+  // document is ready.
+  useEffect(() => {
+    if (!sections || hasRestoredScrollPositionRef.current || preferences.slideshowMode) return;
+    hasRestoredScrollPositionRef.current = true;
+
+    const lastSectionId = getLastDocumentPosition(documentPositionKey);
+    if (!lastSectionId || !sections.some((s) => s.id === lastSectionId)) return;
+    documentRef.current?.scrollToSection(lastSectionId);
+  }, [sections, documentPositionKey, preferences.slideshowMode]);
+
   const handleAction = (action: DocumentAction) => {
     if (action.type === 'toggleCopticGospelRite') {
       setCopticGospelRite((current) => !current);
@@ -101,7 +134,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     if (!sections) return;
 
     if (action.type === 'currentSection') {
-      if (action.sectionId) setCurrentSectionId(action.sectionId);
+      if (action.sectionId) {
+        setCurrentSectionId(action.sectionId);
+        setLastDocumentPosition(documentPositionKey, action.sectionId);
+      }
       return;
     }
 
@@ -180,7 +216,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             preferences={preferences}
             onAction={handleAction}
             selectedSectionId={selectedSlideSectionId}
-            onCurrentSectionChange={setCurrentSectionId}
+            onCurrentSectionChange={(id) => {
+              setCurrentSectionId(id);
+              setLastDocumentPosition(documentPositionKey, id);
+            }}
             onOpenSelector={() => setSelectorOpen(true)}
             copticGospelRite={copticGospelRite}
           />

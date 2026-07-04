@@ -225,7 +225,7 @@ export default function SlideshowContainer({
       measuredViewportHeight - slidePadding.top - slidePadding.bottom;
 
     if (!effectiveViewportHeight) {
-      return [items.slice(0, 1)];
+      return dropEmptySlides([items.slice(0, 1)]);
     }
 
     const effectiveHeights = {};
@@ -235,14 +235,16 @@ export default function SlideshowContainer({
         estimateItemHeight(item, fontSize, visibleLanguages, slideTableWidth);
     });
 
-    return paginateItems(
-      items,
-      effectiveHeights,
-      measuredLanguageHeights,
-      Math.max(effectiveViewportHeight - 8, 120),
-      fontSize,
-      visibleLanguages,
-      slideTableWidth,
+    return dropEmptySlides(
+      paginateItems(
+        items,
+        effectiveHeights,
+        measuredLanguageHeights,
+        Math.max(effectiveViewportHeight - 8, 120),
+        fontSize,
+        visibleLanguages,
+        slideTableWidth,
+      ),
     );
   }, [
     fontSize,
@@ -269,6 +271,19 @@ export default function SlideshowContainer({
   }, [slides.length]);
 
   useEffect(() => {
+    // A fresh, explicit content-selector pick always wins over (and cancels)
+    // whatever the reset effect above was hoping to auto-restore — otherwise
+    // the reporting effect below would keep comparing the user's brand-new
+    // position against that now-irrelevant stale target and refuse to report
+    // it. Runs as its own effect, keyed only on selectedSectionId, so it
+    // fires (and clears the stale target) in the same commit as — but before
+    // — the jump effect right below, which shares this same trigger.
+    if (selectedSectionId) {
+      pendingRestoreSectionIdRef.current = null;
+    }
+  }, [selectedSectionId]);
+
+  useEffect(() => {
     // An explicit content-selector jump (selectedSectionId) takes priority;
     // otherwise, if a settings/minimization change just forced a repagination,
     // fall back to jumping back to wherever the user was previously looking
@@ -283,25 +298,46 @@ export default function SlideshowContainer({
     }
 
     const nextSlideIndex = slides.findIndex((slide) =>
-      slide.some((item) => item.id === `${targetSectionId}-title`),
+      slide.some((item) => item.sectionId === targetSectionId),
     );
 
     if (nextSlideIndex >= 0) {
       setCurrentSlideIndex(nextSlideIndex);
       lastAppliedSelectedSectionId.current = targetSectionId;
-      if (!selectedSectionId) {
-        pendingRestoreSectionIdRef.current = null;
-      }
+    }
+
+    // Only the auto-restore path (no explicit selectedSectionId) clears here;
+    // an explicit pick already cleared it above, and re-clearing here would
+    // happen too early — before setCurrentSlideIndex's update has actually
+    // landed — letting the reporting effect below see a still-stale slide
+    // with nothing left to compare it against.
+    if (!selectedSectionId) {
+      pendingRestoreSectionIdRef.current = null;
     }
   }, [selectedSectionId, slides]);
 
   useEffect(() => {
     const currentSectionId = findSlideSectionId(slides[currentSlideIndex]);
+    if (!currentSectionId) return;
 
-    if (currentSectionId) {
-      preservedSectionIdRef.current = currentSectionId;
-      onCurrentSectionChange?.(currentSectionId);
+    // A measuredKey reset (settings change, minimization, or even just the
+    // surrounding layout shifting while navigating to another screen) always
+    // snaps currentSlideIndex to 0 for a moment before the jump effect above
+    // can correct it back to pendingRestoreSectionIdRef.current. That
+    // transient "slide 0" is not where the user actually is — reporting it
+    // here (and to the host app, which persists it as "last known position")
+    // would overwrite the real position with a reset artifact before the
+    // correction even gets a chance to land.
+    if (pendingRestoreSectionIdRef.current && pendingRestoreSectionIdRef.current !== currentSectionId) {
+      return;
     }
+
+    // The pending restore (if any) has now been confirmed reached — clear it
+    // so it doesn't keep gating every future report once selectedSectionId
+    // stops changing (it never resets back to undefined on its own).
+    pendingRestoreSectionIdRef.current = null;
+    preservedSectionIdRef.current = currentSectionId;
+    onCurrentSectionChange?.(currentSectionId);
   }, [currentSlideIndex, onCurrentSectionChange, slides]);
 
   const goToPreviousSlide = useCallback(() => {
@@ -918,6 +954,44 @@ const EASTERN_ARABIC_DIGITS = {
   9: "٩",
 };
 
+// A minimized/collapsed section (verses emptied but the title kept, so the
+// user can still see and re-expand it) or a section whose only verses were
+// comments/silent-prayer lines hidden by the current display settings can
+// end up contributing a slide with nothing actually visible on it — no
+// title text, no verse text, not even a Subdocument/Antiphonary button.
+// Rather than show that as a blank page in the middle of swiping, such
+// slides are dropped entirely.
+function slideHasVisibleContent(slide = []) {
+  return slide.some((item) => {
+    if (item.type === "button") {
+      return true;
+    }
+
+    if (item.type === "title") {
+      const title = item.title || {};
+      return Boolean(String(title.english || "").trim() || String(title.arabic || "").trim());
+    }
+
+    if (item.type === "verse") {
+      const verse = item.verse || {};
+      return Boolean(
+        String(verse.english || "").trim() ||
+          String(verse.coptic || "").trim() ||
+          String(verse.arabic || "").trim(),
+      );
+    }
+
+    return false;
+  });
+}
+
+function dropEmptySlides(slides) {
+  const withContent = slides.filter(slideHasVisibleContent);
+  // Never drop down to zero slides — an entirely contentless document still
+  // needs somewhere for the slideshow to land.
+  return withContent.length ? withContent : slides;
+}
+
 function paginateItems(
   items,
   heights,
@@ -1140,8 +1214,23 @@ function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
     slideshowLanguageKeys: languageKeys,
   };
   const lineCounts = {};
+  // A language that wraps to fewer total lines than its siblings (Coptic at
+  // a larger font routinely does, since its words/glyphs run wider) can
+  // finish displaying all of its content in an earlier segment while
+  // English/Arabic still have more to show in later ones. Once that's
+  // happened, this and every later segment has nothing left to put in that
+  // column — rendering it anyway (VerseBlock's fixed-column-table behavior,
+  // which is correct for a verse that never had text in a language at all)
+  // produces a persistent blank gap next to whichever column comes after it,
+  // reading as a phantom empty column. Suppress only the languages that were
+  // ALREADY fully consumed before this segment started; a language with no
+  // text for the verse from the start (lines.length === 0 for all of
+  // state.languages) never reaches this function's per-language block at
+  // all, so it's untouched and still gets its normal fixed blank column.
+  const exhaustedLanguages = [];
 
   state.languages.forEach((entry) => {
+    const wasAlreadyExhausted = entry.offset >= entry.lines.length;
     const remainingCount = entry.lines.length - entry.offset;
     const takeCount = Math.min(lineCapacities[entry.language] || 0, remainingCount);
     const lines = entry.lines.slice(entry.offset, entry.offset + takeCount);
@@ -1149,7 +1238,15 @@ function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
     verse[entry.language] = joinRenderedLines(lines);
     lineCounts[entry.language] = lines.length;
     entry.offset += takeCount;
+
+    if (wasAlreadyExhausted) {
+      exhaustedLanguages.push(entry.language);
+    }
   });
+
+  if (exhaustedLanguages.length) {
+    verse.slideshowSuppressedLanguages = exhaustedLanguages;
+  }
 
   return {
     item: {

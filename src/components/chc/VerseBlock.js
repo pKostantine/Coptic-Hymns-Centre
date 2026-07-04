@@ -126,7 +126,17 @@ export default function VerseBlock({
     // rows, reading as a stray gap or "imaginary extra column". Documents
     // should read like a fixed-column table — see documentHtml.ts, which
     // applies the same fixed-column philosophy to the WebView reader.
+    //
+    // The one exception is slideshowSuppressedLanguages: when a tall verse
+    // has to split across multiple slides, a language that wraps to fewer
+    // lines than its siblings (Coptic at a larger font routinely does) can
+    // run out of content in an earlier segment while English/Arabic still
+    // have more left. Rendering its now-permanently-blank column on every
+    // later segment reads as a phantom empty column next to whichever column
+    // comes after it — worse than the rare cross-row misalignment this
+    // filter otherwise avoids — so those segments drop the column entirely.
     (language) =>
+      !verse.slideshowSuppressedLanguages?.includes(language.key) &&
       (verse.invincibleCoptic ||
         visibleLanguages[language.key] ||
         (language.key === "coptic" && verse.forceCopticVisible)) &&
