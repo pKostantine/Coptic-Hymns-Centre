@@ -20,7 +20,7 @@ export const SUBDOCUMENT_MAP = {
   PRAXIS_RESPONSE: { schema: "praxis_response", table: "praxis_response" },
   HYMN_OF_THE_INTERCESSIONS: { schema: "hymn_of_the_intercessions", table: "hymn_of_the_intercessions" },
   VERSES_OF_THE_CYMBALS: { schema: "verses_of_the_cymbals", table: "verses_of_the_cymbals" },
-  SEASONAL_LITURGY_HYMNS: { schema: "seasonal_liturgy_hymns", table: "seasonal_liturgy_hymns" },
+  SEASONAL_LITURGY_HYMNS: null, // not yet in database — "seasonal_liturgy_hymns" is not an exposed schema/table
   THIRD_HOUR: { schema: "agpeya", table: "third_hour" },
   SIXTH_HOUR: { schema: "agpeya", table: "sixth_hour" },
   NINTH_HOUR: { schema: "agpeya", table: "ninth_hour" },
