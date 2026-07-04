@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
+import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -45,6 +46,9 @@ const ANTIPHONARY_GROUPS: { key: 'introduction' | 'adam' | 'vatos'; label: strin
 function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: DocumentModalProps) {
   const { preferences } = useReadingPreferences();
   const [nestedModal, setNestedModal] = useState<DocumentModalTarget | null>(null);
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
+  const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
   const documentRef = useRef<DocumentWebViewHandle>(null);
 
   const handleAction = (action: DocumentAction) => {
@@ -83,7 +87,14 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose}>
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
-        <AppHeader title={title || ''} canGoBack onBack={onClose} />
+        <AppHeader
+          title={title || ''}
+          canGoBack
+          onBack={onClose}
+          rightIcon="list-outline"
+          rightAccessibilityLabel="Open content list"
+          onRightPress={() => setSelectorOpen(true)}
+        />
         {isAntiphonary ? (
           <View style={styles.selectorRow}>
             {ANTIPHONARY_GROUPS.map((group) => (
@@ -98,7 +109,32 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
             <Text style={styles.loading}>Loading…</Text>
           </View>
         ) : (
-          <DocumentSurface ref={documentRef} sections={sections} preferences={preferences} onAction={handleAction} />
+          <>
+            <DocumentSurface
+              ref={documentRef}
+              sections={sections}
+              preferences={preferences}
+              onAction={handleAction}
+              fontScaleMultiplier={0.75}
+              selectedSectionId={selectedSlideSectionId}
+              onCurrentSectionChange={setCurrentSectionId}
+              onOpenSelector={() => setSelectorOpen(true)}
+            />
+            <ContentSelectorDrawer
+              visible={selectorOpen}
+              sections={sections}
+              currentSectionId={currentSectionId}
+              onClose={() => setSelectorOpen(false)}
+              onSelectSection={(id) => {
+                if (preferences.slideshowMode) {
+                  setSelectedSlideSectionId(id);
+                } else {
+                  documentRef.current?.scrollToSection(id);
+                }
+              }}
+              displaySilentPrayers={preferences.displaySilentPrayers}
+            />
+          </>
         )}
         <DocumentModal
           visible={Boolean(nestedModal)}

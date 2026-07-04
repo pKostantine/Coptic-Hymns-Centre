@@ -1,5 +1,5 @@
-import { supabase } from "./supabase";
 import { evaluateCondition, getContextFlags } from "./conditionEngine";
+import { supabase } from "./supabase";
 
 // ─── Subdocument sentinel → schema.table registry ────────────────────────────
 // Verified against live DB usage (see project memory project_subdocument_registry.md).
@@ -49,6 +49,18 @@ const ALL_CAPS_KEY_REGEX = /^[A-Z][A-Z0-9_]*$/;
  */
 function resolveWholeTableInlineTarget(hymnKey) {
   return ALL_CAPS_KEY_REGEX.test(hymnKey) ? SUBDOCUMENT_MAP[hymnKey] || null : null;
+}
+
+/**
+ * GOSPEL_RITE always gets its "Coptic Gospel Rite" toggle button rendered
+ * immediately before its content, wherever it's spliced in — mutates the
+ * first of the just-hydrated nested sections in place (mirrors how
+ * addTuneMarkersToAntiphonarySections tags sections post-hydration).
+ */
+function markGospelRiteToggleStart(hymnKey, nestedSections) {
+  if (hymnKey === "GOSPEL_RITE" && nestedSections.length) {
+    nestedSections[0] = { ...nestedSections[0], startsGospelRiteToggle: true };
+  }
 }
 
 // Sentinels that resolve through the Lectionary/Bible reading flow rather
@@ -581,15 +593,9 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
       // restarts once, at the very first verse, exactly as if this were a
       // single hymn rather than several spliced together.
       const target = resolveWholeTableInlineTarget(section.hymn_key);
-      if (target && depth < 3) {
-        const nestedSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1, isoDate);
-        hydrated.push(applyCopticCaseToSection(mergeNestedSectionsAsOneHymn(section, nestedSections)));
-        continue;
-      }
-      if (!target && READING_SENTINELS.has(section.hymn_key) && isoDate) {
-        const readingSection = await resolveReadingSentinelSection(section, isoDate);
-        if (readingSection) hydrated.push(readingSection);
-      }
+      if (!target || depth >= 3) continue;
+      const nestedSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1);
+      hydrated.push(...nestedSections);
       continue;
     }
 
@@ -623,18 +629,10 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
 
         const wholeTableTarget = resolveWholeTableInlineTarget(verse.inlineHymnKey);
         if (wholeTableTarget) {
-          // Spliced as plain continuation verses of the CURRENT hymn (not
-          // separate sections) — "treated as one hymn" applies here too,
-          // even though the whole-table reference is injected mid-verse-list
-          // rather than at the order-table level.
-          const nestedSections = await safeHydrateNested(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1, isoDate);
-          verses.push(...nestedSections.flatMap((s) => s.verses || []));
-          continue;
-        }
-
-        if (READING_SENTINELS.has(verse.inlineHymnKey) && isoDate) {
-          const readingVerses = await resolveReadingSentinelVerses(verse.inlineHymnKey, isoDate);
-          verses.push(...readingVerses);
+          flushVerses();
+          const nestedSections = await safeHydrateNested(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1);
+          hydrated.push(...nestedSections);
+          pushedAnything = true;
           continue;
         }
 

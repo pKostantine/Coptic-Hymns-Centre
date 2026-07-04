@@ -55,6 +55,9 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const { width: screenWidth } = useWindowDimensions();
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // In-document toggle button (rendered wherever GOSPEL_RITE is spliced in) —
+  // session-only, not a persisted reading preference like Bishop Present.
+  const [copticGospelRite, setCopticGospelRite] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
@@ -74,7 +77,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       schema,
       table,
       effectiveDate,
-      { BishopPresent: preferences.bishopPresent, ...extraContext },
+      { BishopPresent: preferences.bishopPresent, CopticGospelRite: copticGospelRite, ...extraContext },
       isVespersService ? vespersEffectiveDate : undefined,
     )
       .then((result) => {
@@ -87,9 +90,14 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, preferences.bishopPresent, extraContext]);
+  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, preferences.bishopPresent, copticGospelRite, extraContext]);
 
   const handleAction = (action: DocumentAction) => {
+    if (action.type === 'toggleCopticGospelRite') {
+      setCopticGospelRite((current) => !current);
+      return;
+    }
+
     if (!sections) return;
 
     if (action.type === 'currentSection') {
@@ -150,7 +158,6 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           canGoBack
           onBack={() => goBack(router, backHref)}
           rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
-          rightLeadingIconFamily="material"
           onRightLeadingPress={toggleFullscreen}
           rightIcon="list-outline"
           rightAccessibilityLabel="Open content list"
@@ -175,6 +182,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             selectedSectionId={selectedSlideSectionId}
             onCurrentSectionChange={setCurrentSectionId}
             onOpenSelector={() => setSelectorOpen(true)}
+            copticGospelRite={copticGospelRite}
           />
           <ContentSelectorDrawer
             visible={selectorOpen}
@@ -194,6 +202,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             onOpenSettings={() => router.push('/settings')}
             bishopPresent={preferences.bishopPresent}
             onToggleBishopPresent={toggleBishopPresent}
+            displaySilentPrayers={preferences.displaySilentPrayers}
           />
           <SubdocumentModal
             visible={Boolean(subdocumentModal)}

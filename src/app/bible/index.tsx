@@ -28,7 +28,6 @@ export default function BibleTestamentList() {
         canGoBack
         onBack={() => goBack(router, '/')}
         rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
-        rightLeadingIconFamily="material"
         onRightLeadingPress={toggleFullscreen}
       />
       <ScrollView contentContainerStyle={styles.list}>

@@ -32,6 +32,8 @@ export interface DocumentSection {
   isAntiphonaryButton?: boolean;
   /** Prefetched during the parent document's own hydration, so opening the button's modal is a local render, never a fresh fetch. */
   subdocumentSections?: DocumentSection[];
+  /** Set on the first section spliced in from a GOSPEL_RITE inline import — renders the "Coptic Gospel Rite" toggle button immediately before it. */
+  startsGospelRiteToggle?: boolean;
 }
 
 export interface VisibleColumns {
@@ -81,6 +83,7 @@ export function buildDocumentHtml(
     displaySilentPrayers = false,
     bishopPresent = false,
     copticRecitedPrayers = true,
+    copticGospelRite = false,
   }: {
     copticFontDataUri: string;
     fontSize: number;
@@ -90,10 +93,13 @@ export function buildDocumentHtml(
     displaySilentPrayers?: boolean;
     bishopPresent?: boolean;
     copticRecitedPrayers?: boolean;
+    copticGospelRite?: boolean;
   },
 ) {
   const sectionTitleFontSize = Math.max(Math.round(fontSize * 0.5), 14);
   const sectionTitleLineHeight = Math.max(Math.round(fontSize * 0.62), 18);
+  const openButtonFontSize = Math.max(Math.round(sectionTitleFontSize * 1.3), 18);
+  const openButtonLineHeight = Math.max(Math.round(sectionTitleLineHeight * 1.3), 24);
   const copticFontSize = Math.round(fontSize * 1.25);
   const arabicFontSize = Math.round(fontSize * 1.15);
   const verseLineHeight = Math.round(fontSize * 1.25);
@@ -103,7 +109,15 @@ export function buildDocumentHtml(
   );
   const htmlSections = visibleSections
     .map((section) =>
-      renderSection(section, { fontSize, visibleColumns, displayComments, displaySilentPrayers, bishopPresent, copticRecitedPrayers }),
+      renderSection(section, {
+        fontSize,
+        visibleColumns,
+        displayComments,
+        displaySilentPrayers,
+        bishopPresent,
+        copticRecitedPrayers,
+        copticGospelRite,
+      }),
     )
     .join('');
 
@@ -112,7 +126,6 @@ export function buildDocumentHtml(
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&display=swap");
       @font-face {
         font-family: "CopticCHC";
         src: url("${copticFontDataUri}") format("truetype");
@@ -230,25 +243,60 @@ export function buildDocumentHtml(
         align-items: center;
         background: ${COLORS.surface};
         border: 1px solid ${COLORS.gold};
-        border-radius: 8px;
+        border-radius: 12px;
         color: ${COLORS.white};
         display: flex;
         flex-direction: column;
-        gap: ${SPACING.xs}px;
+        gap: ${SPACING.sm}px;
         font-family: Georgia, serif;
-        font-size: ${sectionTitleFontSize}px;
+        font-size: ${openButtonFontSize}px;
         font-weight: 800;
-        min-height: 120px;
+        min-height: 168px;
         justify-content: center;
         margin: 0 auto;
-        max-width: 320px;
-        width: 72%;
+        max-width: 420px;
+        padding: ${SPACING.lg}px ${SPACING.md}px;
+        width: 84%;
       }
       .open-button .arabic {
         direction: rtl;
         font-family: "Arial", sans-serif;
+        font-size: ${openButtonFontSize}px;
+        line-height: ${openButtonLineHeight}px;
+      }
+      .gospel-rite-toggle-row {
+        align-items: center;
+        display: flex;
+        justify-content: center;
+        margin: 0 0 ${SPACING.lg}px;
+      }
+      .gospel-rite-toggle {
+        align-items: center;
+        background: ${COLORS.surface};
+        border: 1px solid ${COLORS.gold};
+        border-radius: 999px;
+        color: ${COLORS.white};
+        cursor: pointer;
+        display: flex;
+        font-family: Georgia, serif;
         font-size: ${sectionTitleFontSize}px;
-        line-height: ${sectionTitleLineHeight}px;
+        font-weight: 700;
+        gap: ${SPACING.sm}px;
+        padding: ${SPACING.sm}px ${SPACING.lg}px;
+      }
+      .gospel-rite-toggle.is-on {
+        background: ${COLORS.gold};
+        color: ${COLORS.black};
+      }
+      .gospel-rite-toggle-dot {
+        background: currentColor;
+        border-radius: 999px;
+        height: 10px;
+        width: 10px;
+        opacity: 0.4;
+      }
+      .gospel-rite-toggle.is-on .gospel-rite-toggle-dot {
+        opacity: 1;
       }
     </style>
   </head>
@@ -334,12 +382,14 @@ function renderSection(
     displaySilentPrayers: boolean;
     bishopPresent: boolean;
     copticRecitedPrayers: boolean;
+    copticGospelRite: boolean;
   },
 ) {
-  const { visibleColumns, displayComments, displaySilentPrayers, bishopPresent } = opts;
+  const { visibleColumns, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite } = opts;
+  const toggleHtml = section.startsGospelRiteToggle ? renderGospelRiteToggle(copticGospelRite) : '';
 
   if (section.isSubdocumentButton || section.isAntiphonaryButton) {
-    return renderDocumentButtonSection(section, visibleColumns);
+    return toggleHtml + renderDocumentButtonSection(section, visibleColumns);
   }
 
   const isCollapsed = Boolean(section.collapsible && section.defaultCollapsed);
@@ -367,10 +417,28 @@ function renderSection(
     .join('');
 
   return `
+    ${toggleHtml}
     <section class="section ${isCollapsed ? 'collapsed' : ''}" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
       ${titleHtml}
       <div class="section-content">${versesHtml}</div>
     </section>
+  `;
+}
+
+/**
+ * The "Coptic Gospel Rite" toggle button always rendered immediately before
+ * GOSPEL_RITE's spliced-in content (see startsGospelRiteToggle). Tapping it
+ * posts `toggleCopticGospelRite`, which the host app answers by flipping the
+ * CopticGospelRite condition flag and re-hydrating the whole document.
+ */
+function renderGospelRiteToggle(isOn: boolean) {
+  return `
+    <div class="gospel-rite-toggle-row">
+      <button class="gospel-rite-toggle${isOn ? ' is-on' : ''}" onclick="postAction('toggleCopticGospelRite')">
+        <span class="gospel-rite-toggle-dot"></span>
+        <span>Coptic Gospel Rite</span>
+      </button>
+    </div>
   `;
 }
 

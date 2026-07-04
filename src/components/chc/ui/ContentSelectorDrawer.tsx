@@ -1,5 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -18,6 +17,8 @@ interface ContentSelectorDrawerProps {
   onOpenSettings?: () => void;
   bishopPresent?: boolean;
   onToggleBishopPresent?: () => void;
+  /** When false, sections titled Silent Prayer are excluded from the list, matching their hidden state in the document itself. */
+  displaySilentPrayers?: boolean;
 }
 
 /** CHC ContentSelectorDrawer — ported 1:1 from HymnDisplayScreen.js's selector Modal/panel. */
@@ -33,6 +34,7 @@ export default function ContentSelectorDrawer({
   onOpenSettings,
   bishopPresent,
   onToggleBishopPresent,
+  displaySilentPrayers = false,
 }: ContentSelectorDrawerProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
@@ -61,6 +63,9 @@ export default function ContentSelectorDrawer({
   const listable = sections.filter((section) => {
     // "Our Father" always has a title but should never clutter the jump-to list.
     if (section.hymnKey === 'ourFather') return false;
+    // A section hidden from the document because Silent Prayers are disabled
+    // shouldn't still be jumpable from the content list.
+    if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;
     // Subdocument/Antiphonary buttons are a real UI action, not hymn text —
     // they must survive even though they carry no verses.
     if (section.isSubdocumentButton || section.isAntiphonaryButton) return true;
@@ -115,7 +120,7 @@ export default function ContentSelectorDrawer({
           <View style={[styles.selectorHeader, isCompactSelector && styles.selectorHeaderMobile]}>
             {isCompactSelector ? (
               <Pressable accessibilityLabel="Close content list" style={styles.selectorBackButton} onPress={onClose}>
-                <Ionicons name="chevron-back" size={24} color={COLORS.gold} />
+                <Icon name="chevron-back" size={24} color={COLORS.gold} />
               </Pressable>
             ) : null}
             <Text style={styles.actionLabel}>Content</Text>
@@ -166,7 +171,7 @@ export default function ContentSelectorDrawer({
             <View style={styles.selectorActionRow}>
               {onToggleBookmark ? (
                 <Pressable accessibilityLabel="Bookmark hymn" style={styles.selectorIconButton} onPress={onToggleBookmark}>
-                  <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={COLORS.gold} />
+                  <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={COLORS.gold} />
                 </Pressable>
               ) : null}
               {onOpenCalendar ? (
@@ -178,7 +183,7 @@ export default function ContentSelectorDrawer({
                     onOpenCalendar();
                   }}
                 >
-                  <Ionicons name="calendar-outline" size={26} color={COLORS.gold} />
+                  <Icon name="calendar-outline" size={26} color={COLORS.gold} />
                 </Pressable>
               ) : null}
               {onOpenSettings ? (
@@ -190,7 +195,7 @@ export default function ContentSelectorDrawer({
                     onOpenSettings();
                   }}
                 >
-                  <Ionicons name="settings-outline" size={26} color={COLORS.gold} />
+                  <Icon name="settings-outline" size={26} color={COLORS.gold} />
                 </Pressable>
               ) : null}
             </View>

@@ -65,7 +65,6 @@ export default function BibleChapterDocument() {
         canGoBack
         onBack={() => goBack(router, bookKey ? { pathname: '/bible/[bookKey]', params: { bookKey, title } } : '/bible')}
         rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
-        rightLeadingIconFamily="material"
         onRightLeadingPress={toggleFullscreen}
       />
       {error ? (

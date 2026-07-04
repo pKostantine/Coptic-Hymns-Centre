@@ -13,6 +13,10 @@ interface DocumentSurfaceProps {
   selectedSectionId?: string | null;
   onCurrentSectionChange?: (id: string) => void;
   onOpenSelector?: () => void;
+  /** Scales the reading font size relative to the user's normal preference — subdocument modals render smaller (0.75) than the main document (1). */
+  fontScaleMultiplier?: number;
+  /** Current on/off state of the in-document "Coptic Gospel Rite" toggle button (only rendered where GOSPEL_RITE content is spliced in). */
+  copticGospelRite?: boolean;
 }
 
 /** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
@@ -73,8 +77,12 @@ function buildSlideshowSections(
  * same onAction handler as the WebView reader.
  */
 const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
-  ({ sections, preferences, onAction, selectedSectionId, onCurrentSectionChange, onOpenSelector }, ref) => {
+  (
+    { sections, preferences, onAction, selectedSectionId, onCurrentSectionChange, onOpenSelector, fontScaleMultiplier = 1, copticGospelRite = false },
+    ref,
+  ) => {
     const { width: screenWidth } = useWindowDimensions();
+    const fontSize = Math.round(fontScaleToPx(preferences.fontScale) * fontScaleMultiplier);
     // Keyed by section.id, same model as the old app's collapsedContentIds: a
     // missing entry falls back to the section's own defaultCollapsed, an
     // explicit entry (set by tapping the slideshow's collapse button) wins.
@@ -106,7 +114,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         <SlideshowContainer
           sections={slideshowSections}
           visibleLanguages={preferences.visibleLanguages}
-          fontSize={fontScaleToPx(preferences.fontScale)}
+          fontSize={fontSize}
           theme={CHC_SLIDESHOW_THEME}
           tableWidth={screenWidth}
           titleHelpers={titleHelpers}
@@ -131,7 +139,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       <DocumentWebView
         ref={ref}
         sections={sections}
-        fontSize={fontScaleToPx(preferences.fontScale)}
+        fontSize={fontSize}
         visibleColumns={{
           english: preferences.visibleLanguages.english,
           coptic: preferences.visibleLanguages.coptic,
@@ -141,6 +149,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         displayComments={preferences.displayComments}
         displaySilentPrayers={preferences.displaySilentPrayers}
         bishopPresent={preferences.bishopPresent}
+        copticGospelRite={copticGospelRite}
         copticRecitedPrayers={preferences.visibleLanguages.copticRecitedPrayers}
         onAction={onAction}
       />

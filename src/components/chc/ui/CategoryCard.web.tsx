@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -31,30 +30,19 @@ export default function CategoryCard({ title, arabic, onPress }: CategoryCardPro
   const isMobileWeb = useIsMobileWeb();
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.row, isMobileWeb && styles.rowMobile, pressed && styles.rowPressed]}
-      onPress={onPress}
-    >
-      <View style={[styles.iconWrap, isMobileWeb && styles.iconWrapMobile]}>
-        <Ionicons name="library-outline" size={isMobileWeb ? 20 : 26} color={COLORS.gold} />
+    <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
+      <View style={styles.iconWrap}>
+        <Ionicons name="library-outline" size={26} color={COLORS.gold} />
       </View>
-      <View style={[styles.titleGroup, isMobileWeb && styles.titleGroupMobile]}>
-        <Text
-          style={[styles.title, isMobileWeb && styles.titleMobile]}
-          numberOfLines={isMobileWeb ? 2 : 1}
-        >
-          {formatEnglishDisplayText(title)}
+      <Text style={styles.title} numberOfLines={1}>
+        {formatEnglishDisplayText(title)}
+      </Text>
+      {arabic ? (
+        <Text style={styles.arabicTitle} numberOfLines={1}>
+          {formatArabicNumbers(arabic)}
         </Text>
-        {arabic ? (
-          <Text
-            style={[styles.arabicTitle, isMobileWeb && styles.arabicTitleMobile]}
-            numberOfLines={isMobileWeb ? 2 : 1}
-          >
-            {formatArabicNumbers(arabic)}
-          </Text>
-        ) : null}
-      </View>
-      <Ionicons name="chevron-forward" size={isMobileWeb ? 20 : 24} color={COLORS.gold} style={styles.chevron} />
+      ) : null}
+      <Ionicons name="chevron-forward" size={24} color={COLORS.gold} style={styles.chevron} />
     </Pressable>
   );
 }

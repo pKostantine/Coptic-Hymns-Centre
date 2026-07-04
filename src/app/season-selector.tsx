@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/chc/ui/Icon';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
@@ -193,7 +193,7 @@ export default function SeasonSelectorScreen() {
       </Head>
       <View style={[styles.header, { paddingTop: safeAreaInsets.top }]}>
         <Pressable accessibilityLabel="Close season selector" style={styles.headerButton} onPress={() => goBack(router, '/calendar')}>
-          <Ionicons name="chevron-back" size={28} color={COLORS.white} />
+          <Icon name="chevron-back" size={28} color={COLORS.white} />
         </Pressable>
         <Text style={styles.headerTitle}>Season Selector</Text>
         <View style={styles.headerButton} />
@@ -205,14 +205,14 @@ export default function SeasonSelectorScreen() {
         <>
           <View style={styles.yearRow}>
             <Pressable accessibilityLabel="Previous year" style={styles.yearButton} onPress={() => setYear((y) => (y ?? 0) - 1)}>
-              <Ionicons name="chevron-back" size={26} color={COLORS.rowBlue} />
+              <Icon name="chevron-back" size={26} color={COLORS.rowBlue} />
             </Pressable>
             <View style={styles.yearLabel}>
               {year === currentCopticYear ? <View style={styles.currentYearDot} /> : null}
               <Text style={styles.yearText}>{formatCopticYear(year)}</Text>
             </View>
             <Pressable accessibilityLabel="Next year" style={styles.yearButton} onPress={() => setYear((y) => (y ?? 0) + 1)}>
-              <Ionicons name="chevron-forward" size={26} color={COLORS.rowBlue} />
+              <Icon name="chevron-forward" size={26} color={COLORS.rowBlue} />
             </Pressable>
           </View>
 
