@@ -84,7 +84,6 @@ export default function LectionaryDocument() {
         canGoBack
         onBack={() => goBack(router, '/')}
         rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
-        rightLeadingIconFamily="material"
         onRightLeadingPress={toggleFullscreen}
       />
       {error ? (

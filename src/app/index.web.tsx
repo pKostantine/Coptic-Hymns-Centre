@@ -1,10 +1,10 @@
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import CategoryCard from '@/components/chc/ui/CategoryCard';
+import Icon from '@/components/chc/ui/Icon';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { CATEGORIES } from '@/constants/manifest';
 import { useCalendar } from '@/context/CalendarContext';
@@ -35,23 +35,23 @@ export default function MainMenuWeb() {
         </View>
         <View style={styles.toolbar}>
           <Pressable accessibilityLabel="Toggle full screen" style={styles.toolbarButton} onPress={toggleFullscreen}>
-            <MaterialIcons name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={26} color={COLORS.gold} />
+            <Icon name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={26} color={COLORS.gold} />
           </Pressable>
           <Pressable accessibilityLabel="Open bookmarks" style={styles.toolbarButton} onPress={() => router.push('/bookmarks')}>
-            <Ionicons name="bookmark-outline" size={26} color={COLORS.gold} />
+            <Icon name="bookmark-outline" size={26} color={COLORS.gold} />
           </Pressable>
           <Pressable accessibilityLabel="Open calendar" style={styles.toolbarButton} onPress={() => router.push('/calendar')}>
-            <Ionicons name="calendar-outline" size={26} color={COLORS.gold} />
+            <Icon name="calendar-outline" size={26} color={COLORS.gold} />
           </Pressable>
           <Pressable accessibilityLabel="Open settings" style={styles.toolbarButton} onPress={() => router.push('/settings')}>
-            <Ionicons name="settings-outline" size={26} color={COLORS.gold} />
+            <Icon name="settings-outline" size={26} color={COLORS.gold} />
           </Pressable>
         </View>
       </View>
 
       {!isLive ? (
         <Pressable style={styles.notLiveBanner} onPress={goLive}>
-          <Ionicons name="time-outline" size={16} color={COLORS.gold} />
+          <Icon name="time-outline" size={16} color={COLORS.gold} />
           <Text style={styles.notLiveText}>
             Viewing {effectiveDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })} — tap to go live
           </Text>

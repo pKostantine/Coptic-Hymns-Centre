@@ -74,7 +74,6 @@ export default function BibleNestedList() {
         canGoBack
         onBack={() => goBack(router, '/bible')}
         rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
-        rightLeadingIconFamily="material"
         onRightLeadingPress={toggleFullscreen}
       />
       {error ? (

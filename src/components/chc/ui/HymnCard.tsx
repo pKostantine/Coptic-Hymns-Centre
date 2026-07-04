@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './Icon';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -33,7 +33,7 @@ export default function HymnCard({ title, arabic, isBookmarked, onPress }: HymnC
             <Text style={[styles.title, visibleTitleCount === 1 && styles.centeredTitle]}>{formatEnglishDisplayText(title)}</Text>
             {showArabic ? <Text style={[styles.title, styles.arabicTitle]}>{formatArabicNumbers(arabic!)}</Text> : null}
           </View>
-          {isBookmarked ? <Ionicons name="bookmark" size={18} color={COLORS.gold} /> : null}
+          {isBookmarked ? <Icon name="bookmark" size={18} color={COLORS.gold} /> : null}
         </View>
       </View>
     </Pressable>

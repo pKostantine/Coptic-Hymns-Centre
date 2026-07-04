@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/chc/ui/Icon';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -136,7 +136,7 @@ export default function CalendarScreen() {
       </Head>
       <View style={[styles.header, { paddingTop: safeAreaInsets.top }]}>
         <Pressable accessibilityLabel="Close calendar" style={styles.headerButton} onPress={() => goBack(router, '/')}>
-          <Ionicons name="chevron-back" size={30} color={COLORS.white} />
+          <Icon name="chevron-back" size={30} color={COLORS.white} />
         </Pressable>
         <Text style={styles.headerTitle}>Calendar</Text>
         <View style={styles.headerButton} />
@@ -158,7 +158,7 @@ export default function CalendarScreen() {
             <Text numberOfLines={1} style={styles.summaryText}>
               {activeSeason ? getSeasonShortName(activeSeason.rangeKey, activeSeason.activeSeason) : 'Seasons'}
             </Text>
-            <Ionicons name="chevron-forward" size={22} color={COLORS.white} />
+            <Icon name="chevron-forward" size={22} color={COLORS.white} />
           </Pressable>
           <Pressable
             accessibilityLabel={liturgicalDayPeriod === 'morning' ? 'Switch to evening liturgical day' : 'Switch to morning liturgical day'}
@@ -168,7 +168,7 @@ export default function CalendarScreen() {
             ]}
             onPress={() => setLiturgicalDayPeriod(liturgicalDayPeriod === 'morning' ? 'evening' : 'morning')}
           >
-            <Ionicons
+            <Icon
               name={liturgicalDayPeriod === 'morning' ? 'sunny' : 'moon'}
               size={24}
               color={liturgicalDayPeriod === 'morning' ? COLORS.gold : COLORS.rowBlue}
@@ -184,7 +184,7 @@ export default function CalendarScreen() {
             style={styles.monthButton}
             onPress={() => (mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1))}
           >
-            <Ionicons name="chevron-back" size={28} color={COLORS.rowBlue} />
+            <Icon name="chevron-back" size={28} color={COLORS.rowBlue} />
           </Pressable>
 
           <View style={styles.monthTitleGroup}>
@@ -213,7 +213,7 @@ export default function CalendarScreen() {
             style={styles.monthButton}
             onPress={() => (mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1))}
           >
-            <Ionicons name="chevron-forward" size={28} color={COLORS.rowBlue} />
+            <Icon name="chevron-forward" size={28} color={COLORS.rowBlue} />
           </Pressable>
         </View>
 

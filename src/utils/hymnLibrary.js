@@ -51,6 +51,18 @@ function resolveWholeTableInlineTarget(hymnKey) {
   return ALL_CAPS_KEY_REGEX.test(hymnKey) ? SUBDOCUMENT_MAP[hymnKey] || null : null;
 }
 
+/**
+ * GOSPEL_RITE always gets its "Coptic Gospel Rite" toggle button rendered
+ * immediately before its content, wherever it's spliced in — mutates the
+ * first of the just-hydrated nested sections in place (mirrors how
+ * addTuneMarkersToAntiphonarySections tags sections post-hydration).
+ */
+function markGospelRiteToggleStart(hymnKey, nestedSections) {
+  if (hymnKey === "GOSPEL_RITE" && nestedSections.length) {
+    nestedSections[0] = { ...nestedSections[0], startsGospelRiteToggle: true };
+  }
+}
+
 // Sentinels that resolve through the Lectionary/Bible reading flow rather
 // than a schema.table — kept separate so callers can branch before treating
 // an unmapped Subdocument as "not built yet".
@@ -460,6 +472,7 @@ async function hydrateWithFlags(schema, table, flags, depth) {
       const target = resolveWholeTableInlineTarget(section.hymn_key);
       if (!target || depth >= 3) continue;
       const nestedSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1);
+      markGospelRiteToggleStart(section.hymn_key, nestedSections);
       hydrated.push(...nestedSections);
       continue;
     }
@@ -496,6 +509,7 @@ async function hydrateWithFlags(schema, table, flags, depth) {
         if (wholeTableTarget) {
           flushVerses();
           const nestedSections = await safeHydrateNested(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1);
+          markGospelRiteToggleStart(verse.inlineHymnKey, nestedSections);
           hydrated.push(...nestedSections);
           pushedAnything = true;
           continue;

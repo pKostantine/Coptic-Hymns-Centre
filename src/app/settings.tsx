@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/chc/ui/Icon';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -63,11 +63,11 @@ export default function SettingsScreen() {
 
           <View style={styles.fontControls}>
             <Pressable accessibilityLabel="Decrease font size" style={styles.fontButton} onPress={() => setFontScale(-1)}>
-              <Ionicons name="remove" size={18} color={COLORS.gold} />
+              <Icon name="remove" size={18} color={COLORS.gold} />
             </Pressable>
             <Text style={styles.fontSize}>{preferences.fontScale}</Text>
             <Pressable accessibilityLabel="Increase font size" style={styles.fontButton} onPress={() => setFontScale(1)}>
-              <Ionicons name="add" size={18} color={COLORS.gold} />
+              <Icon name="add" size={18} color={COLORS.gold} />
             </Pressable>
           </View>
 

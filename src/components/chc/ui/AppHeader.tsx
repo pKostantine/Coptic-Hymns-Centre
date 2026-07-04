@@ -1,21 +1,18 @@
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
-
-type IconFamily = 'ionicons' | 'material';
+import Icon, { IconName } from './Icon';
 
 interface AppHeaderProps {
   title: string | { english: string; arabic: string };
   canGoBack?: boolean;
   onBack?: () => void;
-  rightLeadingIcon?: keyof typeof Ionicons.glyphMap | keyof typeof MaterialIcons.glyphMap;
-  rightLeadingIconFamily?: IconFamily;
+  rightLeadingIcon?: IconName;
   onRightLeadingPress?: () => void;
   rightLeadingAccessibilityLabel?: string;
-  rightIcon?: keyof typeof Ionicons.glyphMap;
+  rightIcon?: IconName;
   onRightPress?: () => void;
   rightAccessibilityLabel?: string;
   visibleLanguages?: { english: boolean; arabic: boolean };
@@ -27,7 +24,6 @@ export default function AppHeader({
   canGoBack = false,
   onBack,
   rightLeadingIcon,
-  rightLeadingIconFamily = 'ionicons',
   onRightLeadingPress,
   rightLeadingAccessibilityLabel = 'Toggle full screen',
   rightIcon,
@@ -48,7 +44,7 @@ export default function AppHeader({
       <View style={styles.topRow}>
         {canGoBack ? (
           <Pressable accessibilityLabel="Go back" style={styles.iconButton} onPress={onBack}>
-            <Ionicons name="chevron-back" size={24} color={COLORS.gold} />
+            <Icon name="chevron-back" size={24} color={COLORS.gold} />
           </Pressable>
         ) : (
           <Image source={require('../../../../assets/images/CHC_sm.png')} style={styles.logo} />
@@ -75,16 +71,12 @@ export default function AppHeader({
                 style={styles.iconButton}
                 onPress={onRightLeadingPress}
               >
-                {rightLeadingIconFamily === 'material' ? (
-                  <MaterialIcons name={rightLeadingIcon as keyof typeof MaterialIcons.glyphMap} size={24} color={COLORS.gold} />
-                ) : (
-                  <Ionicons name={rightLeadingIcon as keyof typeof Ionicons.glyphMap} size={23} color={COLORS.gold} />
-                )}
+                <Icon name={rightLeadingIcon as IconName} size={23} color={COLORS.gold} />
               </Pressable>
             ) : null}
             {hasRightAction ? (
               <Pressable accessibilityLabel={rightAccessibilityLabel} style={styles.iconButton} onPress={onRightPress}>
-                <Ionicons name={rightIcon as keyof typeof Ionicons.glyphMap} size={23} color={COLORS.gold} />
+                <Icon name={rightIcon as IconName} size={23} color={COLORS.gold} />
               </Pressable>
             ) : null}
           </View>

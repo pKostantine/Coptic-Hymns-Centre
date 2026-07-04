@@ -22,6 +22,7 @@ interface DocumentWebViewProps {
   displaySilentPrayers?: boolean;
   bishopPresent?: boolean;
   copticRecitedPrayers?: boolean;
+  copticGospelRite?: boolean;
   onAction?: (action: DocumentAction) => void;
 }
 
@@ -41,6 +42,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       displaySilentPrayers = false,
       bishopPresent = false,
       copticRecitedPrayers = true,
+      copticGospelRite = false,
       onAction,
     },
     ref,
@@ -77,6 +79,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               displaySilentPrayers,
               bishopPresent,
               copticRecitedPrayers,
+              copticGospelRite,
             })
           : null,
       [
@@ -89,6 +92,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         displaySilentPrayers,
         bishopPresent,
         copticRecitedPrayers,
+        copticGospelRite,
       ],
     );
 

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './Icon';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -24,7 +24,7 @@ export default function CategoryCard({ title, arabic, onPress }: CategoryCardPro
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
       <View style={styles.iconWrap}>
-        <Ionicons name="library-outline" size={26} color={COLORS.gold} />
+        <Icon name="library-outline" size={26} color={COLORS.gold} />
       </View>
       <Text style={styles.title} numberOfLines={1}>
         {formatEnglishDisplayText(title)}
@@ -34,7 +34,7 @@ export default function CategoryCard({ title, arabic, onPress }: CategoryCardPro
           {formatArabicNumbers(arabic)}
         </Text>
       ) : null}
-      <Ionicons name="chevron-forward" size={24} color={COLORS.gold} style={styles.chevron} />
+      <Icon name="chevron-forward" size={24} color={COLORS.gold} style={styles.chevron} />
     </Pressable>
   );
 }
