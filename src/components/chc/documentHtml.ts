@@ -117,7 +117,6 @@ export function buildDocumentHtml(
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&display=swap");
       @font-face {
         font-family: "CopticCHC";
         src: url("${copticFontDataUri}") format("truetype");
