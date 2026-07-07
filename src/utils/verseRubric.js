@@ -30,10 +30,12 @@ export function isRubricType(resolvedType) {
 export function computeSuppressSpeakerLabelFlags(verses, bishopPresent) {
   const resolvedTypes = verses.map((verse) => resolveRubricKey(verse.type, bishopPresent));
   return verses.map((verse, index) => {
+    if ((verse.bishopOnly && !bishopPresent) || (verse.priestOnly && bishopPresent)) return false;
     const resolved = resolvedTypes[index];
     if (!isRubricType(resolved)) return false;
     for (let i = index - 1; i >= 0; i -= 1) {
       if (verses[i].type === "comment") continue;
+      if ((verses[i].bishopOnly && !bishopPresent) || (verses[i].priestOnly && bishopPresent)) continue;
       return resolvedTypes[i] === resolved;
     }
     return false;

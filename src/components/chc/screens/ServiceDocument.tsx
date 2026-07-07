@@ -93,11 +93,18 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     setError(null);
     hasRestoredScrollPositionRef.current = false;
 
+    // BishopPresent is always hydrated as if a bishop *could* be present —
+    // hydrateWithFlags evaluates every condition both ways and tags the
+    // result (verse.bishopOnly / verse.priestOnly), so the document already
+    // contains both variants. Toggling the Bishop Present preference is then
+    // a pure client-side re-render (DocumentSurface/documentHtml.ts filter by
+    // it directly) and never needs to re-fetch — that's why it's fixed here
+    // instead of reading preferences.bishopPresent, and not in the deps below.
     hydrateSupabaseServiceHymn(
       schema,
       table,
       effectiveDate,
-      { BishopPresent: preferences.bishopPresent, CopticGospelRite: copticGospelRite, ...extraContext },
+      { BishopPresent: true, CopticGospelRite: copticGospelRite, ...extraContext },
       isVespersService ? vespersEffectiveDate : undefined,
     )
       .then((result) => {
@@ -110,7 +117,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, preferences.bishopPresent, copticGospelRite, extraContext]);
+  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, copticGospelRite, extraContext]);
 
   // The scrolling WebView reader has no equivalent "seed the initial prop"
   // option (scrollToSection is imperative and needs the WebView mounted

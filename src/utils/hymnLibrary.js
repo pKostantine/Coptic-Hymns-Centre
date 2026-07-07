@@ -187,6 +187,7 @@ function mergeNestedSectionsAsOneHymn(callingSection, nestedSections) {
     verses,
     prayerType: dominantPrayerType,
     alternateEvery,
+    reverseAlternating: dominantPrayerType === "Reverse Alternating",
     forceWhiteVerses: !alternateEvery,
   };
 }
@@ -366,6 +367,7 @@ function createFlatServiceRow(orderRow, title, line) {
 
 const ALTERNATE_EVERY = {
   "Single Alternating": 1,
+  "Reverse Alternating": 1,
   "Double Alternating": 2,
   "Quadruple Alternating": 4,
 };
@@ -446,6 +448,9 @@ export function assembleServiceSections(rawRows) {
 
     if (dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)) {
       section.alternateEvery = ALTERNATE_EVERY[dominantPrayerType];
+      // Reverse Alternating is Single Alternating's mirror image: same
+      // per-verse cadence, just starting on blue instead of white.
+      section.reverseAlternating = dominantPrayerType === "Reverse Alternating";
     } else {
       section.alternateEvery = null;
       section.forceWhiteVerses = true;
@@ -498,8 +503,43 @@ function resolveEffectiveVerseType(personType, prayerType, sectionTitlePrayerTyp
 // and Inline placeholders. depth guards against runaway recursion the same
 // way the Postgres get_service RPC does (see project_condition_engine.md).
 
+// Real hymn_texts rows condition specific wording on WHICH document they're
+// being read from (e.g. the same "adamAspasmos" hymn sits in all three
+// anaphora order tables, but individual lines are conditioned on
+// StBasilLiturgy/StGregoryLiturgy/StCyrilLiturgy to pick the right wording) —
+// these are structural flags derived from schema/table, not the date, but
+// they still need to reach evaluateCondition the same way date flags do.
+const STRUCTURAL_FLAGS_BY_TABLE = {
+  liturgy_of_st_basil: { StBasilLiturgy: true },
+  liturgy_of_st_gregory: { StGregoryLiturgy: true },
+  liturgy_of_st_cyril: { StCyrilLiturgy: true },
+  liturgy_of_the_word: { PaulineIncense: true },
+  vespers_praises: { VesperPraises: true },
+};
+const LITURGY_SCHEMA_TABLES = new Set([
+  "offering_of_the_lamb",
+  "liturgy_of_the_word",
+  "liturgy_of_st_basil",
+  "liturgy_of_st_gregory",
+  "liturgy_of_st_cyril",
+  "distribution",
+]);
+const PSALMODY_SCHEMA_TABLES = new Set(["vespers_praises", "midnight_praises", "morning_doxology", "antiphonary"]);
+
+function deriveStructuralFlags(schema, table) {
+  const flags = { ...(STRUCTURAL_FLAGS_BY_TABLE[table] || {}) };
+  if (schema === "liturgy" && LITURGY_SCHEMA_TABLES.has(table)) {
+    flags.Liturgy = true;
+  }
+  if (schema === "psalmody" && PSALMODY_SCHEMA_TABLES.has(table)) {
+    flags.MidnightPraises = table !== "vespers_praises";
+  }
+  return flags;
+}
+
 export async function hydrateSupabaseServiceHymn(schema, table, date, extraContext = {}, weekdayDate, depth = 0) {
-  const flags = await getContextFlags(date, extraContext, weekdayDate);
+  const structuralFlags = deriveStructuralFlags(schema, table);
+  const flags = await getContextFlags(date, { ...structuralFlags, ...extraContext }, weekdayDate);
   const isoDate = toIsoDateString(date);
   return hydrateWithFlags(schema, table, flags, depth, isoDate);
 }
@@ -523,11 +563,50 @@ async function safeHydrateNested(schema, table, flags, depth, isoDate) {
   }
 }
 
+/**
+ * Whether a verse/section survives hydration regardless of the *current*
+ * Bishop Present toggle: its condition is evaluated once with BishopPresent
+ * forced true and once forced false (every other flag — weekday, season,
+ * date, etc. — stays exactly as already computed for the day), and it's
+ * included if EITHER passes. That way the document is always hydrated with
+ * both the bishop-present content and the priest-only content already
+ * present, tagged with which state each needs — so toggling Bishop Present
+ * afterward is a pure client-side re-render (see bishopOnly/priestOnly on
+ * the resulting section/verse), never a re-fetch.
+ */
+function evaluateBishopAwareVisibility(condition, flags) {
+  if (!String(condition || "").trim()) return { visible: true, bishopOnly: false, priestOnly: false };
+  const withBishop = evaluateCondition(condition, { ...flags, BishopPresent: true });
+  const withoutBishop = evaluateCondition(condition, { ...flags, BishopPresent: false });
+  return {
+    visible: withBishop || withoutBishop,
+    bishopOnly: withBishop && !withoutBishop,
+    priestOnly: withoutBishop && !withBishop,
+  };
+}
+
+function combineBishopVisibility(outer, inner) {
+  const withBishop = !outer.priestOnly && !inner.priestOnly;
+  const withoutBishop = !outer.bishopOnly && !inner.bishopOnly;
+  return {
+    visible: withBishop || withoutBishop,
+    bishopOnly: withBishop && !withoutBishop,
+    priestOnly: withoutBishop && !withBishop,
+  };
+}
+
 async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
   const rawRows = await fetchServiceRows(schema, table);
   const sections = assembleServiceSections(rawRows);
 
-  const visibleSections = sections.filter((section) => evaluateCondition(section.condition, flags));
+  const visibleSections = sections
+    .map((section) => {
+      const visibility = evaluateBishopAwareVisibility(section.condition, flags);
+      return visibility.visible
+        ? { ...section, bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }
+        : null;
+    })
+    .filter(Boolean);
 
   const hydrated = [];
   for (const section of visibleSections) {
@@ -536,7 +615,13 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
       if (!target) {
         if (READING_SENTINELS.has(section.hymn_key) && isoDate) {
           const readingSection = await resolveReadingSentinelSection(section, isoDate);
-          if (readingSection) hydrated.push(readingSection);
+          if (readingSection) {
+            hydrated.push({
+              ...readingSection,
+              bishopOnly: section.bishopOnly,
+              priestOnly: section.priestOnly,
+            });
+          }
         }
         continue; // not-yet-built, or a reading sentinel with no live mapping/data
       }
@@ -561,6 +646,8 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
           subdocumentSections: addTuneMarkersToAntiphonarySections(subdocumentSections),
           alternateEvery: null,
           forceWhiteVerses: true,
+          bishopOnly: section.bishopOnly,
+          priestOnly: section.priestOnly,
         });
         continue;
       }
@@ -574,6 +661,8 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
         subdocumentSections,
         alternateEvery: null,
         forceWhiteVerses: true,
+        bishopOnly: section.bishopOnly,
+        priestOnly: section.priestOnly,
       });
       continue;
     }
@@ -594,7 +683,7 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
       // single hymn rather than several spliced together.
       const target = resolveWholeTableInlineTarget(section.hymn_key);
       if (!target || depth >= 3) continue;
-      const nestedSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1);
+      const nestedSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1, isoDate);
       hydrated.push(...nestedSections);
       continue;
     }
@@ -622,7 +711,8 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
     };
 
     for (const verse of section.verses) {
-      if (!evaluateCondition(verse.condition, flags)) continue;
+      const verseVisibility = evaluateBishopAwareVisibility(verse.condition, flags);
+      if (!verseVisibility.visible) continue;
 
       if (verse.type === "inlinePlaceholder") {
         if (depth >= 3) continue;
@@ -630,7 +720,7 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
         const wholeTableTarget = resolveWholeTableInlineTarget(verse.inlineHymnKey);
         if (wholeTableTarget) {
           flushVerses();
-          const nestedSections = await safeHydrateNested(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1);
+          const nestedSections = await safeHydrateNested(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1, isoDate);
           hydrated.push(...nestedSections);
           pushedAnything = true;
           continue;
@@ -654,8 +744,10 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
 
         const inlineVerses = await fetchInlineHymnVerses(schema, verse.inlineHymnKey);
         const builtVerses = inlineVerses
-          .filter((row) => evaluateCondition(row.condition, flags))
-          .map((row) => {
+          .map((row) => ({ row, visibility: evaluateBishopAwareVisibility(row.condition, flags) }))
+          .map(({ row, visibility }) => ({ row, visibility: combineBishopVisibility(verseVisibility, visibility) }))
+          .filter(({ visibility }) => visibility.visible)
+          .map(({ row, visibility }) => {
             const effectivePersonType = verse.overridePersonType || row.person_type || "";
             const effectivePrayerType = verse.overridePrayerType || row.prayer_type || "";
             return {
@@ -664,6 +756,8 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
               arabic: row.arabic || "",
               type: resolveEffectiveVerseType(effectivePersonType, effectivePrayerType, inlineTitlePrayerType),
               prayerType: effectivePrayerType || null,
+              bishopOnly: visibility.bishopOnly,
+              priestOnly: visibility.priestOnly,
             };
           });
 
@@ -674,6 +768,11 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
             dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)
               ? ALTERNATE_EVERY[dominantPrayerType]
               : null;
+          const sectionVisibility = combineBishopVisibility(verseVisibility, {
+            visible: true,
+            bishopOnly: false,
+            priestOnly: false,
+          });
           hydrated.push(
             applyCopticCaseToSection({
               id: `${section.id}-inline-${verse.inlineHymnKey}`,
@@ -685,7 +784,10 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
               verses: builtVerses,
               prayerType: dominantPrayerType,
               alternateEvery,
+              reverseAlternating: dominantPrayerType === "Reverse Alternating",
               forceWhiteVerses: !alternateEvery,
+              bishopOnly: sectionVisibility.bishopOnly,
+              priestOnly: sectionVisibility.priestOnly,
             }),
           );
           pushedAnything = true;
@@ -695,7 +797,7 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
         continue;
       }
 
-      verses.push(verse);
+      verses.push({ ...verse, bishopOnly: verseVisibility.bishopOnly, priestOnly: verseVisibility.priestOnly });
     }
 
     flushVerses();

@@ -9,6 +9,9 @@ export interface DocumentVerse {
   prayerType?: string | null;
   /** Antiphonary only: "adam" | "vatos" — which tune this verse is chanted in. */
   tune?: string | null;
+  /** This verse's own condition only passes when Bishop Present is on/off respectively — evaluated both ways at hydration time so toggling Bishop Present never needs a re-fetch. */
+  bishopOnly?: boolean;
+  priestOnly?: boolean;
 }
 
 export interface DocumentSection {
@@ -17,6 +20,8 @@ export interface DocumentSection {
   verses: DocumentVerse[];
   alternateEvery?: number | null;
   forceWhiteVerses?: boolean;
+  /** "Reverse Alternating": same cadence as Single Alternating, but starts on the blue verse instead of white. */
+  reverseAlternating?: boolean;
   /** hymn_titles.prayer_type — "Silent Prayer" here means the whole hymn is a silent prayer. */
   titlePrayerType?: string | null;
   /** order table `minimization` column: null = normal, "Minimizable" = collapsible-but-open, "Minimized" = collapsible-and-closed. */
@@ -34,6 +39,9 @@ export interface DocumentSection {
   subdocumentSections?: DocumentSection[];
   /** Set on the first section spliced in from a GOSPEL_RITE inline import — renders the "Coptic Gospel Rite" toggle button immediately before it. */
   startsGospelRiteToggle?: boolean;
+  /** Same Bishop Present dual-evaluation as DocumentVerse, applied to the section's own placement condition. */
+  bishopOnly?: boolean;
+  priestOnly?: boolean;
 }
 
 export interface VisibleColumns {
@@ -104,9 +112,12 @@ export function buildDocumentHtml(
   const arabicFontSize = Math.round(fontSize * 1.15);
   const verseLineHeight = Math.round(fontSize * 1.25);
 
-  const visibleSections = sections.filter(
-    (section) => displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer',
-  );
+  const visibleSections = sections.filter((section) => {
+    if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;
+    if (section.bishopOnly && !bishopPresent) return false;
+    if (section.priestOnly && bishopPresent) return false;
+    return true;
+  });
   const htmlSections = visibleSections
     .map((section) =>
       renderSection(section, {
@@ -405,6 +416,7 @@ function renderSection(
   const suppressFlags = computeSuppressSpeakerLabelFlags(section.verses, bishopPresent);
   const versesHtml = section.verses
     .map((verse, index) => ({ verse, index }))
+    .filter(({ verse }) => !(verse.bishopOnly && !bishopPresent) && !(verse.priestOnly && bishopPresent))
     .filter(({ verse }) => displayComments || verse.type !== 'comment')
     .filter(({ verse, index }) => {
       // A comment always renders (subject to displayComments above) *except*
@@ -479,7 +491,6 @@ function renderDocumentButtonSection(section: DocumentSection, visibleColumns: V
   `;
 }
 
-
 function renderSectionTitle(section: DocumentSection, visibleColumns: VisibleColumns, isCollapsed: boolean) {
   const titleEn = section.title?.english || '';
   const titleAr = section.title?.arabic || '';
@@ -542,7 +553,7 @@ function renderVerse(
     copticRecitedPrayers,
   }: { fontSize: number; visibleColumns: VisibleColumns; bishopPresent: boolean; copticRecitedPrayers: boolean },
 ) {
-  const { color, italic } = resolveVerseColor(verse, index, section);
+  const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveRubricKey(verse.type, bishopPresent)];
   const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
   // "Coptic Recited Prayers" hides just this verse's Coptic text when the
@@ -603,23 +614,25 @@ const NON_ALTERNATING_TYPES = new Set(['comment', 'silentPrayer', 'refrain', 're
  * parity slot, so the sequence seen by the alternation is "verse 1 / verse
  * 2 / verse 3..." regardless of what non-participant rows are interleaved.
  */
-function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number): number {
+function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number, bishopPresent: boolean): number {
   let count = -1;
   for (let i = 0; i <= index; i += 1) {
+    if ((verses[i].bishopOnly && !bishopPresent) || (verses[i].priestOnly && bishopPresent)) continue;
     if (!NON_ALTERNATING_TYPES.has(verses[i].type)) count += 1;
   }
   return count;
 }
 
-function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection) {
+function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean) {
   if (verse.type === 'comment') return { color: COLORS.comment, italic: true };
   if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
   if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: true };
   if (verse.type === 'readingReference') return { color: COLORS.gold, italic: false };
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 
-  const effectiveIndex = getEffectiveAlternatingIndex(section.verses, index);
-  const colorIndex = Math.floor(effectiveIndex / section.alternateEvery) % 2;
+  const effectiveIndex = getEffectiveAlternatingIndex(section.verses, index, bishopPresent);
+  let colorIndex = Math.floor(effectiveIndex / section.alternateEvery) % 2;
+  if (section.reverseAlternating) colorIndex = colorIndex === 0 ? 1 : 0;
   return { color: colorIndex === 0 ? COLORS.white : COLORS.rowBlue, italic: false };
 }
 

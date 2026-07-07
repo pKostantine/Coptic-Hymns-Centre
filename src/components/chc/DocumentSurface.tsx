@@ -45,11 +45,16 @@ function isCommentWithinSilentPrayer(section: DocumentSection, index: number): b
  */
 function buildSlideshowSections(
   sections: DocumentSection[],
-  { displayComments, displaySilentPrayers }: { displayComments: boolean; displaySilentPrayers: boolean },
+  {
+    displayComments,
+    displaySilentPrayers,
+    bishopPresent,
+  }: { displayComments: boolean; displaySilentPrayers: boolean; bishopPresent: boolean },
   collapsedSectionIds: Record<string, boolean>,
 ): DocumentSection[] {
   return sections
     .filter((section) => displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer')
+    .filter((section) => !(section.bishopOnly && !bishopPresent) && !(section.priestOnly && bishopPresent))
     .map((section) => {
       const currentlyCollapsed = section.collapsible
         ? (collapsedSectionIds[section.id] ?? Boolean(section.defaultCollapsed))
@@ -58,6 +63,7 @@ function buildSlideshowSections(
       const verses = currentlyCollapsed
         ? []
         : section.verses.filter((verse, index) => {
+            if ((verse.bishopOnly && !bishopPresent) || (verse.priestOnly && bishopPresent)) return false;
             if (verse.type === 'comment') {
               return isCommentWithinSilentPrayer(section, index) ? displaySilentPrayers : displayComments;
             }
@@ -103,10 +109,14 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       () =>
         buildSlideshowSections(
           sections,
-          { displayComments: preferences.displayComments, displaySilentPrayers: preferences.displaySilentPrayers },
+          {
+            displayComments: preferences.displayComments,
+            displaySilentPrayers: preferences.displaySilentPrayers,
+            bishopPresent: preferences.bishopPresent,
+          },
           collapsedSectionIds,
         ),
-      [sections, preferences.displayComments, preferences.displaySilentPrayers, collapsedSectionIds],
+      [sections, preferences.displayComments, preferences.displaySilentPrayers, preferences.bishopPresent, collapsedSectionIds],
     );
 
     if (preferences.slideshowMode) {

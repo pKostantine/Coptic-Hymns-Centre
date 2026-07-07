@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { computeMovableFeastDates, FIXED_FEASTS } from './fixedFeasts';
 
 export interface CalendarDay {
   gregorianDate: string;
@@ -18,12 +19,6 @@ export interface SeasonRange {
 
 function toIsoDate(date: Date) {
   return date.toISOString().slice(0, 10);
-}
-
-function addDaysIso(isoDate: string, delta: number): string {
-  const d = new Date(`${isoDate}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + delta);
-  return toIsoDate(d);
 }
 
 /** Gregorian calendar-month grid: every row in `calendar.coptic_date_conversions` for the given Gregorian year/month. */
@@ -166,20 +161,6 @@ export interface SingleDayEvent {
   date: string;
 }
 
-/** Coptic month name spellings exactly as stored in `coptic_date_conversions.coptic_month_name`. */
-const FIXED_FEASTS: { monthName: string; day: number; key: string; title: string }[] = [
-  { monthName: 'Thoout', day: 1, key: 'nayrouz', title: 'Nayrouz (Coptic New Year)' },
-  { monthName: 'Thoout', day: 17, key: 'feast-of-the-cross', title: 'Feast of the Cross' },
-  { monthName: 'Kiahk', day: 29, key: 'nativity', title: 'Nativity' },
-  { monthName: 'Tobe', day: 6, key: 'circumcision', title: 'Circumcision' },
-  { monthName: 'Tobe', day: 11, key: 'theophany', title: 'Theophany' },
-  { monthName: 'Tobe', day: 13, key: 'wedding-at-cana', title: 'Wedding at Cana' },
-  { monthName: 'Meshir', day: 8, key: 'entry-into-temple', title: 'Entry into the Temple' },
-  { monthName: 'Paremhotep', day: 29, key: 'annunciation', title: 'Annunciation' },
-  { monthName: 'Pashons', day: 24, key: 'entry-into-egypt', title: 'Entry into Egypt' },
-  { monthName: 'Mesore', day: 13, key: 'transfiguration', title: 'Transfiguration' },
-];
-
 async function resolveCopticDate(copticYear: number, monthName: string, day: number): Promise<string | null> {
   const { data, error } = await supabase
     .schema('calendar')
@@ -215,13 +196,10 @@ async function getKiahkSundays(copticYear: number): Promise<SingleDayEvent[]> {
 
 /** Every named single-day feast for a Coptic year: fixed Coptic-date feasts, Easter-relative movable feasts, and the Kiahk Sundays. */
 export async function getSingleDayEventsForCopticYear(copticYear: number, periods: SeasonRange[]): Promise<SingleDayEvent[]> {
-  const byKey = (key: string) => periods.find((p) => p.rangeKey === key);
-  const holyWeek = byKey('holy-week');
-  const holy50Days = byKey('holy-50-days');
-  const greatFast = byKey('great-fast');
-  const jonahsFast = byKey('jonahs-fast');
-  const apostlesFast = byKey('apostles-fast');
-  const stMaryFast = byKey('st-mary-fast');
+  const rangesByKey: Record<string, { startDate: string; endDate: string }> = {};
+  for (const period of periods) {
+    rangesByKey[period.rangeKey] = { startDate: period.startDate, endDate: period.endDate };
+  }
 
   const fixed = await Promise.all(
     FIXED_FEASTS.map(async (feast) => {
@@ -230,21 +208,7 @@ export async function getSingleDayEventsForCopticYear(copticYear: number, period
     }),
   );
 
-  const movable: (SingleDayEvent | null)[] = [
-    holyWeek ? { key: 'lazarus-saturday', title: 'Lazarus Saturday', date: holyWeek.startDate } : null,
-    holyWeek ? { key: 'palm-sunday', title: 'Palm Sunday', date: addDaysIso(holyWeek.startDate, 1) } : null,
-    holy50Days ? { key: 'holy-thursday', title: 'Holy Thursday', date: addDaysIso(holy50Days.startDate, -3) } : null,
-    holy50Days ? { key: 'good-friday', title: 'Good Friday', date: addDaysIso(holy50Days.startDate, -2) } : null,
-    holyWeek ? { key: 'resurrection', title: 'Glorious Feast of the Resurrection', date: holyWeek.endDate } : null,
-    holy50Days ? { key: 'bright-saturday', title: 'Bright Saturday', date: addDaysIso(holy50Days.startDate, 1) } : null,
-    holy50Days ? { key: 'thomas-sunday', title: "Thomas Sunday", date: addDaysIso(holy50Days.startDate, 7) } : null,
-    holy50Days ? { key: 'ascension', title: 'Ascension', date: addDaysIso(holy50Days.startDate, 39) } : null,
-    holy50Days ? { key: 'pentecost', title: 'Feast of Pentecost', date: holy50Days.endDate } : null,
-    greatFast ? { key: 'last-friday-of-lent', title: 'Last Friday of Lent', date: greatFast.endDate } : null,
-    jonahsFast ? { key: 'jonahs-feast', title: "Jonah's Feast", date: addDaysIso(jonahsFast.endDate, 1) } : null,
-    apostlesFast ? { key: 'apostles-feast', title: "Apostles' Feast", date: addDaysIso(apostlesFast.endDate, 1) } : null,
-    stMaryFast ? { key: 'st-marys-feast', title: "St. Mary's Feast", date: addDaysIso(stMaryFast.endDate, 1) } : null,
-  ];
+  const movable = computeMovableFeastDates(rangesByKey);
 
   const kiahkSundays = await getKiahkSundays(copticYear);
 

@@ -133,6 +133,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
                 }
               }}
               displaySilentPrayers={preferences.displaySilentPrayers}
+              bishopPresent={preferences.bishopPresent}
             />
           </>
         )}

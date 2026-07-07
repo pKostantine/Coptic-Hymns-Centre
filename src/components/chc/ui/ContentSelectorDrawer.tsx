@@ -67,6 +67,9 @@ export default function ContentSelectorDrawer({
     // A section hidden from the document because Silent Prayers are disabled
     // shouldn't still be jumpable from the content list.
     if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;
+    // Same for a section hidden by the current Bishop Present state.
+    if (section.bishopOnly && !bishopPresent) return false;
+    if (section.priestOnly && bishopPresent) return false;
     // Subdocument/Antiphonary buttons are a real UI action, not hymn text —
     // they must survive even though they carry no verses.
     if (section.isSubdocumentButton || section.isAntiphonaryButton) return true;
