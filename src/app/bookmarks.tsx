@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,6 +10,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { CATEGORIES, DIVINE_LITURGY_SERVICES, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
 import { goBack } from '@/utils/navigation';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { getBibleBooks, type BibleBook } from '@/utils/bibleService';
 
 interface BookmarkEntry {
   id: string;
@@ -69,8 +71,38 @@ const BOOKMARK_INDEX = buildBookmarkIndex();
 export default function BookmarksScreen() {
   const router = useRouter();
   const { bookmarks } = useReadingPreferences();
+  const [bibleBooks, setBibleBooks] = useState<BibleBook[]>([]);
 
-  const entries = bookmarks.map((id) => BOOKMARK_INDEX[id]).filter(Boolean);
+  useEffect(() => {
+    let cancelled = false;
+    getBibleBooks()
+      .then((books) => {
+        if (!cancelled) setBibleBooks(books);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const entries = useMemo(() => {
+    return bookmarks
+      .map((id): BookmarkEntry | null => {
+        if (id.startsWith('bible:')) {
+          const [, , bookKey, chapter] = id.split(':');
+          const book = bibleBooks.find((b) => b.bookKey === bookKey);
+          if (!book) return null;
+          return {
+            id,
+            title: `${book.titleEnglish} ${chapter}`,
+            arabic: `${book.titleArabic} ${chapter}`,
+            href: `/bible/${bookKey}/${chapter}`,
+          };
+        }
+        return BOOKMARK_INDEX[id] || null;
+      })
+      .filter((entry): entry is BookmarkEntry => entry !== null);
+  }, [bookmarks, bibleBooks]);
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>

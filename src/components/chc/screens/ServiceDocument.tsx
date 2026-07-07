@@ -52,7 +52,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const isVespersService =
     (schema === 'psalmody' && table === 'vespers_praises') ||
     (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true);
-  const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
+  const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth } = useWindowDimensions();
   const bookmarkId = `${schema}:${table}`;
   // Navigating to Settings and back unmounts this screen (React Navigation
@@ -188,7 +188,6 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
 
   return (
     <SafeAreaView
-      edges={['left', 'right', 'bottom']}
       style={styles.safeArea}
       {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}
     >
@@ -200,8 +199,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           title={{ english: title, arabic }}
           canGoBack
           onBack={() => goBack(router, backHref)}
-          rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
-          onRightLeadingPress={toggleFullscreen}
+          rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+          onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
           rightIcon="list-outline"
           rightAccessibilityLabel="Open content list"
           onRightPress={() => setSelectorOpen(true)}

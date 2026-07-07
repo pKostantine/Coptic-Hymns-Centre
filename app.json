@@ -4,7 +4,7 @@
     "slug": "Coptic-Hymns-Centre",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/CHC.png",
     "scheme": "coptichymnscentre",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -29,8 +29,8 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#003566",
+          "image": "./assets/images/CHC.png",
           "imageWidth": 76
         }
       ],

@@ -36,7 +36,7 @@ export default function LectionaryDocument() {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
   const { effectiveDate } = useCalendar();
-  const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
+  const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,8 +83,8 @@ export default function LectionaryDocument() {
         title={{ english: 'Lectionary', arabic: 'القطمارس' }}
         canGoBack
         onBack={() => goBack(router, '/')}
-        rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
-        onRightLeadingPress={toggleFullscreen}
+        rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+        onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
       />
       {error ? (
         <View style={styles.center}>

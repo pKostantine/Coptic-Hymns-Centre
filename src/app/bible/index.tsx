@@ -16,7 +16,7 @@ const TESTAMENTS = [
 
 export default function BibleTestamentList() {
   const router = useRouter();
-  const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
+  const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
@@ -27,8 +27,8 @@ export default function BibleTestamentList() {
         title={{ english: 'Bible', arabic: 'الكتاب المقدس' }}
         canGoBack
         onBack={() => goBack(router, '/')}
-        rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
-        onRightLeadingPress={toggleFullscreen}
+        rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+        onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
       />
       <ScrollView contentContainerStyle={styles.list}>
         {TESTAMENTS.map((testament) => (

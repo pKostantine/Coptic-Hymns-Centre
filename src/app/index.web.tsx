@@ -21,7 +21,7 @@ import { useIsMobileWeb } from '@/utils/useIsMobileWeb';
 export default function MainMenuWeb() {
   const router = useRouter();
   const { isLive, effectiveDate, goLive } = useCalendar();
-  const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
+  const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const isMobileWeb = useIsMobileWeb();
   const iconSize = isMobileWeb ? 20 : 26;
 
@@ -39,13 +39,15 @@ export default function MainMenuWeb() {
           </Text>
         </View>
         <View style={styles.toolbar}>
-          <Pressable
-            accessibilityLabel="Toggle full screen"
-            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
-            onPress={toggleFullscreen}
-          >
-            <Icon name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={iconSize} color={COLORS.gold} />
-          </Pressable>
+          {shouldShowFullscreen ? (
+            <Pressable
+              accessibilityLabel="Toggle full screen"
+              style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
+              onPress={toggleFullscreen}
+            >
+              <Icon name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={iconSize} color={COLORS.gold} />
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityLabel="Open bookmarks"
             style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}

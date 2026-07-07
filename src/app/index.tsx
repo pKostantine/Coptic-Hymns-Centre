@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
@@ -15,7 +15,7 @@ import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 export default function MainMenu() {
   const router = useRouter();
   const { isLive, effectiveDate, goLive } = useCalendar();
-  const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
+  const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
@@ -25,7 +25,7 @@ export default function MainMenu() {
       <AppHeader title="Coptic Hymns Centre" />
 
       <View style={styles.actionRow}>
-        {Platform.OS === 'web' ? (
+        {shouldShowFullscreen ? (
           <Pressable accessibilityLabel="Toggle full screen" style={styles.actionButton} onPress={toggleFullscreen}>
             <Icon name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={24} color={COLORS.gold} />
           </Pressable>

@@ -6,63 +6,48 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { supabase } from '@/utils/supabase';
+import { getBibleBooks, getBibleChapterKeys, PsalmNumbering } from '@/utils/bibleService';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { goBack } from '@/utils/navigation';
 
-interface BibleBook {
-  book_key: string;
-  book_order: number;
-  testament: string;
-  title_english: string;
-  title_arabic: string;
-}
-
-interface ChapterRow {
-  chapter_number: number;
-  verse_count: number;
-}
-
 const CHIP_SIZE = 58;
+
+const PSALM_NUMBERING_OPTIONS: { key: PsalmNumbering; label: string; arabic: string }[] = [
+  { key: 'septuagint', label: 'Septuagint', arabic: 'السبعيني' },
+  { key: 'masoretic', label: 'Masoretic', arabic: 'العبري' },
+];
 
 export default function BibleNestedList() {
   const router = useRouter();
   const { bookKey, title, arabic } = useLocalSearchParams<{ bookKey: string; title?: string; arabic?: string }>();
-  const { isFullscreen, toggle: toggleFullscreen } = useBrowserFullscreen();
+  const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const testament = bookKey === 'OT' || bookKey === 'NT' ? bookKey : null;
-  const [books, setBooks] = useState<BibleBook[] | null>(null);
-  const [chapters, setChapters] = useState<ChapterRow[] | null>(null);
+  const isPsalms = bookKey === 'psalms';
+  const [books, setBooks] = useState<Awaited<ReturnType<typeof getBibleBooks>> | null>(null);
+  const [chapters, setChapters] = useState<number[] | null>(null);
+  const [psalmNumbering, setPsalmNumbering] = useState<PsalmNumbering>('septuagint');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bookKey) return;
     setBooks(null);
-    setChapters(null);
     setError(null);
 
     if (testament) {
-      supabase.rpc('get_bible_books').then(({ data, error: err }) => {
-        if (err) {
-          setError(err.message);
-          return;
-        }
-        setBooks(
-          ((data as BibleBook[]) || [])
-            .filter((book) => book.testament === testament)
-            .sort((a, b) => a.book_order - b.book_order),
-        );
-      });
-      return;
+      getBibleBooks()
+        .then((allBooks) => setBooks(allBooks.filter((book) => book.testament === testament).sort((a, b) => a.bookOrder - b.bookOrder)))
+        .catch((err) => setError(err.message));
     }
-
-    supabase.rpc('get_bible_chapter_list', { p_book_key: bookKey }).then(({ data, error: err }) => {
-      if (err) {
-        setError(err.message);
-        return;
-      }
-      setChapters((data as ChapterRow[]) || []);
-    });
   }, [bookKey, testament]);
+
+  useEffect(() => {
+    if (!bookKey || testament) return;
+    setChapters(null);
+    setError(null);
+    getBibleChapterKeys(bookKey, psalmNumbering)
+      .then(setChapters)
+      .catch((err) => setError(err.message));
+  }, [bookKey, testament, psalmNumbering]);
 
   return (
     <View style={styles.screen}>
@@ -73,8 +58,8 @@ export default function BibleNestedList() {
         title={{ english: title || bookKey || '', arabic: arabic || '' }}
         canGoBack
         onBack={() => goBack(router, '/bible')}
-        rightLeadingIcon={isFullscreen ? 'close-fullscreen' : 'open-in-full'}
-        onRightLeadingPress={toggleFullscreen}
+        rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+        onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
       />
       {error ? (
         <View style={styles.center}>
@@ -89,13 +74,13 @@ export default function BibleNestedList() {
           <ScrollView contentContainerStyle={styles.list}>
             {books.map((book) => (
               <HymnCard
-                key={book.book_key}
-                title={book.title_english}
-                arabic={book.title_arabic}
+                key={book.bookKey}
+                title={book.titleEnglish}
+                arabic={book.titleArabic}
                 onPress={() =>
                   router.push({
                     pathname: '/bible/[bookKey]',
-                    params: { bookKey: book.book_key, title: book.title_english, arabic: book.title_arabic },
+                    params: { bookKey: book.bookKey, title: book.titleEnglish, arabic: book.titleArabic },
                   })
                 }
               />
@@ -107,21 +92,48 @@ export default function BibleNestedList() {
           <Text style={styles.loading}>Loading...</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.grid}>
-          {chapters.map((item) => (
-            <Pressable
-              key={item.chapter_number}
-              style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
-              onPress={() =>
-                router.push({
-                  pathname: '/bible/[bookKey]/[chapter]',
-                  params: { bookKey: bookKey!, chapter: String(item.chapter_number), title: title || bookKey || '' },
-                })
-              }
-            >
-              <Text style={styles.chipText}>{item.chapter_number}</Text>
-            </Pressable>
-          ))}
+        <ScrollView contentContainerStyle={styles.chapterContent}>
+          {isPsalms ? (
+            <View style={styles.psalmNumberingDeck}>
+              {PSALM_NUMBERING_OPTIONS.map((option) => {
+                const isSelected = psalmNumbering === option.key;
+                return (
+                  <Pressable
+                    key={option.key}
+                    style={[
+                      styles.psalmNumberingButton,
+                      { backgroundColor: isSelected ? COLORS.gold : COLORS.surface, borderColor: isSelected ? COLORS.gold : COLORS.border },
+                    ]}
+                    onPress={() => setPsalmNumbering(option.key)}
+                  >
+                    <Text style={[styles.psalmNumberingText, { color: isSelected ? COLORS.black : COLORS.white }]}>{option.label}</Text>
+                    <Text style={[styles.psalmNumberingArabic, { color: isSelected ? COLORS.black : COLORS.white }]}>{option.arabic}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+          <View style={styles.grid}>
+            {chapters.map((chapterNumber) => (
+              <Pressable
+                key={chapterNumber}
+                style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
+                onPress={() =>
+                  router.push({
+                    pathname: '/bible/[bookKey]/[chapter]',
+                    params: {
+                      bookKey: bookKey!,
+                      chapter: String(chapterNumber),
+                      title: title || bookKey || '',
+                      psalmNumbering: isPsalms ? psalmNumbering : undefined,
+                    },
+                  })
+                }
+              >
+                <Text style={styles.chipText}>{chapterNumber}</Text>
+              </Pressable>
+            ))}
+          </View>
         </ScrollView>
       )}
     </View>
@@ -134,11 +146,26 @@ const styles = StyleSheet.create({
   loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
   error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17, textAlign: 'center' },
   list: { padding: SPACING.md, gap: SPACING.md },
+  chapterContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
+  psalmNumberingDeck: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
+  psalmNumberingButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    gap: 2,
+    justifyContent: 'center',
+    minHeight: 58,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  psalmNumberingText: { fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  psalmNumberingArabic: { fontFamily: 'Arial', fontSize: 14, fontWeight: '700', textAlign: 'right', writingDirection: 'rtl' },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: SPACING.md,
     gap: SPACING.sm,
+    justifyContent: 'center',
   },
   chip: {
     width: CHIP_SIZE,
