@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
+import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
@@ -211,9 +212,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           <Text style={styles.error}>{error}</Text>
         </View>
       ) : !sections ? (
-        <View style={styles.center}>
-          <Text style={styles.loading}>Loading…</Text>
-        </View>
+        <LoadingScreen />
       ) : (
         <>
           <DocumentSurface

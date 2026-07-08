@@ -9,6 +9,8 @@ export interface VisibleLanguages {
 
 export type OrientationMode = 'auto' | 'landscape' | 'reverseLandscape' | 'portrait';
 
+export type AppLanguage = 'en' | 'ar';
+
 export interface ReadingPreferences {
   visibleLanguages: VisibleLanguages;
   fontScale: number; // integer 1-10
@@ -18,6 +20,8 @@ export interface ReadingPreferences {
   displayComments: boolean;
   displaySilentPrayers: boolean;
   bishopPresent: boolean;
+  /** Menu-chrome-only language (main menu + submenus/list screens) — never affects the text rendered inside an actual document, which is governed by visibleLanguages instead. */
+  appLanguage: AppLanguage;
 }
 
 // Matches the old app's DEFAULT_READING_PREFERENCES exactly (preferencesStorage.js).
@@ -35,6 +39,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   displayComments: false,
   displaySilentPrayers: false,
   bishopPresent: false,
+  appLanguage: 'en',
 };
 
 // Old app's getRenderedFontSize clamps to roughly a 20-41px range on a typical
@@ -63,6 +68,9 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
     merged.orientationMode = 'auto';
   }
   merged.fontScale = Math.min(10, Math.max(1, Math.round(merged.fontScale) || 1));
+  if (merged.appLanguage !== 'en' && merged.appLanguage !== 'ar') {
+    merged.appLanguage = 'en';
+  }
   return merged;
 }
 

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
+import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import { DocumentSection } from '../documentHtml';
 import Icon from './Icon';
 
@@ -38,17 +40,17 @@ export default function ContentSelectorDrawer({
   displaySilentPrayers = false,
 }: ContentSelectorDrawerProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isMobileDocument = Platform.OS !== 'web';
-  // A narrow browser viewport (phone-sized mobile web) gets the same
-  // full-screen treatment as the native app — a 50%-width side panel would
-  // be too narrow to read on a phone screen.
+  // A narrow browser viewport (phone-sized mobile web) gets the same compact
+  // treatment as the native app.
   const isCompactSelector = isMobileDocument || screenWidth < MOBILE_WEB_BREAKPOINT;
   const isLandscapeViewport = screenWidth > screenHeight;
-  // Mobile uses depth (a full-screen slide-in, like opening another document)
-  // rather than web's side panel — there's no room for a side drawer to feel
-  // native on a phone, and it matches how subdocument/Antiphonary modals
-  // already present on mobile.
-  const selectorPanelWidth = isCompactSelector ? screenWidth : Math.round(screenWidth * 0.5);
+  // Mobile is a narrow slide-in drawer (70% width, backdrop showing through
+  // on the remaining 30%) rather than a full-screen takeover — a full-screen
+  // panel felt like opening a whole new document instead of a lightweight
+  // jump-to list.
+  const selectorPanelWidth = isCompactSelector ? Math.round(screenWidth * 0.7) : Math.round(screenWidth * 0.5);
 
   const [slide] = useState(() => new Animated.Value(0));
 
@@ -109,7 +111,13 @@ export default function ContentSelectorDrawer({
   }, [visible, resolvedCurrentSectionId, itemLayouts]);
 
   return (
-    <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
+    <Modal
+      transparent
+      animationType="none"
+      visible={visible}
+      onRequestClose={onClose}
+      supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
+    >
       <View style={styles.selectorOverlay}>
         <Pressable accessibilityLabel="Close selector" style={styles.selectorBackdrop} onPress={onClose} />
         <Animated.View
@@ -117,6 +125,7 @@ export default function ContentSelectorDrawer({
             styles.selectorPanel,
             {
               width: selectorPanelWidth,
+              paddingTop: insets.top,
               transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, selectorPanelWidth] }) }],
             },
           ]}

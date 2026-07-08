@@ -70,7 +70,9 @@ const BOOKMARK_INDEX = buildBookmarkIndex();
 /** Bookmarks screen — ported from HomeScreen.js's bookmarks Modal (rendered as its own route here instead of a Modal). */
 export default function BookmarksScreen() {
   const router = useRouter();
-  const { bookmarks } = useReadingPreferences();
+  const { bookmarks, preferences } = useReadingPreferences();
+  const showEnglish = preferences.appLanguage === 'en';
+  const showArabic = preferences.appLanguage === 'ar';
   const [bibleBooks, setBibleBooks] = useState<BibleBook[]>([]);
 
   useEffect(() => {
@@ -120,7 +122,14 @@ export default function BookmarksScreen() {
           data={entries}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <HymnCard title={item.title} arabic={item.arabic} isBookmarked onPress={() => router.push(item.href as never)} />
+            <HymnCard
+              title={item.title}
+              arabic={item.arabic}
+              showEnglish={showEnglish}
+              showArabic={showArabic}
+              isBookmarked
+              onPress={() => router.push(item.href as never)}
+            />
           )}
         />
       )}

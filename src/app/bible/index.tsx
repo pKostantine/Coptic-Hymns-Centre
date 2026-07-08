@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING } from '@/constants/theme';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { goBack } from '@/utils/navigation';
 
@@ -17,6 +18,9 @@ const TESTAMENTS = [
 export default function BibleTestamentList() {
   const router = useRouter();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
+  const { preferences } = useReadingPreferences();
+  const showEnglish = preferences.appLanguage === 'en';
+  const showArabic = preferences.appLanguage === 'ar';
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
@@ -27,6 +31,7 @@ export default function BibleTestamentList() {
         title={{ english: 'Bible', arabic: 'الكتاب المقدس' }}
         canGoBack
         onBack={() => goBack(router, '/')}
+        visibleLanguages={{ english: showEnglish, arabic: showArabic }}
         rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
         onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
       />
@@ -36,6 +41,8 @@ export default function BibleTestamentList() {
             key={testament.key}
             title={testament.title}
             arabic={testament.arabic}
+            showEnglish={showEnglish}
+            showArabic={showArabic}
             onPress={() =>
               router.push({
                 pathname: '/bible/[bookKey]',
@@ -51,5 +58,5 @@ export default function BibleTestamentList() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  list: { padding: SPACING.md, gap: SPACING.md },
+  list: { padding: SPACING.md, paddingBottom: SPACING.xl },
 });

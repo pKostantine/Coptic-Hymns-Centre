@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { loadBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
 import {
+  AppLanguage,
   DEFAULT_READING_PREFERENCES,
   loadReadingPreferences,
   OrientationMode,
@@ -21,6 +22,7 @@ interface ReadingPreferencesContextValue {
   toggleDisplayComments: () => void;
   toggleDisplaySilentPrayers: () => void;
   toggleBishopPresent: () => void;
+  setAppLanguage: (language: AppLanguage) => void;
   bookmarks: string[];
   isBookmarked: (id: string) => boolean;
   toggleBookmark: (id: string) => void;
@@ -89,6 +91,10 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     setPreferences((prev) => ({ ...prev, bishopPresent: !prev.bishopPresent }));
   }, []);
 
+  const setAppLanguage = useCallback((language: AppLanguage) => {
+    setPreferences((prev) => ({ ...prev, appLanguage: language }));
+  }, []);
+
   const isBookmarked = useCallback((id: string) => bookmarks.includes(id), [bookmarks]);
 
   const toggleBookmark = useCallback((id: string) => {
@@ -107,6 +113,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleDisplayComments,
       toggleDisplaySilentPrayers,
       toggleBishopPresent,
+      setAppLanguage,
       bookmarks,
       isBookmarked,
       toggleBookmark,
@@ -122,6 +129,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleDisplayComments,
       toggleDisplaySilentPrayers,
       toggleBishopPresent,
+      setAppLanguage,
       bookmarks,
       isBookmarked,
       toggleBookmark,

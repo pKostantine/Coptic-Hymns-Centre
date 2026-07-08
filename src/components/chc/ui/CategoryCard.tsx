@@ -17,12 +17,16 @@ interface CategoryCardProps {
   title: string;
   arabic?: string;
   onPress?: () => void;
+  /** Both default true — the main menu's App Language setting passes only one of these, so the card shows a single centered title instead of the normal bilingual pair. */
+  showEnglish?: boolean;
+  showArabic?: boolean;
 }
 
 /** CHC CategoryCard — ported 1:1 from CategoryCard.js: main-menu row with a generic library-outline icon chip. */
-export default function CategoryCard({ title, arabic, onPress }: CategoryCardProps) {
-  const showArabic = Boolean(arabic);
-  const visibleTitleCount = showArabic ? 2 : 1;
+export default function CategoryCard({ title, arabic, onPress, showEnglish = true, showArabic: showArabicProp = true }: CategoryCardProps) {
+  const showArabic = showArabicProp && Boolean(arabic);
+  const showEnglishTitle = showEnglish;
+  const visibleTitleCount = (showEnglishTitle ? 1 : 0) + (showArabic ? 1 : 0);
 
   return (
     <Pressable style={({ pressed }) => [styles.card, SHADOWS.card, pressed && { opacity: 0.82 }]} onPress={onPress}>
@@ -31,8 +35,12 @@ export default function CategoryCard({ title, arabic, onPress }: CategoryCardPro
       </View>
       <View style={styles.content}>
         <View style={styles.titleTable}>
-          <Text style={[styles.title, visibleTitleCount === 1 && styles.centeredTitle]}>{formatEnglishDisplayText(title)}</Text>
-          {showArabic ? <Text style={[styles.title, styles.arabicTitle]}>{formatArabicNumbers(arabic!)}</Text> : null}
+          {showEnglishTitle ? (
+            <Text style={[styles.title, visibleTitleCount === 1 && styles.centeredTitle]}>{formatEnglishDisplayText(title)}</Text>
+          ) : null}
+          {showArabic ? (
+            <Text style={[styles.title, styles.arabicTitle, visibleTitleCount === 1 && styles.centeredTitle]}>{formatArabicNumbers(arabic!)}</Text>
+          ) : null}
         </View>
       </View>
       <Icon name="chevron-forward" size={22} color={COLORS.gold} />

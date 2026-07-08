@@ -13,7 +13,7 @@ interface DocumentSurfaceProps {
   selectedSectionId?: string | null;
   onCurrentSectionChange?: (id: string) => void;
   onOpenSelector?: () => void;
-  /** Scales the reading font size relative to the user's normal preference — subdocument modals render smaller (0.75) than the main document (1). */
+  /** Scales the reading font size relative to the user's normal preference. Defaults to 1 — subdocuments intentionally match the main document's font size exactly, same as every other reading preference. */
   fontScaleMultiplier?: number;
   /** Current on/off state of the in-document "Coptic Gospel Rite" toggle button (only rendered where GOSPEL_RITE content is spliced in). */
   copticGospelRite?: boolean;

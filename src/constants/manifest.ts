@@ -100,9 +100,12 @@ export const SERVICES_BY_CATEGORY: Record<string, ServiceDef[]> = {
     { id: 'vespers_praises', schema: 'psalmody', table: 'vespers_praises', title: 'Vespers Praises', arabic: 'تسبحة عشية' },
     { id: 'midnight_praises', schema: 'psalmody', table: 'midnight_praises', title: 'Midnight Praises', arabic: 'تسبحة نصف الليل' },
     { id: 'morning_doxology', schema: 'psalmody', table: 'morning_doxology', title: 'Morning Doxology', arabic: 'تسبحة باكر' },
-    { id: 'antiphonary', schema: 'psalmody', table: 'antiphonary', title: 'Antiphonary', arabic: 'الإبصالية' },
+    // Antiphonary is not a standalone book — it's only ever opened as the
+    // subdocument Midnight Praises references internally (see the
+    // isAntiphonaryButton handling in documentHtml.ts/ServiceDocument.tsx).
   ],
   agpeya: [
+    { id: 'introduction_to_every_hour', schema: 'agpeya', table: 'introduction_to_every_hour', title: 'Introduction to Every Hour', arabic: 'مقدمة كل ساعة' },
     { id: 'first_hour', schema: 'agpeya', table: 'first_hour', title: '1st Hour', arabic: 'الساعة الأولى' },
     { id: 'third_hour', schema: 'agpeya', table: 'third_hour', title: '3rd Hour', arabic: 'الساعة الثالثة' },
     { id: 'sixth_hour', schema: 'agpeya', table: 'sixth_hour', title: '6th Hour', arabic: 'الساعة السادسة' },

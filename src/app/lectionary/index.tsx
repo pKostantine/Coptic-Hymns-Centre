@@ -1,110 +1,129 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { StyleSheet, Text, View } from 'react-native';
+import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
-import DocumentWebView, { DocumentSection } from '@/components/chc/DocumentWebView';
-import { COLORS, TYPOGRAPHY } from '@/constants/theme';
+import ContentSelectorDrawer from '@/components/chc/ui/ContentSelectorDrawer';
+import LoadingScreen from '@/components/chc/ui/LoadingScreen';
+import DocumentSurface from '@/components/chc/DocumentSurface';
+import { DocumentSection, DocumentWebViewHandle } from '@/components/chc/DocumentWebView';
+import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { fontScaleToPx } from '@/utils/preferencesStorage';
-import { supabase } from '@/utils/supabase';
+import { getReadingsForDate } from '@/utils/readingsService';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { goBack } from '@/utils/navigation';
 
-interface ResolvedVerse {
-  verse_number: number;
-  chapter_number: number;
-  english: string;
-  coptic: string;
-  arabic: string;
-}
+const isMobileDocument = Platform.OS !== 'web';
 
-interface ReadingRow {
-  service: string;
-  reading_type: string;
-  reading_reference: string;
-  resolved_verses: { segment: string; book_key: string; verses: ResolvedVerse[] }[];
-}
-
-const SERVICE_ORDER = ['Vespers', 'Matins', 'Pauline', 'Catholic', 'Praxis', 'Liturgy'];
-const TYPE_ORDER = ['Psalm', 'Gospel', 'Prophecy', 'Pauline Epistle', 'Catholic Epistle', 'Praxis'];
-
+/** Daily Readings screen — resolves calendar.reading_rules for the current effective date and renders the result through the exact same DocumentSurface/ContentSelectorDrawer pipeline as every other service document, so slideshow mode, font size, bookmarking, and gesture nav all work identically. */
 export default function LectionaryDocument() {
   const router = useRouter();
-  const { preferences } = useReadingPreferences();
+  const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent } = useReadingPreferences();
   const { effectiveDate } = useCalendar();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
+  const { width: screenWidth } = useWindowDimensions();
+  const bookmarkId = `lectionary:${effectiveDate.toISOString().slice(0, 10)}`;
+
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
+  const documentRef = useRef<DocumentWebViewHandle>(null);
 
   useEffect(() => {
-    const isoDate = effectiveDate.toISOString().slice(0, 10);
-    supabase
-      .rpc('get_readings_for_date', { p_date: isoDate })
-      .then(({ data, error: err }) => {
-        if (err) {
-          setError(err.message);
-          return;
-        }
-        const rows = ((data as ReadingRow[]) || []).sort(
-          (a, b) =>
-            SERVICE_ORDER.indexOf(a.service) - SERVICE_ORDER.indexOf(b.service) ||
-            TYPE_ORDER.indexOf(a.reading_type) - TYPE_ORDER.indexOf(b.reading_type),
-        );
-
-        setSections(
-          rows.map((row) => ({
-            id: `${row.service}-${row.reading_type}`,
-            title: { english: `${row.service} — ${row.reading_type}`, arabic: '' },
-            verses: row.resolved_verses.flatMap((segment) =>
-              segment.verses.map((v) => ({
-                english: `${v.chapter_number}:${v.verse_number} ${v.english || ''}`,
-                coptic: v.coptic || '',
-                arabic: v.arabic || '',
-                type: 'text',
-              })),
-            ),
-            alternateEvery: null,
-            forceWhiteVerses: true,
-          })),
-        );
+    let cancelled = false;
+    setSections(null);
+    setError(null);
+    getReadingsForDate(effectiveDate)
+      .then((result) => {
+        if (!cancelled) setSections(result.sections);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err?.message || 'Failed to load today’s readings.');
       });
+    return () => {
+      cancelled = true;
+    };
   }, [effectiveDate]);
 
+  const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
+  const selectorSwipeStartX = Math.max(screenWidth - selectorEdgeWidth, 0);
+
+  const gesturePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          const startsInRightEdge = gestureState.x0 >= selectorSwipeStartX;
+          const startsInLeftEdge = gestureState.x0 < 56;
+          const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+          return (startsInRightEdge || startsInLeftEdge) && isHorizontal && Math.abs(gestureState.dx) > 18;
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.x0 >= selectorSwipeStartX && gestureState.dx <= -36) {
+            setSelectorOpen(true);
+            return;
+          }
+          if (gestureState.x0 < 56 && gestureState.dx > 60) {
+            goBack(router, '/');
+          }
+        },
+      }),
+    [router, selectorSwipeStartX],
+  );
+
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}>
       <Head>
-        <title>CHC Lectionary</title>
+        <title>CHC Daily Readings</title>
       </Head>
-      <AppHeader
-        title={{ english: 'Lectionary', arabic: 'القطمارس' }}
-        canGoBack
-        onBack={() => goBack(router, '/')}
-        rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
-        onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
-      />
+      {!isMobileDocument ? (
+        <AppHeader
+          title={{ english: 'Daily Readings', arabic: 'قراءات اليوم' }}
+          canGoBack
+          onBack={() => goBack(router, '/')}
+          rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+          onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
+          rightIcon="list-outline"
+          rightAccessibilityLabel="Open content list"
+          onRightPress={() => setSelectorOpen(true)}
+        />
+      ) : null}
       {error ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
         </View>
       ) : !sections ? (
+        <LoadingScreen />
+      ) : sections.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.loading}>Loading…</Text>
+          <Text style={styles.loading}>No readings are recorded for this day.</Text>
         </View>
       ) : (
-        <DocumentWebView
-          sections={sections}
-          fontSize={fontScaleToPx(preferences.fontScale)}
-          visibleColumns={{
-            english: preferences.visibleLanguages.english,
-            coptic: preferences.visibleLanguages.coptic,
-            arabic: preferences.visibleLanguages.arabic,
-          }}
-          selectText={preferences.selectText}
-        />
+        <>
+          <DocumentSurface
+            ref={documentRef}
+            sections={sections}
+            preferences={preferences}
+            onCurrentSectionChange={setCurrentSectionId}
+            onOpenSelector={() => setSelectorOpen(true)}
+          />
+          <ContentSelectorDrawer
+            visible={selectorOpen}
+            sections={sections}
+            currentSectionId={currentSectionId}
+            onClose={() => setSelectorOpen(false)}
+            onSelectSection={(id) => documentRef.current?.scrollToSection(id)}
+            bookmarked={isBookmarked(bookmarkId)}
+            onToggleBookmark={() => toggleBookmark(bookmarkId)}
+            onOpenSettings={() => router.push('/settings')}
+            bishopPresent={preferences.bishopPresent}
+            onToggleBishopPresent={toggleBishopPresent}
+            displaySilentPrayers={preferences.displaySilentPrayers}
+          />
+        </>
       )}
     </SafeAreaView>
   );
@@ -112,7 +131,7 @@ export default function LectionaryDocument() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
-  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
+  loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17, textAlign: 'center' },
+  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17, textAlign: 'center' },
 });

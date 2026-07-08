@@ -40,7 +40,7 @@ export default function AppHeader({
   const hasRightAction = Boolean(rightIcon && onRightPress);
 
   return (
-    <View style={[styles.container, { paddingTop: SPACING.lg + insets.top }]}>
+    <View style={[styles.container, { paddingTop: SPACING.sm + insets.top }]}>
       <View style={styles.topRow}>
         {canGoBack ? (
           <Pressable accessibilityLabel="Go back" style={styles.iconButton} onPress={onBack}>
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.navy,
     borderBottomColor: COLORS.gold,
     borderBottomWidth: 1,
-    paddingBottom: SPACING.md,
+    paddingBottom: SPACING.sm,
     paddingHorizontal: SPACING.md,
   },
   topRow: {

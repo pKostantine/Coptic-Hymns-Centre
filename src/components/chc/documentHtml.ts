@@ -12,6 +12,8 @@ export interface DocumentVerse {
   /** This verse's own condition only passes when Bishop Present is on/off respectively — evaluated both ways at hydration time so toggling Bishop Present never needs a re-fetch. */
   bishopOnly?: boolean;
   priestOnly?: boolean;
+  /** Readings only: "chapter:verse" gold badge prefixed before this verse's text in every visible language column. */
+  bibleVerseNumber?: string;
 }
 
 export interface DocumentSection {
@@ -238,6 +240,7 @@ export function buildDocumentHtml(
       .speaker-label.people { color: ${COLORS.people}; }
       .speaker-label.deacon, .speaker-label.reader { color: ${COLORS.deacon}; }
       .speaker-label.refrain { color: ${COLORS.refrain}; font-style: italic;}
+      .bible-verse-number { color: ${COLORS.gold}; font-weight: 700; }
       .section-title {
         color: ${COLORS.gold};
         font-family: Georgia, serif;
@@ -555,7 +558,10 @@ function renderVerse(
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveRubricKey(verse.type, bishopPresent)];
-  const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
+  // Invincible Coptic lines have no English/Arabic counterpart by design —
+  // they render as a single column and should read centered, not justified
+  // against a column width that no longer has anything to justify against.
+  const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference' || verse.prayerType === 'Invincible Coptic';
   // "Coptic Recited Prayers" hides just this verse's Coptic text when the
   // verse is a Recited Prayer — combined with the verse-by-verse column
   // collapse below, that verse's Coptic column disappears for that row only,
@@ -588,15 +594,20 @@ function renderVerse(
   const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;
 
   const cells = languages
-    .map(
-      (language) => `
+    .map((language) => {
+      const verseNumberText = verse.bibleVerseNumber
+        ? language.key === 'arabic'
+          ? formatArabicDigits(verse.bibleVerseNumber)
+          : verse.bibleVerseNumber
+        : '';
+      return `
         <div class="cell">
           <p class="verse-text ${language.className} ${isCentered ? 'centered' : ''}" style="${textStyle}">${
             language.speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(language.speakerLabel)}</span><br/>` : ''
-          }${escapeHtml(language.text)}</p>
+          }${verseNumberText ? `<span class="bible-verse-number">${escapeHtml(verseNumberText)}</span> ` : ''}${escapeHtml(language.text)}</p>
         </div>
-      `,
-    )
+      `;
+    })
     .join('');
 
   const tuneAttribute = verse.tune ? ` data-tune="${escapeAttribute(verse.tune)}"` : '';

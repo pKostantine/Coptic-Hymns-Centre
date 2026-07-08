@@ -18,20 +18,28 @@ interface HymnCardProps {
   arabic?: string;
   isBookmarked?: boolean;
   onPress?: () => void;
+  /** Both default true — the main menu's App Language setting passes only one of these, so the card shows a single centered title instead of the normal bilingual pair. */
+  showEnglish?: boolean;
+  showArabic?: boolean;
 }
 
 /** CHC HymnCard — ported 1:1 from HymnCard.js: submenu/bookmark row, no icon chip, inline bookmark glyph. */
-export default function HymnCard({ title, arabic, isBookmarked, onPress }: HymnCardProps) {
-  const showArabic = Boolean(arabic);
-  const visibleTitleCount = showArabic ? 2 : 1;
+export default function HymnCard({ title, arabic, isBookmarked, onPress, showEnglish = true, showArabic: showArabicProp = true }: HymnCardProps) {
+  const showArabic = showArabicProp && Boolean(arabic);
+  const showEnglishTitle = showEnglish;
+  const visibleTitleCount = (showEnglishTitle ? 1 : 0) + (showArabic ? 1 : 0);
 
   return (
     <Pressable style={({ pressed }) => [styles.card, SHADOWS.hymnCard, pressed && { opacity: 0.82 }]} onPress={onPress}>
       <View style={styles.textGroup}>
         <View style={styles.titleRow}>
           <View style={styles.titleTable}>
-            <Text style={[styles.title, visibleTitleCount === 1 && styles.centeredTitle]}>{formatEnglishDisplayText(title)}</Text>
-            {showArabic ? <Text style={[styles.title, styles.arabicTitle]}>{formatArabicNumbers(arabic!)}</Text> : null}
+            {showEnglishTitle ? (
+              <Text style={[styles.title, visibleTitleCount === 1 && styles.centeredTitle]}>{formatEnglishDisplayText(title)}</Text>
+            ) : null}
+            {showArabic ? (
+              <Text style={[styles.title, styles.arabicTitle, visibleTitleCount === 1 && styles.centeredTitle]}>{formatArabicNumbers(arabic!)}</Text>
+            ) : null}
           </View>
           {isBookmarked ? <Icon name="bookmark" size={18} color={COLORS.gold} /> : null}
         </View>

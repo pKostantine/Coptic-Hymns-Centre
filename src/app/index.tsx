@@ -4,21 +4,26 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
+import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import CategoryCard from '@/components/chc/ui/CategoryCard';
 import Icon from '@/components/chc/ui/Icon';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { CATEGORIES } from '@/constants/manifest';
 import { useCalendar } from '@/context/CalendarContext';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 
-/** Main menu — ported 1:1 from HomeScreen.js/HomeScreen.web.js: Header, an action row (web adds a fullscreen toggle), then the category list. */
+/** Main menu — ported 1:1 from HomeScreen.js/HomeScreen.web.js: Header, an action row (web adds a fullscreen toggle), then the category list. Bottom tab bar (Books/App Settings) shown only here. */
 export default function MainMenu() {
   const router = useRouter();
   const { isLive, effectiveDate, goLive } = useCalendar();
+  const { preferences } = useReadingPreferences();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
+  const showEnglish = preferences.appLanguage === 'en';
+  const showArabic = preferences.appLanguage === 'ar';
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
         <title>Coptic Hymns Centre</title>
       </Head>
@@ -55,9 +60,16 @@ export default function MainMenu() {
         data={CATEGORIES}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <CategoryCard title={item.title} arabic={item.arabic} onPress={() => router.push(`/${item.id}`)} />
+          <CategoryCard
+            title={item.title}
+            arabic={item.arabic}
+            showEnglish={showEnglish}
+            showArabic={showArabic}
+            onPress={() => router.push(`/${item.id}`)}
+          />
         )}
       />
+      <BottomTabBar active="books" />
     </SafeAreaView>
   );
 }
@@ -69,16 +81,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: COLORS.border,
-    height: 52,
+    height: 44,
     justifyContent: 'center',
-    width: 52,
+    width: 44,
   },
   actionRow: {
     flexDirection: 'row',
     gap: SPACING.md,
     justifyContent: 'center',
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
+    paddingTop: SPACING.sm,
   },
   notLiveBanner: {
     flexDirection: 'row',

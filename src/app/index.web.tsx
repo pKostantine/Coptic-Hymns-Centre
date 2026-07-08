@@ -3,11 +3,13 @@ import Head from 'expo-router/head';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import CategoryCard from '@/components/chc/ui/CategoryCard';
 import Icon from '@/components/chc/ui/Icon';
 import { CATEGORIES } from '@/constants/manifest';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useCalendar } from '@/context/CalendarContext';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { useIsMobileWeb } from '@/utils/useIsMobileWeb';
 
@@ -22,11 +24,14 @@ export default function MainMenuWeb() {
   const router = useRouter();
   const { isLive, effectiveDate, goLive } = useCalendar();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
+  const { preferences } = useReadingPreferences();
   const isMobileWeb = useIsMobileWeb();
   const iconSize = isMobileWeb ? 20 : 26;
+  const showEnglish = preferences.appLanguage === 'en';
+  const showArabic = preferences.appLanguage === 'ar';
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
         <title>Coptic Hymns Centre</title>
       </Head>
@@ -86,9 +91,16 @@ export default function MainMenuWeb() {
         data={CATEGORIES}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <CategoryCard title={item.title} arabic={item.arabic} onPress={() => router.push(`/${item.id}`)} />
+          <CategoryCard
+            title={item.title}
+            arabic={item.arabic}
+            showEnglish={showEnglish}
+            showArabic={showArabic}
+            onPress={() => router.push(`/${item.id}`)}
+          />
         )}
       />
+      <BottomTabBar active="books" />
     </SafeAreaView>
   );
 }

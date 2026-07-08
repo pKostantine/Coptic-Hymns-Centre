@@ -4,10 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
+import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
+import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 
 interface DocumentModalTarget {
   title: { english: string; arabic: string };
@@ -85,7 +87,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
   }
 
   return (
-    <Modal animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
         <AppHeader
           title={title || ''}
@@ -105,9 +107,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
           </View>
         ) : null}
         {!sections ? (
-          <View style={styles.center}>
-            <Text style={styles.loading}>Loading…</Text>
-          </View>
+          <LoadingScreen />
         ) : (
           <>
             <DocumentSurface
@@ -115,7 +115,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
               sections={sections}
               preferences={preferences}
               onAction={handleAction}
-              fontScaleMultiplier={0.75}
               selectedSectionId={selectedSlideSectionId}
               onCurrentSectionChange={setCurrentSectionId}
               onOpenSelector={() => setSelectorOpen(true)}

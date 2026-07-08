@@ -427,6 +427,11 @@ export function assembleServiceSections(rawRows) {
         condition: normalizeText(row.line_condition),
         type: resolveEffectiveVerseType(row.person_type, row.prayer_type, row.title_prayer_type),
         prayerType: row.prayer_type || null,
+        // "Invincible Coptic" lines have no English/Arabic counterpart by
+        // design (a Coptic-only exclamation like "Glory to our God") — they
+        // render as a single centered column rather than trying to line up
+        // against blank parallel columns.
+        invincibleCoptic: row.prayer_type === "Invincible Coptic",
       });
     }
   }
@@ -585,9 +590,21 @@ function evaluateBishopAwareVisibility(condition, flags) {
   };
 }
 
+// Expands each side's collapsed {visible, bishopOnly, priestOnly} back into
+// its two per-branch booleans (visible-with-bishop, visible-without-bishop)
+// before combining, rather than combining bishopOnly/priestOnly directly —
+// those two flags alone can't tell "unrestricted and visible in both
+// branches" apart from "condition false in both branches" (both read as
+// bishopOnly=false, priestOnly=false), so combining them without `visible`
+// silently resurrected verses whose condition never actually matched.
 function combineBishopVisibility(outer, inner) {
-  const withBishop = !outer.priestOnly && !inner.priestOnly;
-  const withoutBishop = !outer.bishopOnly && !inner.bishopOnly;
+  const outerWithBishop = outer.visible && !outer.priestOnly;
+  const outerWithoutBishop = outer.visible && !outer.bishopOnly;
+  const innerWithBishop = inner.visible && !inner.priestOnly;
+  const innerWithoutBishop = inner.visible && !inner.bishopOnly;
+
+  const withBishop = outerWithBishop && innerWithBishop;
+  const withoutBishop = outerWithoutBishop && innerWithoutBishop;
   return {
     visible: withBishop || withoutBishop,
     bishopOnly: withBishop && !withoutBishop,
@@ -756,6 +773,7 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
               arabic: row.arabic || "",
               type: resolveEffectiveVerseType(effectivePersonType, effectivePrayerType, inlineTitlePrayerType),
               prayerType: effectivePrayerType || null,
+              invincibleCoptic: effectivePrayerType === "Invincible Coptic",
               bishopOnly: visibility.bishopOnly,
               priestOnly: visibility.priestOnly,
             };

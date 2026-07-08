@@ -61,10 +61,10 @@ export default function VerseBlock({
               ? titleLineHeight
               : Math.round(copticFontSize * 1),
           styles: [styles.coptic],
-          textAlign:
-            verse.centeredAcrossPage || isRefrainLabel || isReadingReference
-              ? "center"
-              : "justify",
+          // Invincible Coptic never has parallel English/Arabic text to
+          // justify against — it should always read centered in its column,
+          // not just when centeredAcrossPage happens to also be set.
+          textAlign: "center",
         },
       ]
     : [
@@ -119,24 +119,16 @@ export default function VerseBlock({
         },
       ]).filter(
     // A toggled-on language always keeps its column, even when this specific
-    // verse has no text in it — the column just renders blank. Collapsing a
-    // column per-verse (the old behavior) made adjacent rows use different
-    // column counts/widths whenever one row's Coptic or Arabic happened to be
-    // empty, so the Arabic column's left edge would jump left/right between
-    // rows, reading as a stray gap or "imaginary extra column". Documents
-    // should read like a fixed-column table — see documentHtml.ts, which
-    // applies the same fixed-column philosophy to the WebView reader.
-    //
-    // The one exception is slideshowSuppressedLanguages: when a tall verse
-    // has to split across multiple slides, a language that wraps to fewer
-    // lines than its siblings (Coptic at a larger font routinely does) can
-    // run out of content in an earlier segment while English/Arabic still
-    // have more left. Rendering its now-permanently-blank column on every
-    // later segment reads as a phantom empty column next to whichever column
-    // comes after it — worse than the rare cross-row misalignment this
-    // filter otherwise avoids — so those segments drop the column entirely.
+    // verse (or this specific segment of a verse split across multiple
+    // slideshow slides) has no text in it — the column just renders blank.
+    // Collapsing a column per-verse/per-segment made adjacent rows use
+    // different column counts/widths whenever one row's Coptic or Arabic
+    // happened to be empty, so the Arabic column's left edge would jump
+    // left/right between rows, reading as a stray gap or "imaginary extra
+    // column". Documents should read like a fixed-column table — see
+    // documentHtml.ts, which applies the same fixed-column philosophy to the
+    // WebView reader.
     (language) =>
-      !verse.slideshowSuppressedLanguages?.includes(language.key) &&
       (verse.invincibleCoptic ||
         visibleLanguages[language.key] ||
         (language.key === "coptic" && verse.forceCopticVisible)) &&

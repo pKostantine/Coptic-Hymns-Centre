@@ -70,7 +70,12 @@ export default function RootLayout() {
               headerShown: false,
               contentStyle: { backgroundColor: COLORS.black },
             }}
-          />
+          >
+            {/* Books <-> App Settings behaves like switching tabs, not pushing a
+                subpage — no slide transition between them. */}
+            <Stack.Screen name="index" options={{ animation: 'none' }} />
+            <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
+          </Stack>
         </CalendarProvider>
       </ReadingPreferencesProvider>
     </SafeAreaProvider>

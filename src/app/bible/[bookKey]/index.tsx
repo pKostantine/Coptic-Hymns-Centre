@@ -5,7 +5,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
+import LoadingScreen from '@/components/chc/ui/LoadingScreen';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { getBibleBooks, getBibleChapterKeys, PsalmNumbering } from '@/utils/bibleService';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { goBack } from '@/utils/navigation';
@@ -21,6 +23,9 @@ export default function BibleNestedList() {
   const router = useRouter();
   const { bookKey, title, arabic } = useLocalSearchParams<{ bookKey: string; title?: string; arabic?: string }>();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
+  const { preferences } = useReadingPreferences();
+  const showEnglish = preferences.appLanguage === 'en';
+  const showArabic = preferences.appLanguage === 'ar';
   const testament = bookKey === 'OT' || bookKey === 'NT' ? bookKey : null;
   const isPsalms = bookKey === 'psalms';
   const [books, setBooks] = useState<Awaited<ReturnType<typeof getBibleBooks>> | null>(null);
@@ -58,6 +63,7 @@ export default function BibleNestedList() {
         title={{ english: title || bookKey || '', arabic: arabic || '' }}
         canGoBack
         onBack={() => goBack(router, '/bible')}
+        visibleLanguages={{ english: showEnglish, arabic: showArabic }}
         rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
         onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
       />
@@ -67,9 +73,7 @@ export default function BibleNestedList() {
         </View>
       ) : testament ? (
         !books ? (
-          <View style={styles.center}>
-            <Text style={styles.loading}>Loading...</Text>
-          </View>
+          <LoadingScreen />
         ) : (
           <ScrollView contentContainerStyle={styles.list}>
             {books.map((book) => (
@@ -77,6 +81,8 @@ export default function BibleNestedList() {
                 key={book.bookKey}
                 title={book.titleEnglish}
                 arabic={book.titleArabic}
+                showEnglish={showEnglish}
+                showArabic={showArabic}
                 onPress={() =>
                   router.push({
                     pathname: '/bible/[bookKey]',
@@ -88,9 +94,7 @@ export default function BibleNestedList() {
           </ScrollView>
         )
       ) : !chapters ? (
-        <View style={styles.center}>
-          <Text style={styles.loading}>Loading...</Text>
-        </View>
+        <LoadingScreen />
       ) : (
         <ScrollView contentContainerStyle={styles.chapterContent}>
           {isPsalms ? (
@@ -145,7 +149,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
   loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
   error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17, textAlign: 'center' },
-  list: { padding: SPACING.md, gap: SPACING.md },
+  list: { padding: SPACING.md, paddingBottom: SPACING.xl },
   chapterContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
   psalmNumberingDeck: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
   psalmNumberingButton: {

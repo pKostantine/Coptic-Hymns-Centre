@@ -1217,20 +1217,13 @@ function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
   // A language that wraps to fewer total lines than its siblings (Coptic at
   // a larger font routinely does, since its words/glyphs run wider) can
   // finish displaying all of its content in an earlier segment while
-  // English/Arabic still have more to show in later ones. Once that's
-  // happened, this and every later segment has nothing left to put in that
-  // column — rendering it anyway (VerseBlock's fixed-column-table behavior,
-  // which is correct for a verse that never had text in a language at all)
-  // produces a persistent blank gap next to whichever column comes after it,
-  // reading as a phantom empty column. Suppress only the languages that were
-  // ALREADY fully consumed before this segment started; a language with no
-  // text for the verse from the start (lines.length === 0 for all of
-  // state.languages) never reaches this function's per-language block at
-  // all, so it's untouched and still gets its normal fixed blank column.
-  const exhaustedLanguages = [];
-
+  // English/Arabic still have more to show in later ones. That column stays
+  // in the fixed-column layout anyway (rendered blank) for every later
+  // segment — every segment of a split verse must keep the exact same set of
+  // columns at the exact same widths, or the other languages visibly shift
+  // position between segments, which reads far worse than one column
+  // sitting blank for a segment or two.
   state.languages.forEach((entry) => {
-    const wasAlreadyExhausted = entry.offset >= entry.lines.length;
     const remainingCount = entry.lines.length - entry.offset;
     const takeCount = Math.min(lineCapacities[entry.language] || 0, remainingCount);
     const lines = entry.lines.slice(entry.offset, entry.offset + takeCount);
@@ -1238,15 +1231,7 @@ function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
     verse[entry.language] = joinRenderedLines(lines);
     lineCounts[entry.language] = lines.length;
     entry.offset += takeCount;
-
-    if (wasAlreadyExhausted) {
-      exhaustedLanguages.push(entry.language);
-    }
   });
-
-  if (exhaustedLanguages.length) {
-    verse.slideshowSuppressedLanguages = exhaustedLanguages;
-  }
 
   return {
     item: {

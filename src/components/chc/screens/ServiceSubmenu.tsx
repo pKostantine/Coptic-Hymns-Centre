@@ -31,14 +31,16 @@ interface ServiceSubmenuProps {
 /** Generic submenu screen: lists the order-table services (or navigational sub-groups) within a category. Ported from HymnListScreen.js. */
 export default function ServiceSubmenu({ basePath, title, arabic, services, backHref }: ServiceSubmenuProps) {
   const router = useRouter();
-  const { isBookmarked } = useReadingPreferences();
+  const { isBookmarked, preferences } = useReadingPreferences();
+  const showEnglish = preferences.appLanguage === 'en';
+  const showArabic = preferences.appLanguage === 'ar';
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
       <Head>
         <title>{`CHC ${title}`}</title>
       </Head>
-      <AppHeader title={{ english: title, arabic }} canGoBack onBack={() => goBack(router, backHref)} />
+      <AppHeader title={{ english: title, arabic }} canGoBack onBack={() => goBack(router, backHref)} visibleLanguages={{ english: showEnglish, arabic: showArabic }} />
       <FlatList
         contentContainerStyle={styles.listContent}
         data={services}
@@ -47,6 +49,8 @@ export default function ServiceSubmenu({ basePath, title, arabic, services, back
           <HymnCard
             title={item.title}
             arabic={item.arabic}
+            showEnglish={showEnglish}
+            showArabic={showArabic}
             isBookmarked={item.schema && item.table ? isBookmarked(`${item.schema}:${item.table}`) : false}
             onPress={() => router.push(`/${basePath}/${item.id}` as never)}
           />

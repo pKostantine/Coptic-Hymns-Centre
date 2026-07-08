@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import Icon from '@/components/chc/ui/Icon';
+import LoadingScreen from '@/components/chc/ui/LoadingScreen';
 import BibleWebView, { BibleWebViewHandle } from '@/components/chc/BibleWebView';
 import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/chc/bibleDocumentHtml';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
   BibleBook,
@@ -20,10 +22,10 @@ import {
 } from '@/utils/bibleService';
 import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
+import { fontScaleToPx } from '@/utils/preferencesStorage';
+import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { goBack } from '@/utils/navigation';
 
-const MIN_FONT_SCALE = 1;
-const MAX_FONT_SCALE = 10;
 const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: string }[] = [
   { key: 'english', label: 'English' },
   { key: 'coptic', label: 'Coptic' },
@@ -43,24 +45,14 @@ function normalizeInitialLanguages(visibleLanguages: { english: boolean; coptic:
   };
 }
 
-/** Bible-specific font sizing (screen/column-width driven) — ported from BibleScreen.js's getRenderedFontSize, distinct from hymns' flat fontScaleToPx. */
-function getRenderedFontSize(fontScale: number, screenWidth: number, screenHeight: number, columnWidth: number) {
-  const normalizedScale = Math.min(Math.max(fontScale || MIN_FONT_SCALE, MIN_FONT_SCALE), MAX_FONT_SCALE);
-  const deviceBase = Math.min(screenWidth || 390, screenHeight || 844);
-  const columnBase = columnWidth || screenWidth || 390;
-  const minRenderedFontSize = clamp(Math.round(Math.min(deviceBase * 0.052, columnBase * 0.075)), 14, 30);
-  const maxRenderedFontSize = clamp(Math.round(Math.min(deviceBase * 0.105, columnBase * 0.14)), 24, 72);
-  const step = (maxRenderedFontSize - minRenderedFontSize) / (MAX_FONT_SCALE - MIN_FONT_SCALE);
-  return Math.round(minRenderedFontSize + (normalizedScale - 1) * step);
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
+const isMobileDocument = Platform.OS !== 'web';
 
 export default function BibleChapterDocument() {
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isCompactSelector = isMobileDocument || screenWidth < MOBILE_WEB_BREAKPOINT;
+  const selectorPanelWidth = isCompactSelector ? Math.round(screenWidth * 0.7) : Math.round(screenWidth * 0.5);
   const { bookKey, chapter, title, psalmNumbering: psalmNumberingParam } = useLocalSearchParams<{
     bookKey: string;
     chapter: string;
@@ -101,11 +93,7 @@ export default function BibleChapterDocument() {
   const availableLanguages = useMemo(() => getAvailableLanguages(verses || []), [verses]);
   const visibleLanguageKeys = availableLanguages.filter((language) => enabledLanguages[language]);
   const effectiveLanguageKeys = visibleLanguageKeys.length ? visibleLanguageKeys : [availableLanguages[0] || 'english'];
-  const columnWidth = Math.max(
-    (screenWidth - SPACING.md * 2 - SPACING.md * Math.max(effectiveLanguageKeys.length - 1, 0)) / Math.max(effectiveLanguageKeys.length, 1),
-    1,
-  );
-  const fontSize = getRenderedFontSize(preferences.fontScale, screenWidth, screenHeight, columnWidth);
+  const fontSize = fontScaleToPx(preferences.fontScale);
   const preface = book?.bookKey === 'psalms' ? getDisplayedPsalmPreface() : null;
 
   const chapterIndex = chapterKeys ? chapterKeys.indexOf(Number(chapter)) : -1;
@@ -187,9 +175,7 @@ export default function BibleChapterDocument() {
           <Text style={styles.error}>{error}</Text>
         </View>
       ) : !chapterHtml ? (
-        <View style={styles.center}>
-          <Text style={styles.loading}>Loading…</Text>
-        </View>
+        <LoadingScreen />
       ) : (
         <View style={styles.verseScreen}>
           <BibleWebView
@@ -202,18 +188,25 @@ export default function BibleChapterDocument() {
             }}
           />
 
-          <Modal animationType="none" transparent visible={isSelectorOpen} onRequestClose={() => setIsSelectorOpen(false)}>
+          <Modal
+            animationType="none"
+            transparent
+            visible={isSelectorOpen}
+            onRequestClose={() => setIsSelectorOpen(false)}
+            supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
+          >
             <View style={styles.selectorOverlay}>
               <Pressable accessibilityLabel="Close verse selector" style={styles.selectorBackdrop} onPress={() => setIsSelectorOpen(false)} />
-              <View style={styles.selectorPanel}>
+              <View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top }]}>
                 <View style={styles.selectorHeader}>
+                  <Pressable accessibilityLabel="Close verse selector" style={styles.selectorBackButton} onPress={() => setIsSelectorOpen(false)}>
+                    <Icon name="chevron-back" size={24} color={COLORS.gold} />
+                  </Pressable>
                   <View style={styles.selectorHeaderTitleGroup}>
                     <Text style={styles.selectorHeaderTitle}>Verses</Text>
                     <Text style={[styles.selectorHeaderTitle, styles.selectorHeaderArabic]}>الآيات</Text>
                   </View>
-                  <Pressable accessibilityLabel="Close verse selector" style={styles.selectorCloseButton} onPress={() => setIsSelectorOpen(false)}>
-                    <Icon name="chevron-back" size={22} color={COLORS.gold} />
-                  </Pressable>
+                  <View style={styles.selectorBackButton} />
                 </View>
 
                 <View style={styles.chapterNavRow}>
@@ -249,7 +242,7 @@ export default function BibleChapterDocument() {
 
                 <View style={styles.selectorActionRow}>
                   <Pressable accessibilityLabel="Bookmark chapter" style={styles.selectorIconButton} onPress={() => toggleBookmark(bookmarkId)}>
-                    <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={COLORS.gold} />
+                    <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={COLORS.gold} />
                   </Pressable>
                   <Pressable
                     accessibilityLabel="Open Bible settings"
@@ -259,7 +252,7 @@ export default function BibleChapterDocument() {
                       router.push('/settings');
                     }}
                   >
-                    <Icon name="settings-outline" size={22} color={COLORS.gold} />
+                    <Icon name="settings-outline" size={25} color={COLORS.gold} />
                   </Pressable>
                 </View>
               </View>
@@ -293,26 +286,41 @@ const styles = StyleSheet.create({
   verseScreen: { flex: 1 },
   selectorOverlay: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.48)' },
   selectorBackdrop: { flex: 1 },
+  // Visual language matched to ContentSelectorDrawer (the normal document
+  // reader's content selector) — same panel background/border, header
+  // pattern (back button left, centered bilingual title), and card-style
+  // list items, per the request to make the two selectors feel consistent.
   selectorPanel: {
-    width: '75%',
-    maxWidth: 340,
     backgroundColor: '#050505',
-    borderLeftWidth: 1,
     borderColor: 'rgba(201, 162, 39, 0.35)',
+    borderLeftWidth: 1,
+    paddingHorizontal: SPACING.md,
   },
   selectorHeader: {
     alignItems: 'center',
-    borderBottomColor: 'rgba(201, 162, 39, 0.28)',
+    backgroundColor: '#111111',
     borderBottomWidth: 1,
+    borderBottomColor: 'rgba(201, 162, 39, 0.28)',
     flexDirection: 'row',
-    minHeight: 54,
-    paddingLeft: SPACING.md,
+    justifyContent: 'space-between',
+    marginHorizontal: -SPACING.md,
+    minHeight: 62,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
   },
-  selectorHeaderTitleGroup: { flex: 1, flexDirection: 'row', gap: SPACING.sm },
-  selectorHeaderTitle: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '800' },
+  selectorBackButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(201, 162, 39, 0.45)',
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  selectorHeaderTitleGroup: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm },
+  selectorHeaderTitle: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
   selectorHeaderArabic: { fontFamily: 'Arial', textAlign: 'right', writingDirection: 'rtl' },
-  selectorCloseButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
-  chapterNavRow: { borderBottomColor: 'rgba(201, 162, 39, 0.18)', borderBottomWidth: 1, flexDirection: 'row', gap: SPACING.sm, padding: SPACING.sm },
+  chapterNavRow: { borderBottomColor: 'rgba(201, 162, 39, 0.18)', borderBottomWidth: 1, flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.sm },
   chapterNavButton: {
     alignItems: 'center',
     borderColor: 'rgba(201, 162, 39, 0.42)',
@@ -326,35 +334,40 @@ const styles = StyleSheet.create({
   },
   chapterNavButtonDisabled: { borderColor: 'rgba(110, 110, 110, 0.4)', opacity: 0.72 },
   chapterNavText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '800' },
-  selectorLanguageBar: { borderBottomColor: 'rgba(201, 162, 39, 0.18)', borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, padding: SPACING.sm },
+  selectorLanguageBar: { borderBottomColor: 'rgba(201, 162, 39, 0.18)', borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingVertical: SPACING.sm },
   languageButton: { borderRadius: 8, borderWidth: 1, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
   languageText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
-  selectorList: { flex: 1 },
+  selectorList: { flex: 1, paddingTop: SPACING.md },
   selectorItem: {
     alignItems: 'center',
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    borderBottomWidth: 1,
+    backgroundColor: '#111111',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#262626',
     flexDirection: 'row',
     gap: SPACING.sm,
-    minHeight: 42,
+    minHeight: 56,
+    marginBottom: SPACING.sm,
     paddingHorizontal: SPACING.md,
   },
   selectorVerseNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', minWidth: 28 },
   selectorVersePreview: { flex: 1, fontFamily: 'Georgia', fontSize: 13, lineHeight: 18, color: COLORS.white },
   selectorActionRow: {
+    alignItems: 'center',
     backgroundColor: '#101010',
-    borderTopColor: 'rgba(201, 162, 39, 0.32)',
+    borderColor: 'rgba(201, 162, 39, 0.32)',
     borderTopWidth: 1,
     flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'flex-end',
-    paddingHorizontal: SPACING.md,
+    justifyContent: 'space-around',
+    marginHorizontal: -SPACING.md,
+    paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.sm,
   },
   selectorIconButton: {
     alignItems: 'center',
-    borderColor: 'rgba(201, 162, 39, 0.42)',
-    borderRadius: 18,
+    backgroundColor: 'rgba(201, 162, 39, 0.06)',
+    borderColor: 'rgba(201, 162, 39, 0.24)',
+    borderRadius: 20,
     borderWidth: 1,
     height: 40,
     justifyContent: 'center',
