@@ -904,7 +904,13 @@ function getEffectiveAlternatingVerseIndex(section, index) {
       verse.type !== "refrain" &&
       verse.type !== "comment" &&
       verse.type !== "silentComment" &&
-      !verse.forceWhiteText
+      !verse.forceWhiteText &&
+      // A "White"/"Blue" prayer_type forces that exact color on this one
+      // verse — it never consumes a parity slot, so verses around it
+      // alternate exactly as if it weren't there at all (see rowTextColor
+      // in VerseBlock.js).
+      verse.prayerType !== "White" &&
+      verse.prayerType !== "Blue"
     )
     .length - 1;
 }

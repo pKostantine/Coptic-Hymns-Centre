@@ -241,7 +241,7 @@ const SCHEMAS_WITHOUT_HYMN_TITLES = new Set([
 // Hymn-key resolution always starts in the calling schema, then walks the
 // shared/common pools in this exact order. If the calling schema is one of
 // these, it stays first and is skipped later in the fallback list.
-const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "psalmody", "agpeya", "veneration"];
+const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "psalmody", "agpeya", "veneration", "doxologies"];
 
 function getHymnKeyLookupSchemas(schema) {
   return [...new Set([schema, ...HYMN_KEY_FALLBACK_SCHEMAS].filter(Boolean))];

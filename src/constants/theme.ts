@@ -33,8 +33,8 @@ export const COLORS = {
   reader: '#FFFF00',
   people: '#E28A2E',
   comment: '#47627F',
-  silent: '#C5CBD2',
-  silentTitle: '#AEB7C0',
+  silent: '#959ba1',
+  silentTitle: '#959ba1',
   refrain: '#8FD19E',
 
   // theme.colors.* shape expected by SlideshowContainer/VerseBlock

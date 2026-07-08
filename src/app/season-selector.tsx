@@ -173,11 +173,11 @@ export default function SeasonSelectorScreen() {
       <Head>
         <title>{`CHC ${labelText(SEASON_SELECTOR_LABELS.title)}`}</title>
       </Head>
-      <View style={[styles.header, isArabic && styles.rowReverse, { paddingTop: safeAreaInsets.top }]}>
+      <View style={[styles.header, { paddingTop: safeAreaInsets.top }]}>
         <Pressable accessibilityLabel="Close season selector" style={styles.headerButton} onPress={() => goBack(router, '/calendar')}>
-          <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={28} color={COLORS.white} />
+          <Icon name="chevron-back" size={28} color={COLORS.white} />
         </Pressable>
-        <Text style={[styles.headerTitle, isArabic && styles.arabicText]}>{labelText(SEASON_SELECTOR_LABELS.title)}</Text>
+        <Text style={[styles.headerTitle, isArabic && styles.headerTitleArabic]}>{labelText(SEASON_SELECTOR_LABELS.title)}</Text>
         <View style={styles.headerButton} />
       </View>
 
@@ -321,6 +321,7 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', backgroundColor: COLORS.navy, flexDirection: 'row', minHeight: 56, paddingHorizontal: SPACING.sm },
   headerButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
   headerTitle: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  headerTitleArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'center', writingDirection: 'rtl' },
   yearRow: { alignItems: 'center', borderBottomWidth: 1, borderColor: COLORS.border, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
   yearButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 56 },
   yearLabel: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: SPACING.sm, justifyContent: 'center' },

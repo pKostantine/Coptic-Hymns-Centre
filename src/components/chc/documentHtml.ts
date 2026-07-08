@@ -720,6 +720,10 @@ function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number, bi
   let count = -1;
   for (let i = 0; i <= index; i += 1) {
     if ((verses[i].bishopOnly && !bishopPresent) || (verses[i].priestOnly && bishopPresent)) continue;
+    // A "White"/"Blue" prayer_type forces that exact color on this one verse
+    // — it never consumes a parity slot, so the verses around it alternate
+    // exactly as if it weren't there at all (see resolveVerseColorBase).
+    if (verses[i].prayerType === 'White' || verses[i].prayerType === 'Blue') continue;
     if (!NON_ALTERNATING_TYPES.has(verses[i].type)) count += 1;
   }
   return count;
@@ -737,6 +741,12 @@ function resolveVerseColorBase(verse: DocumentVerse, index: number, section: Doc
   if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
   if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: true };
   if (verse.type === 'readingReference') return { color: COLORS.gold, italic: false };
+  // "White"/"Blue" prayer_type forces that alternating color directly,
+  // bypassing the normal alternation computation for this verse entirely —
+  // getEffectiveAlternatingIndex above excludes it from the count so
+  // surrounding verses keep alternating exactly as if it weren't there.
+  if (verse.prayerType === 'White') return { color: COLORS.white, italic: false };
+  if (verse.prayerType === 'Blue') return { color: COLORS.rowBlue, italic: false };
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 
   const effectiveIndex = getEffectiveAlternatingIndex(section.verses, index, bishopPresent);

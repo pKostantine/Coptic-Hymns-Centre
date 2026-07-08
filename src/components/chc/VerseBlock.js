@@ -46,6 +46,14 @@ export default function VerseBlock({
       ? REFRAIN_TAN
       : isReadingReference
       ? COLORS.gold
+      : // "White"/"Blue" prayer_type forces that alternating color directly on
+      // this one verse — surrounding verses alternate exactly as if it
+      // weren't there (see getEffectiveAlternatingVerseIndex in
+      // SlideshowContainer.js, which excludes it from the parity count).
+      verse.prayerType === "White"
+      ? theme.colors.text
+      : verse.prayerType === "Blue"
+      ? theme.colors.rowBlue
       : forceWhiteText || verse.forceWhiteText || isRefrain || isRecitedPrayer || isReading || (colorIndex ?? index) % 2 === 0
       ? theme.colors.text
       : theme.colors.rowBlue;

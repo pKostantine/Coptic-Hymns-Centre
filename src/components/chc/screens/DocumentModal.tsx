@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
@@ -86,9 +86,35 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
     if (introSection) documentRef.current?.scrollToSection(introSection.id);
   }
 
+  // Left-edge swipe-right closes *this* modal only — same gesture ServiceDocument
+  // uses to go back, but scoped to `onClose` instead of the parent screen's own
+  // back navigation, so swiping out of a subdocument never also exits the
+  // document underneath it (nested modals stack the same way: each one's own
+  // gesture only closes itself).
+  const closeSwipePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          const startsInLeftEdge = gestureState.x0 < 56;
+          const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+          return startsInLeftEdge && isHorizontal && Math.abs(gestureState.dx) > 18;
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.x0 < 56 && gestureState.dx > 60) {
+            onClose();
+          }
+        },
+      }),
+    [onClose],
+  );
+
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
+      <SafeAreaView
+        edges={['left', 'right', 'bottom']}
+        style={styles.screen}
+        {...(Platform.OS !== 'web' ? closeSwipePanResponder.panHandlers : {})}
+      >
         <AppHeader
           title={title || ''}
           canGoBack

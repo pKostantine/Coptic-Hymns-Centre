@@ -101,22 +101,28 @@ export function formatGregorianDate(isoDate: string, isArabic: boolean) {
   return `${day} ${month} ${year}`;
 }
 
-export function formatGregorianDateRange(startDate: string, endDateExclusive: string, isArabic: boolean) {
-  const displayEnd = new Date(`${endDateExclusive}T00:00:00Z`);
-  displayEnd.setUTCDate(displayEnd.getUTCDate() - 1);
-  const endIso = displayEnd.toISOString().slice(0, 10);
-  if (endIso <= startDate) return formatGregorianDate(startDate, isArabic);
+// `calendar.season_ranges.end_date` is the last calendar day the season is
+// still active — inclusive, same as start_date — confirmed against the
+// Nativity Fast row (end_date 2026-01-06, the day *before* Nativity itself
+// on Jan 7, i.e. the fast's actual last day) and matched by fixedFeasts.ts's
+// own `addDaysIso(endDate, 1)` to land on the feast day right after. This
+// must never be treated as a half-open/exclusive boundary (that was the bug:
+// subtracting a day here made every season display one day short — e.g.
+// Jonah's Fast's real Feb 2–4 showing as Feb 2–3).
+export function formatGregorianDateRange(startDate: string, endDate: string, isArabic: boolean) {
+  if (endDate <= startDate) return formatGregorianDate(startDate, isArabic);
 
   const start = new Date(`${startDate}T00:00:00Z`);
-  const sameYear = start.getUTCFullYear() === displayEnd.getUTCFullYear();
+  const end = new Date(`${endDate}T00:00:00Z`);
+  const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
 
   if (!isArabic) {
     const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-    const endLabel = formatGregorianDate(endIso, false);
+    const endLabel = formatGregorianDate(endDate, false);
     return sameYear ? `${startLabel} – ${endLabel}` : `${formatGregorianDate(startDate, false)} – ${endLabel}`;
   }
 
   const startLabel = `${toEasternArabicDigits(start.getUTCDate())} ${GREGORIAN_MONTHS_AR[start.getUTCMonth()]}`;
-  const endLabel = formatGregorianDate(endIso, true);
+  const endLabel = formatGregorianDate(endDate, true);
   return sameYear ? `${startLabel} – ${endLabel}` : `${formatGregorianDate(startDate, true)} – ${endLabel}`;
 }

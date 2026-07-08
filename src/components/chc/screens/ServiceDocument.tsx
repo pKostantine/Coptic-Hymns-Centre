@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Href, useRouter } from 'expo-router';
+import { Href, Stack, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -227,6 +227,14 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       style={styles.safeArea}
       {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}
     >
+      {/* The native stack's own default edge-swipe-to-go-back gesture isn't
+          scoped to whether a subdocument modal is currently covering this
+          screen — swiping the left edge would pop this whole document out
+          from underneath an open subdocument instead of just closing it.
+          This screen already implements its own equivalent gesture above
+          (gesturePanResponder), so the native one is both redundant and the
+          source of that bug — disabled here in favor of it. */}
+      <Stack.Screen options={{ gestureEnabled: false }} />
       <Head>
         <title>{`CHC ${title}`}</title>
       </Head>

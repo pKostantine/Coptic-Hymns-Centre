@@ -167,9 +167,9 @@ export default function CalendarScreen() {
       <Head>
         <title>{`CHC ${labelText(CALENDAR_LABELS.calendar)}`}</title>
       </Head>
-      <View style={[styles.header, isArabic && styles.rowReverse, { paddingTop: safeAreaInsets.top }]}>
+      <View style={[styles.header, { paddingTop: safeAreaInsets.top }]}>
         <Pressable accessibilityLabel="Close calendar" style={styles.headerButton} onPress={() => goBack(router, '/')}>
-          <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={30} color={COLORS.white} />
+          <Icon name="chevron-back" size={30} color={COLORS.white} />
         </Pressable>
         <Text style={[styles.headerTitle, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.calendar)}</Text>
         <View style={styles.headerButton} />
