@@ -56,6 +56,7 @@ export interface VisibleColumns {
 export interface DocumentAction {
   type: string;
   sectionId?: string;
+  verseId?: string | null;
 }
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, coptic: true, arabic: true };
@@ -332,6 +333,13 @@ export function buildDocumentHtml(
           window.scrollTo({ top: Math.max(top - 1, 0), behavior: 'auto' });
         }
       };
+      window.scrollToVerse = function (verseId) {
+        var element = document.querySelector('[data-verse-id="' + verseId + '"]');
+        if (!element) return false;
+        var top = element.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0);
+        window.scrollTo({ top: Math.max(top - 1, 0), behavior: 'auto' });
+        return true;
+      };
       window.scrollToTune = function (tune) {
         var element = document.querySelector('[data-tune="' + tune + '"]');
         if (element) {
@@ -348,30 +356,41 @@ export function buildDocumentHtml(
         button.setAttribute('aria-label', collapsed ? 'Expand section' : 'Collapse section');
       });
       (function () {
-        // Reports whichever section currently straddles a fixed "reading
-        // line" near the top of the viewport, so the host app always knows
-        // where the user actually is — used to keep the content selector
-        // scrolled to the right spot and to jump back to the same place
-        // after a settings change forces this document to reload.
+        // Reports whichever section AND verse currently straddle a fixed
+        // "reading line" near the top of the viewport, so the host app
+        // always knows where the user actually is — used to keep the
+        // content selector scrolled to the right spot, to jump back to the
+        // same place after a settings change forces this document to
+        // reload, and to re-anchor scroll position (at verse granularity)
+        // after a rotation/resize reflows the layout without reloading.
         var sections = Array.prototype.slice.call(document.querySelectorAll('.section[data-section-id]'));
-        var lastReported = null;
+        var verseRows = Array.prototype.slice.call(document.querySelectorAll('.verse-row[data-verse-id]'));
+        var lastReportedSection = null;
+        var lastReportedVerse = null;
         var pending = false;
-        function reportCurrentSection() {
-          pending = false;
-          if (!sections.length) return;
-          var threshold = 96;
-          var current = sections[0];
-          for (var i = 0; i < sections.length; i += 1) {
-            if (sections[i].getBoundingClientRect().top <= threshold) {
-              current = sections[i];
+        function findCurrent(list, threshold) {
+          if (!list.length) return null;
+          var current = list[0];
+          for (var i = 0; i < list.length; i += 1) {
+            if (list[i].getBoundingClientRect().top <= threshold) {
+              current = list[i];
             } else {
               break;
             }
           }
-          var sectionId = current.getAttribute('data-section-id');
-          if (sectionId && sectionId !== lastReported) {
-            lastReported = sectionId;
-            postAction('currentSection', { sectionId: sectionId });
+          return current;
+        }
+        function reportCurrentSection() {
+          pending = false;
+          var threshold = 96;
+          var currentSection = findCurrent(sections, threshold);
+          var currentVerse = findCurrent(verseRows, threshold);
+          var sectionId = currentSection && currentSection.getAttribute('data-section-id');
+          var verseId = currentVerse && currentVerse.getAttribute('data-verse-id');
+          if (sectionId && (sectionId !== lastReportedSection || verseId !== lastReportedVerse)) {
+            lastReportedSection = sectionId;
+            lastReportedVerse = verseId;
+            postAction('currentSection', { sectionId: sectionId, verseId: verseId || null });
           }
         }
         function scheduleReport() {
@@ -611,8 +630,9 @@ function renderVerse(
     .join('');
 
   const tuneAttribute = verse.tune ? ` data-tune="${escapeAttribute(verse.tune)}"` : '';
+  const verseId = `${section.id}::v${index}`;
 
-  return `<div class="verse-row" style="grid-template-columns: ${gridTemplateColumns};"${tuneAttribute}>${cells}</div>`;
+  return `<div class="verse-row" data-verse-id="${escapeAttribute(verseId)}"${tuneAttribute} style="grid-template-columns: ${gridTemplateColumns};">${cells}</div>`;
 }
 
 /** Verse types that never take part in Single/Double/Quadruple Alternating — kept in sync with resolveVerseColor's early returns below. */

@@ -10,6 +10,7 @@ export type { DocumentAction, DocumentSection, DocumentVerse } from './documentH
 
 export interface DocumentWebViewHandle {
   scrollToSection: (id: string) => void;
+  scrollToVerse: (id: string) => void;
   scrollToTune: (tune: string) => void;
 }
 
@@ -56,10 +57,17 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     // to the top — restoring to this section on load is what brings the
     // user back to where they were instead.
     const preservedSectionIdRef = useRef<string | null>(null);
+    // Verse-granular position, reported alongside the section — preferred
+    // over preservedSectionIdRef when restoring (falls back to the section
+    // if that exact verse can't be found, e.g. hidden by a settings change).
+    const preservedVerseIdRef = useRef<string | null>(null);
 
     useImperativeHandle(ref, () => ({
       scrollToSection: (id: string) => {
         webviewRef.current?.injectJavaScript(`window.scrollToSection(${JSON.stringify(id)}); true;`);
+      },
+      scrollToVerse: (id: string) => {
+        webviewRef.current?.injectJavaScript(`window.scrollToVerse(${JSON.stringify(id)}); true;`);
       },
       scrollToTune: (tune: string) => {
         webviewRef.current?.injectJavaScript(`window.scrollToTune(${JSON.stringify(tune)}); true;`);
@@ -71,6 +79,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         const action = JSON.parse(event.nativeEvent.data);
         if (action?.type === 'currentSection' && action.sectionId) {
           preservedSectionIdRef.current = action.sectionId;
+          preservedVerseIdRef.current = action.verseId || null;
         }
         onAction?.(action);
       } catch {
@@ -79,9 +88,15 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     };
 
     const handleLoadEnd = () => {
-      if (preservedSectionIdRef.current) {
+      const verseId = preservedVerseIdRef.current;
+      const sectionId = preservedSectionIdRef.current;
+      if (verseId) {
         webviewRef.current?.injectJavaScript(
-          `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(preservedSectionIdRef.current)}); } true;`,
+          `if (!(window.scrollToVerse && window.scrollToVerse(${JSON.stringify(verseId)})) && window.scrollToSection) { window.scrollToSection(${JSON.stringify(sectionId)}); } true;`,
+        );
+      } else if (sectionId) {
+        webviewRef.current?.injectJavaScript(
+          `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(sectionId)}); } true;`,
         );
       }
     };

@@ -9,6 +9,7 @@ export type { DocumentAction, DocumentSection, DocumentVerse } from './documentH
 
 export interface DocumentWebViewHandle {
   scrollToSection: (id: string) => void;
+  scrollToVerse: (id: string) => void;
   scrollToTune: (tune: string) => void;
 }
 
@@ -57,11 +58,19 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     // the top — restoring to this section on load is what brings the user
     // back to where they were instead.
     const preservedSectionIdRef = useRef<string | null>(null);
+    // Verse-granular position, reported alongside the section — preferred
+    // over preservedSectionIdRef when restoring (falls back to the section
+    // if that exact verse can't be found, e.g. hidden by a settings change).
+    const preservedVerseIdRef = useRef<string | null>(null);
 
     useImperativeHandle(ref, () => ({
       scrollToSection: (id: string) => {
         const win = iframeRef.current?.contentWindow as (Window & { scrollToSection?: (id: string) => void }) | null | undefined;
         win?.scrollToSection?.(id);
+      },
+      scrollToVerse: (id: string) => {
+        const win = iframeRef.current?.contentWindow as (Window & { scrollToVerse?: (id: string) => boolean }) | null | undefined;
+        win?.scrollToVerse?.(id);
       },
       scrollToTune: (tune: string) => {
         const win = iframeRef.current?.contentWindow as (Window & { scrollToTune?: (tune: string) => void }) | null | undefined;
@@ -76,6 +85,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
           const action = JSON.parse(event.data);
           if (action?.type === 'currentSection' && action.sectionId) {
             preservedSectionIdRef.current = action.sectionId;
+            preservedVerseIdRef.current = action.verseId || null;
           }
           onAction?.(action);
         } catch {
@@ -88,10 +98,14 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     }, [onAction]);
 
     const handleLoad = () => {
-      if (preservedSectionIdRef.current) {
-        const win = iframeRef.current?.contentWindow as (Window & { scrollToSection?: (id: string) => void }) | null | undefined;
-        win?.scrollToSection?.(preservedSectionIdRef.current);
-      }
+      const win = iframeRef.current?.contentWindow as
+        | (Window & { scrollToSection?: (id: string) => void; scrollToVerse?: (id: string) => boolean })
+        | null
+        | undefined;
+      const verseId = preservedVerseIdRef.current;
+      const sectionId = preservedSectionIdRef.current;
+      if (verseId && win?.scrollToVerse?.(verseId)) return;
+      if (sectionId) win?.scrollToSection?.(sectionId);
     };
 
     const html = useMemo(

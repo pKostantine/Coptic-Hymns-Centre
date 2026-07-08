@@ -53,6 +53,15 @@ export default function SlideshowContainer({
   // very start of the document every time they changed anything.
   const preservedSectionIdRef = useRef(null);
   const pendingRestoreSectionIdRef = useRef(null);
+  // Same idea, but at verse granularity — a section can span many slides
+  // (or a single verse can itself split across slides), so restoring to
+  // "some slide in this section" after a rotation/resize repagination can
+  // land several slides away from the exact verse the user had been
+  // reading. This is tried first; the section-level ref above is the
+  // fallback if that specific verse no longer exists after the change
+  // (e.g. a settings toggle hid it).
+  const preservedVerseIdRef = useRef(null);
+  const pendingRestoreVerseIdRef = useRef(null);
 
   const items = useMemo(() => flattenSections(sections, bishopPresent), [sections, bishopPresent]);
   const itemsSignature = useMemo(
@@ -101,6 +110,7 @@ export default function SlideshowContainer({
       pendingMeasurementFrameRef.current = null;
     }
     pendingRestoreSectionIdRef.current = preservedSectionIdRef.current;
+    pendingRestoreVerseIdRef.current = preservedVerseIdRef.current;
     setMeasuredHeights({});
     setMeasuredLanguageHeights({});
     setCurrentSlideIndex(0);
@@ -280,14 +290,33 @@ export default function SlideshowContainer({
     // — the jump effect right below, which shares this same trigger.
     if (selectedSectionId) {
       pendingRestoreSectionIdRef.current = null;
+      pendingRestoreVerseIdRef.current = null;
     }
   }, [selectedSectionId]);
 
   useEffect(() => {
     // An explicit content-selector jump (selectedSectionId) takes priority;
-    // otherwise, if a settings/minimization change just forced a repagination,
-    // fall back to jumping back to wherever the user was previously looking
-    // (pendingRestoreSectionIdRef, set by the measuredKey reset effect above).
+    // otherwise, if a rotation/settings/minimization change just forced a
+    // repagination, prefer restoring to the exact verse the user had been
+    // reading (pendingRestoreVerseIdRef), falling back to just the section
+    // if that specific verse fragment no longer exists after the change.
+    if (!selectedSectionId && pendingRestoreVerseIdRef.current) {
+      const targetVerseId = pendingRestoreVerseIdRef.current;
+      if (lastAppliedSelectedSectionId.current !== targetVerseId) {
+        const verseSlideIndex = slides.findIndex((slide) =>
+          slide.some((item) => item.id === targetVerseId || (item.type === "verse" && item.id.split("-segment-")[0] === targetVerseId)),
+        );
+        if (verseSlideIndex >= 0) {
+          setCurrentSlideIndex(verseSlideIndex);
+          lastAppliedSelectedSectionId.current = targetVerseId;
+          pendingRestoreVerseIdRef.current = null;
+          pendingRestoreSectionIdRef.current = null;
+          return;
+        }
+      }
+      pendingRestoreVerseIdRef.current = null;
+    }
+
     const targetSectionId = selectedSectionId || pendingRestoreSectionIdRef.current;
 
     if (
@@ -317,13 +346,15 @@ export default function SlideshowContainer({
   }, [selectedSectionId, slides]);
 
   useEffect(() => {
-    const currentSectionId = findSlideSectionId(slides[currentSlideIndex]);
+    const currentSlide = slides[currentSlideIndex];
+    const currentSectionId = findSlideSectionId(currentSlide);
     if (!currentSectionId) return;
 
-    // A measuredKey reset (settings change, minimization, or even just the
-    // surrounding layout shifting while navigating to another screen) always
-    // snaps currentSlideIndex to 0 for a moment before the jump effect above
-    // can correct it back to pendingRestoreSectionIdRef.current. That
+    // A measuredKey reset (settings change, minimization, rotation/resize,
+    // or even just the surrounding layout shifting while navigating to
+    // another screen) always snaps currentSlideIndex to 0 for a moment
+    // before the jump effect above can correct it back to
+    // pendingRestoreSectionIdRef/pendingRestoreVerseIdRef.current. That
     // transient "slide 0" is not where the user actually is — reporting it
     // here (and to the host app, which persists it as "last known position")
     // would overwrite the real position with a reset artifact before the
@@ -331,12 +362,21 @@ export default function SlideshowContainer({
     if (pendingRestoreSectionIdRef.current && pendingRestoreSectionIdRef.current !== currentSectionId) {
       return;
     }
+    if (pendingRestoreVerseIdRef.current) {
+      const targetVerseId = pendingRestoreVerseIdRef.current;
+      const stillPending = currentSlide?.some(
+        (item) => item.id === targetVerseId || (item.type === "verse" && item.id.split("-segment-")[0] === targetVerseId),
+      );
+      if (!stillPending) return;
+    }
 
     // The pending restore (if any) has now been confirmed reached — clear it
     // so it doesn't keep gating every future report once selectedSectionId
     // stops changing (it never resets back to undefined on its own).
     pendingRestoreSectionIdRef.current = null;
+    pendingRestoreVerseIdRef.current = null;
     preservedSectionIdRef.current = currentSectionId;
+    preservedVerseIdRef.current = findSlidePositionId(currentSlide);
     onCurrentSectionChange?.(currentSectionId);
   }, [currentSlideIndex, onCurrentSectionChange, slides]);
 
@@ -876,6 +916,12 @@ function getSpeakerRole(type, bishopPresent) {
 
 function findSlideSectionId(slide = []) {
   return slide.find((item) => item.sectionId)?.sectionId;
+}
+
+/** The specific verse item id (falling back to whatever other item — title/button — is present) representing this slide's reading position, for verse-granular restore after a repagination. */
+function findSlidePositionId(slide = []) {
+  const verseItem = slide.find((item) => item.type === "verse");
+  return verseItem ? verseItem.id : findSlideSectionId(slide);
 }
 
 function getItemSignature(item) {

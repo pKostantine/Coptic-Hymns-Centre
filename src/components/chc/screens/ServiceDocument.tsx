@@ -54,7 +54,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     (schema === 'psalmody' && table === 'vespers_praises') ||
     (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true);
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const bookmarkId = `${schema}:${table}`;
   // Navigating to Settings and back unmounts this screen (React Navigation
   // doesn't keep off-screen web routes mounted), which would otherwise wipe
@@ -72,6 +72,12 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const [copticGospelRite, setCopticGospelRite] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
+  // Verse-granular position within currentSectionId, reported by the WebView
+  // reader's scroll-tracking script — used to re-anchor scroll position
+  // after a rotation/window-resize reflows the layout (see the effect below).
+  // Slideshow mode doesn't need this: SlideshowContainer already restores
+  // its own verse-level position internally whenever it repaginates.
+  const [currentVerseId, setCurrentVerseId] = useState<string | null>(null);
   // Seeded synchronously (not via an effect) from the module-level store: a
   // child effect inside SlideshowContainer reports "slide 0" the instant it
   // mounts, which — if this started out undefined and only got set a render
@@ -133,6 +139,29 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     documentRef.current?.scrollToSection(lastSectionId);
   }, [sections, documentPositionKey, preferences.slideshowMode]);
 
+  // Rotating the device (or, on web, resizing the window) reflows the
+  // WebView's CSS layout at the new width without reloading it — the scroll
+  // position (in pixels) stays put, but the content that used to be at that
+  // pixel offset has usually moved, so the reader silently lands on the
+  // wrong verse. Re-anchor to wherever the user actually was once the
+  // reflow has had a moment to settle. Slideshow mode doesn't need this —
+  // SlideshowContainer already restores its own verse-level position
+  // whenever a dimension change forces it to repaginate.
+  const dimensionKeyRef = useRef(`${screenWidth}x${screenHeight}`);
+  useEffect(() => {
+    const nextKey = `${screenWidth}x${screenHeight}`;
+    if (dimensionKeyRef.current === nextKey) return;
+    dimensionKeyRef.current = nextKey;
+    if (preferences.slideshowMode) return;
+    if (!currentVerseId && !currentSectionId) return;
+
+    const timeoutId = setTimeout(() => {
+      if (currentVerseId) documentRef.current?.scrollToVerse(currentVerseId);
+      else if (currentSectionId) documentRef.current?.scrollToSection(currentSectionId);
+    }, 260);
+    return () => clearTimeout(timeoutId);
+  }, [screenWidth, screenHeight, preferences.slideshowMode, currentVerseId, currentSectionId]);
+
   const handleAction = (action: DocumentAction) => {
     if (action.type === 'toggleCopticGospelRite') {
       setCopticGospelRite((current) => !current);
@@ -146,6 +175,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         setCurrentSectionId(action.sectionId);
         setLastDocumentPosition(documentPositionKey, action.sectionId);
       }
+      setCurrentVerseId(action.verseId || null);
       return;
     }
 

@@ -1,7 +1,7 @@
 import Icon from '@/components/chc/ui/Icon';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
@@ -39,8 +39,6 @@ export default function SettingsScreen() {
     toggleDisplaySilentPrayers,
   } = useReadingPreferences();
 
-  const showOrientationControls = Platform.OS !== 'web';
-
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
       <Head>
@@ -71,26 +69,24 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
 
-          {showOrientationControls ? (
-            <View style={styles.orientationGroup}>
-              <Text style={styles.groupLabel}>Orientation</Text>
-              <View style={styles.orientationRow}>
-                {ORIENTATION_OPTIONS.map((item) => {
-                  const isActive = preferences.orientationMode === item.key;
-                  return (
-                    <Pressable
-                      key={item.key}
-                      accessibilityLabel={`Use ${item.label} orientation`}
-                      style={[styles.orientationButton, isActive && styles.toggleActive, { borderColor: isActive ? COLORS.gold : COLORS.border }]}
-                      onPress={() => setOrientationMode(item.key)}
-                    >
-                      <Text style={styles.toggleText}>{item.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+          <View style={styles.orientationGroup}>
+            <Text style={styles.groupLabel}>Orientation</Text>
+            <View style={styles.orientationRow}>
+              {ORIENTATION_OPTIONS.map((item) => {
+                const isActive = preferences.orientationMode === item.key;
+                return (
+                  <Pressable
+                    key={item.key}
+                    accessibilityLabel={`Use ${item.label} orientation`}
+                    style={[styles.orientationButton, isActive && styles.toggleActive, { borderColor: isActive ? COLORS.gold : COLORS.border }]}
+                    onPress={() => setOrientationMode(item.key)}
+                  >
+                    <Text style={styles.toggleText}>{item.label}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-          ) : null}
+          </View>
 
           <ToggleRow label="Slideshow Mode" active={preferences.slideshowMode} onPress={toggleSlideshowMode} />
           <ToggleRow label="Select Text" active={preferences.selectText} onPress={toggleSelectText} />
