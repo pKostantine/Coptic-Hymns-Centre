@@ -4,6 +4,7 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 import { COLORS } from '../../constants/theme';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
+import type { AppLanguage } from '../../utils/preferencesStorage';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns } from './documentHtml';
 
 export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
@@ -18,6 +19,7 @@ interface DocumentWebViewProps {
   sections: DocumentSection[];
   fontSize?: number;
   visibleColumns?: VisibleColumns;
+  appLanguage?: AppLanguage;
   selectText?: boolean;
   displayComments?: boolean;
   displaySilentPrayers?: boolean;
@@ -38,6 +40,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       sections,
       fontSize = 18,
       visibleColumns,
+      appLanguage = 'en',
       selectText = false,
       displayComments = false,
       displaySilentPrayers = false,
@@ -108,6 +111,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               copticFontDataUri,
               fontSize,
               visibleColumns,
+              appLanguage,
               selectText,
               displayComments,
               displaySilentPrayers,
@@ -121,6 +125,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         copticFontDataUri,
         fontSize,
         visibleColumns,
+        appLanguage,
         selectText,
         displayComments,
         displaySilentPrayers,

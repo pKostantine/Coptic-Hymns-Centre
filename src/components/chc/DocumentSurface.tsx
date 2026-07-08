@@ -19,17 +19,17 @@ interface DocumentSurfaceProps {
   copticGospelRite?: boolean;
 }
 
-/** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
+/** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer/silentComment — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
 function isCommentWithinSilentPrayer(section: DocumentSection, index: number): boolean {
   if (section.titlePrayerType === 'Silent Prayer') return true;
   const verses = section.verses;
   for (let i = index - 1; i >= 0; i -= 1) {
     if (verses[i].type === 'comment') continue;
-    return verses[i].type === 'silentPrayer';
+    return verses[i].type === 'silentPrayer' || verses[i].type === 'silentComment';
   }
   for (let i = index + 1; i < verses.length; i += 1) {
     if (verses[i].type === 'comment') continue;
-    return verses[i].type === 'silentPrayer';
+    return verses[i].type === 'silentPrayer' || verses[i].type === 'silentComment';
   }
   return false;
 }
@@ -64,8 +64,12 @@ function buildSlideshowSections(
         ? []
         : section.verses.filter((verse, index) => {
             if ((verse.bishopOnly && !bishopPresent) || (verse.priestOnly && bishopPresent)) return false;
+            // A row explicitly marked both Comment and Silent Prayer needs
+            // BOTH toggles on — it's not "a comment" or "a silent prayer"
+            // alone, it's both at once.
+            if (verse.type === 'silentComment') return displayComments && displaySilentPrayers;
             if (verse.type === 'comment') {
-              return isCommentWithinSilentPrayer(section, index) ? displaySilentPrayers : displayComments;
+              return isCommentWithinSilentPrayer(section, index) ? displayComments && displaySilentPrayers : displayComments;
             }
             return displaySilentPrayers || verse.type !== 'silentPrayer';
           });
@@ -94,16 +98,23 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     // explicit entry (set by tapping the slideshow's collapse button) wins.
     const [collapsedSectionIds, setCollapsedSectionIds] = useState<Record<string, boolean>>({});
 
-    const titleHelpers = useMemo(
-      () => ({
+    // All titles (section titles, and Subdocument/Antiphonary open-button
+    // labels) follow the App Language setting, not the document's own
+    // visibleLanguages — this is menu-adjacent chrome, not reading content.
+    // If the selected language has no title text for a given section (e.g.
+    // Arabic selected but this hymn has no Arabic title), fall back to
+    // whichever language does have one instead of showing nothing.
+    const titleHelpers = useMemo(() => {
+      const appLanguage = preferences.appLanguage;
+      return {
         getTitleParts: (title: { english: string; arabic: string }) => title || { english: '', arabic: '' },
-        getTitleText: (title: { english: string; arabic: string }) => title?.english || '',
-        shouldShowEnglishTitle: () => preferences.visibleLanguages.english,
+        getTitleText: (title: { english: string; arabic: string }) => title?.english || title?.arabic || '',
+        shouldShowEnglishTitle: (title: { english: string; arabic: string }) =>
+          appLanguage === 'en' || !title?.arabic,
         shouldShowArabicTitle: (title: { english: string; arabic: string }) =>
-          preferences.visibleLanguages.arabic && Boolean(title?.arabic),
-      }),
-      [preferences.visibleLanguages.english, preferences.visibleLanguages.arabic],
-    );
+          appLanguage === 'ar' && Boolean(title?.arabic),
+      };
+    }, [preferences.appLanguage]);
 
     const slideshowSections = useMemo(
       () =>
@@ -155,6 +166,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           coptic: preferences.visibleLanguages.coptic,
           arabic: preferences.visibleLanguages.arabic,
         }}
+        appLanguage={preferences.appLanguage}
         selectText={preferences.selectText}
         displayComments={preferences.displayComments}
         displaySilentPrayers={preferences.displaySilentPrayers}

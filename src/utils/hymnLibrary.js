@@ -199,8 +199,12 @@ const SERVICE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, category, t
 // Note: line_id is deliberately NOT selected here — doxologies.hymn_texts is
 // missing that column (every other schema's hymn_texts has it), and line_id
 // isn't actually needed: line_order is sufficient for sorting.
+// inline_hymn_title_shown/inline_hymn_minimization live on the row that
+// carries inline_hymn_key — they decide whether the spliced-in hymn shows
+// its own title, and (when shown) whether that title gets a minimize
+// button, the same way the order table's own `minimization` column works.
 const SERVICE_TEXT_FIELDS =
-  "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key";
+  "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
 // agpeya.hymn_texts is missing both item_type and inline_hymn_key (every
 // other schema's hymn_texts has them) — omit those columns there so the
 // query doesn't 400, and agpeya lines simply never resolve as
@@ -360,6 +364,8 @@ function createFlatServiceRow(orderRow, title, line) {
     line_condition: normalizeText(line?.condition),
     line_item_type: normalizeText(line?.item_type),
     inline_hymn_key: normalizeText(line?.inline_hymn_key),
+    inline_hymn_title_shown: Boolean(line?.inline_hymn_title_shown),
+    inline_hymn_minimization: normalizeText(line?.inline_hymn_minimization),
   };
 }
 
@@ -412,6 +418,12 @@ export function assembleServiceSections(rawRows) {
         // override whatever the imported hymn's own lines carry.
         overridePersonType: row.person_type || null,
         overridePrayerType: row.prayer_type || null,
+        // Whether the spliced-in hymn shows its own title at all (rather
+        // than just being a silent content splice), and — only when shown —
+        // whether that title gets a minimize button, same semantics as the
+        // order table's own minimization column.
+        inlineHymnTitleShown: row.inline_hymn_title_shown,
+        inlineHymnMinimization: row.inline_hymn_minimization,
         english: "",
         coptic: "",
         arabic: "",
@@ -427,11 +439,18 @@ export function assembleServiceSections(rawRows) {
         condition: normalizeText(row.line_condition),
         type: resolveEffectiveVerseType(row.person_type, row.prayer_type, row.title_prayer_type),
         prayerType: row.prayer_type || null,
+        // Preserved separately from `type` so a Silent/Recited Prayer or
+        // Refrain line said by a specific speaker still shows/tracks that
+        // speaker — see resolvePersonRole.
+        personRole: resolvePersonRole(row.person_type),
         // "Invincible Coptic" lines have no English/Arabic counterpart by
         // design (a Coptic-only exclamation like "Glory to our God") — they
         // render as a single centered column rather than trying to line up
         // against blank parallel columns.
         invincibleCoptic: row.prayer_type === "Invincible Coptic",
+        // Pre-Refrain keeps its natural type/role (see resolveEffectiveVerseType
+        // above) but always renders italic on top of it.
+        italic: row.prayer_type === "Pre-Refrain",
       });
     }
   }
@@ -469,11 +488,35 @@ function isInlineLineItem(itemType) {
   return ["Inline", "Subdocument", "Hyperlink"].includes(normalizeText(itemType));
 }
 
+/**
+ * The speaker role a verse's person_type carries, independent of prayer_type
+ * — unlike `type` (getServiceVerseType), which collapses a Silent
+ * Prayer/Recited Prayer/Refrain verse's type to that prayer type and loses
+ * the underlying speaker info entirely. Used for the rubric label
+ * ("Priest:"/"Deacon:"/etc.) and the person-type-indicator suppression
+ * tracking, so a silently-prayed line said by the priest still shows
+ * "Priest:" (in the silent-prayer color) and still counts as a real speaker
+ * change in the indicator sequence, instead of silently losing that
+ * information the moment it's also a Silent/Recited Prayer or Refrain line.
+ */
+export function resolvePersonRole(personType) {
+  if (personType === "Bishop/Priest") return "bishopOrPriest";
+  if (personType === "Priest") return "priest";
+  if (personType === "Deacon") return "deacon";
+  if (personType === "Reader") return "reader";
+  if (personType === "People") return "people";
+  return null;
+}
+
 export function getServiceVerseType(personType, prayerType) {
+  // A row explicitly marked BOTH Comment and Silent Prayer renders with
+  // comment styling (dark, italic) but is gated by displayComments AND
+  // displaySilentPrayers together, not either alone — see "silentComment"
+  // handling in documentHtml.ts/VerseBlock.js.
+  if (personType === "Comment" && prayerType === "Silent Prayer") return "silentComment";
   if (prayerType === "Silent Prayer") return "silentPrayer";
   if (prayerType === "Recited Prayer") return "recitedPrayer";
   if (prayerType === "Refrain") return "refrain";
-  if (prayerType === "Pre-Refrain") return "refrainLabel";
   if (personType === "Comment") return "comment";
   // "Bishop/Priest" is a distinct type from plain "Priest": the renderer
   // resolves it to "Bishop:" or "Priest:" at display time based on the
@@ -495,9 +538,16 @@ export function getServiceVerseType(personType, prayerType) {
  * regardless of the hymn it sits inside (its *visibility* is separately
  * gated by whether the section counts as a silent prayer — see
  * isCommentWithinSilentPrayer in documentHtml.ts).
+ *
+ * "Pre-Refrain" is not a real distinct role — a Pre-Refrain verse keeps
+ * whatever role it would have gotten with no prayer_type at all (its own
+ * person_type, or the section's inherited prayer_type), it just always
+ * renders italic on top of that (see the invincibleCoptic-style `italic`
+ * flag set at the verse-construction call sites below).
  */
 function resolveEffectiveVerseType(personType, prayerType, sectionTitlePrayerType) {
-  const effectivePrayerType = prayerType || (personType === "Comment" ? "" : sectionTitlePrayerType) || "";
+  const ownPrayerType = prayerType === "Pre-Refrain" ? "" : prayerType;
+  const effectivePrayerType = ownPrayerType || (personType === "Comment" ? "" : sectionTitlePrayerType) || "";
   return getServiceVerseType(personType, effectivePrayerType);
 }
 
@@ -721,7 +771,12 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
         return;
       }
       const id = splitIndex === 0 ? section.id : `${section.id}-cont${splitIndex}`;
-      hydrated.push(applyCopticCaseToSection({ ...section, id, hymnKey: section.hymn_key, verses }));
+      // Only the very first chunk shows the hymn's title — a chunk that
+      // resumes after a shown-title inline splice interrupted the flow is a
+      // continuation of the same hymn, not a new one, so it must not repeat
+      // the title again.
+      const title = splitIndex === 0 ? section.title : { english: "", arabic: "" };
+      hydrated.push(applyCopticCaseToSection({ ...section, id, title, hymnKey: section.hymn_key, verses }));
       splitIndex += 1;
       pushedAnything = true;
       verses = [];
@@ -744,19 +799,21 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
         }
 
         // Regular single-hymn-key inline splice. Two distinct behaviors,
-        // decided by whether the inline hymn has its own row in its schema's
-        // hymn_titles (public fallback, same as everywhere else): if it does,
-        // it's treated as its OWN hymn — flush whatever the parent had so
-        // far, push a standalone section with that title, its own
-        // prayer-type-driven color alternation, and (since suppression/
-        // rubric restart operates per-section) a fresh restart of the
-        // person-type indicators — then keep accumulating the parent's
-        // remaining verses in a new chunk afterward. If it has no title,
-        // it's just a content splice: pull in its verses only, with the
-        // destination line's own person_type/prayer_type overriding the
-        // source, per resolveEffectiveVerseType's cascade, and no restart.
+        // decided by the triggering line's own inline_hymn_title_shown
+        // column: if true (and the inline hymn actually has a title in its
+        // own schema's hymn_titles / public fallback), it's treated as its
+        // OWN hymn — flush whatever the parent had so far, push a standalone
+        // section with that title, its own prayer-type-driven color
+        // alternation, and (since suppression/rubric restart operates
+        // per-section) a fresh restart of the person-type indicators — then
+        // keep accumulating the parent's remaining verses in a new chunk
+        // afterward. If inline_hymn_title_shown is false, it's just a
+        // content splice regardless of whether the inline hymn has a title
+        // row: pull in its verses only, with the destination line's own
+        // person_type/prayer_type overriding the source, per
+        // resolveEffectiveVerseType's cascade, and no restart.
         const inlineTitle = await fetchInlineHymnTitle(schema, verse.inlineHymnKey);
-        const hasOwnTitle = Boolean(inlineTitle?.title_english || inlineTitle?.title_arabic);
+        const hasOwnTitle = Boolean(verse.inlineHymnTitleShown) && Boolean(inlineTitle?.title_english || inlineTitle?.title_arabic);
         const inlineTitlePrayerType = hasOwnTitle ? inlineTitle.prayer_type || null : section.titlePrayerType;
 
         const inlineVerses = await fetchInlineHymnVerses(schema, verse.inlineHymnKey);
@@ -773,7 +830,9 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
               arabic: row.arabic || "",
               type: resolveEffectiveVerseType(effectivePersonType, effectivePrayerType, inlineTitlePrayerType),
               prayerType: effectivePrayerType || null,
+              personRole: resolvePersonRole(effectivePersonType),
               invincibleCoptic: effectivePrayerType === "Invincible Coptic",
+              italic: effectivePrayerType === "Pre-Refrain",
               bishopOnly: visibility.bishopOnly,
               priestOnly: visibility.priestOnly,
             };
@@ -797,8 +856,17 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
               hymn_key: verse.inlineHymnKey,
               title: { english: inlineTitle.title_english || "", arabic: inlineTitle.title_arabic || "" },
               titlePrayerType: inlineTitlePrayerType,
-              collapsible: false,
-              defaultCollapsed: false,
+              // inline_hymn_minimization works exactly like a type-3 order
+              // table's own minimization column on this shown title — and
+              // when the encapsulating hymn itself is Minimizable/Minimized
+              // (section.collapsible/defaultCollapsed, from the ORDER
+              // table's own minimization), the inline hymn follows that
+              // lead too, on top of whatever its own column says.
+              collapsible:
+                verse.inlineHymnMinimization === "Minimizable" ||
+                verse.inlineHymnMinimization === "Minimized" ||
+                Boolean(section.collapsible),
+              defaultCollapsed: verse.inlineHymnMinimization === "Minimized" || Boolean(section.defaultCollapsed),
               verses: builtVerses,
               prayerType: dominantPrayerType,
               alternateEvery,

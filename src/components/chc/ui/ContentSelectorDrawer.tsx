@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
+import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection } from '../documentHtml';
 import Icon from './Icon';
 
@@ -22,6 +23,8 @@ interface ContentSelectorDrawerProps {
   onToggleBishopPresent?: () => void;
   /** When false, sections titled Silent Prayer are excluded from the list, matching their hidden state in the document itself. */
   displaySilentPrayers?: boolean;
+  /** Drives which single language each list entry's title shows — falls back to whichever language has text when the selected one is missing. */
+  appLanguage?: AppLanguage;
 }
 
 /** CHC ContentSelectorDrawer — ported 1:1 from HymnDisplayScreen.js's selector Modal/panel. */
@@ -38,6 +41,7 @@ export default function ContentSelectorDrawer({
   bishopPresent,
   onToggleBishopPresent,
   displaySilentPrayers = false,
+  appLanguage = 'en',
 }: ContentSelectorDrawerProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -141,31 +145,35 @@ export default function ContentSelectorDrawer({
           </View>
 
           <ScrollView ref={scrollViewRef} style={styles.selectorList}>
-            {listable.map((section) => (
-              <Pressable
-                key={section.id}
-                style={[styles.selectorItem, section.id === resolvedCurrentSectionId && styles.selectorItemActive]}
-                onLayout={(event) => {
-                  const y = event.nativeEvent.layout.y;
-                  setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
-                }}
-                onPress={() => {
-                  onSelectSection(section.id);
-                  onClose();
-                }}
-              >
-                <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
-                  {section.title.english ? (
-                    <Text style={[styles.selectorTitle, !section.title.arabic && styles.centeredTitle]}>{section.title.english}</Text>
-                  ) : null}
-                  {section.title.arabic ? (
-                    <Text style={[styles.selectorTitle, styles.selectorTitleArabic, !section.title.english && styles.centeredTitle]}>
-                      {section.title.arabic}
-                    </Text>
-                  ) : null}
-                </View>
-              </Pressable>
-            ))}
+            {listable.map((section) => {
+              // A list entry always shows exactly one language, driven by
+              // the App Language setting — falling back to whichever
+              // language actually has text for this specific section if the
+              // selected one doesn't.
+              const showArabic = appLanguage === 'ar' ? Boolean(section.title.arabic) : !section.title.english && Boolean(section.title.arabic);
+              return (
+                <Pressable
+                  key={section.id}
+                  style={[styles.selectorItem, section.id === resolvedCurrentSectionId && styles.selectorItemActive]}
+                  onLayout={(event) => {
+                    const y = event.nativeEvent.layout.y;
+                    setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
+                  }}
+                  onPress={() => {
+                    onSelectSection(section.id);
+                    onClose();
+                  }}
+                >
+                  <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
+                    {showArabic ? (
+                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle]}>{section.title.arabic}</Text>
+                    ) : (
+                      <Text style={[styles.selectorTitle, styles.centeredTitle]}>{section.title.english || section.title.arabic}</Text>
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })}
           </ScrollView>
 
           {onToggleBishopPresent ? (

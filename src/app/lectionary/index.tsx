@@ -122,6 +122,7 @@ export default function LectionaryDocument() {
             bishopPresent={preferences.bishopPresent}
             onToggleBishopPresent={toggleBishopPresent}
             displaySilentPrayers={preferences.displaySilentPrayers}
+            appLanguage={preferences.appLanguage}
           />
         </>
       )}

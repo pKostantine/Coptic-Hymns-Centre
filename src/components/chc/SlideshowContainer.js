@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
-import { resolveRubricKey, computeSuppressSpeakerLabelFlags } from "../../utils/verseRubric";
+import { resolveRubricKey, computeGlobalSuppressSpeakerLabelFlags } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 
 export default function SlideshowContainer({
@@ -665,7 +665,7 @@ function SlideItem({
   onAction,
 }) {
   if (item.type === "button") {
-    const label = titleHelpers.shouldShowEnglishTitle() ? titleHelpers.getTitleText(item.title) : "";
+    const label = titleHelpers.shouldShowEnglishTitle(item.title) ? titleHelpers.getTitleText(item.title) : "";
     const arabicLabel =
       titleHelpers.shouldShowArabicTitle(item.title) ? item.title?.arabic || "" : "";
 
@@ -793,11 +793,15 @@ function SlideItem({
   );
 }
 
-// A hymn's own verse list (one section = one hymn) never changes speaker
-// mid-flight from what the WebView reader would show — computeSuppressSpeakerLabelFlags
-// is the exact same function documentHtml.ts uses, so the two renderers can
-// never diverge on "does this verse show its Priest:/Deacon:/etc. indicator".
+// Speaker-label suppression is a whole-document decision, not a per-hymn
+// one — computeGlobalSuppressSpeakerLabelFlags is the exact same function
+// documentHtml.ts uses, so the two renderers can never diverge on "does this
+// verse show its Priest:/Deacon:/etc. indicator". `sections` here is already
+// the pre-filtered, displayed-only view (see DocumentSurface's
+// buildSlideshowSections), so it can be passed straight through.
 function flattenSections(sections, bishopPresent) {
+  const suppressMap = computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent);
+
   return sections.flatMap((section, sectionIndex) => {
     if (section.isSubdocumentButton || section.isAntiphonaryButton) {
       return [
@@ -812,7 +816,6 @@ function flattenSections(sections, bishopPresent) {
     }
 
     const verses = section.verses || [];
-    const suppressFlags = computeSuppressSpeakerLabelFlags(verses, bishopPresent);
 
     return [
       {
@@ -835,12 +838,16 @@ function flattenSections(sections, bishopPresent) {
         type: "verse",
         verse,
         colorIndex: getVerseColorIndex(section, verseIndex, bishopPresent),
-        suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || suppressFlags[verseIndex],
+        suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || Boolean(suppressMap.get(verse)),
         bishopPresent,
         // Recited Prayer is a per-verse type (a verse's own effective type
         // after inheritance — see resolveEffectiveVerseType), not a
-        // whole-section flag.
-        isRecitedPrayer: verse.type === "recitedPrayer",
+        // whole-section flag. Silent Prayer/silent Comment verses are
+        // grouped in here too — despite the prop name, this really means
+        // "Coptic is gated by the Coptic Recited Prayers toggle", which
+        // applies to both Recited and Silent Prayer content alike.
+        isRecitedPrayer:
+          verse.type === "recitedPrayer" || verse.type === "silentPrayer" || verse.type === "silentComment",
         isReading: Boolean(section.isReading),
         forceWhiteVerses: Boolean(section.forceWhiteVerses),
         verseIndex: sectionIndex + verseIndex,
@@ -867,7 +874,7 @@ function getVerseColorIndex(section, index, bishopPresent) {
     section.isPsali ||
     /psali|aripsaleen/i.test(title) ||
     isPsaliLikeTwoVerseSectionTitle(title) ||
-    (section.verses || []).some((verse) => Boolean(getSpeakerRole(verse.type, bishopPresent)));
+    (section.verses || []).some((verse) => Boolean(getSpeakerRole(verse.personRole || verse.type, bishopPresent)));
 
   if (!shouldUsePairing) {
     return effectiveIndex;
@@ -877,7 +884,7 @@ function getVerseColorIndex(section, index, bishopPresent) {
     return effectiveIndex;
   }
 
-  if (getSpeakerRole(section.verses?.[0]?.type, bishopPresent) === "priest") {
+  if (getSpeakerRole(section.verses?.[0]?.personRole || section.verses?.[0]?.type, bishopPresent) === "priest") {
     return effectiveIndex <= 2 ? 0 : 1 + Math.floor((effectiveIndex - 3) / 2);
   }
 
@@ -891,6 +898,7 @@ function getEffectiveAlternatingVerseIndex(section, index) {
       verse.type !== "refrainLabel" &&
       verse.type !== "refrain" &&
       verse.type !== "comment" &&
+      verse.type !== "silentComment" &&
       !verse.forceWhiteText
     )
     .length - 1;
@@ -903,8 +911,8 @@ function isPsaliLikeTwoVerseSectionTitle(title) {
 
 // Used only by the psali/pairing color-alternation heuristic in
 // getVerseColorIndex above — actual speaker-label suppression is
-// computeSuppressSpeakerLabelFlags from utils/verseRubric.js (shared with
-// the WebView reader), not this. Resolves "bishopOrPriest" via the same
+// computeGlobalSuppressSpeakerLabelFlags from utils/verseRubric.js (shared
+// with the WebView reader), not this. Resolves "bishopOrPriest" via the same
 // shared resolveRubricKey so this heuristic doesn't diverge either.
 function getSpeakerRole(type, bishopPresent) {
   const resolved = resolveRubricKey(type, bishopPresent);
@@ -955,7 +963,7 @@ function getItemSignature(item) {
 function buildTitleLanguages(title, visibleLanguages, titleHelpers) {
   const titleParts = titleHelpers.getTitleParts(title);
   const languages = [];
-  const showEnglish = titleHelpers.shouldShowEnglishTitle();
+  const showEnglish = titleHelpers.shouldShowEnglishTitle(title);
   const showArabic = titleHelpers.shouldShowArabicTitle(title);
 
   if (showEnglish) {
@@ -1555,7 +1563,7 @@ function getLanguageExtraTopPadding(language, item, fontSize) {
   if (
     language !== "coptic" ||
     item.suppressSpeakerLabel ||
-    !getSpeakerRole(item.verse?.type)
+    !getSpeakerRole(item.verse?.personRole || item.verse?.type)
   ) {
     return 0;
   }

@@ -18,6 +18,9 @@ interface CategoryCardProps {
   title: string;
   arabic?: string;
   onPress?: () => void;
+  /** Both default true — the main menu's App Language setting passes only one of these, so the row shows a single title instead of the normal English-left/Arabic-right pair. */
+  showEnglish?: boolean;
+  showArabic?: boolean;
 }
 
 /**
@@ -27,8 +30,9 @@ interface CategoryCardProps {
  * English and Arabic side by side without truncating either one, so the two
  * stack instead — same row, just taller.
  */
-export default function CategoryCard({ title, arabic, onPress }: CategoryCardProps) {
+export default function CategoryCard({ title, arabic, onPress, showEnglish = true, showArabic: showArabicProp = true }: CategoryCardProps) {
   const isMobileWeb = useIsMobileWeb();
+  const showArabic = showArabicProp && Boolean(arabic);
 
   return (
     <Pressable
@@ -39,18 +43,20 @@ export default function CategoryCard({ title, arabic, onPress }: CategoryCardPro
         <Icon name="library-outline" size={isMobileWeb ? 20 : 26} color={COLORS.gold} />
       </View>
       <View style={[styles.titleGroup, isMobileWeb && styles.titleGroupMobile]}>
-        <Text
-          style={[styles.title, isMobileWeb && styles.titleMobile]}
-          numberOfLines={isMobileWeb ? 2 : 1}
-        >
-          {formatEnglishDisplayText(title)}
-        </Text>
-        {arabic ? (
+        {showEnglish ? (
           <Text
-            style={[styles.arabicTitle, isMobileWeb && styles.arabicTitleMobile]}
+            style={[styles.title, isMobileWeb && styles.titleMobile, !showArabic && styles.titleSolo]}
             numberOfLines={isMobileWeb ? 2 : 1}
           >
-            {formatArabicNumbers(arabic)}
+            {formatEnglishDisplayText(title)}
+          </Text>
+        ) : null}
+        {showArabic ? (
+          <Text
+            style={[styles.arabicTitle, isMobileWeb && styles.arabicTitleMobile, !showEnglish && styles.titleSolo]}
+            numberOfLines={isMobileWeb ? 2 : 1}
+          >
+            {formatArabicNumbers(arabic!)}
           </Text>
         ) : null}
       </View>
@@ -133,6 +139,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginRight: 0,
     width: '100%',
+  },
+  titleSolo: {
+    marginRight: 0,
+    textAlign: 'center',
   },
   chevron: {
     marginLeft: SPACING.sm,

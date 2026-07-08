@@ -11,6 +11,19 @@ export function resolveRubricKey(verseType, bishopPresent) {
   return verseType;
 }
 
+/**
+ * The type to use for rubric label lookup AND person-type-indicator
+ * tracking — verse.personRole when the verse has one, verse.type otherwise.
+ * A Silent/Recited Prayer or Refrain line's `type` collapses to that prayer
+ * type (silentPrayer/recitedPrayer/refrain), losing which speaker said
+ * it — personRole (set independently in hymnLibrary.js from person_type
+ * alone) preserves that, so e.g. a silently-prayed line said by the priest
+ * still shows/tracks as "Priest:", just rendered in the silent-prayer color.
+ */
+export function resolveVerseRubricType(verse, bishopPresent) {
+  return resolveRubricKey(verse.personRole || verse.type, bishopPresent);
+}
+
 /** Verse types that get a speaker-rubric label/indicator at all (Refrain included — "Refrain:" is a rubric label like any other speaker). */
 const RUBRIC_TYPES = new Set(["priest", "bishop", "deacon", "reader", "people", "refrain"]);
 
@@ -19,25 +32,62 @@ export function isRubricType(resolvedType) {
 }
 
 /**
- * For each verse in a hymn (a single section — this always operates within
- * one hymn's own verse list, so it naturally "restarts" at every new hymn),
- * decide whether its speaker-type indicator should be suppressed: shown only
- * on the first verse of a run of the same resolved type, comments never
- * counting as a "previous verse" for this purpose (skipped entirely, in
- * either direction of the scan). Matches the person-type-indicator algorithm
- * verbatim in both the scrolling WebView reader and slideshow mode.
+ * Whole-document version of speaker-label suppression: walks every section
+ * in document order (not each section in isolation), so a person-type
+ * indicator only re-shows where the reader would actually perceive a new
+ * hymn starting.
+ *
+ * The caller must pass only the sections/verses that are actually DISPLAYED
+ * — already filtered for displayComments/displaySilentPrayers/bishopPresent
+ * — since this function decides suppression purely among what's visible, it
+ * never accounts for hidden verses/sections.
+ *
+ * Rules:
+ *  - The very first non-comment verse in the whole document always shows.
+ *  - Walking forward, a verse's indicator is suppressed unless its resolved
+ *    type differs from the most recently encountered non-comment verse's
+ *    resolved type — comments (including silentComment) are entirely
+ *    transparent to this tracking, skipped in either direction.
+ *  - Crossing into a new section: if that section has a displayed title,
+ *    the cycle restarts — its first verse always shows, regardless of what
+ *    came right before. If the section has no displayed title, it reads as
+ *    a seamless continuation of the previous section — the same "only if it
+ *    changed" comparison carries straight through the boundary.
+ *
+ * Returns a Map from verse object to a suppress boolean, keyed by object
+ * reference — verse objects are stable within one render pass, so callers
+ * look their own verses up directly rather than by index.
  */
-export function computeSuppressSpeakerLabelFlags(verses, bishopPresent) {
-  const resolvedTypes = verses.map((verse) => resolveRubricKey(verse.type, bishopPresent));
-  return verses.map((verse, index) => {
-    if ((verse.bishopOnly && !bishopPresent) || (verse.priestOnly && bishopPresent)) return false;
-    const resolved = resolvedTypes[index];
-    if (!isRubricType(resolved)) return false;
-    for (let i = index - 1; i >= 0; i -= 1) {
-      if (verses[i].type === "comment") continue;
-      if ((verses[i].bishopOnly && !bishopPresent) || (verses[i].priestOnly && bishopPresent)) continue;
-      return resolvedTypes[i] === resolved;
+export function computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent) {
+  const suppressMap = new Map();
+  let lastType = null;
+  let lastSection = null;
+
+  for (const section of sections) {
+    const sectionHasTitle = Boolean(section.title?.english || section.title?.arabic);
+    const verses = section.verses || [];
+
+    for (const verse of verses) {
+      if (verse.type === "comment" || verse.type === "silentComment") continue;
+
+      const resolvedType = resolveVerseRubricType(verse, bishopPresent);
+      const isFirstOfSection = lastSection !== section;
+
+      let suppress;
+      if (isFirstOfSection && sectionHasTitle) {
+        suppress = false;
+      } else if (lastType === null) {
+        suppress = false;
+      } else {
+        suppress = resolvedType === lastType;
+      }
+      if (!isRubricType(resolvedType)) suppress = true;
+
+      suppressMap.set(verse, suppress);
+      lastType = resolvedType;
+      lastSection = section;
     }
-    return false;
-  });
+  }
+
+  return suppressMap;
 }

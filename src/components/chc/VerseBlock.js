@@ -31,6 +31,11 @@ export default function VerseBlock({
   const isRefrain = verse.type === "refrain";
   const isComment = isCommentVerseType(verse.type);
   const isSilentPrayer = isSilentPrayerVerse(verse);
+  // Who actually said this line, independent of `type` — a Silent/Recited
+  // Prayer or Refrain line's `type` collapses to that prayer type and loses
+  // the underlying speaker, so the rubric label/color falls back to the
+  // preserved personRole instead (see resolvePersonRole in hymnLibrary.js).
+  const rubricType = verse.personRole || verse.type;
   const isSeasonalHoosVerse = Boolean(verse.seasonalHoosVersePrefix);
   const rowTextColor =
     isComment
@@ -70,7 +75,7 @@ export default function VerseBlock({
     : [
         {
           key: "english",
-          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(verse.type, "english", bishopPresent),
+          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "english", bishopPresent),
           text: formatEnglishDisplayText(verse.english),
           bibleVerseNumber: verse.bibleVerseNumber,
           seasonalHoosVersePrefix: verse.seasonalHoosVersePrefix,
@@ -101,7 +106,7 @@ export default function VerseBlock({
         },
         {
           key: "arabic",
-          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(verse.type, "arabic", bishopPresent),
+          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "arabic", bishopPresent),
           text: formatArabicNumbers(verse.arabic),
           bibleVerseNumber: verse.bibleVerseNumber,
           seasonalHoosVersePrefix: formatArabicNumbers(verse.seasonalHoosVersePrefix),
@@ -196,7 +201,7 @@ export default function VerseBlock({
           >
             {language.speakerLabel ? (
               <>
-                <Text style={{ color: getSpeakerColor(verse.type, bishopPresent) }}>
+                <Text style={{ color: getSpeakerColor(rubricType, bishopPresent) }}>
                   {language.speakerLabel}
                 </Text>
                 {"\n"}
@@ -424,7 +429,7 @@ function getSpeakerRole(type, bishopPresent) {
 }
 
 function isCommentVerseType(type) {
-  return ["comment", "note", "tunecomment"].includes(String(type || "").toLowerCase());
+  return ["comment", "note", "tunecomment", "silentcomment"].includes(String(type || "").toLowerCase());
 }
 
 function isSilentPrayerVerse(verse = {}) {

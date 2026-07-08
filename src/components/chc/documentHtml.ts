@@ -1,5 +1,6 @@
 import { COLORS, SPACING } from '../../constants/theme';
-import { resolveRubricKey, computeSuppressSpeakerLabelFlags } from '../../utils/verseRubric';
+import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
+import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType } from '../../utils/verseRubric';
 
 export interface DocumentVerse {
   english: string;
@@ -7,6 +8,8 @@ export interface DocumentVerse {
   arabic: string;
   type: string;
   prayerType?: string | null;
+  /** The speaker role from person_type alone, independent of `type` — see resolveVerseRubricType. Preserves "who said this" even when `type` collapses to silentPrayer/recitedPrayer/refrain. */
+  personRole?: string | null;
   /** Antiphonary only: "adam" | "vatos" — which tune this verse is chanted in. */
   tune?: string | null;
   /** This verse's own condition only passes when Bishop Present is on/off respectively — evaluated both ways at hydration time so toggling Bishop Present never needs a re-fetch. */
@@ -14,6 +17,8 @@ export interface DocumentVerse {
   priestOnly?: boolean;
   /** Readings only: "chapter:verse" gold badge prefixed before this verse's text in every visible language column. */
   bibleVerseNumber?: string;
+  /** Pre-Refrain lines only — forces italic on top of whatever color/role the verse naturally resolves to, without changing that role. */
+  italic?: boolean;
 }
 
 export interface DocumentSection {
@@ -89,6 +94,7 @@ export function buildDocumentHtml(
     copticFontDataUri,
     fontSize,
     visibleColumns = DEFAULT_VISIBLE_COLUMNS,
+    appLanguage = 'en',
     selectText = false,
     displayComments = false,
     displaySilentPrayers = false,
@@ -99,6 +105,8 @@ export function buildDocumentHtml(
     copticFontDataUri: string;
     fontSize: number;
     visibleColumns?: VisibleColumns;
+    /** Drives ALL titles (section titles + Subdocument/Antiphonary open-button labels) — falls back to whichever language has text when the selected one is missing for a given section. Independent of visibleColumns, which governs verse body text only. */
+    appLanguage?: AppTitleLanguage;
     selectText?: boolean;
     displayComments?: boolean;
     displaySilentPrayers?: boolean;
@@ -121,16 +129,27 @@ export function buildDocumentHtml(
     if (section.priestOnly && bishopPresent) return false;
     return true;
   });
+  // Speaker-label suppression is a whole-document decision (see
+  // computeGlobalSuppressSpeakerLabelFlags) — computed once, up front, over
+  // exactly what's displayed, then looked up per verse during rendering.
+  const displayFilterOpts = { displayComments, displaySilentPrayers, bishopPresent };
+  const displayedSectionsForSuppress = visibleSections.map((section) => ({
+    ...section,
+    verses: getDisplayedVerseEntries(section, displayFilterOpts).map(({ verse }) => verse),
+  }));
+  const suppressMap = computeGlobalSuppressSpeakerLabelFlags(displayedSectionsForSuppress, bishopPresent);
   const htmlSections = visibleSections
     .map((section) =>
       renderSection(section, {
         fontSize,
         visibleColumns,
+        appLanguage,
         displayComments,
         displaySilentPrayers,
         bishopPresent,
         copticRecitedPrayers,
         copticGospelRite,
+        suppressMap,
       }),
     )
     .join('');
@@ -406,48 +425,57 @@ export function buildDocumentHtml(
 </html>`;
 }
 
+/** The verse/original-index pairs that will actually render for this section, given the current display preferences — shared by the global suppress-flag pass and the real render pass so they never disagree about what's displayed. */
+function getDisplayedVerseEntries(
+  section: DocumentSection,
+  { displayComments, displaySilentPrayers, bishopPresent }: { displayComments: boolean; displaySilentPrayers: boolean; bishopPresent: boolean },
+): { verse: DocumentVerse; index: number }[] {
+  return section.verses
+    .map((verse, index) => ({ verse, index }))
+    .filter(({ verse }) => !(verse.bishopOnly && !bishopPresent) && !(verse.priestOnly && bishopPresent))
+    .filter(({ verse, index }) => {
+      // A row explicitly marked both Comment and Silent Prayer (type
+      // 'silentComment') needs BOTH toggles on — it's not "a comment" or "a
+      // silent prayer" alone, it's both at once.
+      if (verse.type === 'silentComment') return displayComments && displaySilentPrayers;
+      if (verse.type === 'silentPrayer') return displaySilentPrayers;
+      if (verse.type === 'comment') {
+        // A comment always renders (subject to displayComments) *except*
+        // when it sits inside a silent prayer — there its visibility is tied
+        // to displaySilentPrayers too, same as the silent prayer around it.
+        if (isWithinSilentPrayer(section, index)) return displayComments && displaySilentPrayers;
+        return displayComments;
+      }
+      return true;
+    });
+}
+
 function renderSection(
   section: DocumentSection,
   opts: {
     fontSize: number;
     visibleColumns: VisibleColumns;
+    appLanguage: AppTitleLanguage;
     displayComments: boolean;
     displaySilentPrayers: boolean;
     bishopPresent: boolean;
     copticRecitedPrayers: boolean;
     copticGospelRite: boolean;
+    suppressMap: Map<DocumentVerse, boolean>;
   },
 ) {
-  const { visibleColumns, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite } = opts;
+  const { appLanguage, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite, suppressMap } = opts;
   const toggleHtml = section.startsGospelRiteToggle ? renderGospelRiteToggle(copticGospelRite) : '';
 
   if (section.isSubdocumentButton || section.isAntiphonaryButton) {
-    return toggleHtml + renderDocumentButtonSection(section, visibleColumns);
+    return toggleHtml + renderDocumentButtonSection(section, appLanguage);
   }
 
   const isCollapsed = Boolean(section.collapsible && section.defaultCollapsed);
-  const titleHtml = renderSectionTitle(section, visibleColumns, isCollapsed);
+  const titleHtml = renderSectionTitle(section, appLanguage, isCollapsed);
 
-  // Speaker-label suppression (only the first verse of a consecutive same-speaker
-  // run shows its "Priest:"/"Deacon:"/"Refrain:"/etc. label) is computed against
-  // the full, unfiltered verse list — comments never break a speaker run,
-  // whether or not they're currently visible — then verses are filtered for
-  // display. Suppression compares *resolved* types so a "Bishop/Priest" verse
-  // and a plain "Priest" verse are treated as the same speaker when the
-  // Bishop Present toggle is off (both render as "Priest:").
-  const suppressFlags = computeSuppressSpeakerLabelFlags(section.verses, bishopPresent);
-  const versesHtml = section.verses
-    .map((verse, index) => ({ verse, index }))
-    .filter(({ verse }) => !(verse.bishopOnly && !bishopPresent) && !(verse.priestOnly && bishopPresent))
-    .filter(({ verse }) => displayComments || verse.type !== 'comment')
-    .filter(({ verse, index }) => {
-      // A comment always renders (subject to displayComments above) *except*
-      // when it sits inside a silent prayer — there its visibility is tied
-      // to displaySilentPrayers too, same as the silent prayer around it.
-      if (verse.type === 'comment' && isWithinSilentPrayer(section, index)) return displaySilentPrayers;
-      return displaySilentPrayers || verse.type !== 'silentPrayer';
-    })
-    .map(({ verse, index }) => renderVerse(verse, index, section, suppressFlags[index], opts))
+  const versesHtml = getDisplayedVerseEntries(section, { displayComments, displaySilentPrayers, bishopPresent })
+    .map(({ verse, index }) => renderVerse(verse, index, section, suppressMap.get(verse) ?? false, opts))
     .join('');
 
   return `
@@ -476,17 +504,17 @@ function renderGospelRiteToggle(isOn: boolean) {
   `;
 }
 
-/** A section titled Silent Prayer overall, or a comment directly adjacent to explicit silentPrayer verses, counts as "within" the silent prayer for visibility purposes. */
+/** A section titled Silent Prayer overall, or a comment directly adjacent to explicit silentPrayer/silentComment verses, counts as "within" the silent prayer for visibility purposes. */
 function isWithinSilentPrayer(section: DocumentSection, index: number): boolean {
   if (section.titlePrayerType === 'Silent Prayer') return true;
   const verses = section.verses;
   for (let i = index - 1; i >= 0; i -= 1) {
     if (verses[i].type === 'comment') continue;
-    return verses[i].type === 'silentPrayer';
+    return verses[i].type === 'silentPrayer' || verses[i].type === 'silentComment';
   }
   for (let i = index + 1; i < verses.length; i += 1) {
     if (verses[i].type === 'comment') continue;
-    return verses[i].type === 'silentPrayer';
+    return verses[i].type === 'silentPrayer' || verses[i].type === 'silentComment';
   }
   return false;
 }
@@ -497,40 +525,36 @@ function isWithinSilentPrayer(section: DocumentSection, index: number): boolean 
  * (`openSubdocument`/`openAntiphonary`) which opens the nested document in a
  * full-screen modal.
  */
-function renderDocumentButtonSection(section: DocumentSection, visibleColumns: VisibleColumns) {
+function renderDocumentButtonSection(section: DocumentSection, appLanguage: AppTitleLanguage) {
   const action = section.isAntiphonaryButton ? 'openAntiphonary' : 'openSubdocument';
-  const label = section.title?.english || section.subdocumentKey || 'Open';
-  const arabicLabel = section.title?.arabic || '';
+  const titleEn = section.title?.english || section.subdocumentKey || 'Open';
+  const titleAr = section.title?.arabic || '';
+  const showArabic = appLanguage === 'ar' ? Boolean(titleAr) : !titleEn && Boolean(titleAr);
   const onclick = `postAction(${JSON.stringify(action)}, { sectionId: ${JSON.stringify(section.id)} })`;
 
   return `
     <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
       <button class="open-button" onclick="${escapeAttribute(onclick)}">
-        ${visibleColumns.english ? `<span>${escapeHtml(label)}</span>` : ''}
-        ${visibleColumns.arabic && arabicLabel ? `<span class="arabic">${escapeHtml(arabicLabel)}</span>` : ''}
+        ${!showArabic ? `<span>${escapeHtml(titleEn || titleAr)}</span>` : ''}
+        ${showArabic ? `<span class="arabic">${escapeHtml(titleAr)}</span>` : ''}
       </button>
     </section>
   `;
 }
 
-function renderSectionTitle(section: DocumentSection, visibleColumns: VisibleColumns, isCollapsed: boolean) {
+function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLanguage, isCollapsed: boolean) {
   const titleEn = section.title?.english || '';
   const titleAr = section.title?.arabic || '';
   if (!titleEn && !titleAr) return '';
 
-  const languages: { align: string; className: string; text: string }[] = [];
-  const showEnglish = visibleColumns.english;
-  const showArabic = visibleColumns.arabic && Boolean(titleAr);
-
-  if (showEnglish) {
-    languages.push({ align: showArabic ? 'left' : 'center', className: 'english', text: titleEn });
-  }
-  if (showArabic) {
-    languages.push({ align: showEnglish ? 'right' : 'center', className: 'arabic', text: formatArabicDigits(titleAr) });
-  }
-  if (!languages.length) {
-    languages.push({ align: 'center', className: 'english', text: titleEn });
-  }
+  // A title always shows exactly one language, driven by the App Language
+  // setting — falling back to whichever language actually has text for this
+  // specific section if the selected one doesn't (e.g. Arabic selected but
+  // this hymn has no Arabic title).
+  const showArabic = appLanguage === 'ar' ? Boolean(titleAr) : !titleEn && Boolean(titleAr);
+  const languages: { align: string; className: string; text: string }[] = showArabic
+    ? [{ align: 'center', className: 'arabic', text: formatArabicDigits(titleAr) }]
+    : [{ align: 'center', className: 'english', text: titleEn || titleAr }];
 
   const gridTemplateColumns = `repeat(${Math.max(languages.length, 1)}, minmax(0, 1fr))`;
   const titleCells = languages
@@ -576,16 +600,21 @@ function renderVerse(
   }: { fontSize: number; visibleColumns: VisibleColumns; bishopPresent: boolean; copticRecitedPrayers: boolean },
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent);
-  const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveRubricKey(verse.type, bishopPresent)];
+  const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveVerseRubricType(verse, bishopPresent)];
   // Invincible Coptic lines have no English/Arabic counterpart by design —
   // they render as a single column and should read centered, not justified
   // against a column width that no longer has anything to justify against.
   const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference' || verse.prayerType === 'Invincible Coptic';
   // "Coptic Recited Prayers" hides just this verse's Coptic text when the
-  // verse is a Recited Prayer — combined with the verse-by-verse column
-  // collapse below, that verse's Coptic column disappears for that row only,
-  // filling the freed width into whatever columns remain for that verse.
-  const copticText = verse.type === 'recitedPrayer' && !copticRecitedPrayers ? '' : verse.coptic || '';
+  // verse is a Recited Prayer or Silent Prayer (spoken/prayed silently, both
+  // conventionally read from Coptic-transliterated-into-English/Arabic
+  // rather than the Coptic script itself) — combined with the verse-by-verse
+  // column collapse below, that verse's Coptic column disappears for that
+  // row only, filling the freed width into whatever columns remain.
+  const copticHiddenByToggle =
+    (verse.type === 'recitedPrayer' || verse.type === 'silentPrayer' || verse.type === 'silentComment') &&
+    !copticRecitedPrayers;
+  const copticText = copticHiddenByToggle ? '' : verse.coptic || '';
 
   const languages: { className: string; key: keyof VisibleColumns; text: string; speakerLabel?: string; speakerClass?: string }[] = [
     { className: 'english', key: 'english' as const, text: verse.english || '', speakerLabel: rubric?.english, speakerClass: rubric?.class },
@@ -607,7 +636,15 @@ function renderVerse(
     // this specific verse has no text in it and no speaker label to show —
     // e.g. the Orthodox Creed's Recited Prayer verses lose their Coptic
     // column individually while its one Chanted Prayer verse keeps all three.
-  ].filter((language) => visibleColumns[language.key] && (Boolean(language.text.trim()) || Boolean(language.speakerLabel)));
+    // Coptic hidden by the toggle above is a deliberate hide, though, not
+    // "genuinely missing text" — RUBRIC's coptic field is always a non-empty
+    // BLANK_COPTIC_LABEL filler (for vertical alignment when Coptic *is*
+    // shown), so without the explicit exclusion below that filler alone
+    // would keep reserving a blank Coptic column even with the toggle off.
+  ].filter((language) => {
+    if (language.key === 'coptic' && copticHiddenByToggle) return false;
+    return visibleColumns[language.key] && (Boolean(language.text.trim()) || Boolean(language.speakerLabel));
+  });
 
   const gridTemplateColumns = `repeat(${Math.max(languages.length, 1)}, minmax(0, 1fr))`;
   const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;
@@ -636,7 +673,7 @@ function renderVerse(
 }
 
 /** Verse types that never take part in Single/Double/Quadruple Alternating — kept in sync with resolveVerseColor's early returns below. */
-const NON_ALTERNATING_TYPES = new Set(['comment', 'silentPrayer', 'refrain', 'refrainLabel', 'readingReference']);
+const NON_ALTERNATING_TYPES = new Set(['comment', 'silentComment', 'silentPrayer', 'refrain', 'refrainLabel', 'readingReference']);
 
 /**
  * The alternating color parity only ticks for verses that are actually
@@ -655,7 +692,14 @@ function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number, bi
 }
 
 function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean) {
-  if (verse.type === 'comment') return { color: COLORS.comment, italic: true };
+  const resolved = resolveVerseColorBase(verse, index, section, bishopPresent);
+  // Pre-Refrain lines keep whatever role/color they'd naturally get — this
+  // only ever adds italic on top, never changes the color.
+  return verse.italic ? { ...resolved, italic: true } : resolved;
+}
+
+function resolveVerseColorBase(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean) {
+  if (verse.type === 'comment' || verse.type === 'silentComment') return { color: COLORS.comment, italic: true };
   if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
   if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: true };
   if (verse.type === 'readingReference') return { color: COLORS.gold, italic: false };

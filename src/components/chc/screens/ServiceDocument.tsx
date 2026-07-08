@@ -277,6 +277,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             bishopPresent={preferences.bishopPresent}
             onToggleBishopPresent={toggleBishopPresent}
             displaySilentPrayers={preferences.displaySilentPrayers}
+            appLanguage={preferences.appLanguage}
           />
           <SubdocumentModal
             visible={Boolean(subdocumentModal)}
