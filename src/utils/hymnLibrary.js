@@ -53,14 +53,25 @@ function resolveWholeTableInlineTarget(hymnKey) {
 
 /**
  * GOSPEL_RITE always gets its "Coptic Gospel Rite" toggle button rendered
- * immediately before its content, wherever it's spliced in — mutates the
- * first of the just-hydrated nested sections in place (mirrors how
- * addTuneMarkersToAntiphonarySections tags sections post-hydration).
+ * immediately before its content, wherever it's spliced in. This is its own
+ * dedicated zero-verse pseudo-section (rather than a flag mutated onto
+ * whichever nested section happens to end up first) specifically so the
+ * button's own visibility is never coupled to whether that particular piece
+ * of content happens to be copticGospelRiteOnly/nonCopticGospelRiteOnly —
+ * the button itself must always render so the toggle stays reachable in
+ * both states, exactly matching hydrateWholeTableInlineNested's "hydrate
+ * every state up front, tag the result" no-refetch approach.
  */
-function markGospelRiteToggleStart(hymnKey, nestedSections) {
-  if (hymnKey === "GOSPEL_RITE" && nestedSections.length) {
-    nestedSections[0] = { ...nestedSections[0], startsGospelRiteToggle: true };
-  }
+function buildGospelRiteToggleSection(hymnKey, anchorId) {
+  if (hymnKey !== "GOSPEL_RITE") return null;
+  return {
+    id: `${anchorId}-gospel-rite-toggle`,
+    title: { english: "", arabic: "" },
+    verses: [],
+    alternateEvery: null,
+    forceWhiteVerses: true,
+    startsGospelRiteToggle: true,
+  };
 }
 
 // Sentinels that resolve through the Lectionary/Bible reading flow rather
@@ -170,9 +181,12 @@ async function resolveReadingSentinelSection(section, isoDate) {
 
 /** Merges every nested section's verses into ONE flat list under the calling section's own title/prayer_type — see the isInlinePlacement branch in hydrateWithFlags for why. */
 function mergeNestedSectionsAsOneHymn(callingSection, nestedSections) {
-  const verses = nestedSections.flatMap((s) => s.verses || []);
+  const verses = applyInheritedPreRefrainItalic(
+    nestedSections.flatMap((s) => s.verses || []),
+    callingSection.titlePrayerType,
+  );
   const titlePrayerType = callingSection.titlePrayerType || null;
-  const dominantPrayerType = titlePrayerType || verses.find((v) => v.prayerType)?.prayerType || null;
+  const dominantPrayerType = getDominantPrayerType(titlePrayerType, verses);
   const alternateEvery =
     dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)
       ? ALTERNATE_EVERY[dominantPrayerType]
@@ -213,10 +227,10 @@ const SERVICE_TEXT_FIELDS =
 const SERVICE_TEXT_FIELDS_NO_ITEM_TYPE =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition";
 const SCHEMAS_WITHOUT_TEXT_ITEM_TYPE = new Set(["agpeya"]);
-// These schemas only have their own order table + hymn_texts — no
-// hymn_titles table at all (confirmed against the live schema) — so every
-// hymn_key in them is titleless by construction. Skip the fetch entirely
-// rather than 404ing and crashing the whole recursive hydration chain.
+// These schemas only have their own order table + hymn_texts — no native
+// hymn_titles table at all (confirmed against the live schema). Skip just
+// their native title fetch; later schemas in the shared lookup order can
+// still supply a title for the same hymn_key.
 const SCHEMAS_WITHOUT_HYMN_TITLES = new Set([
   "gospel_responses",
   "hymn_of_the_intercessions",
@@ -224,19 +238,27 @@ const SCHEMAS_WITHOUT_HYMN_TITLES = new Set([
   "verses_of_the_cymbals",
 ]);
 
+// Hymn-key resolution always starts in the calling schema, then walks the
+// shared/common pools in this exact order. If the calling schema is one of
+// these, it stays first and is skipped later in the fallback list.
+const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "psalmody", "agpeya", "veneration"];
+
+function getHymnKeyLookupSchemas(schema) {
+  return [...new Set([schema, ...HYMN_KEY_FALLBACK_SCHEMAS].filter(Boolean))];
+}
+
 export async function fetchServiceRows(schema, table) {
   const orderRows = await fetchOrderRows(schema, table);
   if (!orderRows.length) return [];
 
   const hymnKeys = uniqueNonEmpty(orderRows.map((row) => row.hymn_key));
-  const [nativeTitleRows, nativeTextRows, publicTitleRows, publicTextRows] = await Promise.all([
-    fetchSchemaTitlesByKeys(schema, hymnKeys),
-    fetchSchemaTextRowsByKeys(schema, hymnKeys),
-    schema === "public" ? Promise.resolve([]) : fetchSchemaTitlesByKeys("public", hymnKeys),
-    schema === "public" ? Promise.resolve([]) : fetchSchemaTextRowsByKeys("public", hymnKeys),
+  const lookupSchemas = getHymnKeyLookupSchemas(schema);
+  const [titleRowsBySchema, textRowsBySchema] = await Promise.all([
+    Promise.all(lookupSchemas.map((lookupSchema) => fetchSchemaTitlesByKeys(lookupSchema, hymnKeys))),
+    Promise.all(lookupSchemas.map((lookupSchema) => fetchSchemaTextRowsByKeys(lookupSchema, hymnKeys))),
   ]);
 
-  return flattenServiceRows(orderRows, { nativeTitleRows, nativeTextRows, publicTitleRows, publicTextRows });
+  return flattenServiceRows(orderRows, { lookupSchemas, titleRowsBySchema, textRowsBySchema });
 }
 
 async function fetchOrderRows(schema, table) {
@@ -298,12 +320,10 @@ async function fetchSchemaTextRowsByKeys(schema, hymnKeys) {
 
 function flattenServiceRows(
   orderRows,
-  { nativeTitleRows = [], nativeTextRows = [], publicTitleRows = [], publicTextRows = [] } = {},
+  { lookupSchemas = [], titleRowsBySchema = [], textRowsBySchema = [] } = {},
 ) {
-  const nativeTitleByKey = createTitleMap(nativeTitleRows);
-  const publicTitleByKey = createTitleMap(publicTitleRows);
-  const nativeTextRowsByKey = createTextRowsMap(nativeTextRows);
-  const publicTextRowsByKey = createTextRowsMap(publicTextRows);
+  const titleMaps = lookupSchemas.map((_, index) => createTitleMap(titleRowsBySchema[index] || []));
+  const textMaps = lookupSchemas.map((_, index) => createTextRowsMap(textRowsBySchema[index] || []));
 
   const rows = [];
   const sortedOrderRows = [...orderRows].sort(compareItemOrder);
@@ -312,10 +332,8 @@ function flattenServiceRows(
     const hymnKey = normalizeText(orderRow.hymn_key);
     if (!hymnKey) continue;
 
-    const title = nativeTitleByKey.get(hymnKey) || publicTitleByKey.get(hymnKey) || {};
-    const nativeLines = nativeTextRowsByKey.get(hymnKey) || [];
-    const publicLines = publicTextRowsByKey.get(hymnKey) || [];
-    const lines = nativeLines.length ? nativeLines : publicLines;
+    const title = findFirstMappedValue(titleMaps, hymnKey) || {};
+    const lines = findFirstMappedValue(textMaps, hymnKey) || [];
 
     if (!lines.length) {
       rows.push(createFlatServiceRow(orderRow, title, null));
@@ -328,6 +346,14 @@ function flattenServiceRows(
   }
 
   return rows;
+}
+
+function findFirstMappedValue(schemaMaps, hymnKey) {
+  for (const rowsByKey of schemaMaps) {
+    const value = rowsByKey.get(hymnKey);
+    if (Array.isArray(value) ? value.length : value) return value;
+  }
+  return null;
 }
 
 function createTitleMap(titleRows = []) {
@@ -450,7 +476,7 @@ export function assembleServiceSections(rawRows) {
         invincibleCoptic: row.prayer_type === "Invincible Coptic",
         // Pre-Refrain keeps its natural type/role (see resolveEffectiveVerseType
         // above) but always renders italic on top of it.
-        italic: row.prayer_type === "Pre-Refrain",
+        italic: shouldItalicizeAsPreRefrain(row.prayer_type, row.title_prayer_type, row.person_type),
       });
     }
   }
@@ -459,15 +485,15 @@ export function assembleServiceSections(rawRows) {
   for (const section of sections) {
     if (section.isSubdocumentPlaceholder) continue;
 
-    // The hymn's own declared prayer_type (hymn_titles.prayer_type) always
-    // wins for the section's overall alternation scheme — a single Refrain
-    // or Silent Prayer verse mixed into an otherwise "Single Alternating"
-    // hymn must not hijack the whole section into forceWhiteVerses just
-    // because it happens to be the first verse with any line-level
-    // prayer_type set. Only fall back to scanning verses when the hymn has
-    // no title-level prayer_type of its own.
-    const dominantPrayerType =
-      section.titlePrayerType || section.verses.find((v) => v.prayerType)?.prayerType || null;
+    // The hymn's own declared prayer_type (hymn_titles.prayer_type) wins for
+    // the section's overall alternation scheme, except Pre-Refrain, which is
+    // presentation-only italic styling and must not change color/alternation.
+    // A single Refrain or Silent Prayer verse mixed into an otherwise
+    // "Single Alternating" hymn must not hijack the whole section into
+    // forceWhiteVerses just because it happens to be the first verse with any
+    // line-level prayer_type set. Only fall back to scanning verses when the
+    // hymn has no dominant title-level prayer_type of its own.
+    const dominantPrayerType = getDominantPrayerType(section.titlePrayerType, section.verses);
     section.prayerType = dominantPrayerType;
 
     if (dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)) {
@@ -546,9 +572,34 @@ export function getServiceVerseType(personType, prayerType) {
  * flag set at the verse-construction call sites below).
  */
 function resolveEffectiveVerseType(personType, prayerType, sectionTitlePrayerType) {
-  const ownPrayerType = prayerType === "Pre-Refrain" ? "" : prayerType;
-  const effectivePrayerType = ownPrayerType || (personType === "Comment" ? "" : sectionTitlePrayerType) || "";
+  const ownPrayerType = isPreRefrainPrayerType(prayerType) ? "" : prayerType;
+  const inheritedPrayerType = isPreRefrainPrayerType(sectionTitlePrayerType) ? "" : sectionTitlePrayerType;
+  const effectivePrayerType = ownPrayerType || (personType === "Comment" ? "" : inheritedPrayerType) || "";
   return getServiceVerseType(personType, effectivePrayerType);
+}
+
+function isPreRefrainPrayerType(prayerType) {
+  return normalizeText(prayerType) === "Pre-Refrain";
+}
+
+function shouldItalicizeAsPreRefrain(prayerType, inheritedPrayerType, personType) {
+  if (isPreRefrainPrayerType(prayerType)) return true;
+  if (normalizeText(prayerType) || personType === "Comment") return false;
+  return isPreRefrainPrayerType(inheritedPrayerType);
+}
+
+function applyInheritedPreRefrainItalic(verses, inheritedPrayerType) {
+  if (!isPreRefrainPrayerType(inheritedPrayerType)) return verses;
+  return verses.map((verse) => {
+    if (isPreRefrainPrayerType(verse.prayerType)) return { ...verse, italic: true };
+    return normalizeText(verse.prayerType) ? verse : { ...verse, italic: true };
+  });
+}
+
+function getDominantPrayerType(titlePrayerType, verses) {
+  const normalizedTitlePrayerType = normalizeText(titlePrayerType);
+  if (normalizedTitlePrayerType && !isPreRefrainPrayerType(normalizedTitlePrayerType)) return normalizedTitlePrayerType;
+  return (verses || []).find((verse) => verse.prayerType && !isPreRefrainPrayerType(verse.prayerType))?.prayerType || null;
 }
 
 // ─── hydrateSupabaseServiceHymn ────────────────────────────────────────────
@@ -619,6 +670,36 @@ async function safeHydrateNested(schema, table, flags, depth, isoDate) {
 }
 
 /**
+ * GOSPEL_RITE's own nested content (gospel_rite.gospel_rite) includes rows
+ * conditioned on the in-document "Coptic Gospel Rite" toggle (the button
+ * rendered via startsGospelRiteToggle/renderGospelRiteToggle) — same
+ * "hydrate every state up front, tag the result, let the client toggle
+ * without a re-fetch" principle already used for Bishop Present. Hydrated
+ * TWICE (CopticGospelRite forced true and forced false) and merged: content
+ * present in both stays always-visible; content present in only one state
+ * gets tagged copticGospelRiteOnly/nonCopticGospelRiteOnly so
+ * documentHtml.ts/SlideshowContainer can filter it purely from the live
+ * toggle, exactly like bishopOnly/priestOnly. Every other whole-table Inline
+ * target has no such toggle, so it's just a single ordinary hydration.
+ */
+async function hydrateWholeTableInlineNested(hymnKey, target, flags, depth, isoDate) {
+  if (hymnKey !== "GOSPEL_RITE") {
+    return safeHydrateNested(target.schema, target.table, flags, depth, isoDate);
+  }
+
+  const [onSections, offSections] = await Promise.all([
+    safeHydrateNested(target.schema, target.table, { ...flags, CopticGospelRite: true }, depth, isoDate),
+    safeHydrateNested(target.schema, target.table, { ...flags, CopticGospelRite: false }, depth, isoDate),
+  ]);
+
+  const offIds = new Set(offSections.map((s) => s.id));
+  const onIds = new Set(onSections.map((s) => s.id));
+  const merged = onSections.map((s) => (offIds.has(s.id) ? s : { ...s, copticGospelRiteOnly: true }));
+  const offOnly = offSections.filter((s) => !onIds.has(s.id)).map((s) => ({ ...s, nonCopticGospelRiteOnly: true }));
+  return [...merged, ...offOnly];
+}
+
+/**
  * Whether a verse/section survives hydration regardless of the *current*
  * Bishop Present toggle: its condition is evaluated once with BishopPresent
  * forced true and once forced false (every other flag — weekday, season,
@@ -662,6 +743,86 @@ function combineBishopVisibility(outer, inner) {
   };
 }
 
+/**
+ * Whole-table Inline sentinel splices (GOSPEL_RITE, VERSES_OF_THE_CYMBALS,
+ * etc.) are governed by the calling schema's own hymn_titles/order-table row
+ * for the sentinel key — same "look at what the calling schema gives it"
+ * principle as any other hymn_key: if it's given a title, display it; if
+ * it's given a prayer_type, follow it; if it's given a minimization,
+ * include it.
+ *
+ * How that title is actually placed depends on whether the target schema's
+ * nested content has titles of its own:
+ *  - GOSPEL_RITE's target (gospel_rite.gospel_rite) has its own native
+ *    hymn_titles — dozens of individually titled, individually Minimized
+ *    psalm trailers/responses. Those stay separate sections exactly as
+ *    hydrated; the calling schema's own title for "GOSPEL_RITE" itself (if
+ *    given) is prepended as its own header section in front of them.
+ *  - VERSES_OF_THE_CYMBALS's target (verses_of_the_cymbals) has no native
+ *    hymn_titles at all — ~90 condition-gated, individually untitled verse
+ *    blocks that are really one continuous hymn. There's nothing of theirs
+ *    to preserve individually, so every verse from every nested hymn_key is
+ *    merged into ONE flat section using the calling schema's own
+ *    title/prayer_type/minimization — the person-type indicator only
+ *    restarts once, at the very first verse, exactly as if this were a
+ *    single ordinary hymn rather than dozens spliced together.
+ */
+function buildWholeTableInlineSections(nestedSections, callingRow) {
+  if (!nestedSections.length) return [];
+  const nestedSectionsHaveOwnTitles = nestedSections.some((s) => s.title?.english || s.title?.arabic);
+
+  if (nestedSectionsHaveOwnTitles) {
+    const header = buildInlineTitleOnlySection(callingRow);
+    return header ? [header, ...nestedSections] : nestedSections;
+  }
+
+  return [mergeIntoOneInlineSection(callingRow, nestedSections)];
+}
+
+function buildInlineTitleOnlySection(callingRow) {
+  if (!callingRow || !(callingRow.title?.english || callingRow.title?.arabic)) return null;
+  return {
+    id: callingRow.id,
+    title: callingRow.title,
+    titlePrayerType: callingRow.titlePrayerType || null,
+    collapsible: Boolean(callingRow.collapsible),
+    defaultCollapsed: Boolean(callingRow.defaultCollapsed),
+    verses: [],
+    alternateEvery: null,
+    forceWhiteVerses: true,
+    bishopOnly: callingRow.bishopOnly,
+    priestOnly: callingRow.priestOnly,
+  };
+}
+
+function mergeIntoOneInlineSection(callingRow, nestedSections) {
+  const verses = applyInheritedPreRefrainItalic(
+    nestedSections.flatMap((s) => s.verses || []),
+    callingRow?.titlePrayerType,
+  );
+  const titlePrayerType = callingRow?.titlePrayerType || null;
+  const dominantPrayerType = getDominantPrayerType(titlePrayerType, verses);
+  const merged = {
+    id: callingRow?.id,
+    title: callingRow?.title || { english: "", arabic: "" },
+    titlePrayerType,
+    collapsible: Boolean(callingRow?.collapsible),
+    defaultCollapsed: Boolean(callingRow?.defaultCollapsed),
+    verses,
+    prayerType: dominantPrayerType,
+    bishopOnly: callingRow?.bishopOnly,
+    priestOnly: callingRow?.priestOnly,
+  };
+  if (dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)) {
+    merged.alternateEvery = ALTERNATE_EVERY[dominantPrayerType];
+    merged.reverseAlternating = dominantPrayerType === "Reverse Alternating";
+  } else {
+    merged.alternateEvery = null;
+    merged.forceWhiteVerses = true;
+  }
+  return applyCopticCaseToSection(merged);
+}
+
 async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
   const rawRows = await fetchServiceRows(schema, table);
   const sections = assembleServiceSections(rawRows);
@@ -699,8 +860,8 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
       // right here (during the parent's own hydration) and stashed on the
       // button, so opening the modal is a local filter/render, never a fresh
       // Supabase round-trip. The button's own label is resolved from the
-      // calling schema's hymn_titles (public fallback), falling back to the
-      // sentinel key itself when no title is defined.
+      // calling schema's hymn_titles, then the shared fallback schemas,
+      // falling back to the sentinel key itself when no title is defined.
       const label = section.title.english || section.hymn_key;
       const subdocumentSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1, isoDate);
 
@@ -737,21 +898,19 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
     if (section.isInlinePlacement) {
       // An order-table-level Inline placeholder (item_type = "Inline" on the
       // order row itself, hymn_key an all-caps sentinel like GOSPEL_RITE or
-      // CANONS) is structurally identical to a Subdocument placeholder — it
-      // always references another whole type-3 table — except it splices
-      // that table's content directly into this document instead of
-      // becoming a button. The WHOLE imported schema is treated as ONE
-      // hymn using the calling row's own title/prayer_type (e.g.
-      // VERSES_OF_THE_CYMBALS imported into raising_of_incense has its own
-      // title "Verses of the Cymbals" and prayer type "Single Alternating"
-      // in liturgy.hymn_titles) — every verse from every nested hymn_key is
-      // merged into one flat verse list so the person-type indicator only
-      // restarts once, at the very first verse, exactly as if this were a
-      // single hymn rather than several spliced together.
+      // VERSES_OF_THE_CYMBALS) is structurally identical to a Subdocument
+      // placeholder — it always references another whole type-3 table —
+      // except it splices that table's content directly into this document
+      // instead of becoming a button. See buildWholeTableInlineSections for
+      // how the calling row's own title/prayer_type/minimization (already
+      // resolved onto `section` above, same as any other hymn_key) get
+      // applied to the imported content.
       const target = resolveWholeTableInlineTarget(section.hymn_key);
       if (!target || depth >= 3) continue;
-      const nestedSections = await safeHydrateNested(target.schema, target.table, flags, depth + 1, isoDate);
-      hydrated.push(...nestedSections);
+      const nestedSections = await hydrateWholeTableInlineNested(section.hymn_key, target, flags, depth + 1, isoDate);
+      const toggleSection = buildGospelRiteToggleSection(section.hymn_key, section.id);
+      if (toggleSection) hydrated.push(toggleSection);
+      hydrated.push(...buildWholeTableInlineSections(nestedSections, section));
       continue;
     }
 
@@ -792,18 +951,42 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
         const wholeTableTarget = resolveWholeTableInlineTarget(verse.inlineHymnKey);
         if (wholeTableTarget) {
           flushVerses();
-          const nestedSections = await safeHydrateNested(wholeTableTarget.schema, wholeTableTarget.table, flags, depth + 1, isoDate);
-          hydrated.push(...nestedSections);
+          const nestedSections = await hydrateWholeTableInlineNested(verse.inlineHymnKey, wholeTableTarget, flags, depth + 1, isoDate);
+          const toggleSection = buildGospelRiteToggleSection(verse.inlineHymnKey, `${section.id}-inline-${verse.inlineHymnKey}`);
+          if (toggleSection) hydrated.push(toggleSection);
+          // Same calling-schema-gives-the-title principle as the top-level
+          // Inline placeholder above, just sourced from this line's own
+          // inline_hymn_title_shown/inline_hymn_minimization (the type-2
+          // table's per-line equivalent) instead of a top-level order row.
+          const inlineSentinelTitle = await fetchInlineHymnTitle(schema, verse.inlineHymnKey);
+          const hasOwnSentinelTitle =
+            Boolean(verse.inlineHymnTitleShown) &&
+            Boolean(inlineSentinelTitle?.title_english || inlineSentinelTitle?.title_arabic);
+          const callingRow = {
+            id: `${section.id}-inline-${verse.inlineHymnKey}`,
+            title: hasOwnSentinelTitle
+              ? { english: inlineSentinelTitle.title_english || "", arabic: inlineSentinelTitle.title_arabic || "" }
+              : { english: "", arabic: "" },
+            titlePrayerType: hasOwnSentinelTitle ? inlineSentinelTitle.prayer_type || null : section.titlePrayerType,
+            collapsible:
+              verse.inlineHymnMinimization === "Minimizable" ||
+              verse.inlineHymnMinimization === "Minimized" ||
+              Boolean(section.collapsible),
+            defaultCollapsed: verse.inlineHymnMinimization === "Minimized" || Boolean(section.defaultCollapsed),
+            bishopOnly: verseVisibility.bishopOnly,
+            priestOnly: verseVisibility.priestOnly,
+          };
+          hydrated.push(...buildWholeTableInlineSections(nestedSections, callingRow));
           pushedAnything = true;
           continue;
         }
 
         // Regular single-hymn-key inline splice. Two distinct behaviors,
         // decided by the triggering line's own inline_hymn_title_shown
-        // column: if true (and the inline hymn actually has a title in its
-        // own schema's hymn_titles / public fallback), it's treated as its
-        // OWN hymn — flush whatever the parent had so far, push a standalone
-        // section with that title, its own prayer-type-driven color
+        // column: if true (and the inline hymn actually has a title in the
+        // ordered schema lookup), it's treated as its OWN hymn — flush
+        // whatever the parent had so far, push a standalone section with
+        // that title, its own prayer-type-driven color
         // alternation, and (since suppression/rubric restart operates
         // per-section) a fresh restart of the person-type indicators — then
         // keep accumulating the parent's remaining verses in a new chunk
@@ -822,8 +1005,16 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
           .map(({ row, visibility }) => ({ row, visibility: combineBishopVisibility(verseVisibility, visibility) }))
           .filter(({ visibility }) => visibility.visible)
           .map(({ row, visibility }) => {
-            const effectivePersonType = verse.overridePersonType || row.person_type || "";
-            const effectivePrayerType = verse.overridePrayerType || row.prayer_type || "";
+            // A Comment row is a stage direction intrinsic to the source
+            // hymn (e.g. "If a bishop is present, the following verse is
+            // added.") — the calling line's own person_type/prayer_type
+            // override exists to reassign a *speaker* onto the spliced-in
+            // content (e.g. "recite this as the Deacon" regardless of what
+            // the source table says), never to silently turn a stage
+            // direction into spoken dialogue.
+            const isCommentRow = row.person_type === "Comment";
+            const effectivePersonType = isCommentRow ? row.person_type : verse.overridePersonType || row.person_type || "";
+            const effectivePrayerType = isCommentRow ? row.prayer_type || "" : verse.overridePrayerType || row.prayer_type || "";
             return {
               english: row.english || "",
               coptic: row.coptic || "",
@@ -832,7 +1023,7 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
               prayerType: effectivePrayerType || null,
               personRole: resolvePersonRole(effectivePersonType),
               invincibleCoptic: effectivePrayerType === "Invincible Coptic",
-              italic: effectivePrayerType === "Pre-Refrain",
+              italic: shouldItalicizeAsPreRefrain(effectivePrayerType, inlineTitlePrayerType, effectivePersonType),
               bishopOnly: visibility.bishopOnly,
               priestOnly: visibility.priestOnly,
             };
@@ -840,7 +1031,7 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
 
         if (hasOwnTitle) {
           flushVerses();
-          const dominantPrayerType = inlineTitlePrayerType || builtVerses.find((v) => v.prayerType)?.prayerType || null;
+          const dominantPrayerType = getDominantPrayerType(inlineTitlePrayerType, builtVerses);
           const alternateEvery =
             dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)
               ? ALTERNATE_EVERY[dominantPrayerType]
@@ -953,31 +1144,15 @@ function uppercaseFirstCopticChar(text) {
 const INLINE_TEXT_FIELDS =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition";
 
-// Hymn-key lookups (inline splices, whole-table references) search the
-// calling schema first, then this fixed fallback order — public (the
-// shared cross-schema hymn pool), then liturgy, agpeya, psalmody, veneration
-// — stopping at the first schema that actually has the key.
-const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "agpeya", "psalmody", "veneration"];
-
 async function fetchInlineHymnVerses(schema, hymnKey) {
-  const { data: nativeRows, error: nativeError } = await supabase
-    .schema(schema)
-    .from("hymn_texts")
-    .select(INLINE_TEXT_FIELDS)
-    .eq("hymn_key", hymnKey)
-    .order("line_order", { ascending: true });
-  if (nativeError) throw createReadableSupabaseError(nativeError, `${schema}.hymn_texts`);
-  if (nativeRows?.length) return nativeRows;
-
-  for (const fallbackSchema of HYMN_KEY_FALLBACK_SCHEMAS) {
-    if (fallbackSchema === schema) continue;
+  for (const lookupSchema of getHymnKeyLookupSchemas(schema)) {
     const { data, error } = await supabase
-      .schema(fallbackSchema)
+      .schema(lookupSchema)
       .from("hymn_texts")
       .select(INLINE_TEXT_FIELDS)
       .eq("hymn_key", hymnKey)
       .order("line_order", { ascending: true });
-    if (error) throw createReadableSupabaseError(error, `${fallbackSchema}.hymn_texts`);
+    if (error) throw createReadableSupabaseError(error, `${lookupSchema}.hymn_texts`);
     if (data?.length) return data;
   }
 
@@ -988,26 +1163,15 @@ const INLINE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, prayer_type"
 
 /** Whether an inline-spliced hymn should be treated as its own hymn (own title, own alternation, restarted person-type indicators) hinges entirely on whether it has a row in hymn_titles — same schema search order as fetchInlineHymnVerses. Returns null if no title row exists anywhere. */
 async function fetchInlineHymnTitle(schema, hymnKey) {
-  if (!SCHEMAS_WITHOUT_HYMN_TITLES.has(schema)) {
+  for (const lookupSchema of getHymnKeyLookupSchemas(schema)) {
+    if (SCHEMAS_WITHOUT_HYMN_TITLES.has(lookupSchema)) continue;
     const { data, error } = await supabase
-      .schema(schema)
+      .schema(lookupSchema)
       .from("hymn_titles")
       .select(INLINE_TITLE_FIELDS)
       .eq("hymn_key", hymnKey)
       .maybeSingle();
-    if (error) throw createReadableSupabaseError(error, `${schema}.hymn_titles`);
-    if (data) return data;
-  }
-
-  for (const fallbackSchema of HYMN_KEY_FALLBACK_SCHEMAS) {
-    if (fallbackSchema === schema || SCHEMAS_WITHOUT_HYMN_TITLES.has(fallbackSchema)) continue;
-    const { data, error } = await supabase
-      .schema(fallbackSchema)
-      .from("hymn_titles")
-      .select(INLINE_TITLE_FIELDS)
-      .eq("hymn_key", hymnKey)
-      .maybeSingle();
-    if (error) throw createReadableSupabaseError(error, `${fallbackSchema}.hymn_titles`);
+    if (error) throw createReadableSupabaseError(error, `${lookupSchema}.hymn_titles`);
     if (data) return data;
   }
 

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
-import { COLORS, SPACING } from '@/constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { AppLanguage } from '@/utils/preferencesStorage';
 
@@ -25,16 +25,23 @@ const APP_LANGUAGE_OPTIONS: { key: AppLanguage; label: string; arabic: string }[
  */
 export default function AppSettingsScreen() {
   const { preferences, setAppLanguage } = useReadingPreferences();
+  const showArabicChrome = preferences.appLanguage === 'ar';
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
         <title>CHC App Settings</title>
       </Head>
-      <AppHeader title="App Settings" />
+      <AppHeader
+        title={{ english: 'App Settings', arabic: 'إعدادات التطبيق' }}
+        visibleLanguages={{ english: !showArabicChrome, arabic: showArabicChrome }}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>
-          <Text style={styles.groupLabel}>App Language</Text>
+          <View style={styles.groupLabelRow}>
+            <Text style={styles.groupLabel}>App Language</Text>
+            <Text style={[styles.groupLabel, styles.groupLabelArabic]}>لغة التطبيق</Text>
+          </View>
           <View style={styles.optionRow}>
             {APP_LANGUAGE_OPTIONS.map((option) => {
               const isActive = preferences.appLanguage === option.key;
@@ -74,6 +81,8 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
   },
   groupLabel: { fontSize: 15, fontWeight: '800', color: COLORS.white },
+  groupLabelRow: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, justifyContent: 'space-between' },
+  groupLabelArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   optionRow: { gap: SPACING.sm },
   optionButton: {
     alignItems: 'center',

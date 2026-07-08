@@ -6,8 +6,9 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { getSeasonShortName } from '@/constants/seasonNames';
+import { getSeasonFormalName, getSeasonShortName } from '@/constants/seasonNames';
 import { useCalendar } from '@/context/CalendarContext';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
   CalendarDay,
   getAdjacentCopticMonth,
@@ -17,14 +18,20 @@ import {
   getSeasonRanges,
   SeasonRange,
 } from '@/utils/calendarService';
+import { formatCalendarDay, formatCopticMonthName, formatGregorianMonthTitle } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAYS_AR = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
 const WEEKDAY_INDEX: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
-const GREGORIAN_MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+const CALENDAR_LABELS = {
+  calendar: { english: 'Calendar', arabic: 'التقويم' },
+  live: { english: 'Live', arabic: 'حاليًا' },
+  setLive: { english: 'Set Live', arabic: 'العودة للحالي' },
+  season: { english: 'Season', arabic: 'فترة' },
+  gregorian: { english: 'Gregorian', arabic: 'ميلادي' },
+  coptic: { english: 'Coptic', arabic: 'قبطي' },
+};
 
 type Mode = 'gregorian' | 'coptic';
 
@@ -33,6 +40,9 @@ export default function CalendarScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
   const { rawDate, isLive, selectDate, goLive, liturgicalDayPeriod, setLiturgicalDayPeriod } = useCalendar();
+  const { preferences } = useReadingPreferences();
+  const isArabic = preferences.appLanguage === 'ar';
+  const labelText = (label: { english: string; arabic: string }) => (isArabic ? label.arabic : label.english);
 
   const [mode, setMode] = useState<Mode>('gregorian');
   const [gregorianYear, setGregorianYear] = useState(rawDate.getUTCFullYear());
@@ -127,38 +137,61 @@ export default function CalendarScreen() {
   const leadingBlanks = days && days.length ? WEEKDAY_INDEX[days[0].weekday] : 0;
 
   const activeSeason = useMemo(() => seasons.find((s) => s.startDate <= todayIso && s.endDate >= todayIso), [seasons, todayIso]);
-  const monthTitle = mode === 'gregorian' ? `${GREGORIAN_MONTHS[gregorianMonth - 1]} ${gregorianYear}` : `${copticMonthName} ${copticYear ?? ''}`;
+  const activeSeasonLabel = activeSeason
+    ? isArabic
+      ? getSeasonFormalName(activeSeason.rangeKey, activeSeason.activeSeason).arabic || getSeasonShortName(activeSeason.rangeKey, activeSeason.activeSeason)
+      : getSeasonShortName(activeSeason.rangeKey, activeSeason.activeSeason)
+    : labelText(CALENDAR_LABELS.season);
+  const monthTitle =
+    mode === 'gregorian'
+      ? formatGregorianMonthTitle(gregorianMonth, gregorianYear, isArabic)
+      : `${formatCopticMonthName(copticMonthName, isArabic)} ${copticYear === null ? '' : formatCalendarDay(copticYear, isArabic)}`.trim();
+  const weekdayLabels = isArabic ? WEEKDAYS_AR : WEEKDAYS;
+  const goVisualLeftMonth = () => {
+    if (isArabic) {
+      mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1);
+    } else {
+      mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1);
+    }
+  };
+  const goVisualRightMonth = () => {
+    if (isArabic) {
+      mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1);
+    } else {
+      mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1);
+    }
+  };
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
       <Head>
-        <title>CHC Calendar</title>
+        <title>{`CHC ${labelText(CALENDAR_LABELS.calendar)}`}</title>
       </Head>
-      <View style={[styles.header, { paddingTop: safeAreaInsets.top }]}>
+      <View style={[styles.header, isArabic && styles.rowReverse, { paddingTop: safeAreaInsets.top }]}>
         <Pressable accessibilityLabel="Close calendar" style={styles.headerButton} onPress={() => goBack(router, '/')}>
-          <Icon name="chevron-back" size={30} color={COLORS.white} />
+          <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={30} color={COLORS.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>Calendar</Text>
+        <Text style={[styles.headerTitle, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.calendar)}</Text>
         <View style={styles.headerButton} />
       </View>
 
       <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.liveRow}>
+        <View style={[styles.liveRow, isArabic && styles.rowReverse]}>
           {isLive ? (
-            <View style={styles.liveStatus}>
+            <View style={[styles.liveStatus, isArabic && styles.rowReverse]}>
               <View style={styles.liveDot} />
-              <Text style={styles.liveText}>Live</Text>
+              <Text style={[styles.liveText, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.live)}</Text>
             </View>
           ) : (
             <Pressable accessibilityLabel="Set calendar to live date" style={styles.setLiveButton} onPress={goLive}>
-              <Text style={styles.setLiveText}>Set Live</Text>
+              <Text style={[styles.setLiveText, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.setLive)}</Text>
             </Pressable>
           )}
-          <Pressable accessibilityLabel="Open season selector" style={styles.seasonSummary} onPress={() => router.push('/season-selector')}>
-            <Text numberOfLines={1} style={styles.summaryText}>
-              {activeSeason ? getSeasonShortName(activeSeason.rangeKey, activeSeason.activeSeason) : 'Seasons'}
+          <Pressable accessibilityLabel="Open season selector" style={[styles.seasonSummary, isArabic && styles.rowReverse]} onPress={() => router.push('/season-selector')}>
+            <Text numberOfLines={1} style={[styles.summaryText, isArabic && styles.arabicText]}>
+              {activeSeasonLabel}
             </Text>
-            <Icon name="chevron-forward" size={22} color={COLORS.white} />
+            <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={22} color={COLORS.white} />
           </Pressable>
           <Pressable
             accessibilityLabel={liturgicalDayPeriod === 'morning' ? 'Switch to evening liturgical day' : 'Switch to morning liturgical day'}
@@ -180,16 +213,16 @@ export default function CalendarScreen() {
 
         <View style={styles.monthHeader}>
           <Pressable
-            accessibilityLabel="Previous month"
+            accessibilityLabel={isArabic ? 'Next month' : 'Previous month'}
             style={styles.monthButton}
-            onPress={() => (mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1))}
+            onPress={goVisualLeftMonth}
           >
             <Icon name="chevron-back" size={28} color={COLORS.rowBlue} />
           </Pressable>
 
           <View style={styles.monthTitleGroup}>
-            <Text style={styles.monthTitle}>{monthTitle}</Text>
-            <View style={styles.modeSelector}>
+            <Text style={[styles.monthTitle, isArabic && styles.arabicText]}>{monthTitle}</Text>
+            <View style={[styles.modeSelector, isArabic && styles.rowReverse]}>
               {(['gregorian', 'coptic'] as Mode[]).map((option) => {
                 const isActive = mode === option;
                 return (
@@ -199,8 +232,8 @@ export default function CalendarScreen() {
                     style={[styles.modeOption, isActive && styles.modeOptionActive]}
                     onPress={() => setMode(option)}
                   >
-                    <Text style={[styles.modeText, { color: isActive ? COLORS.white : COLORS.muted }]}>
-                      {option === 'gregorian' ? 'Gregorian' : 'Coptic'}
+                    <Text style={[styles.modeText, isArabic && styles.arabicText, { color: isActive ? COLORS.white : COLORS.muted }]}>
+                      {labelText(option === 'gregorian' ? CALENDAR_LABELS.gregorian : CALENDAR_LABELS.coptic)}
                     </Text>
                   </Pressable>
                 );
@@ -209,17 +242,17 @@ export default function CalendarScreen() {
           </View>
 
           <Pressable
-            accessibilityLabel="Next month"
+            accessibilityLabel={isArabic ? 'Previous month' : 'Next month'}
             style={styles.monthButton}
-            onPress={() => (mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1))}
+            onPress={goVisualRightMonth}
           >
             <Icon name="chevron-forward" size={28} color={COLORS.rowBlue} />
           </Pressable>
         </View>
 
-        <View style={styles.weekdayGrid}>
-          {WEEKDAYS.map((weekday) => (
-            <Text key={weekday} style={styles.weekday}>
+        <View style={[styles.weekdayGrid, isArabic && styles.rowReverse]}>
+          {weekdayLabels.map((weekday) => (
+            <Text key={weekday} style={[styles.weekday, isArabic && styles.arabicText]}>
               {weekday}
             </Text>
           ))}
@@ -228,7 +261,7 @@ export default function CalendarScreen() {
         {!days ? (
           <ActivityIndicator color={COLORS.gold} style={{ marginTop: SPACING.xl }} />
         ) : (
-          <View style={styles.dayGrid}>
+          <View style={[styles.dayGrid, isArabic && styles.rowReverse]}>
             {Array.from({ length: leadingBlanks }).map((_, i) => (
               <View key={`blank-${i}`} style={styles.dayCell} />
             ))}
@@ -238,7 +271,9 @@ export default function CalendarScreen() {
               return (
                 <Pressable accessibilityLabel={`Select ${day.gregorianDate}`} key={day.gregorianDate} style={styles.dayCell} onPress={() => pickDate(new Date(`${day.gregorianDate}T00:00:00Z`))}>
                   <View style={[styles.dayCircle, isSelected && styles.dayCircleSelected]}>
-                    <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{day.displayDay}</Text>
+                    <Text style={[styles.dayText, isArabic && styles.arabicText, isSelected && styles.dayTextSelected]}>
+                      {formatCalendarDay(day.displayDay, isArabic)}
+                    </Text>
                   </View>
                 </Pressable>
               );
@@ -252,6 +287,7 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
+  rowReverse: { flexDirection: 'row-reverse' },
   header: {
     alignItems: 'center',
     backgroundColor: COLORS.navy,
@@ -336,4 +372,8 @@ const styles = StyleSheet.create({
   dayCircleSelected: { backgroundColor: COLORS.gold },
   dayText: { fontSize: 24, fontWeight: '500', color: COLORS.white },
   dayTextSelected: { color: COLORS.white, fontWeight: '800' },
+  arabicText: {
+    fontFamily: TYPOGRAPHY.arabic,
+    writingDirection: 'rtl',
+  },
 });

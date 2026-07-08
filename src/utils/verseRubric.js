@@ -52,7 +52,12 @@ export function isRubricType(resolvedType) {
  *    the cycle restarts — its first verse always shows, regardless of what
  *    came right before. If the section has no displayed title, it reads as
  *    a seamless continuation of the previous section — the same "only if it
- *    changed" comparison carries straight through the boundary.
+ *    changed" comparison carries straight through the boundary. The one
+ *    exception: a section immediately following a Minimizable/Minimized
+ *    hymn always restarts too, titled or not — a minimized hymn reads as
+ *    optional/collapsible content, so whatever comes after it needs its own
+ *    fresh indicator rather than silently inheriting the last speaker shown
+ *    before the (possibly-collapsed) minimized hymn.
  *
  * Returns a Map from verse object to a suppress boolean, keyed by object
  * reference — verse objects are stable within one render pass, so callers
@@ -72,9 +77,10 @@ export function computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent) 
 
       const resolvedType = resolveVerseRubricType(verse, bishopPresent);
       const isFirstOfSection = lastSection !== section;
+      const previousHymnWasMinimizable = isFirstOfSection && Boolean(lastSection?.collapsible);
 
       let suppress;
-      if (isFirstOfSection && sectionHasTitle) {
+      if (isFirstOfSection && (sectionHasTitle || previousHymnWasMinimizable)) {
         suppress = false;
       } else if (lastType === null) {
         suppress = false;

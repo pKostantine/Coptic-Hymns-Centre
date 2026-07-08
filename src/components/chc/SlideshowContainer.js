@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { SPACING } from "../../constants/theme";
+import { COLORS, SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
 import { resolveRubricKey, computeGlobalSuppressSpeakerLabelFlags } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
@@ -711,6 +711,9 @@ function SlideItem({
       titleHelpers,
     );
     const titleColumnWidth = titleTableWidth / Math.max(titleLanguages.length, 1);
+    // A hymn whose own title row declares "Silent Prayer" reads visually
+    // distinct — dimmer/italic — since none of its content is spoken aloud.
+    const isSilentPrayerHymn = item.titlePrayerType === "Silent Prayer";
 
     return (
       <View
@@ -741,7 +744,8 @@ function SlideItem({
                       styles.sectionTitle,
                       language.key === "arabic" && styles.sectionTitleArabic,
                       {
-                        color: theme.colors.gold,
+                        color: isSilentPrayerHymn ? COLORS.silentTitle : theme.colors.gold,
+                        fontStyle: isSilentPrayerHymn ? "italic" : "normal",
                         fontSize: Math.max(Math.round(fontSize * 0.5), 14),
                         lineHeight: Math.max(Math.round(fontSize * 0.62), 18),
                         textAlign: language.align,
@@ -829,6 +833,7 @@ function flattenSections(sections, bishopPresent) {
         sectionId: section.id,
         type: "title",
         title: section.title,
+        titlePrayerType: section.titlePrayerType || null,
         collapsible: Boolean(section.collapsible),
         currentlyCollapsed: Boolean(section.currentlyCollapsed),
       },

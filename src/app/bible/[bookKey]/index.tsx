@@ -101,17 +101,20 @@ export default function BibleNestedList() {
             <View style={styles.psalmNumberingDeck}>
               {PSALM_NUMBERING_OPTIONS.map((option) => {
                 const isSelected = psalmNumbering === option.key;
+                const label = showArabic ? option.arabic : option.label;
                 return (
                   <Pressable
                     key={option.key}
+                    accessibilityLabel={label}
                     style={[
                       styles.psalmNumberingButton,
                       { backgroundColor: isSelected ? COLORS.gold : COLORS.surface, borderColor: isSelected ? COLORS.gold : COLORS.border },
                     ]}
                     onPress={() => setPsalmNumbering(option.key)}
                   >
-                    <Text style={[styles.psalmNumberingText, { color: isSelected ? COLORS.black : COLORS.white }]}>{option.label}</Text>
-                    <Text style={[styles.psalmNumberingArabic, { color: isSelected ? COLORS.black : COLORS.white }]}>{option.arabic}</Text>
+                    <Text style={[styles.psalmNumberingText, showArabic && styles.psalmNumberingArabic, { color: isSelected ? COLORS.black : COLORS.white }]}>
+                      {label}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -157,7 +160,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
-    gap: 2,
     justifyContent: 'center',
     minHeight: 58,
     paddingHorizontal: SPACING.sm,

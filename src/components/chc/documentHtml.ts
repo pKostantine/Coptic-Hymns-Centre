@@ -15,6 +15,9 @@ export interface DocumentVerse {
   /** This verse's own condition only passes when Bishop Present is on/off respectively — evaluated both ways at hydration time so toggling Bishop Present never needs a re-fetch. */
   bishopOnly?: boolean;
   priestOnly?: boolean;
+  /** Same dual-evaluation, but for the in-document "Coptic Gospel Rite" toggle — only set on verses spliced in from GOSPEL_RITE. */
+  copticGospelRiteOnly?: boolean;
+  nonCopticGospelRiteOnly?: boolean;
   /** Readings only: "chapter:verse" gold badge prefixed before this verse's text in every visible language column. */
   bibleVerseNumber?: string;
   /** Pre-Refrain lines only — forces italic on top of whatever color/role the verse naturally resolves to, without changing that role. */
@@ -49,6 +52,9 @@ export interface DocumentSection {
   /** Same Bishop Present dual-evaluation as DocumentVerse, applied to the section's own placement condition. */
   bishopOnly?: boolean;
   priestOnly?: boolean;
+  /** Same dual-evaluation, but for the in-document "Coptic Gospel Rite" toggle — only set on sections spliced in from GOSPEL_RITE. */
+  copticGospelRiteOnly?: boolean;
+  nonCopticGospelRiteOnly?: boolean;
 }
 
 export interface VisibleColumns {
@@ -127,12 +133,14 @@ export function buildDocumentHtml(
     if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;
     if (section.bishopOnly && !bishopPresent) return false;
     if (section.priestOnly && bishopPresent) return false;
+    if (section.copticGospelRiteOnly && !copticGospelRite) return false;
+    if (section.nonCopticGospelRiteOnly && copticGospelRite) return false;
     return true;
   });
   // Speaker-label suppression is a whole-document decision (see
   // computeGlobalSuppressSpeakerLabelFlags) — computed once, up front, over
   // exactly what's displayed, then looked up per verse during rendering.
-  const displayFilterOpts = { displayComments, displaySilentPrayers, bishopPresent };
+  const displayFilterOpts = { displayComments, displaySilentPrayers, bishopPresent, copticGospelRite };
   const displayedSectionsForSuppress = visibleSections.map((section) => ({
     ...section,
     verses: getDisplayedVerseEntries(section, displayFilterOpts).map(({ verse }) => verse),
@@ -272,6 +280,10 @@ export function buildDocumentHtml(
       .section-title.arabic {
         font-family: "Arial", sans-serif;
         text-align: right;
+      }
+      .section-title.silent-prayer {
+        color: ${COLORS.silentTitle};
+        font-style: italic;
       }
       .open-button {
         align-items: center;
@@ -428,11 +440,20 @@ export function buildDocumentHtml(
 /** The verse/original-index pairs that will actually render for this section, given the current display preferences — shared by the global suppress-flag pass and the real render pass so they never disagree about what's displayed. */
 function getDisplayedVerseEntries(
   section: DocumentSection,
-  { displayComments, displaySilentPrayers, bishopPresent }: { displayComments: boolean; displaySilentPrayers: boolean; bishopPresent: boolean },
+  {
+    displayComments,
+    displaySilentPrayers,
+    bishopPresent,
+    copticGospelRite = false,
+  }: { displayComments: boolean; displaySilentPrayers: boolean; bishopPresent: boolean; copticGospelRite?: boolean },
 ): { verse: DocumentVerse; index: number }[] {
   return section.verses
     .map((verse, index) => ({ verse, index }))
     .filter(({ verse }) => !(verse.bishopOnly && !bishopPresent) && !(verse.priestOnly && bishopPresent))
+    .filter(
+      ({ verse }) =>
+        !(verse.copticGospelRiteOnly && !copticGospelRite) && !(verse.nonCopticGospelRiteOnly && copticGospelRite),
+    )
     .filter(({ verse, index }) => {
       // A row explicitly marked both Comment and Silent Prayer (type
       // 'silentComment') needs BOTH toggles on — it's not "a comment" or "a
@@ -474,7 +495,7 @@ function renderSection(
   const isCollapsed = Boolean(section.collapsible && section.defaultCollapsed);
   const titleHtml = renderSectionTitle(section, appLanguage, isCollapsed);
 
-  const versesHtml = getDisplayedVerseEntries(section, { displayComments, displaySilentPrayers, bishopPresent })
+  const versesHtml = getDisplayedVerseEntries(section, { displayComments, displaySilentPrayers, bishopPresent, copticGospelRite })
     .map(({ verse, index }) => renderVerse(verse, index, section, suppressMap.get(verse) ?? false, opts))
     .join('');
 
@@ -556,12 +577,17 @@ function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLangu
     ? [{ align: 'center', className: 'arabic', text: formatArabicDigits(titleAr) }]
     : [{ align: 'center', className: 'english', text: titleEn || titleAr }];
 
+  // A hymn whose own title row declares "Silent Prayer" reads visually
+  // distinct from a normal title — dimmer/italic — since none of its
+  // content is meant to be spoken aloud.
+  const isSilentPrayerHymn = section.titlePrayerType === 'Silent Prayer';
+
   const gridTemplateColumns = `repeat(${Math.max(languages.length, 1)}, minmax(0, 1fr))`;
   const titleCells = languages
     .map(
       (language) => `
         <div class="title-cell">
-          <p class="section-title ${language.className}" style="text-align: ${language.align};">${escapeHtml(language.text)}</p>
+          <p class="section-title ${language.className}${isSilentPrayerHymn ? ' silent-prayer' : ''}" style="text-align: ${language.align};">${escapeHtml(language.text)}</p>
         </div>
       `,
     )
@@ -636,13 +662,21 @@ function renderVerse(
     // this specific verse has no text in it and no speaker label to show —
     // e.g. the Orthodox Creed's Recited Prayer verses lose their Coptic
     // column individually while its one Chanted Prayer verse keeps all three.
-    // Coptic hidden by the toggle above is a deliberate hide, though, not
-    // "genuinely missing text" — RUBRIC's coptic field is always a non-empty
-    // BLANK_COPTIC_LABEL filler (for vertical alignment when Coptic *is*
-    // shown), so without the explicit exclusion below that filler alone
-    // would keep reserving a blank Coptic column even with the toggle off.
+    // That "keep it if there's a speaker label" exception only makes sense
+    // for English/Arabic, where the label is real, distinguishing text.
+    // RUBRIC's coptic field is always a non-empty BLANK_COPTIC_LABEL filler
+    // (pure vertical-alignment spacing for when Coptic *is* shown alongside
+    // it) — never a reason on its own to keep the column, or every verse
+    // with a speaker label but no actual Coptic text in the DB (common in
+    // e.g. gospel_rite's Reader-labeled verses) would reserve a blank
+    // column. So Coptic collapses whenever it's hidden by the toggle above
+    // OR simply has no text, full stop; English/Arabic keep the older
+    // label-justifies-the-column behavior.
   ].filter((language) => {
-    if (language.key === 'coptic' && copticHiddenByToggle) return false;
+    if (language.key === 'coptic') {
+      if (copticHiddenByToggle) return false;
+      return visibleColumns.coptic && Boolean(language.text.trim());
+    }
     return visibleColumns[language.key] && (Boolean(language.text.trim()) || Boolean(language.speakerLabel));
   });
 

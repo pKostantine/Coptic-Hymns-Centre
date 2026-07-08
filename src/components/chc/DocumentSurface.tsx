@@ -49,12 +49,23 @@ function buildSlideshowSections(
     displayComments,
     displaySilentPrayers,
     bishopPresent,
-  }: { displayComments: boolean; displaySilentPrayers: boolean; bishopPresent: boolean },
+    copticGospelRite,
+  }: { displayComments: boolean; displaySilentPrayers: boolean; bishopPresent: boolean; copticGospelRite: boolean },
   collapsedSectionIds: Record<string, boolean>,
 ): DocumentSection[] {
   return sections
+    // The "Coptic Gospel Rite" toggle button is a WebView(scroll)-mode-only
+    // control (documentHtml.ts renders it inline via startsGospelRiteToggle)
+    // — its anchor is a dedicated zero-verse, untitled pseudo-section that
+    // exists purely to carry that flag, and would otherwise show up here as
+    // a blank slide with nothing on it.
+    .filter((section) => !section.startsGospelRiteToggle)
     .filter((section) => displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer')
     .filter((section) => !(section.bishopOnly && !bishopPresent) && !(section.priestOnly && bishopPresent))
+    .filter(
+      (section) =>
+        !(section.copticGospelRiteOnly && !copticGospelRite) && !(section.nonCopticGospelRiteOnly && copticGospelRite),
+    )
     .map((section) => {
       const currentlyCollapsed = section.collapsible
         ? (collapsedSectionIds[section.id] ?? Boolean(section.defaultCollapsed))
@@ -64,6 +75,7 @@ function buildSlideshowSections(
         ? []
         : section.verses.filter((verse, index) => {
             if ((verse.bishopOnly && !bishopPresent) || (verse.priestOnly && bishopPresent)) return false;
+            if ((verse.copticGospelRiteOnly && !copticGospelRite) || (verse.nonCopticGospelRiteOnly && copticGospelRite)) return false;
             // A row explicitly marked both Comment and Silent Prayer needs
             // BOTH toggles on — it's not "a comment" or "a silent prayer"
             // alone, it's both at once.
@@ -124,10 +136,11 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
             displayComments: preferences.displayComments,
             displaySilentPrayers: preferences.displaySilentPrayers,
             bishopPresent: preferences.bishopPresent,
+            copticGospelRite,
           },
           collapsedSectionIds,
         ),
-      [sections, preferences.displayComments, preferences.displaySilentPrayers, preferences.bishopPresent, collapsedSectionIds],
+      [sections, preferences.displayComments, preferences.displaySilentPrayers, preferences.bishopPresent, copticGospelRite, collapsedSectionIds],
     );
 
     if (preferences.slideshowMode) {

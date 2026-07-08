@@ -151,6 +151,10 @@ export default function ContentSelectorDrawer({
               // language actually has text for this specific section if the
               // selected one doesn't.
               const showArabic = appLanguage === 'ar' ? Boolean(section.title.arabic) : !section.title.english && Boolean(section.title.arabic);
+              // A hymn whose own title row declares "Silent Prayer" reads
+              // visually distinct in the selector too — dimmer/italic, since
+              // none of its content is spoken aloud.
+              const isSilentPrayerHymn = section.titlePrayerType === 'Silent Prayer';
               return (
                 <Pressable
                   key={section.id}
@@ -166,9 +170,9 @@ export default function ContentSelectorDrawer({
                 >
                   <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
                     {showArabic ? (
-                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle]}>{section.title.arabic}</Text>
+                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{section.title.arabic}</Text>
                     ) : (
-                      <Text style={[styles.selectorTitle, styles.centeredTitle]}>{section.title.english || section.title.arabic}</Text>
+                      <Text style={[styles.selectorTitle, styles.centeredTitle, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{section.title.english || section.title.arabic}</Text>
                     )}
                   </View>
                 </Pressable>
@@ -315,6 +319,10 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     flexShrink: 1,
     color: COLORS.white,
+  },
+  selectorTitleSilentPrayer: {
+    color: COLORS.silentTitle,
+    fontStyle: 'italic',
   },
   selectorTitleArabic: {
     textAlign: 'right',

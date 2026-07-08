@@ -1,18 +1,19 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { COLORS } from '../../../constants/theme';
+import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 
 interface ToggleRowProps {
   label: string;
+  isArabic?: boolean;
   active: boolean;
   onPress: () => void;
 }
 
 /** CHC ToggleRow — ported 1:1 from LanguageToggleBar.js's `languageOption` row + hand-drawn switch. */
-export default function ToggleRow({ label, active, onPress }: ToggleRowProps) {
+export default function ToggleRow({ label, isArabic = false, active, onPress }: ToggleRowProps) {
   return (
     <Pressable accessibilityLabel={`Toggle ${label}`} onPress={onPress} style={styles.languageOption}>
-      <Text style={styles.languageLabel}>{label}</Text>
+      <Text style={[styles.languageLabel, isArabic && styles.languageLabelArabic]}>{label}</Text>
       <View style={[styles.switchTrack, { backgroundColor: active ? COLORS.navy : '#1C1C1C', borderColor: active ? COLORS.gold : COLORS.border }]}>
         <View
           style={[
@@ -43,6 +44,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.white,
     paddingRight: 16,
+  },
+  languageLabelArabic: {
+    fontFamily: TYPOGRAPHY.arabic,
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
   switchTrack: {
     width: 48,

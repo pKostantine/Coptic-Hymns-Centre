@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
+import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import Icon from './Icon';
 
 interface BottomTabBarProps {
@@ -11,16 +12,24 @@ interface BottomTabBarProps {
 
 export default function BottomTabBar({ active }: BottomTabBarProps) {
   const router = useRouter();
+  const { preferences } = useReadingPreferences();
+  const isArabic = preferences.appLanguage === 'ar';
+  const labels = isArabic
+    ? { books: 'الكتب', settings: 'إعدادات التطبيق' }
+    : { books: 'Books', settings: 'App Settings' };
+  const labelStyle = [styles.tabLabel, isArabic && styles.tabLabelArabic];
 
   return (
     <View style={styles.bar}>
-      <Pressable accessibilityLabel="Books" style={styles.tab} onPress={() => router.replace('/')}>
+      <Pressable accessibilityLabel={labels.books} style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]} onPress={() => router.replace('/')}>
+        {active === 'books' ? <View style={styles.activeIndicator} /> : null}
         <Icon name="library-outline" size={27} color={active === 'books' ? COLORS.gold : COLORS.muted} />
-        <Text style={[styles.tabLabel, active === 'books' && styles.tabLabelActive]}>Books</Text>
+        <Text style={[labelStyle, active === 'books' && styles.tabLabelActive]}>{labels.books}</Text>
       </Pressable>
-      <Pressable accessibilityLabel="App Settings" style={styles.tab} onPress={() => router.replace('/app-settings')}>
+      <Pressable accessibilityLabel={labels.settings} style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]} onPress={() => router.replace('/app-settings')}>
+        {active === 'settings' ? <View style={styles.activeIndicator} /> : null}
         <Icon name="settings-outline" size={27} color={active === 'settings' ? COLORS.gold : COLORS.muted} />
-        <Text style={[styles.tabLabel, active === 'settings' && styles.tabLabelActive]}>App Settings</Text>
+        <Text style={[labelStyle, active === 'settings' && styles.tabLabelActive]}>{labels.settings}</Text>
       </Pressable>
     </View>
   );
@@ -29,9 +38,17 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
 const styles = StyleSheet.create({
   bar: {
     backgroundColor: COLORS.navy,
-    borderTopColor: COLORS.gold,
+    borderTopColor: COLORS.border,
     borderTopWidth: 1,
     flexDirection: 'row',
+  },
+  activeIndicator: {
+    backgroundColor: COLORS.gold,
+    height: 3,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   tab: {
     alignItems: 'center',
@@ -40,12 +57,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 0,
     paddingVertical: 10,
+    position: 'relative',
+  },
+  tabPressed: {
+    backgroundColor: COLORS.surfaceSoft,
   },
   tabLabel: {
     color: COLORS.muted,
     fontFamily: TYPOGRAPHY.title,
     fontSize: 12,
     fontWeight: '700',
+  },
+  tabLabelArabic: {
+    fontFamily: TYPOGRAPHY.arabic,
+    textAlign: 'center',
+    writingDirection: 'rtl',
   },
   tabLabelActive: {
     color: COLORS.gold,

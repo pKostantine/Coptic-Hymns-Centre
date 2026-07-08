@@ -22,7 +22,7 @@ interface CategoryCardProps {
   showArabic?: boolean;
 }
 
-/** CHC CategoryCard — ported 1:1 from CategoryCard.js: main-menu row with a generic library-outline icon chip. */
+/** CHC CategoryCard — main-menu row with a single open-book icon chip. */
 export default function CategoryCard({ title, arabic, onPress, showEnglish = true, showArabic: showArabicProp = true }: CategoryCardProps) {
   const showArabic = showArabicProp && Boolean(arabic);
   const showEnglishTitle = showEnglish;
@@ -31,7 +31,7 @@ export default function CategoryCard({ title, arabic, onPress, showEnglish = tru
   return (
     <Pressable style={({ pressed }) => [styles.card, SHADOWS.card, pressed && { opacity: 0.82 }]} onPress={onPress}>
       <View style={styles.iconWrap}>
-        <Icon name="library-outline" size={24} color={COLORS.gold} />
+        <Icon name="book" size={24} color={COLORS.gold} />
       </View>
       <View style={styles.content}>
         <View style={styles.titleTable}>

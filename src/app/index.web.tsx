@@ -29,18 +29,22 @@ export default function MainMenuWeb() {
   const iconSize = isMobileWeb ? 20 : 26;
   const showEnglish = preferences.appLanguage === 'en';
   const showArabic = preferences.appLanguage === 'ar';
+  const appTitle = showArabic ? 'كوبتك هيمنز سنتر' : 'Coptic Hymns Centre';
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
-        <title>Coptic Hymns Centre</title>
+        <title>{appTitle}</title>
       </Head>
 
       <View style={[styles.header, isMobileWeb && styles.headerMobile]}>
         <View style={styles.brand}>
           <Image source={require('../../assets/images/CHC_sm_web.png')} style={[styles.logo, isMobileWeb && styles.logoMobile]} />
-          <Text style={[styles.brandText, isMobileWeb && styles.brandTextMobile]} numberOfLines={1}>
-            Coptic Hymns Centre
+          <Text
+            style={[styles.brandText, isMobileWeb && styles.brandTextMobile, showArabic && styles.brandTextArabic]}
+            numberOfLines={1}
+          >
+            {appTitle}
           </Text>
         </View>
         <View style={styles.toolbar}>
@@ -146,6 +150,11 @@ const styles = StyleSheet.create({
   },
   brandTextMobile: {
     fontSize: 16,
+  },
+  brandTextArabic: {
+    fontFamily: TYPOGRAPHY.arabic,
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
   toolbar: {
     flexDirection: 'row',

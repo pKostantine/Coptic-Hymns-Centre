@@ -40,7 +40,7 @@ export default function CategoryCard({ title, arabic, onPress, showEnglish = tru
       onPress={onPress}
     >
       <View style={[styles.iconWrap, isMobileWeb && styles.iconWrapMobile]}>
-        <Icon name="library-outline" size={isMobileWeb ? 20 : 26} color={COLORS.gold} />
+        <Icon name="book" size={isMobileWeb ? 20 : 26} color={COLORS.gold} />
       </View>
       <View style={[styles.titleGroup, isMobileWeb && styles.titleGroupMobile]}>
         {showEnglish ? (

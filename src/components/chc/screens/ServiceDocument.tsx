@@ -107,11 +107,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     // a pure client-side re-render (DocumentSurface/documentHtml.ts filter by
     // it directly) and never needs to re-fetch — that's why it's fixed here
     // instead of reading preferences.bishopPresent, and not in the deps below.
+    // CopticGospelRite gets the exact same treatment, but only for GOSPEL_RITE
+    // splices specifically (see hydrateWholeTableInlineNested in
+    // hymnLibrary.js) — the value passed here is irrelevant since that
+    // function always hydrates both states itself, so it's fixed too and
+    // copticGospelRite (session toggle state) isn't a dep below either.
     hydrateSupabaseServiceHymn(
       schema,
       table,
       effectiveDate,
-      { BishopPresent: true, CopticGospelRite: copticGospelRite, ...extraContext },
+      { BishopPresent: true, CopticGospelRite: false, ...extraContext },
       isVespersService ? vespersEffectiveDate : undefined,
     )
       .then((result) => {
@@ -124,7 +129,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, copticGospelRite, extraContext]);
+  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, extraContext]);
 
   // The scrolling WebView reader has no equivalent "seed the initial prop"
   // option (scrollToSection is imperative and needs the WebView mounted

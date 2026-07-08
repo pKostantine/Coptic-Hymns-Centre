@@ -21,13 +21,17 @@ export default function MainMenu() {
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const showEnglish = preferences.appLanguage === 'en';
   const showArabic = preferences.appLanguage === 'ar';
+  const appTitle = showArabic ? 'كوبتك هيمنز سنتر' : 'Coptic Hymns Centre';
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
-        <title>Coptic Hymns Centre</title>
+        <title>{appTitle}</title>
       </Head>
-      <AppHeader title="Coptic Hymns Centre" />
+      <AppHeader
+        title={{ english: 'Coptic Hymns Centre', arabic: 'كوبتك هيمنز سنتر' }}
+        visibleLanguages={{ english: showEnglish, arabic: showArabic }}
+      />
 
       <View style={styles.actionRow}>
         {shouldShowFullscreen ? (
