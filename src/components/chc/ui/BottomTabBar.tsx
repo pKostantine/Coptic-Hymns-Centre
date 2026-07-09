@@ -59,9 +59,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     position: 'relative',
   },
-  tabPressed: {
-    backgroundColor: COLORS.surfaceSoft,
-  },
   tabLabel: {
     color: COLORS.muted,
     fontFamily: TYPOGRAPHY.title,
