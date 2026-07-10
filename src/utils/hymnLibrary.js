@@ -20,6 +20,19 @@ export const SUBDOCUMENT_MAP = {
   PRAXIS_RESPONSE: { schema: "praxis_response", table: "praxis_response" },
   HYMN_OF_THE_INTERCESSIONS: { schema: "hymn_of_the_intercessions", table: "hymn_of_the_intercessions" },
   VERSES_OF_THE_CYMBALS: { schema: "verses_of_the_cymbals", table: "verses_of_the_cymbals" },
+  // The intro/reading/conclusion wrapper tables for each epistle-style
+  // reading — PAULINE_EPISTLE/CATHOLIC_EPISTLE/PRAXIS are the "Inline"
+  // (English-only) variant spliced directly into the document flow;
+  // COPTIC_PAULINE_EPISTLE/COPTIC_CATHOLIC_EPISTLE/COPTIC_PRAXIS are the
+  // "Subdocument" (Coptic-included) variant opened as its own button/modal.
+  // Each table's own middle row (PAULINE_EPISTLE_WITH/WITHOUT_COPTIC etc.,
+  // see READING_SENTINEL_MAP) resolves the actual day's scripture text.
+  PAULINE_EPISTLE: { schema: "readings", table: "pauline_epistle" },
+  CATHOLIC_EPISTLE: { schema: "readings", table: "catholic_epistle" },
+  PRAXIS: { schema: "readings", table: "praxis" },
+  COPTIC_PAULINE_EPISTLE: { schema: "readings", table: "coptic_pauline_epistle" },
+  COPTIC_CATHOLIC_EPISTLE: { schema: "readings", table: "coptic_catholic_epistle" },
+  COPTIC_PRAXIS: { schema: "readings", table: "coptic_praxis" },
   SEASONAL_LITURGY_HYMNS: null, // not yet in database — "seasonal_liturgy_hymns" is not an exposed schema/table
   THIRD_HOUR: { schema: "agpeya", table: "third_hour" },
   SIXTH_HOUR: { schema: "agpeya", table: "sixth_hour" },
@@ -79,13 +92,7 @@ function buildGospelRiteToggleSection(hymnKey, anchorId) {
 // an unmapped Subdocument as "not built yet".
 export const READING_SENTINELS = new Set([
   "PROPHECIES",
-  "CATHOLIC_EPISTLE",
-  "COPTIC_CATHOLIC_EPISTLE",
-  "COPTIC_PAULINE_EPISTLE",
-  "COPTIC_PRAXIS",
   "COPTIC_READINGS",
-  "PAULINE_EPISTLE",
-  "PRAXIS",
   "PSALM_RESPONSES",
   "SYNAXARIUM",
   "LITURGY_PSALM_WITH_COPTIC",
@@ -98,6 +105,17 @@ export const READING_SENTINELS = new Set([
   "VESPERS_GOSPEL_WITHOUT_COPTIC",
   "VESPERS_PSALM_WITH_COPTIC",
   "VESPERS_PSALM_WITHOUT_COPTIC",
+  // The actual scripture-text sentinels nested inside readings.pauline_epistle/
+  // catholic_epistle/praxis/coptic_* (see SUBDOCUMENT_MAP) — everything
+  // around them (intro/conclusion, title, minimization) now comes from
+  // those tables directly; only the verses themselves still need live
+  // day-of resolution.
+  "PAULINE_EPISTLE_WITH_COPTIC",
+  "PAULINE_EPISTLE_WITHOUT_COPTIC",
+  "CATHOLIC_EPISTLE_WITH_COPTIC",
+  "CATHOLIC_EPISTLE_WITHOUT_COPTIC",
+  "PRAXIS_WITH_COPTIC",
+  "PRAXIS_WITHOUT_COPTIC",
 ]);
 
 // Maps each reading sentinel to the (service, reading_type) pair it needs
@@ -108,12 +126,12 @@ export const READING_SENTINELS = new Set([
 // resolve to nothing rather than guessing wrong.
 const READING_SENTINEL_MAP = {
   PROPHECIES: { service: "Matins", readingType: "Prophecy", withCoptic: true },
-  CATHOLIC_EPISTLE: { service: "Catholic", readingType: "Catholic Epistle", withCoptic: true },
-  COPTIC_CATHOLIC_EPISTLE: { service: "Catholic", readingType: "Catholic Epistle", withCoptic: true },
-  COPTIC_PAULINE_EPISTLE: { service: "Pauline", readingType: "Pauline Epistle", withCoptic: true },
-  PAULINE_EPISTLE: { service: "Pauline", readingType: "Pauline Epistle", withCoptic: true },
-  COPTIC_PRAXIS: { service: "Praxis", readingType: "Praxis", withCoptic: true },
-  PRAXIS: { service: "Praxis", readingType: "Praxis", withCoptic: true },
+  PAULINE_EPISTLE_WITH_COPTIC: { service: "Pauline", readingType: "Pauline Epistle", withCoptic: true },
+  PAULINE_EPISTLE_WITHOUT_COPTIC: { service: "Pauline", readingType: "Pauline Epistle", withCoptic: false },
+  CATHOLIC_EPISTLE_WITH_COPTIC: { service: "Catholic", readingType: "Catholic Epistle", withCoptic: true },
+  CATHOLIC_EPISTLE_WITHOUT_COPTIC: { service: "Catholic", readingType: "Catholic Epistle", withCoptic: false },
+  PRAXIS_WITH_COPTIC: { service: "Praxis", readingType: "Praxis", withCoptic: true },
+  PRAXIS_WITHOUT_COPTIC: { service: "Praxis", readingType: "Praxis", withCoptic: false },
   LITURGY_PSALM_WITH_COPTIC: { service: "Liturgy", readingType: "Psalm", withCoptic: true },
   LITURGY_PSALM_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Psalm", withCoptic: false },
   MATINS_GOSPEL_WITH_COPTIC: { service: "Matins", readingType: "Gospel", withCoptic: true },
@@ -140,17 +158,39 @@ function getReadingsForDate(isoDate) {
   return promise;
 }
 
-/** Flattens a get_readings_for_date entry's resolved_verses into plain verse objects, dropping Coptic text for the "WithoutCoptic" variants. */
-function buildReadingVerses(readingRow, withCoptic) {
+/**
+ * Flattens a get_readings_for_date entry's resolved_verses into plain verse
+ * objects, dropping Coptic text for the "WithoutCoptic" variants. Every
+ * reading shows a plain verse-number gold badge (bibleVerseNumber), same as
+ * the Bible reader — never a chapter number, even when the reading spans
+ * multiple chapters (the verse numbers just keep counting straight through,
+ * with no visual break at the chapter boundary). The Psalm reading is the
+ * one exception: it's forced into a single unbroken paragraph with no verse
+ * numbers or line breaks at all, regardless of how many verses it spans.
+ */
+function buildReadingVerses(readingRow, withCoptic, isPsalm) {
   if (!readingRow) return [];
-  return (readingRow.resolved_verses || []).flatMap((segment) =>
-    (segment.verses || []).map((v) => ({
-      english: `${v.chapter_number}:${v.verse_number} ${v.english || ""}`.trim(),
-      coptic: withCoptic ? v.coptic || "" : "",
-      arabic: v.arabic || "",
-      type: "text",
-    })),
-  );
+  const flatVerses = (readingRow.resolved_verses || []).flatMap((segment) => segment.verses || []);
+  if (!flatVerses.length) return [];
+
+  if (isPsalm) {
+    return [
+      {
+        english: flatVerses.map((v) => v.english || "").filter(Boolean).join(" "),
+        coptic: withCoptic ? flatVerses.map((v) => v.coptic || "").filter(Boolean).join(" ") : "",
+        arabic: flatVerses.map((v) => v.arabic || "").filter(Boolean).join(" "),
+        type: "text",
+      },
+    ];
+  }
+
+  return flatVerses.map((v) => ({
+    english: v.english || "",
+    coptic: withCoptic ? v.coptic || "" : "",
+    arabic: v.arabic || "",
+    type: "text",
+    bibleVerseNumber: String(v.verse_number),
+  }));
 }
 
 async function resolveReadingSentinelVerses(sentinel, isoDate) {
@@ -158,7 +198,7 @@ async function resolveReadingSentinelVerses(sentinel, isoDate) {
   if (!mapping) return [];
   const readings = await getReadingsForDate(isoDate);
   const match = readings.find((r) => r.service === mapping.service && r.reading_type === mapping.readingType);
-  return buildReadingVerses(match, mapping.withCoptic);
+  return buildReadingVerses(match, mapping.withCoptic, mapping.readingType === "Psalm");
 }
 
 /** Same as resolveReadingSentinelVerses but wraps the result as a titled section (for Subdocument/order-table-level Inline placements, which need a section object, not a bare verse list). */
@@ -896,6 +936,17 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
     }
 
     if (section.isInlinePlacement) {
+      // A reading-resolution sentinel (e.g. PAULINE_EPISTLE_WITHOUT_COPTIC,
+      // nested inside readings.pauline_epistle between its introduction and
+      // conclusion rows) needs the day's actual scripture text, not a
+      // schema.table lookup — same live resolution as the Subdocument branch
+      // above, just producing an inline section instead of a button.
+      if (READING_SENTINELS.has(section.hymn_key) && isoDate) {
+        const readingSection = await resolveReadingSentinelSection(section, isoDate);
+        if (readingSection) hydrated.push(readingSection);
+        continue;
+      }
+
       // An order-table-level Inline placeholder (item_type = "Inline" on the
       // order row itself, hymn_key an all-caps sentinel like GOSPEL_RITE or
       // VERSES_OF_THE_CYMBALS) is structurally identical to a Subdocument
@@ -947,6 +998,18 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
 
       if (verse.type === "inlinePlaceholder") {
         if (depth >= 3) continue;
+
+        // A reading-resolution sentinel embedded mid-verse (e.g. gospel_rite's
+        // "gospel"/"copticPsalm" hymns splicing in VESPERS_GOSPEL_WITH_COPTIC)
+        // needs the day's live scripture text — spliced silently into this
+        // hymn's own flowing verse list alongside its surrounding lines
+        // (there's no hymn_titles row for a sentinel like this to show a
+        // title from, so it never breaks into its own section).
+        if (READING_SENTINELS.has(verse.inlineHymnKey) && isoDate) {
+          const readingVerses = await resolveReadingSentinelVerses(verse.inlineHymnKey, isoDate);
+          verses.push(...readingVerses);
+          continue;
+        }
 
         const wholeTableTarget = resolveWholeTableInlineTarget(verse.inlineHymnKey);
         if (wholeTableTarget) {

@@ -21,12 +21,12 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
 
   return (
     <View style={styles.bar}>
-      <Pressable accessibilityLabel={labels.books} style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]} onPress={() => router.replace('/')}>
+      <Pressable accessibilityLabel={labels.books} style={styles.tab} onPress={() => router.replace('/')}>
         {active === 'books' ? <View style={styles.activeIndicator} /> : null}
         <Icon name="library-outline" size={27} color={active === 'books' ? COLORS.gold : COLORS.muted} />
         <Text style={[labelStyle, active === 'books' && styles.tabLabelActive]}>{labels.books}</Text>
       </Pressable>
-      <Pressable accessibilityLabel={labels.settings} style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]} onPress={() => router.replace('/app-settings')}>
+      <Pressable accessibilityLabel={labels.settings} style={styles.tab} onPress={() => router.replace('/app-settings')}>
         {active === 'settings' ? <View style={styles.activeIndicator} /> : null}
         <Icon name="settings-outline" size={27} color={active === 'settings' ? COLORS.gold : COLORS.muted} />
         <Text style={[labelStyle, active === 'settings' && styles.tabLabelActive]}>{labels.settings}</Text>

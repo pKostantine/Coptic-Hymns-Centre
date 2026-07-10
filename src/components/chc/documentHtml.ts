@@ -640,7 +640,7 @@ function renderVerse(
   const copticHiddenByToggle =
     (verse.type === 'recitedPrayer' || verse.type === 'silentPrayer' || verse.type === 'silentComment') &&
     !copticRecitedPrayers;
-  const copticText = copticHiddenByToggle ? '' : verse.coptic || '';
+  const copticText = copticHiddenByToggle ? '' : formatCopticNumbers(verse.coptic || '');
 
   const languages: { className: string; key: keyof VisibleColumns; text: string; speakerLabel?: string; speakerClass?: string }[] = [
     { className: 'english', key: 'english' as const, text: verse.english || '', speakerLabel: rubric?.english, speakerClass: rubric?.class },
@@ -688,7 +688,9 @@ function renderVerse(
       const verseNumberText = verse.bibleVerseNumber
         ? language.key === 'arabic'
           ? formatArabicDigits(verse.bibleVerseNumber)
-          : verse.bibleVerseNumber
+          : language.key === 'coptic'
+            ? formatCopticNumbers(verse.bibleVerseNumber)
+            : verse.bibleVerseNumber
         : '';
       return `
         <div class="cell">
@@ -762,6 +764,22 @@ const EASTERN_ARABIC_DIGITS: Record<string, string> = {
 
 function formatArabicDigits(text: string) {
   return String(text || '').replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit);
+}
+
+const COPTIC_DIGITS: Record<number, string> = { 1: 'ⲁ̅', 2: 'ⲃ̅', 3: 'ⲅ̅', 4: 'ⲇ̅', 5: 'ⲉ̅', 6: 'Ⲋ', 7: 'ⲍ̅', 8: 'ⲏ̅', 9: 'ⲑ̅' };
+const COPTIC_TENS: Record<number, string> = { 1: 'ⲓ̅', 2: 'ⲕ̅', 3: 'ⲗ̅', 4: 'ⲙ̅', 5: 'ⲛ̅', 6: 'ⲝ̅', 7: 'ⲟ̅', 8: 'ⲡ̅', 9: 'ϥ̅' };
+const COPTIC_HUNDREDS: Record<number, string> = { 1: 'ⲣ̅', 2: 'ⲥ̅', 3: 'ⲧ̅', 4: 'ⲩ̅', 5: 'ⲫ̅', 6: 'ⲭ̅', 7: 'ⲯ̅', 8: 'ⲱ̅', 9: 'ϣ̅' };
+
+function formatCopticNumber(value: number): string {
+  if (!Number.isInteger(value) || value <= 0 || value > 999) return String(value);
+  const hundreds = Math.floor(value / 100);
+  const tens = Math.floor((value % 100) / 10);
+  const ones = value % 10;
+  return `${COPTIC_HUNDREDS[hundreds] || ''}${COPTIC_TENS[tens] || ''}${COPTIC_DIGITS[ones] || ''}`;
+}
+
+function formatCopticNumbers(text: string) {
+  return String(text || '').replace(/\d+/g, (value) => formatCopticNumber(Number(value)));
 }
 
 function escapeHtml(text: string) {

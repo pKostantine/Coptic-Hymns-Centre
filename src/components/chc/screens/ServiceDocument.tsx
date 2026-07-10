@@ -15,6 +15,7 @@ import { useReadingPreferences } from '../../../context/ReadingPreferencesContex
 import { useCalendar } from '../../../context/CalendarContext';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
+import { getEpistleConditionFlags } from '../../../utils/readingsService';
 import { getLastDocumentPosition, setLastDocumentPosition } from '../../../utils/lastDocumentPosition';
 import { goBack } from '../../../utils/navigation';
 
@@ -112,13 +113,25 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     // hymnLibrary.js) — the value passed here is irrelevant since that
     // function always hydrates both states itself, so it's fixed too and
     // copticGospelRite (session toggle state) isn't a dep below either.
-    hydrateSupabaseServiceHymn(
-      schema,
-      table,
-      effectiveDate,
-      { BishopPresent: true, CopticGospelRite: false, ...extraContext },
-      isVespersService ? vespersEffectiveDate : undefined,
-    )
+    //
+    // liturgy_of_the_word is the one document that references the readings
+    // schema's Pauline/Catholic Epistle inline splices — those need today's
+    // PaulineEpistleRomans/CatholicEpistle1Peter-style condition flags (see
+    // getEpistleConditionFlags) to pick the right introduction line, resolved
+    // here and merged into extraContext before hydrating.
+    const needsEpistleFlags = schema === 'liturgy' && table === 'liturgy_of_the_word';
+    const epistleFlagsPromise = needsEpistleFlags ? getEpistleConditionFlags(effectiveDate) : Promise.resolve({});
+
+    epistleFlagsPromise
+      .then((epistleFlags) =>
+        hydrateSupabaseServiceHymn(
+          schema,
+          table,
+          effectiveDate,
+          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...extraContext },
+          isVespersService ? vespersEffectiveDate : undefined,
+        ),
+      )
       .then((result) => {
         if (!cancelled) setSections(result as DocumentSection[]);
       })

@@ -193,6 +193,52 @@ async function resolveReadingRules(isoDate: string, activeFlags: Set<string>): P
   return Array.from(resolved.values());
 }
 
+// ─── Book-specific condition flags for readings.hymn_texts introductions ───
+// readings.hymn_texts's introductionToThePaulineEpistle/introductionToTheCatholicEpistle
+// rows each carry a condition like "PaulineEpistleRomans"/"CatholicEpistle1Peter"
+// selecting the one line matching today's actual epistle. These flags don't
+// come from any calendar RPC — they're derived here from the same
+// reading_rules resolution as everything else, converting the winning rule's
+// book_key (e.g. "first_corinthians") into the PascalCase suffix the DB's
+// condition strings use ("1Corinthians"). Praxis has no book-specific intro
+// (always "the Acts of our fathers the apostles"), so it needs no flag.
+const BOOK_KEY_NUMERAL_WORDS: Record<string, string> = { first: '1', second: '2', third: '3' };
+
+function bookKeyToConditionSuffix(bookKey: string): string {
+  return bookKey
+    .split('_')
+    .map((part) => BOOK_KEY_NUMERAL_WORDS[part] || part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+}
+
+/** Shared by getEpistleConditionFlags (fetches its own rules) and getReadingsForDate (already has rules resolved, so it calls this directly instead of re-fetching). */
+async function computeEpistleConditionFlagsFromRules(rules: ReadingRule[]): Promise<Record<string, boolean>> {
+  const flags: Record<string, boolean> = {};
+  await Promise.all(
+    [
+      { rule: rules.find((r) => r.service === 'Pauline' && r.reading_type === 'Pauline Epistle'), prefix: 'PaulineEpistle' },
+      { rule: rules.find((r) => r.service === 'Catholic' && r.reading_type === 'Catholic Epistle'), prefix: 'CatholicEpistle' },
+    ].map(async ({ rule, prefix }) => {
+      if (!rule) return;
+      const firstSegment = splitReadingReference(rule.reading_reference)[0];
+      if (!firstSegment) return;
+      const { bookNum } = parseSegment(firstSegment);
+      const bookKey = await getBookKeyByCalendarNumber(bookNum);
+      if (!bookKey) return;
+      flags[`${prefix}${bookKeyToConditionSuffix(bookKey)}`] = true;
+    }),
+  );
+  return flags;
+}
+
+/** Resolves the day's { PaulineEpistleRomans: true } / { CatholicEpistle1Peter: true } -style condition flags — pass straight through as extraContext to hydrateSupabaseServiceHymn so readings.hymn_texts's book-specific introduction lines pick the right one. */
+export async function getEpistleConditionFlags(date: Date): Promise<Record<string, boolean>> {
+  const isoDate = toIsoDateString(date);
+  const activeFlags = await getActiveFlags(isoDate);
+  const rules = await resolveReadingRules(isoDate, activeFlags);
+  return computeEpistleConditionFlagsFromRules(rules);
+}
+
 // ─── Step 3: parse reading_reference and fetch verses ──────────────────────
 
 interface ReadingSegmentRange {
@@ -383,19 +429,40 @@ function getReadingBookTitle(bookNum: number): Promise<{ english: string; arabic
 
 // ─── Step 5: build a DocumentSection per reading ───────────────────────────
 
+// Pauline/Catholic Epistle and Praxis are no longer built here — see
+// pushReadingsTable in getReadingsForDate — so only the reading types still
+// resolved through buildReadingSection need a label.
 const READING_TYPE_LABELS: Record<string, { english: string; arabic: string }> = {
   Psalm: { english: 'Psalm', arabic: 'مزمور' },
   Gospel: { english: 'Gospel', arabic: 'إنجيل' },
-  'Pauline Epistle': { english: 'Pauline Epistle', arabic: 'البولس' },
-  'Catholic Epistle': { english: 'Catholic Epistle', arabic: 'الكاثوليكون' },
-  Praxis: { english: 'Praxis', arabic: 'الإبركسيس' },
   Prophecy: { english: 'Prophecy', arabic: 'النبوخة' },
 };
 
+/**
+ * Every reading shows a plain verse-number gold badge (bibleVerseNumber),
+ * same as the Bible reader — never a chapter number, even when the reading
+ * spans multiple chapters. The Psalm reading is the one exception: it's
+ * forced into a single unbroken paragraph with no verse numbers or line
+ * breaks at all, regardless of how many verses it spans — mirrors
+ * buildReadingVerses in hymnLibrary.js, which applies the exact same rule
+ * to readings resolved through a READING_SENTINEL_MAP sentinel.
+ */
 async function buildReadingSection(rule: ReadingRule): Promise<{ section: DocumentSection; bookKey: string | null }> {
   const { verses, firstBookNum } = await fetchReadingReferenceVerses(rule.reading_reference);
   const bookTitle = firstBookNum != null ? await getReadingBookTitle(firstBookNum) : null;
   const label = READING_TYPE_LABELS[rule.reading_type] || { english: rule.reading_type, arabic: rule.reading_type };
+  const isPsalm = rule.reading_type === 'Psalm';
+
+  const psalmVerses = isPsalm && verses.length
+    ? [
+        {
+          english: verses.map((v) => v.english).filter(Boolean).join(' '),
+          coptic: verses.map((v) => v.coptic || '').filter(Boolean).join(' '),
+          arabic: verses.map((v) => v.arabic).filter(Boolean).join(' '),
+          type: 'text',
+        },
+      ]
+    : null;
 
   const section: DocumentSection = {
     id: rule.reading_rule_id,
@@ -403,13 +470,15 @@ async function buildReadingSection(rule: ReadingRule): Promise<{ section: Docume
       english: bookTitle ? `${label.english} according to ${bookTitle.english}` : label.english,
       arabic: bookTitle ? `${label.arabic} ${bookTitle.arabic}` : label.arabic,
     },
-    verses: verses.map((v) => ({
-      english: v.english,
-      coptic: v.coptic || '',
-      arabic: v.arabic,
-      type: 'text',
-      bibleVerseNumber: `${v.displayChapter}:${v.displayVerse}`,
-    })),
+    verses:
+      psalmVerses ??
+      verses.map((v) => ({
+        english: v.english,
+        coptic: v.coptic || '',
+        arabic: v.arabic,
+        type: 'text',
+        bibleVerseNumber: String(v.displayVerse),
+      })),
     forceWhiteVerses: true,
   };
 
@@ -427,7 +496,13 @@ async function getGospelRiteSections(date: Date, serviceFlag: 'Vespers' | 'Matin
     BishopPresent: true,
     [serviceFlag]: true,
   })) as DocumentSection[];
-  return substituteAuthorInSections(sections, gospelBookKey);
+  const authoredSections = substituteAuthorInSections(sections, gospelBookKey);
+  // Vespers/Matins/Liturgy each hydrate the same gospel_rite.gospel_rite
+  // table, so their sections carry the same hymn_key-derived ids — this
+  // function runs 3 times into one flat document, so namespace by
+  // serviceFlag or React (Slideshow's keys) and the WebView's
+  // data-section-id both end up with duplicates across the 3 calls.
+  return authoredSections.map((section) => ({ ...section, id: `${serviceFlag}-${section.id}` }));
 }
 
 // ─── Prophecy placeholder (Lenten Matins only — content not in the DB yet) ──
@@ -494,6 +569,18 @@ export async function getReadingsForDate(date: Date): Promise<ReadingsResult> {
     sections.push(...riteSections);
   }
 
+  // Pauline/Catholic Epistle and Praxis now come from the readings schema's
+  // own order tables (intro + live scripture text + conclusion) via the
+  // standard hydration pipeline, same as any other document — see
+  // SUBDOCUMENT_MAP/READING_SENTINEL_MAP in hymnLibrary.js. This replaces
+  // the old bare-verse-list buildReadingSection path for just these three;
+  // Psalm/Gospel/Prophecy have no readings-schema table yet and stay on it.
+  const epistleFlags = await computeEpistleConditionFlagsFromRules(rules);
+  async function pushReadingsTable(table: 'pauline_epistle' | 'catholic_epistle' | 'praxis') {
+    const tableSections = (await hydrateSupabaseServiceHymn('readings', table, date, epistleFlags)) as DocumentSection[];
+    sections.push(...tableSections);
+  }
+
   await pushReading('Vespers', 'Psalm');
   const vespersGospelBook = await (async () => {
     // Gospel Rite must be spliced in *before* the Gospel text, so resolve the
@@ -513,9 +600,9 @@ export async function getReadingsForDate(date: Date): Promise<ReadingsResult> {
   await pushReading('Matins', 'Gospel');
   await pushReading('Matins', 'Prophecy');
 
-  await pushReading('Pauline', 'Pauline Epistle');
-  await pushReading('Catholic', 'Catholic Epistle');
-  await pushReading('Praxis', 'Praxis');
+  await pushReadingsTable('pauline_epistle');
+  await pushReadingsTable('catholic_epistle');
+  await pushReadingsTable('praxis');
   await pushReading('Liturgy', 'Psalm');
   const liturgyGospelBook = await (async () => {
     const rule = byKey.get('Liturgy|Gospel');

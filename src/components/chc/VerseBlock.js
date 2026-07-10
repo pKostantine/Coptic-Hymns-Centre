@@ -130,27 +130,25 @@ export default function VerseBlock({
           styles: [styles.arabic],
           textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
         },
-      ]).filter(
-    // A toggled-on language always keeps its column, even when this specific
-    // verse (or this specific segment of a verse split across multiple
-    // slideshow slides) has no text in it — the column just renders blank.
-    // Collapsing a column per-verse/per-segment made adjacent rows use
-    // different column counts/widths whenever one row's Coptic or Arabic
-    // happened to be empty, so the Arabic column's left edge would jump
-    // left/right between rows, reading as a stray gap or "imaginary extra
-    // column". Documents should read like a fixed-column table — see
-    // documentHtml.ts, which applies the same fixed-column philosophy to the
-    // WebView reader.
-    (language) =>
-      (verse.invincibleCoptic ||
-        visibleLanguages[language.key] ||
-        (language.key === "coptic" && verse.forceCopticVisible)) &&
-      (verse.invincibleCoptic ||
-        !isRecitedPrayer ||
-        language.key !== "coptic" ||
-        visibleLanguages.copticRecitedPrayers ||
-        verse.forceCopticVisible),
-  );
+      ]).filter((language) => {
+    // A language column collapses per verse (not per whole hymn) whenever
+    // this specific verse has no text in it — matching documentHtml.ts's
+    // scroll-mode behavior exactly, so a Coptic-less verse (e.g. a
+    // Reader-labeled verse with no Coptic in the DB) doesn't reserve a
+    // blank column here while correctly dropping it in scroll mode.
+    if (verse.invincibleCoptic) return true;
+
+    if (language.key === "coptic") {
+      const copticHiddenByToggle =
+        isRecitedPrayer && !visibleLanguages.copticRecitedPrayers && !verse.forceCopticVisible;
+      if (copticHiddenByToggle) return false;
+      if (!visibleLanguages.coptic && !verse.forceCopticVisible) return false;
+      return Boolean(language.text && language.text.trim());
+    }
+
+    if (!visibleLanguages[language.key]) return false;
+    return Boolean((language.text && language.text.trim()) || language.speakerLabel);
+  });
   const rowColumnWidth = tableWidth / Math.max(rowLanguages.length, 1);
   const isCenteredAcrossPage = Boolean(verse.centeredAcrossPage);
   const hasSpeakerLabel = rowLanguages.some((language) => language.speakerLabel);

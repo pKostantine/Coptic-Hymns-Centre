@@ -76,7 +76,7 @@ export function buildBibleChapterHtml({
           }
           return [
             `<div class="cell preface-cell ${language}" dir="${language === 'arabic' ? 'rtl' : 'ltr'}">`,
-            `<span class="verse-text">${escapeHtml(text || '')}</span>`,
+            `<span class="verse-text">${escapeHtml(formatVerseText(text || '', language, false))}</span>`,
             '</div>',
           ].join('');
         })
@@ -519,7 +519,8 @@ function formatVerseText(text: string, language: BibleLanguageKey, isFirstCoptic
   if (language === 'arabic') return formatArabicDigits(text);
   if (language === 'coptic') {
     const normalized = lowercaseCopticCharacters(String(text || ''));
-    return isFirstCopticVerse ? uppercaseFirstCopticCharacter(normalized) : normalized;
+    const withCopticNumbers = formatCopticNumbers(normalized);
+    return isFirstCopticVerse ? uppercaseFirstCopticCharacter(withCopticNumbers) : withCopticNumbers;
   }
   return formatEnglishDisplayText(text);
 }
@@ -561,6 +562,10 @@ function formatCopticNumber(value: number): string {
   const tens = Math.floor((value % 100) / 10);
   const ones = value % 10;
   return `${COPTIC_HUNDREDS[hundreds] || ''}${COPTIC_TENS[tens] || ''}${COPTIC_DIGITS[ones] || ''}`;
+}
+
+function formatCopticNumbers(text: string): string {
+  return String(text || '').replace(/\d+/g, (value) => formatCopticNumber(Number(value)));
 }
 
 function getLanguageFontSize(fontSize: number, language: BibleLanguageKey) {
