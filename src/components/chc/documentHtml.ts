@@ -269,7 +269,7 @@ export function buildDocumentHtml(
       .speaker-label.deacon, .speaker-label.reader { color: ${COLORS.deacon}; }
       .speaker-label.refrain { color: ${COLORS.refrain}; font-style: italic;}
       .bible-verse-number { color: ${COLORS.gold}; font-weight: 700; }
-      .metropolitan { color: ${COLORS.rowBlue}; }
+      .metropolitan { color: ${COLORS.metropolitanBrackets}; }
       .section-title {
         color: ${COLORS.gold};
         font-family: Georgia, serif;

@@ -36,7 +36,8 @@ export const COLORS = {
   silent: '#959ba1',
   silentTitle: '#959ba1',
   refrain: '#8FD19E',
-
+  metropolitanBrackets: '#9cfcff',
+  
   // theme.colors.* shape expected by SlideshowContainer/VerseBlock
   text: '#FFFFFF',
 } as const;
