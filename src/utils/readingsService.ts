@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { hydrateSupabaseServiceHymn } from './hymnLibrary';
 import { mapHebrewPsalmReferenceToSeptuagint, mapSeptuagintPsalmReferenceToHebrew } from './bibleService';
+import { FIXED_FEASTS } from './fixedFeasts';
 import type { DocumentSection } from '../components/chc/documentHtml';
 
 // calendar.reading_rules' Psalm references (calendar book number 19) use
@@ -47,6 +48,7 @@ async function getActiveFlags(isoDate: string): Promise<Set<string>> {
 
 interface CopticDateInfo {
   copticMonth: number;
+  copticMonthName: string;
   copticDay: number;
   weekdayNumber: number;
   sundayOrdinalInCopticMonth: number | null;
@@ -56,13 +58,14 @@ async function getCopticDateInfo(isoDate: string): Promise<CopticDateInfo> {
   const { data, error } = await supabase
     .schema('calendar')
     .from('coptic_date_conversions')
-    .select('coptic_month, coptic_day, weekday_number, sunday_ordinal_in_coptic_month')
+    .select('coptic_month, coptic_month_name, coptic_day, weekday_number, sunday_ordinal_in_coptic_month')
     .eq('gregorian_date', isoDate)
     .maybeSingle();
   if (error) throw new Error(`Unable to load Coptic date info: ${error.message}`);
   if (!data) throw new Error(`No Coptic date conversion found for ${isoDate}`);
   return {
     copticMonth: data.coptic_month,
+    copticMonthName: data.coptic_month_name,
     copticDay: data.coptic_day,
     weekdayNumber: data.weekday_number,
     sundayOrdinalInCopticMonth: data.sunday_ordinal_in_coptic_month,
@@ -140,6 +143,38 @@ async function queryReadingRules(filters: Record<string, string | number>): Prom
   return (data || []) as unknown as ReadingRule[];
 }
 
+/** Highest-priority rule per (service, reading_type) within a single already-chosen tier — a defensive dedupe in case a tier's query ever returns more than one row for the same reading, never a cross-tier comparison. */
+function pickHighestPriorityPerServiceType(rules: ReadingRule[]): ReadingRule[] {
+  const resolved = new Map<string, ReadingRule>();
+  for (const rule of rules) {
+    const key = `${rule.service}|${rule.reading_type}`;
+    const existing = resolved.get(key);
+    if (!existing || rule.priority > existing.priority) {
+      resolved.set(key, rule);
+    }
+  }
+  return Array.from(resolved.values());
+}
+
+/**
+ * The 4 katameros (lectionary) books are checked in a strict priority chain
+ * — not merged by the in-DB `priority` column across cycle_types — only the
+ * one winning tier's rules are ever queried/used:
+ *   1. Holy 50 Days (Pascha through Pentecost) — if today falls anywhere in
+ *      it, that's the only book referenced, full stop.
+ *   2. A fixed-date Feast of the Lord, Nayrouz, or the Feast of the Cross
+ *      (see FIXED_FEASTS) — that day's own Daily reading overrides Lent/
+ *      Sunday even if today would otherwise fall within one of those. The
+ *      Feast of the Cross is a 3-day feast (Thoout 17-19), but FIXED_FEASTS
+ *      only lists day 17 (the feast's first day) — days 18-19 fall straight
+ *      through to the normal chain below, exactly as intended (e.g. if day
+ *      18 is a Sunday, the Sunday katameros takes priority as usual).
+ *   3. Great Lent.
+ *   4. An annual Sunday — only actual Sundays have a Sunday-katameros entry;
+ *      if today is a Sunday with no matching entry, this falls through to
+ *      the Daily book below rather than returning nothing.
+ *   5. The plain Daily katameros — the fallback everything else lands on.
+ */
 async function resolveReadingRules(isoDate: string, activeFlags: Set<string>): Promise<ReadingRule[]> {
   const copticDate = await getCopticDateInfo(isoDate);
   const [lentWeek, pentecostWeek] = await Promise.all([
@@ -147,50 +182,44 @@ async function resolveReadingRules(isoDate: string, activeFlags: Set<string>): P
     getPentecostWeek(isoDate, activeFlags),
   ]);
 
-  const queries: Promise<ReadingRule[]>[] = [
-    queryReadingRules({ cycle_type: 'AnnualDaily', coptic_month: copticDate.copticMonth, coptic_day: copticDate.copticDay }),
-  ];
+  let rules: ReadingRule[];
 
-  if (copticDate.sundayOrdinalInCopticMonth != null) {
-    queries.push(
-      queryReadingRules({
+  if (pentecostWeek != null) {
+    rules = await queryReadingRules({ cycle_type: 'Pentecost', pentecost_week: pentecostWeek, day_of_week: copticDate.weekdayNumber });
+  } else if (
+    FIXED_FEASTS.some((feast) => {
+      if (feast.monthName !== copticDate.copticMonthName || feast.day !== copticDate.copticDay) return false;
+      // Suppressed (e.g. Annunciation falling in Holy Week some years) means
+      // it isn't actually being celebrated today — don't grant feast priority.
+      if (feast.key === 'annunciation' && activeFlags.has('AnnunciationFeastNotCelebratedThisYear')) return false;
+      return true;
+    })
+  ) {
+    rules = await queryReadingRules({ cycle_type: 'AnnualDaily', coptic_month: copticDate.copticMonth, coptic_day: copticDate.copticDay });
+  } else if (lentWeek != null) {
+    rules = await queryReadingRules({ cycle_type: 'GreatLent', lent_week: lentWeek, day_of_week: copticDate.weekdayNumber });
+  } else {
+    rules = [];
+    if (copticDate.sundayOrdinalInCopticMonth != null) {
+      rules = await queryReadingRules({
         cycle_type: 'AnnualSunday',
         coptic_month: copticDate.copticMonth,
         sunday_ordinal: copticDate.sundayOrdinalInCopticMonth,
         day_of_week: copticDate.weekdayNumber,
-      }),
-    );
-  }
-
-  if (lentWeek != null) {
-    queries.push(queryReadingRules({ cycle_type: 'GreatLent', lent_week: lentWeek, day_of_week: copticDate.weekdayNumber }));
-  }
-
-  if (pentecostWeek != null) {
-    queries.push(queryReadingRules({ cycle_type: 'Pentecost', pentecost_week: pentecostWeek, day_of_week: copticDate.weekdayNumber }));
-  }
-
-  const results = await Promise.all(queries);
-  const allRules: ReadingRule[] = results.flat();
-
-  // Annunciation, when suppressed for falling during Holy Week, must not
-  // supply readings — whatever else matches for the day (if anything) wins.
-  if (activeFlags.has('AnnunciationFeastNotCelebratedThisYear')) {
-    const filtered = allRules.filter((rule) => !rule.reading_rule_id.toLowerCase().includes('annunciation'));
-    allRules.length = 0;
-    allRules.push(...filtered);
-  }
-
-  const resolved = new Map<string, ReadingRule>();
-  for (const rule of allRules) {
-    const key = `${rule.service}|${rule.reading_type}`;
-    const existing = resolved.get(key);
-    if (!existing || rule.priority > existing.priority) {
-      resolved.set(key, rule);
+      });
+    }
+    if (!rules.length) {
+      rules = await queryReadingRules({ cycle_type: 'AnnualDaily', coptic_month: copticDate.copticMonth, coptic_day: copticDate.copticDay });
     }
   }
 
-  return Array.from(resolved.values());
+  // Belt-and-braces: even within the winning tier, never let a suppressed
+  // Annunciation reading slip through.
+  if (activeFlags.has('AnnunciationFeastNotCelebratedThisYear')) {
+    rules = rules.filter((rule) => !rule.reading_rule_id.toLowerCase().includes('annunciation'));
+  }
+
+  return pickHighestPriorityPerServiceType(rules);
 }
 
 // ─── Book-specific condition flags for readings.hymn_texts introductions ───
@@ -410,6 +439,55 @@ async function fetchReadingReferenceVerses(reference: string): Promise<{ verses:
   return { verses: verseLists.flat(), firstBookNum: segments[0]?.bookNum ?? null };
 }
 
+/**
+ * Builds the citation-style title for a reading ("Matthew 25:1-13",
+ * "Philippians 1:27-2:11") straight from reading_reference's own segments —
+ * the FIRST segment's start through the LAST segment's end, so a reading
+ * spanning multiple chapters/segments still gets exactly ONE citation, never
+ * one per chapter. For Psalms, the cited chapter:verse is converted to
+ * Septuagint numbering (mapHebrewPsalmReferenceToSeptuagint) rather than the
+ * Masoretic numbering reading_reference itself uses — matching the
+ * Septuagint numbering already native to bible.verses, and deliberately NOT
+ * the Masoretic toDisplayReference conversion used elsewhere in this file
+ * for per-verse display.
+ */
+function buildReadingCitation(reference: string, bookTitle: { english: string; arabic: string }, isPsalm: boolean): { english: string; arabic: string } | null {
+  if (!bookTitle.english && !bookTitle.arabic) return null;
+  const segments = splitReadingReference(reference).map(parseSegment);
+  if (!segments.length) return null;
+  const first = segments[0];
+  const last = segments[segments.length - 1];
+
+  if (segments.length === 1 && first.kind === 'verses') {
+    const converted = isPsalm
+      ? first.verses.map((v) => mapHebrewPsalmReferenceToSeptuagint(first.chapter, v))
+      : first.verses.map((v) => ({ chapter: first.chapter, verse: v }));
+    const chapter = converted[0]?.chapter ?? first.chapter;
+    const verseList = converted.map((c) => c.verse).join(',');
+    return {
+      english: `${bookTitle.english} ${chapter}:${verseList}`.trim(),
+      arabic: `${bookTitle.arabic} ${chapter}:${verseList}`.trim(),
+    };
+  }
+
+  const startRaw = first.kind === 'range' ? { chapter: first.startChapter, verse: first.startVerse } : { chapter: first.chapter, verse: first.verses[0] };
+  const endRaw = last.kind === 'range' ? { chapter: last.endChapter, verse: last.endVerse } : { chapter: last.chapter, verse: last.verses[last.verses.length - 1] };
+  const start = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(startRaw.chapter, startRaw.verse) : startRaw;
+  const end = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(endRaw.chapter, endRaw.verse) : endRaw;
+
+  const citation =
+    start.chapter === end.chapter
+      ? start.verse === end.verse
+        ? `${start.chapter}:${start.verse}`
+        : `${start.chapter}:${start.verse}-${end.verse}`
+      : `${start.chapter}:${start.verse}-${end.chapter}:${end.verse}`;
+
+  return {
+    english: `${bookTitle.english} ${citation}`.trim(),
+    arabic: `${bookTitle.arabic} ${citation}`.trim(),
+  };
+}
+
 const bookTitleCache = new Map<number, Promise<{ english: string; arabic: string; bookKey: string | null } | null>>();
 
 function getReadingBookTitle(bookNum: number): Promise<{ english: string; arabic: string; bookKey: string | null } | null> {
@@ -464,21 +542,29 @@ async function buildReadingSection(rule: ReadingRule): Promise<{ section: Docume
       ]
     : null;
 
+  // The citation ("Matthew 25:1-13") sits right before the actual verse
+  // content, inside `verses` — never merged into `section.title` ("Gospel
+  // according to Mark"), which is a separate header rendered in its own slot.
+  const citation = bookTitle && verses.length ? buildReadingCitation(rule.reading_reference, bookTitle, isPsalm) : null;
+  const citationVerse = citation ? [{ type: 'readingReference', english: citation.english, coptic: '', arabic: citation.arabic }] : [];
+
   const section: DocumentSection = {
     id: rule.reading_rule_id,
     title: {
       english: bookTitle ? `${label.english} according to ${bookTitle.english}` : label.english,
       arabic: bookTitle ? `${label.arabic} ${bookTitle.arabic}` : label.arabic,
     },
-    verses:
-      psalmVerses ??
-      verses.map((v) => ({
-        english: v.english,
-        coptic: v.coptic || '',
-        arabic: v.arabic,
-        type: 'text',
-        bibleVerseNumber: String(v.displayVerse),
-      })),
+    verses: [
+      ...citationVerse,
+      ...(psalmVerses ??
+        verses.map((v) => ({
+          english: v.english,
+          coptic: v.coptic || '',
+          arabic: v.arabic,
+          type: 'text',
+          bibleVerseNumber: String(v.displayVerse),
+        }))),
+    ],
     forceWhiteVerses: true,
   };
 

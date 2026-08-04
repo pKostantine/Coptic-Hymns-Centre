@@ -255,16 +255,51 @@ function renderLanguageText(language) {
 }
 
 function renderTextWithBibleVerseNumber(text, bibleVerseNumber) {
+  const content = renderTextWithMetropolitanHighlight(text);
   if (!bibleVerseNumber) {
-    return text;
+    return content;
   }
 
   return (
     <>
       <Text style={{ color: COLORS.gold }}>{bibleVerseNumber} </Text>
-      {text}
+      {content}
     </>
   );
+}
+
+// A parenthetical naming a Metropolitan — "(Metropolitan)", "(the
+// metropolitan)", "(ⲙ̀ⲙⲏⲧⲣⲟⲡⲟⲗⲓⲧⲏⲥ)", "(والمطران)" — reads visually distinct
+// from the surrounding text, in every language. Matches the innermost
+// bracket pair containing the keyword (never spans into an adjacent,
+// unrelated bracket group like "(bishop) ... (metropolitan)"). Mirrors
+// highlightMetropolitanBrackets in documentHtml.ts.
+const METROPOLITAN_BRACKET_PATTERN = /\(([^()]*(?:metropolitan|ⲙⲏⲧⲣⲟⲡⲟⲗⲓⲧ|مطران)[^()]*)\)/giu;
+
+function renderTextWithMetropolitanHighlight(text) {
+  const raw = String(text || "");
+  if (!raw || !METROPOLITAN_BRACKET_PATTERN.test(raw)) return raw;
+  METROPOLITAN_BRACKET_PATTERN.lastIndex = 0;
+
+  const nodes = [];
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+  while ((match = METROPOLITAN_BRACKET_PATTERN.exec(raw))) {
+    if (match.index > lastIndex) {
+      nodes.push(raw.slice(lastIndex, match.index));
+    }
+    nodes.push(
+      <Text key={`metropolitan-${key++}`} style={{ color: COLORS.rowBlue }}>
+        {match[0]}
+      </Text>,
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < raw.length) {
+    nodes.push(raw.slice(lastIndex));
+  }
+  return nodes;
 }
 
 function formatBibleVerseNumber(number, language) {

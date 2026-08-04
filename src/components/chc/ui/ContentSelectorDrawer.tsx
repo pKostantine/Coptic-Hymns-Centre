@@ -23,6 +23,8 @@ interface ContentSelectorDrawerProps {
   onToggleBishopPresent?: () => void;
   /** When false, sections titled Silent Prayer are excluded from the list, matching their hidden state in the document itself. */
   displaySilentPrayers?: boolean;
+  /** Current on/off state of the in-document "Coptic Gospel Rite" toggle — sections only visible in one state (e.g. "Coptic Psalm") are excluded from the list otherwise, matching their hidden state in the document itself. */
+  copticGospelRite?: boolean;
   /** Drives which single language each list entry's title shows — falls back to whichever language has text when the selected one is missing. */
   appLanguage?: AppLanguage;
 }
@@ -41,6 +43,7 @@ export default function ContentSelectorDrawer({
   bishopPresent,
   onToggleBishopPresent,
   displaySilentPrayers = false,
+  copticGospelRite = false,
   appLanguage = 'en',
 }: ContentSelectorDrawerProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -76,6 +79,10 @@ export default function ContentSelectorDrawer({
     // Same for a section hidden by the current Bishop Present state.
     if (section.bishopOnly && !bishopPresent) return false;
     if (section.priestOnly && bishopPresent) return false;
+    // Same for a section (e.g. "Coptic Psalm") only visible in one state of
+    // the in-document Coptic Gospel Rite toggle.
+    if (section.copticGospelRiteOnly && !copticGospelRite) return false;
+    if (section.nonCopticGospelRiteOnly && copticGospelRite) return false;
     // Subdocument/Antiphonary buttons are a real UI action, not hymn text —
     // they must survive even though they carry no verses.
     if (section.isSubdocumentButton || section.isAntiphonaryButton) return true;
@@ -134,14 +141,8 @@ export default function ContentSelectorDrawer({
             },
           ]}
         >
-          <View style={[styles.selectorHeader, isCompactSelector && styles.selectorHeaderMobile]}>
-            {isCompactSelector ? (
-              <Pressable accessibilityLabel="Close content list" style={styles.selectorBackButton} onPress={onClose}>
-                <Icon name="chevron-back" size={24} color={COLORS.gold} />
-              </Pressable>
-            ) : null}
+          <View style={styles.selectorHeader}>
             <Text style={styles.actionLabel}>Content</Text>
-            {isCompactSelector ? <View style={styles.selectorBackButton} /> : null}
           </View>
 
           <ScrollView ref={scrollViewRef} style={styles.selectorList}>
@@ -262,18 +263,6 @@ const styles = StyleSheet.create({
     minHeight: 62,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-  },
-  selectorHeaderMobile: {
-    justifyContent: 'space-between',
-  },
-  selectorBackButton: {
-    alignItems: 'center',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(201, 162, 39, 0.45)',
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
   },
   actionLabel: {
     color: COLORS.gold,

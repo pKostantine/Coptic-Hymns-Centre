@@ -207,6 +207,19 @@ export async function getContextFlags(date, extraContext = {}, weekdayDate) {
     flags.HolyCross = true;
   }
 
+  // The Feast of the Cross proper (Exaltation of the Holy Cross) is a
+  // 3-day feast at Thoout 17-19 — distinct from the single-day Paremhotep
+  // commemoration above. ThooutFeastOfTheCross1/2/3 give precise per-day
+  // targeting (e.g. hymn_texts condition "ParemhotepFeastOfTheCross ||
+  // ThooutFeastOfTheCross1" already expects this exact flag name), while
+  // FeastOfTheCross/HolyCross stay true for the whole 3-day span, same as
+  // the Paremhotep case above.
+  if (conv.coptic_month_name === "Thoout" && conv.coptic_day >= 17 && conv.coptic_day <= 19) {
+    flags.FeastOfTheCross = true;
+    flags.HolyCross = true;
+    flags[`ThooutFeastOfTheCross${conv.coptic_day - 16}`] = true;
+  }
+
   if (conv.sunday_ordinal_in_coptic_month >= 1 && conv.sunday_ordinal_in_coptic_month <= 5) {
     flags[`${ORDINAL_WORDS[conv.sunday_ordinal_in_coptic_month]}SundayOf${conv.coptic_month_name}`] = true;
     (COPTIC_MONTH_ALIASES[conv.coptic_month_name] || []).forEach((monthName) => {

@@ -269,6 +269,7 @@ export function buildDocumentHtml(
       .speaker-label.deacon, .speaker-label.reader { color: ${COLORS.deacon}; }
       .speaker-label.refrain { color: ${COLORS.refrain}; font-style: italic;}
       .bible-verse-number { color: ${COLORS.gold}; font-weight: 700; }
+      .metropolitan { color: ${COLORS.rowBlue}; }
       .section-title {
         color: ${COLORS.gold};
         font-family: Georgia, serif;
@@ -486,7 +487,7 @@ function renderSection(
   },
 ) {
   const { appLanguage, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite, suppressMap } = opts;
-  const toggleHtml = section.startsGospelRiteToggle ? renderGospelRiteToggle(copticGospelRite) : '';
+  const toggleHtml = section.startsGospelRiteToggle ? renderGospelRiteToggle(copticGospelRite, section.id) : '';
 
   if (section.isSubdocumentButton || section.isAntiphonaryButton) {
     return toggleHtml + renderDocumentButtonSection(section, appLanguage);
@@ -512,12 +513,16 @@ function renderSection(
  * The "Coptic Gospel Rite" toggle button always rendered immediately before
  * GOSPEL_RITE's spliced-in content (see startsGospelRiteToggle). Tapping it
  * posts `toggleCopticGospelRite`, which the host app answers by flipping the
- * CopticGospelRite condition flag and re-hydrating the whole document.
+ * CopticGospelRite condition flag — this regenerates the WebView's whole
+ * HTML (its content depends on the toggle), which reloads the view and
+ * resets scroll to the top, so the button's own section id rides along in
+ * the payload for the host app to scroll back to once the reload settles.
  */
-function renderGospelRiteToggle(isOn: boolean) {
+function renderGospelRiteToggle(isOn: boolean, sectionId: string) {
+  const onclick = `postAction('toggleCopticGospelRite', ${JSON.stringify({ sectionId })})`;
   return `
     <div class="gospel-rite-toggle-row">
-      <button class="gospel-rite-toggle${isOn ? ' is-on' : ''}" onclick="postAction('toggleCopticGospelRite')">
+      <button class="gospel-rite-toggle${isOn ? ' is-on' : ''}" onclick="${escapeAttribute(onclick)}">
         <span class="gospel-rite-toggle-dot"></span>
         <span>Coptic Gospel Rite</span>
       </button>
@@ -696,7 +701,7 @@ function renderVerse(
         <div class="cell">
           <p class="verse-text ${language.className} ${isCentered ? 'centered' : ''}" style="${textStyle}">${
             language.speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(language.speakerLabel)}</span><br/>` : ''
-          }${verseNumberText ? `<span class="bible-verse-number">${escapeHtml(verseNumberText)}</span> ` : ''}${escapeHtml(language.text)}</p>
+          }${verseNumberText ? `<span class="bible-verse-number">${escapeHtml(verseNumberText)}</span> ` : ''}${highlightMetropolitanBrackets(language.text)}</p>
         </div>
       `;
     })
@@ -788,6 +793,29 @@ function escapeHtml(text: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br/>');
+}
+
+// A parenthetical naming a Metropolitan — "(Metropolitan)", "(the
+// metropolitan)", "(ⲙ̀ⲙⲏⲧⲣⲟⲡⲟⲗⲓⲧⲏⲥ)", "(والمطران)" — reads visually distinct
+// from the surrounding text, in every language. Matches the innermost
+// bracket pair containing the keyword (never spans into an adjacent,
+// unrelated bracket group like "(bishop) ... (metropolitan)").
+const METROPOLITAN_BRACKET_PATTERN = /\(([^()]*(?:metropolitan|ⲙⲏⲧⲣⲟⲡⲟⲗⲓⲧ|مطران)[^()]*)\)/giu;
+
+function highlightMetropolitanBrackets(text: string): string {
+  const raw = String(text || '');
+  if (!raw) return '';
+  METROPOLITAN_BRACKET_PATTERN.lastIndex = 0;
+  let lastIndex = 0;
+  let html = '';
+  let match: RegExpExecArray | null;
+  while ((match = METROPOLITAN_BRACKET_PATTERN.exec(raw))) {
+    html += escapeHtml(raw.slice(lastIndex, match.index));
+    html += `<span class="metropolitan">${escapeHtml(match[0])}</span>`;
+    lastIndex = match.index + match[0].length;
+  }
+  html += escapeHtml(raw.slice(lastIndex));
+  return html;
 }
 
 function escapeAttribute(text: string) {

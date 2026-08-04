@@ -92,6 +92,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const [antiphonarySections, setAntiphonarySections] = useState<DocumentSection[] | null>(null);
   const documentRef = useRef<DocumentWebViewHandle>(null);
   const hasRestoredScrollPositionRef = useRef(false);
+  // Set right before toggling copticGospelRite (see handleAction below) to
+  // whichever section id the toggle button itself reported — consumed by
+  // the re-anchor effect right after.
+  const gospelRiteAnchorSectionIdRef = useRef<string | null>(null);
 
   const bookmarked = isBookmarked(bookmarkId);
 
@@ -180,8 +184,27 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => clearTimeout(timeoutId);
   }, [screenWidth, screenHeight, preferences.slideshowMode, currentVerseId, currentSectionId]);
 
+  // Toggling "Coptic Gospel Rite" regenerates the WebView's whole HTML (its
+  // content depends on the toggle), which reloads the view and resets
+  // scroll to the top — re-anchor to the toggle button's own section (see
+  // gospelRiteAnchorSectionIdRef, set in handleAction below) once the
+  // reload has had a moment to settle, same pattern as the dimension-change
+  // re-anchor above.
+  useEffect(() => {
+    const anchorId = gospelRiteAnchorSectionIdRef.current;
+    if (!anchorId) return;
+    gospelRiteAnchorSectionIdRef.current = null;
+    if (preferences.slideshowMode) return;
+
+    const timeoutId = setTimeout(() => {
+      documentRef.current?.scrollToSection(anchorId);
+    }, 260);
+    return () => clearTimeout(timeoutId);
+  }, [copticGospelRite, preferences.slideshowMode]);
+
   const handleAction = (action: DocumentAction) => {
     if (action.type === 'toggleCopticGospelRite') {
+      gospelRiteAnchorSectionIdRef.current = action.sectionId || currentSectionId;
       setCopticGospelRite((current) => !current);
       return;
     }
@@ -303,6 +326,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             bishopPresent={preferences.bishopPresent}
             onToggleBishopPresent={toggleBishopPresent}
             displaySilentPrayers={preferences.displaySilentPrayers}
+            copticGospelRite={copticGospelRite}
             appLanguage={preferences.appLanguage}
           />
           <SubdocumentModal
