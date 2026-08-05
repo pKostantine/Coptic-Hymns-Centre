@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { useIsMobileWeb } from '../../../utils/useIsMobileWeb';
 import Icon, { IconName } from './Icon';
@@ -29,12 +30,18 @@ export default function AppHeader({
   rightIcon,
   onRightPress,
   rightAccessibilityLabel = 'Open settings',
-  visibleLanguages = { english: true, arabic: true },
+  visibleLanguages,
 }: AppHeaderProps) {
+  const { preferences } = useReadingPreferences();
   const titleParts = typeof title === 'string' ? { english: title, arabic: '' } : title;
-  const showEnglish = visibleLanguages.english || !visibleLanguages.arabic;
-  const showArabic = visibleLanguages.arabic && Boolean(titleParts.arabic);
-  const visibleTitleCount = [showEnglish, showArabic].filter(Boolean).length;
+  // Headers show whichever single language the user has selected app-wide —
+  // never both at once — unless a caller explicitly overrides this. Falls
+  // back to whichever language actually has text for this specific title if
+  // the selected one doesn't, so a title missing an Arabic translation still
+  // shows something rather than going blank.
+  const wantsArabic = visibleLanguages ? visibleLanguages.arabic && !visibleLanguages.english : preferences.appLanguage === 'ar';
+  const showArabic = wantsArabic && Boolean(titleParts.arabic);
+  const showEnglish = !showArabic;
   const hasRightLeadingAction = Boolean(rightLeadingIcon && onRightLeadingPress);
   const hasRightAction = Boolean(rightIcon && onRightPress);
   const isMobileWeb = useIsMobileWeb();
@@ -58,10 +65,10 @@ export default function AppHeader({
         <View style={styles.titleGroup}>
           {showEnglish ? (
             <Text
-              style={[styles.title, isMobileWeb && styles.titleMobile, visibleTitleCount === 1 && styles.centeredTitle]}
+              style={[styles.title, isMobileWeb && styles.titleMobile, styles.centeredTitle]}
               numberOfLines={1}
             >
-              {formatEnglishDisplayText(titleParts.english)}
+              {formatEnglishDisplayText(titleParts.english || titleParts.arabic)}
             </Text>
           ) : null}
           {showArabic ? (
@@ -70,7 +77,7 @@ export default function AppHeader({
                 styles.title,
                 isMobileWeb && styles.titleMobile,
                 styles.arabicTitle,
-                visibleTitleCount === 1 && styles.centeredTitle,
+                styles.centeredTitle,
               ]}
               numberOfLines={1}
             >

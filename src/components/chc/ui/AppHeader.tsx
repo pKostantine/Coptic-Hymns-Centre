@@ -2,6 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import Icon, { IconName } from './Icon';
 
@@ -29,13 +30,20 @@ export default function AppHeader({
   rightIcon,
   onRightPress,
   rightAccessibilityLabel = 'Open settings',
-  visibleLanguages = { english: true, arabic: true },
+  visibleLanguages,
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
+  const { preferences } = useReadingPreferences();
   const titleParts = typeof title === 'string' ? { english: title, arabic: '' } : title;
-  const showEnglish = visibleLanguages.english || !visibleLanguages.arabic;
-  const showArabic = visibleLanguages.arabic && Boolean(titleParts.arabic);
-  const visibleTitleCount = [showEnglish, showArabic].filter(Boolean).length;
+  // Headers show whichever single language the user has selected app-wide —
+  // never both at once — unless a caller explicitly overrides this (none
+  // currently do; the prop stays available for a future icon-only/dual-title
+  // special case). Falls back to whichever language actually has text for
+  // this specific title if the selected one doesn't, so a title missing an
+  // Arabic translation still shows something rather than going blank.
+  const wantsArabic = visibleLanguages ? visibleLanguages.arabic && !visibleLanguages.english : preferences.appLanguage === 'ar';
+  const showArabic = wantsArabic && Boolean(titleParts.arabic);
+  const showEnglish = !showArabic;
   const hasRightLeadingAction = Boolean(rightLeadingIcon && onRightLeadingPress);
   const hasRightAction = Boolean(rightIcon && onRightPress);
 
@@ -52,12 +60,12 @@ export default function AppHeader({
 
         <View style={styles.titleGroup}>
           {showEnglish ? (
-            <Text style={[styles.title, visibleTitleCount === 1 && styles.centeredTitle]} numberOfLines={1}>
-              {formatEnglishDisplayText(titleParts.english)}
+            <Text style={[styles.title, styles.centeredTitle]} numberOfLines={1}>
+              {formatEnglishDisplayText(titleParts.english || titleParts.arabic)}
             </Text>
           ) : null}
           {showArabic ? (
-            <Text style={[styles.title, styles.arabicTitle, visibleTitleCount === 1 && styles.centeredTitle]} numberOfLines={1}>
+            <Text style={[styles.title, styles.arabicTitle, styles.centeredTitle]} numberOfLines={1}>
               {titleParts.arabic}
             </Text>
           ) : null}

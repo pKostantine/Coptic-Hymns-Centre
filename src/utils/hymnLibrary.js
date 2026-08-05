@@ -259,7 +259,10 @@ async function buildReadingCitation(readingRow) {
   const lastVerses = lastSegment.verses || [];
   if (!firstVerses.length || !lastVerses.length) return null;
 
-  const bookTitle = await getBibleBookTitleByKey(firstSegment.book_key);
+  // A citation cites ONE psalm chapter, so it reads "Psalm 67:11" — the book
+  // title itself ("Psalms"/"المزامير") is the whole-book plural, wrong here.
+  const bookTitle =
+    firstSegment.book_key === "psalms" ? { english: "Psalm", arabic: "مزمور" } : await getBibleBookTitleByKey(firstSegment.book_key);
   if (!bookTitle || (!bookTitle.english && !bookTitle.arabic)) return null;
 
   if (segments.length === 1 && isDiscreteVerseListSegment(firstSegment.segment)) {
@@ -296,39 +299,55 @@ async function resolveReadingSentinelVerses(sentinel, isoDate) {
   return { verses, citation };
 }
 
+// A nested reading sentinel that becomes its own section (see
+// resolveReadingSentinelSplice below) needs a real, fixed section title —
+// unlike the citation, which is a computed verse shown *inside* that
+// section — since the sentinel itself has no hymn_titles row. Mirrors the
+// exact "Coptic X" phrasing already used by gospel_rite.hymn_titles' own
+// "copticPsalm" entry ("Coptic Psalm" / "المزمور القبطي").
+const COPTIC_READING_TYPE_TITLES = {
+  Gospel: { english: "Coptic Gospel", arabic: "الإنجيل القبطي" },
+  Psalm: { english: "Coptic Psalm", arabic: "المزمور القبطي" },
+};
+
 /**
  * Resolves a reading sentinel into either a standalone titled section (when
- * `titleShown` is true, e.g. gospel_rite's "copticGospel" rows referencing
- * *_GOSPEL_WITH_COPTIC with inline_hymn_title_shown=true) or a flat verse
- * splice with just an inline citation line up front (every other case) — the
- * exact same "shown title -> own section, hidden title -> silent splice"
- * rule already used for regular hymn-key inline splices (see hasOwnTitle in
- * hydrateWithFlags), just sourced from the computed Bible citation instead of
- * a hymn_titles row, since reading sentinels never have one. Either way the
- * citation always appears immediately before the reading's own verses, never
- * before whatever intro line the caller placed ahead of the splice.
+ * `titleShown` is true, e.g. copticGospel's rows referencing
+ * *_GOSPEL_WITH_COPTIC with inline_hymn_title_shown=true — the encompassing
+ * hymn itself isn't already a top-level Minimizable/Minimized unit, so this
+ * splice needs to carry its own) or a flat verse splice with just an inline
+ * citation line up front (every other case). Either way the citation
+ * ("Matthew 25:1-13") always appears as its own verse immediately before the
+ * reading's own text, never before whatever intro line the caller placed
+ * ahead of the splice — when shown as a section, the section's own title is
+ * a fixed "Coptic {reading type}" label instead (the citation stays a verse
+ * inside it, exactly like the flat case), since the citation is a moving
+ * per-day value, not a stable name to navigate by.
  */
 async function resolveReadingSentinelSplice(sentinel, isoDate, titleShown, minimization, sectionId) {
   const { verses, citation } = await resolveReadingSentinelVerses(sentinel, isoDate);
   if (!verses.length) return null;
 
-  if (titleShown && citation) {
+  const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, coptic: "" }] : [];
+
+  if (titleShown) {
+    const readingType = READING_SENTINEL_MAP[sentinel]?.readingType;
+    const title = COPTIC_READING_TYPE_TITLES[readingType] || { english: `Coptic ${readingType || ""}`.trim(), arabic: "" };
     return {
       kind: "section",
       section: {
         id: sectionId,
-        title: { english: citation.english, arabic: citation.arabic },
+        title,
         titlePrayerType: null,
         collapsible: minimization === "Minimizable" || minimization === "Minimized",
         defaultCollapsed: minimization === "Minimized",
-        verses,
+        verses: [...citationVerse, ...verses],
         alternateEvery: null,
         forceWhiteVerses: true,
       },
     };
   }
 
-  const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, coptic: "" }] : [];
   return { kind: "flat", verses: [...citationVerse, ...verses] };
 }
 
@@ -868,7 +887,24 @@ async function hydrateWholeTableInlineNested(hymnKey, target, flags, depth, isoD
 
   const offIds = new Set(offSections.map((s) => s.id));
   const onIds = new Set(onSections.map((s) => s.id));
-  const merged = onSections.map((s) => (offIds.has(s.id) ? s : { ...s, copticGospelRiteOnly: true }));
+  const merged = onSections.map((s) => {
+    if (offIds.has(s.id)) return s;
+    // A "-contN" id (see flushVerses in hydrateWithFlags) means this hymn's
+    // own verse flow got split into multiple chunks mid-hydration — the only
+    // way that happens is a CopticGospelRite-gated splice sitting in the
+    // *middle* of an otherwise-unconditional hymn (e.g. introductionAndPsalm:
+    // its own Reader line, then the CopticGospelRite-only Coptic Gospel
+    // splice, then its own unconditional Psalm intro/text). The off
+    // hydration never hits that splice, so it never splits — its single
+    // unsplit chunk keeps the base id, and this continuation's own id never
+    // appears there even though its content (the hymn's own later lines) is
+    // just as unconditional. Tag it copticGospelRiteOnly only when even its
+    // *base* id is missing from off — genuinely new content, not a chunking
+    // artifact of unconditional content that happened to land after a split.
+    const baseId = s.id.replace(/-cont\d+$/, "");
+    if (baseId !== s.id && offIds.has(baseId)) return s;
+    return { ...s, copticGospelRiteOnly: true };
+  });
   const offOnly = offSections.filter((s) => !onIds.has(s.id)).map((s) => ({ ...s, nonCopticGospelRiteOnly: true }));
   return [...merged, ...offOnly];
 }
@@ -1138,31 +1174,15 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
         // A reading-resolution sentinel embedded mid-verse (e.g. gospel_rite's
         // "gospel"/"copticPsalm" hymns splicing in VESPERS_GOSPEL_WITH_COPTIC)
         // needs the day's live scripture text, with a citation line of its
-        // own ("Matthew 25:1-13") right before it — and when this line's own
-        // inline_hymn_title_shown/inline_hymn_minimization ask for it (see
-        // resolveReadingSentinelSplice), that citation becomes a real
-        // Minimizable/Minimized section break instead of a silent splice.
+        // own ("Matthew 25:1-13") right before it — always a silent splice
+        // into this hymn's own flowing verses, never its own section: the
+        // encompassing hymn (e.g. "copticPsalm") is always already the
+        // top-level Minimizable/Minimized unit here (its own order-table row
+        // carries that), so a second, nested collapse just for this splice
+        // would wrongly split it off as if it were its own separate hymn.
         if (READING_SENTINELS.has(verse.inlineHymnKey) && isoDate) {
-          const spliced = await resolveReadingSentinelSplice(
-            verse.inlineHymnKey,
-            isoDate,
-            verse.inlineHymnTitleShown,
-            verse.inlineHymnMinimization,
-            `${section.id}-inline-${verse.inlineHymnKey}`,
-          );
-          if (spliced?.kind === "section") {
-            flushVerses();
-            hydrated.push(
-              applyCopticCaseToSection({
-                ...spliced.section,
-                bishopOnly: verseVisibility.bishopOnly,
-                priestOnly: verseVisibility.priestOnly,
-              }),
-            );
-            pushedAnything = true;
-          } else if (spliced) {
-            verses.push(...spliced.verses);
-          }
+          const spliced = await resolveReadingSentinelSplice(verse.inlineHymnKey, isoDate, false, null, `${section.id}-inline-${verse.inlineHymnKey}`);
+          if (spliced) verses.push(...spliced.verses);
           continue;
         }
 
@@ -1236,12 +1256,12 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
           inlineTitlePrayerType,
           0,
         );
-        const builtVerses = built.verses;
-        const nestedReadingSections = built.sections;
+        const hasNestedSections = built.segments.some((seg) => seg.kind === "section");
 
         if (hasOwnTitle) {
           flushVerses();
-          const dominantPrayerType = getDominantPrayerType(inlineTitlePrayerType, builtVerses);
+          const flatVerses = built.segments.flatMap((seg) => (seg.kind === "verses" ? seg.verses : seg.section.verses));
+          const dominantPrayerType = getDominantPrayerType(inlineTitlePrayerType, flatVerses);
           const alternateEvery =
             dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)
               ? ALTERNATE_EVERY[dominantPrayerType]
@@ -1268,7 +1288,7 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
                 verse.inlineHymnMinimization === "Minimized" ||
                 Boolean(section.collapsible),
               defaultCollapsed: verse.inlineHymnMinimization === "Minimized" || Boolean(section.defaultCollapsed),
-              verses: builtVerses,
+              verses: flatVerses,
               prayerType: dominantPrayerType,
               alternateEvery,
               reverseAlternating: dominantPrayerType === "Reverse Alternating",
@@ -1277,28 +1297,50 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
               priestOnly: sectionVisibility.priestOnly,
             }),
           );
-          for (const nestedSection of nestedReadingSections) {
-            hydrated.push(applyCopticCaseToSection({ ...nestedSection }));
-          }
           pushedAnything = true;
-        } else if (nestedReadingSections.length) {
+        } else if (hasNestedSections) {
           // The inline hymn itself has no title of its own (e.g.
           // gospel_rite's "copticGospel", whose own hymn_titles row is
           // blank), but one of ITS internal rows individually declared
           // inline_hymn_title_shown=true on a nested reading-sentinel
-          // reference — that citation (built by resolveReadingSentinelSplice)
-          // becomes this content's real title, Minimized per that same
-          // row's own inline_hymn_minimization. Any of the hymn's own plain
-          // flat verses (builtVerses) are spliced in first, in their natural
-          // position, before the titled section(s) that followed them.
-          if (builtVerses.length) verses.push(...builtVerses);
+          // reference (e.g. the WITH_COPTIC gospel sentinel). This line's own
+          // condition (e.g. "CopticGospelRite") already gates the whole
+          // thing, so EVERY piece produced here — copticGospel's own framing
+          // verses (both before AND after the nested section, kept in their
+          // true relative order via `built.segments`) and the nested titled
+          // section itself — is pushed as its own independent hydrated
+          // entry, deliberately never merged into the calling hymn's own
+          // `verses`/flushVerses accumulator. Mixing any of it in there
+          // would make it wrongly survive gospel_rite's dual on/off
+          // CopticGospelRite hydration+merge (hydrateWholeTableInlineNested)
+          // as always-visible, and — since that merge also treats a new
+          // section id as "exclusive to whichever hydration produced it" —
+          // would make the calling hymn's own *later*, unconditional content
+          // (accumulated into a new chunk after this flush) wrongly get
+          // treated as exclusive to this condition too, just for having
+          // landed on a different chunk id than the no-split off hydration.
           flushVerses();
-          for (const nestedSection of nestedReadingSections) {
-            hydrated.push(applyCopticCaseToSection({ ...nestedSection }));
+          let wrapIndex = 0;
+          for (const seg of built.segments) {
+            if (seg.kind === "section") {
+              hydrated.push(applyCopticCaseToSection({ ...seg.section }));
+            } else {
+              hydrated.push(
+                applyCopticCaseToSection({
+                  id: `${section.id}-inline-${verse.inlineHymnKey}-wrap${wrapIndex++}`,
+                  title: { english: "", arabic: "" },
+                  verses: seg.verses,
+                  alternateEvery: null,
+                  forceWhiteVerses: true,
+                  bishopOnly: verseVisibility.bishopOnly,
+                  priestOnly: verseVisibility.priestOnly,
+                }),
+              );
+            }
           }
           pushedAnything = true;
         } else {
-          verses.push(...builtVerses);
+          verses.push(...built.segments.flatMap((seg) => seg.verses));
         }
         continue;
       }
@@ -1435,10 +1477,23 @@ async function resolveInlineHymnVerses(
   inlineTitlePrayerType,
   depth,
 ) {
-  if (depth >= 5) return { verses: [], sections: [] };
+  if (depth >= 5) return { segments: [] };
   const rows = await fetchInlineHymnVerses(schema, hymnKey);
-  const results = [];
-  const sections = [];
+  const segments = [];
+  let currentVerses = [];
+
+  // A run of plain verses is buffered here and only turned into its own
+  // {kind:"verses"} segment once something breaks the run (a nested titled
+  // section) or the rows run out — this is what lets copticGospel's own
+  // framing lines (before AND after its nested WITH_COPTIC gospel section)
+  // stay in their true relative position, instead of collapsing to two flat
+  // "all verses" / "all sections" buckets that lose which came first.
+  const flushCurrentVerses = () => {
+    if (currentVerses.length) {
+      segments.push({ kind: "verses", verses: currentVerses });
+      currentVerses = [];
+    }
+  };
 
   for (const row of rows) {
     const rowVisibility = combineBishopVisibility(outerVisibility, evaluateBishopAwareVisibility(row.condition, flags));
@@ -1454,9 +1509,10 @@ async function resolveInlineHymnVerses(
           `${hymnKey}-${row.line_order}-${row.inline_hymn_key}`,
         );
         if (spliced?.kind === "section") {
-          sections.push({ ...spliced.section, bishopOnly: rowVisibility.bishopOnly, priestOnly: rowVisibility.priestOnly });
+          flushCurrentVerses();
+          segments.push({ kind: "section", section: { ...spliced.section, bishopOnly: rowVisibility.bishopOnly, priestOnly: rowVisibility.priestOnly } });
         } else if (spliced) {
-          results.push(...spliced.verses.map((v) => ({ ...v, bishopOnly: rowVisibility.bishopOnly, priestOnly: rowVisibility.priestOnly })));
+          currentVerses.push(...spliced.verses.map((v) => ({ ...v, bishopOnly: rowVisibility.bishopOnly, priestOnly: rowVisibility.priestOnly })));
         }
         continue;
       }
@@ -1477,8 +1533,14 @@ async function resolveInlineHymnVerses(
           inlineTitlePrayerType,
           depth + 1,
         );
-        results.push(...nested.verses);
-        sections.push(...nested.sections);
+        for (const seg of nested.segments) {
+          if (seg.kind === "verses") {
+            currentVerses.push(...seg.verses);
+          } else {
+            flushCurrentVerses();
+            segments.push(seg);
+          }
+        }
       }
       continue;
     }
@@ -1486,7 +1548,7 @@ async function resolveInlineHymnVerses(
     const isCommentRow = row.person_type === "Comment";
     const effectivePersonType = isCommentRow ? row.person_type : overridePersonType || row.person_type || "";
     const effectivePrayerType = isCommentRow ? row.prayer_type || "" : overridePrayerType || row.prayer_type || "";
-    results.push({
+    currentVerses.push({
       english: row.english || "",
       coptic: row.coptic || "",
       arabic: row.arabic || "",
@@ -1500,7 +1562,8 @@ async function resolveInlineHymnVerses(
     });
   }
 
-  return { verses: results, sections };
+  flushCurrentVerses();
+  return { segments };
 }
 
 const INLINE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, prayer_type";

@@ -1523,7 +1523,7 @@ function getEstimatedLineLength(language, fontSize, rowColumnWidth, item) {
 }
 
 function getLanguageFontSize(language, item, fontSize) {
-  if (["refrainLabel", "readingReference"].includes(item.verse?.type)) {
+  if (item.verse?.type === "refrainLabel") {
     return Math.max(Math.round(fontSize * 0.5), 11);
   }
 

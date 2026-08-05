@@ -45,7 +45,7 @@ export default function VerseBlock({
       : isRefrainLabel || isRefrain
       ? REFRAIN_TAN
       : isReadingReference
-      ? COLORS.gold
+      ? COLORS.comment
       : // "White"/"Blue" prayer_type forces that alternating color directly on
       // this one verse — surrounding verses alternate exactly as if it
       // weren't there (see getEffectiveAlternatingVerseIndex in
@@ -67,10 +67,10 @@ export default function VerseBlock({
           key: "coptic",
           text: formatCopticNumbers(verse.coptic, verse.preserveCopticDigits),
           seasonalHoosVersePrefixSpacer: "",
-          fontSize: isRefrainLabel || isReadingReference ? titleFontSize : copticFontSize,
+          fontSize: isRefrainLabel ? titleFontSize : copticFontSize,
           fontFamily: TYPOGRAPHY.coptic,
           lineHeight:
-            isRefrainLabel || isReadingReference
+            isRefrainLabel
               ? titleLineHeight
               : Math.round(copticFontSize * 1),
           styles: [styles.coptic],
@@ -87,10 +87,10 @@ export default function VerseBlock({
           text: formatEnglishDisplayText(verse.english),
           bibleVerseNumber: verse.bibleVerseNumber,
           seasonalHoosVersePrefix: verse.seasonalHoosVersePrefix,
-          fontSize: isRefrainLabel || isReadingReference ? titleFontSize : fontSize,
-          fontFamily: isReadingReference ? TYPOGRAPHY.title : "Georgia",
+          fontSize: isRefrainLabel ? titleFontSize : fontSize,
+          fontFamily: "Georgia",
           lineHeight:
-            isRefrainLabel || isReadingReference
+            isRefrainLabel
               ? titleLineHeight
               : Math.round(fontSize * 1.25),
           styles: [styles.english],
@@ -103,10 +103,10 @@ export default function VerseBlock({
           seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine
             ? verse.seasonalHoosVersePrefix
             : "",
-          fontSize: isRefrainLabel || isReadingReference ? titleFontSize : copticFontSize,
+          fontSize: isRefrainLabel ? titleFontSize : copticFontSize,
           fontFamily: TYPOGRAPHY.coptic,
           lineHeight:
-            isRefrainLabel || isReadingReference
+            isRefrainLabel
               ? titleLineHeight
               : Math.round(copticFontSize * 1),
           styles: [styles.coptic],
@@ -119,12 +119,12 @@ export default function VerseBlock({
           bibleVerseNumber: verse.bibleVerseNumber,
           seasonalHoosVersePrefix: formatArabicNumbers(verse.seasonalHoosVersePrefix),
           fontSize:
-            isRefrainLabel || isReadingReference
+            isRefrainLabel
               ? titleFontSize
               : Math.round(fontSize * 1.15),
-          fontFamily: isReadingReference ? TYPOGRAPHY.title : "Arial",
+          fontFamily: "Arial",
           lineHeight:
-            isRefrainLabel || isReadingReference
+            isRefrainLabel
               ? titleLineHeight
               : Math.round(fontSize * 1.25),
           styles: [styles.arabic],

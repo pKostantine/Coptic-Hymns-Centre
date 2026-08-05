@@ -747,7 +747,7 @@ function resolveVerseColorBase(verse: DocumentVerse, index: number, section: Doc
   if (verse.type === 'comment' || verse.type === 'silentComment') return { color: COLORS.comment, italic: true };
   if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
   if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: true };
-  if (verse.type === 'readingReference') return { color: COLORS.gold, italic: false };
+  if (verse.type === 'readingReference') return { color: COLORS.comment, italic: false };
   // "White"/"Blue" prayer_type forces that alternating color directly,
   // bypassing the normal alternation computation for this verse entirely —
   // getEffectiveAlternatingIndex above excludes it from the count so

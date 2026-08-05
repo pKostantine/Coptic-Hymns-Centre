@@ -453,6 +453,9 @@ async function fetchReadingReferenceVerses(reference: string): Promise<{ verses:
  */
 function buildReadingCitation(reference: string, bookTitle: { english: string; arabic: string }, isPsalm: boolean): { english: string; arabic: string } | null {
   if (!bookTitle.english && !bookTitle.arabic) return null;
+  // A citation cites ONE psalm chapter, so it reads "Psalm 67:11" — the book
+  // title itself ("Psalms"/"المزامير") is the whole-book plural, wrong here.
+  const citationBookTitle = isPsalm ? { english: 'Psalm', arabic: 'مزمور' } : bookTitle;
   const segments = splitReadingReference(reference).map(parseSegment);
   if (!segments.length) return null;
   const first = segments[0];
@@ -465,8 +468,8 @@ function buildReadingCitation(reference: string, bookTitle: { english: string; a
     const chapter = converted[0]?.chapter ?? first.chapter;
     const verseList = converted.map((c) => c.verse).join(',');
     return {
-      english: `${bookTitle.english} ${chapter}:${verseList}`.trim(),
-      arabic: `${bookTitle.arabic} ${chapter}:${verseList}`.trim(),
+      english: `${citationBookTitle.english} ${chapter}:${verseList}`.trim(),
+      arabic: `${citationBookTitle.arabic} ${chapter}:${verseList}`.trim(),
     };
   }
 
@@ -483,8 +486,8 @@ function buildReadingCitation(reference: string, bookTitle: { english: string; a
       : `${start.chapter}:${start.verse}-${end.chapter}:${end.verse}`;
 
   return {
-    english: `${bookTitle.english} ${citation}`.trim(),
-    arabic: `${bookTitle.arabic} ${citation}`.trim(),
+    english: `${citationBookTitle.english} ${citation}`.trim(),
+    arabic: `${citationBookTitle.arabic} ${citation}`.trim(),
   };
 }
 
@@ -548,11 +551,14 @@ async function buildReadingSection(rule: ReadingRule): Promise<{ section: Docume
   const citation = bookTitle && verses.length ? buildReadingCitation(rule.reading_reference, bookTitle, isPsalm) : null;
   const citationVerse = citation ? [{ type: 'readingReference', english: citation.english, coptic: '', arabic: citation.arabic }] : [];
 
+  // "X according to Y" only makes sense when the book varies by day (Gospel/
+  // Prophecy) — a Psalm reading is always from the Psalms, so naming the
+  // book too would just read "Psalm according to Psalms".
   const section: DocumentSection = {
     id: rule.reading_rule_id,
     title: {
-      english: bookTitle ? `${label.english} according to ${bookTitle.english}` : label.english,
-      arabic: bookTitle ? `${label.arabic} ${bookTitle.arabic}` : label.arabic,
+      english: bookTitle && !isPsalm ? `${label.english} according to ${bookTitle.english}` : label.english,
+      arabic: bookTitle && !isPsalm ? `${label.arabic} ${bookTitle.arabic}` : label.arabic,
     },
     verses: [
       ...citationVerse,

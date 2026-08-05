@@ -184,8 +184,11 @@ export default function ContentSelectorDrawer({
           {onToggleBishopPresent ? (
             <Pressable accessibilityLabel="Toggle bishop present" style={styles.selectorToggleRow} onPress={onToggleBishopPresent}>
               <View style={styles.selectorToggleTextGroup}>
-                <Text style={styles.selectorToggleText}>Bishop Present</Text>
-                <Text style={[styles.selectorToggleText, styles.selectorToggleArabicText]}>حضور أسقف</Text>
+                {appLanguage === 'ar' ? (
+                  <Text style={[styles.selectorToggleText, styles.selectorToggleArabicText]}>حضور أسقف</Text>
+                ) : (
+                  <Text style={styles.selectorToggleText}>Bishop Present</Text>
+                )}
               </View>
               <View style={[styles.selectorSwitch, bishopPresent ? styles.selectorSwitchOn : styles.selectorSwitchOff]}>
                 <View style={[styles.selectorSwitchThumb, bishopPresent && styles.selectorSwitchThumbOn]} />

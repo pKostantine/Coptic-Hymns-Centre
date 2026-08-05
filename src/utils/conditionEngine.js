@@ -450,7 +450,46 @@ export async function getContextFlags(date, extraContext = {}, weekdayDate) {
     flags.Annual = true;
   }
 
+  // ─── Today's Gospel author (gospel_rite's GospelMatthew/Mark/Luke/John) ──
+  // introductionAndPsalm's own Reader line and introductionToTheCopticGospel's
+  // Priest line are conditioned on these tokens, but nothing else in the
+  // client ever sets them — without this they can never pass, silently
+  // dropping those lines from every Vespers/Matins/Liturgy document. Scoped
+  // to whichever one of Vespers/Matins/Liturgy is active in *this* hydration
+  // (the structural flag is already in extraContext by the time this runs),
+  // matching the same service->book_key resolution getGospelRiteSections
+  // (readingsService.ts) already uses for the "[AUTHOR]" placeholder.
+  const activeGospelService = extraContext?.Liturgy ? "Liturgy" : extraContext?.Matins ? "Matins" : extraContext?.Vespers ? "Vespers" : null;
+  if (activeGospelService) {
+    const authorsByService = await getGospelAuthorsByService(isoDate);
+    const bookKey = authorsByService[activeGospelService];
+    if (bookKey) {
+      flags[`Gospel${bookKey.charAt(0).toUpperCase()}${bookKey.slice(1)}`] = true;
+    }
+  }
+
   return { ...flags, ...extraContext };
+}
+
+const gospelAuthorsByDateCache = new Map(); // isoDate -> Promise<Record<service, bookKey>>
+
+function getGospelAuthorsByService(isoDate) {
+  let cached = gospelAuthorsByDateCache.get(isoDate);
+  if (!cached) {
+    cached = (async () => {
+      const { data, error } = await supabase.rpc("get_readings_for_date", { p_date: isoDate });
+      if (error) throw new Error(`Unable to load Gospel readings for ${isoDate}: ${error.message}`);
+      const byService = {};
+      for (const row of data || []) {
+        if (row.reading_type !== "Gospel") continue;
+        const bookKey = row.resolved_verses?.[0]?.book_key;
+        if (bookKey) byService[row.service] = bookKey;
+      }
+      return byService;
+    })();
+    gospelAuthorsByDateCache.set(isoDate, cached);
+  }
+  return cached;
 }
 
 function addDaysIso(isoDate, delta) {

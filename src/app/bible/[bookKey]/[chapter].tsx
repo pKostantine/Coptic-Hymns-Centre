@@ -199,14 +199,11 @@ export default function BibleChapterDocument() {
               <Pressable accessibilityLabel="Close verse selector" style={styles.selectorBackdrop} onPress={() => setIsSelectorOpen(false)} />
               <View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top }]}>
                 <View style={styles.selectorHeader}>
-                  <Pressable accessibilityLabel="Close verse selector" style={styles.selectorBackButton} onPress={() => setIsSelectorOpen(false)}>
-                    <Icon name="chevron-back" size={24} color={COLORS.gold} />
-                  </Pressable>
-                  <View style={styles.selectorHeaderTitleGroup}>
-                    <Text style={styles.selectorHeaderTitle}>Verses</Text>
+                  {preferences.appLanguage === 'ar' ? (
                     <Text style={[styles.selectorHeaderTitle, styles.selectorHeaderArabic]}>الآيات</Text>
-                  </View>
-                  <View style={styles.selectorBackButton} />
+                  ) : (
+                    <Text style={styles.selectorHeaderTitle}>Verses</Text>
+                  )}
                 </View>
 
                 <View style={styles.chapterNavRow}>
@@ -302,22 +299,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(201, 162, 39, 0.28)',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginHorizontal: -SPACING.md,
     minHeight: 62,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
   },
-  selectorBackButton: {
-    alignItems: 'center',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(201, 162, 39, 0.45)',
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-  selectorHeaderTitleGroup: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm },
   selectorHeaderTitle: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
   selectorHeaderArabic: { fontFamily: 'Arial', textAlign: 'right', writingDirection: 'rtl' },
   chapterNavRow: { borderBottomColor: 'rgba(201, 162, 39, 0.18)', borderBottomWidth: 1, flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.sm },
