@@ -189,7 +189,7 @@ export function buildDocumentHtml(
       }
       .document {
         box-sizing: border-box;
-        padding: ${SPACING.md}px ${SPACING.md}px ${SPACING.xl}px;
+        padding: ${SPACING.md}px 0 0;
         max-width: 100vw;
       }
       .section {

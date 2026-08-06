@@ -245,17 +245,36 @@ export default function SlideshowContainer({
         estimateItemHeight(item, fontSize, visibleLanguages, slideTableWidth);
     });
 
-    return dropEmptySlides(
-      paginateItems(
-        items,
-        effectiveHeights,
-        measuredLanguageHeights,
-        Math.max(effectiveViewportHeight - 8, 120),
-        fontSize,
-        visibleLanguages,
-        slideTableWidth,
-      ),
+    const budget = Math.max(effectiveViewportHeight - 8, 120);
+    const paginated = paginateItems(
+      items,
+      effectiveHeights,
+      measuredLanguageHeights,
+      budget,
+      fontSize,
+      visibleLanguages,
+      slideTableWidth,
     );
+
+    if (typeof window !== "undefined" && window.__DEBUG_PAGINATION__ && items.every((item) => typeof measuredHeights[item.id] === "number")) {
+      const itemDebugHeight = (it) =>
+        it.slideshowLineCounts
+          ? Math.ceil(getVerseLineSegmentHeight({ item: it }, fontSize) + 2)
+          : Math.ceil((effectiveHeights[it.id] || 0) + 2);
+      console.log("PAGINATION_DEBUG", JSON.stringify({
+        budget,
+        slides: paginated.slice(0, 20).map((slide) => ({
+          total: slide.reduce((sum, it) => sum + itemDebugHeight(it), 0),
+          items: slide.map((it) => ({
+            id: it.id,
+            h: itemDebugHeight(it),
+            text: (it.verse?.english || it.title?.english || "").slice(0, 30),
+          })),
+        })),
+      }));
+    }
+
+    return dropEmptySlides(paginated);
   }, [
     fontSize,
     items,
