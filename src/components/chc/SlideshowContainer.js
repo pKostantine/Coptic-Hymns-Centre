@@ -256,24 +256,6 @@ export default function SlideshowContainer({
       slideTableWidth,
     );
 
-    if (typeof window !== "undefined" && window.__DEBUG_PAGINATION__ && items.every((item) => typeof measuredHeights[item.id] === "number")) {
-      const itemDebugHeight = (it) =>
-        it.slideshowLineCounts
-          ? Math.ceil(getVerseLineSegmentHeight({ item: it }, fontSize) + 2)
-          : Math.ceil((effectiveHeights[it.id] || 0) + 2);
-      console.log("PAGINATION_DEBUG", JSON.stringify({
-        budget,
-        slides: paginated.slice(0, 20).map((slide) => ({
-          total: slide.reduce((sum, it) => sum + itemDebugHeight(it), 0),
-          items: slide.map((it) => ({
-            id: it.id,
-            h: itemDebugHeight(it),
-            text: (it.verse?.english || it.title?.english || "").slice(0, 30),
-          })),
-        })),
-      }));
-    }
-
     return dropEmptySlides(paginated);
   }, [
     fontSize,
@@ -1076,6 +1058,11 @@ function dropEmptySlides(slides) {
   return withContent.length ? withContent : slides;
 }
 
+/** A section with no title text (e.g. a flat reading-citation splice, or a mid-hymn continuation chunk) has nothing to visually separate — forcing a fresh slide for it wastes the rest of the previous slide for no benefit, unlike a real titled hymn starting. */
+function hasVisibleTitleText(title) {
+  return Boolean(title?.english || title?.arabic);
+}
+
 function paginateItems(
   items,
   heights,
@@ -1093,7 +1080,7 @@ function paginateItems(
     const item = items[index];
     if (
       currentSlide.length &&
-      ((item.type === "title" && !item.isCollapsed) || item.type === "button")
+      ((item.type === "title" && !item.isCollapsed && hasVisibleTitleText(item.title)) || item.type === "button")
     ) {
       slides.push(currentSlide);
       currentSlide = [];

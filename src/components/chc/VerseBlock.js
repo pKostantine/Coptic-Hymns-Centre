@@ -138,6 +138,17 @@ export default function VerseBlock({
     // blank column here while correctly dropping it in scroll mode.
     if (verse.invincibleCoptic) return true;
 
+    // A verse split across multiple slides (see appendTallVerseSegments in
+    // SlideshowContainer.js) can have a language finish its own lines on an
+    // earlier segment while others still have more to show — that language's
+    // text is legitimately blank on this later segment, but the column must
+    // stay in the layout anyway (just empty) rather than collapse: dropping
+    // it would reshape the row from e.g. 3 columns to 2 and back again
+    // segment-to-segment, which reads as the remaining columns visibly
+    // shifting/splitting apart.
+    const isPartOfSplitVerse = Array.isArray(verse.slideshowLanguageKeys);
+    if (isPartOfSplitVerse && verse.slideshowLanguageKeys.includes(language.key)) return true;
+
     if (language.key === "coptic") {
       const copticHiddenByToggle =
         isRecitedPrayer && !visibleLanguages.copticRecitedPrayers && !verse.forceCopticVisible;
