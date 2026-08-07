@@ -543,6 +543,14 @@ function getSafeTextAlign(language) {
     return "center";
   }
 
+  // Real CSS justify (web, via WebView in scroll mode) honors
+  // textJustify:"inter-word" and only stretches the gaps between words.
+  // React Native's Text has no equivalent property — native "justify" on
+  // iOS (NSTextAlignment.justified) and Android alike stretch tracking
+  // between individual LETTERS too, which reads as broken, uneven type.
+  // There's no RN style prop to restrict it to inter-word only, so plain
+  // left/right alignment is the only option that doesn't look broken on
+  // native, on either platform.
   if (Platform.OS === "web") {
     return language.textAlign;
   }

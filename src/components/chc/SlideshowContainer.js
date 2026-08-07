@@ -1088,8 +1088,15 @@ function paginateItems(
     }
 
     const itemHeight = Math.ceil((heights[item.id] || 0) + 2);
+    // Reserving room for the next verse's first line exists only to avoid a
+    // *visible* title sitting orphaned at the bottom of a page with none of
+    // its own content in sight until the next page. A blank title has
+    // nothing to orphan — reserving space for it anyway was forcing an early
+    // break (pushing everything since the last break to a new page) purely
+    // because the next verse's first line didn't fit, even when the blank
+    // title itself trivially would have.
     const followingMinimumHeight =
-      item.type === "title"
+      item.type === "title" && hasVisibleTitleText(item.title)
         ? getMinimumFollowingVerseHeight(items[index + 1], languageHeights, fontSize)
         : 0;
     const requiredHeight = itemHeight + followingMinimumHeight;
