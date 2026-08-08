@@ -106,6 +106,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // doesn't match it yet, so that premature "still at the top" reading can
   // never overwrite the real remembered position.
   const pendingScrollRestoreSectionIdRef = useRef<string | null>(null);
+  // Navigating to Settings/Calendar keeps this screen mounted behind the new
+  // one (see the module comment at the top of this file), and the layout
+  // shift that transition causes is enough to make the still-live WebView's
+  // reading-line tracker briefly misfire -- observed landing on the very
+  // last section in the document, as if the reflow had collapsed its scroll
+  // range out from under it. Set the moment either navigation is triggered;
+  // cleared after a few seconds (long enough for the transition, and its
+  // knock-on layout settling, to be over) rather than on any particular
+  // "we're back and focused" event, since this screen has no such signal.
+  const navigatingAwayRef = useRef(false);
 
   const bookmarked = isBookmarked(bookmarkId);
 
@@ -277,6 +287,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferences.slideshowMode]);
 
+  // See navigatingAwayRef's declaration -- used for any navigation that
+  // leaves this screen mounted behind the destination (Settings, Calendar).
+  const navigateAway = (href: Href) => {
+    navigatingAwayRef.current = true;
+    setTimeout(() => {
+      navigatingAwayRef.current = false;
+    }, 3000);
+    router.push(href);
+  };
+
   const handleAction = (action: DocumentAction) => {
     if (action.type === 'toggleCopticGospelRite') {
       gospelRiteAnchorSectionIdRef.current = action.sectionId || currentSectionId;
@@ -287,6 +307,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     if (!sections) return;
 
     if (action.type === 'currentSection') {
+      // Opening the content-selector drawer (a Modal) sits on top of the
+      // WebView without unmounting it, and the layout shift that causes
+      // (e.g. the underlying page's scrollbar disappearing) is enough to
+      // make its reading-line tracker briefly reassess and report some
+      // unrelated section as "current" -- the user isn't actually scrolling
+      // the document while a modal covers it, so nothing it reports during
+      // that window reflects real reading position. Same idea for
+      // navigatingAwayRef, covering the Settings/Calendar transition itself.
+      if (selectorOpen || navigatingAwayRef.current) return;
+
       const pendingTarget = pendingScrollRestoreSectionIdRef.current;
       if (pendingTarget && action.sectionId !== pendingTarget) {
         // Still mid-restore and this isn't the target yet -- almost
@@ -385,6 +415,13 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             onAction={handleAction}
             selectedSectionId={selectedSlideSectionId}
             onCurrentSectionChange={(id) => {
+              // Only SlideshowContainer ever calls this — a report arriving
+              // while slideshowMode is actually false can only be a stale
+              // callback from an instance that's already mid-unmount (e.g.
+              // right as the mode toggle flips the other way), not a real
+              // position update; trusting it would silently overwrite the
+              // correct remembered position with garbage.
+              if (!preferences.slideshowMode) return;
               setCurrentSectionId(id);
               setLastDocumentPosition(documentPositionKey, id);
             }}
@@ -406,8 +443,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             }}
             bookmarked={bookmarked}
             onToggleBookmark={() => toggleBookmark(bookmarkId)}
-            onOpenCalendar={() => router.push('/calendar')}
-            onOpenSettings={() => router.push('/settings')}
+            onOpenCalendar={() => navigateAway('/calendar')}
+            onOpenSettings={() => navigateAway('/settings')}
             bishopPresent={preferences.bishopPresent}
             onToggleBishopPresent={toggleBishopPresent}
             displaySilentPrayers={preferences.displaySilentPrayers}
