@@ -41,13 +41,31 @@ function addOneDay(date: Date): Date {
   return next;
 }
 
+// Every downstream consumer (conditionEngine.js, hymnLibrary.js,
+// readingsService.ts, calendarService.ts, fixedFeasts.ts, ...) treats a Date
+// as a date-only value and reads its calendar day via the UTC accessors
+// (toISOString().slice(0, 10), getUTCFullYear/getUTCMonth/getUTCDate) — the
+// same convention a manually-picked calendar day already uses (built as
+// `T00:00:00Z`). A bare `new Date()` is a real instant, not a date-only
+// value: reading ITS calendar day via those same UTC accessors reports
+// whatever day it is in UTC, not the device's own local day, silently
+// rolling the app to "tomorrow" hours early (for zones ahead of UTC) or
+// keeping it on "yesterday" for a while after local midnight (for zones
+// behind UTC). Anchoring the device's *local* year/month/date at UTC
+// midnight here means every one of those existing UTC-based reads
+// automatically reflects the device's local calendar day instead, with no
+// changes needed anywhere else.
+export function localDateAtUtcMidnight(date: Date): Date {
+  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+}
+
 export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [liturgicalDayPeriod, setLiturgicalDayPeriodState] = useState<LiturgicalDayPeriod>(computeDefaultPeriod);
   const manualOverrideRef = useRef(false);
 
   const isLive = selectedDate === null;
-  const rawDate = selectedDate ?? new Date();
+  const rawDate = selectedDate ?? localDateAtUtcMidnight(new Date());
 
   // While live and not manually overridden, keep the liturgical day period
   // tracking the real clock so the 5pm boundary flips without a fresh load.

@@ -7,7 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { getEventFormalName, getSeasonFormalName } from '@/constants/seasonNames';
-import { useCalendar } from '@/context/CalendarContext';
+import { localDateAtUtcMidnight, useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
   getCopticYearForDate,
@@ -71,7 +71,12 @@ export default function SeasonSelectorScreen() {
   const [yearRange, setYearRange] = useState<{ startDate: string; endDate: string } | null>(null);
 
   useEffect(() => {
-    getCopticYearForDate(new Date()).then((y) => {
+    // localDateAtUtcMidnight (not a bare `new Date()`) so this resolves
+    // against the device's own local calendar day, same as everywhere else
+    // — see CalendarContext.tsx. Real "today", not rawDate/selectedDate,
+    // since this seeds which Coptic year to show regardless of whatever
+    // date might be selected elsewhere in the app.
+    getCopticYearForDate(localDateAtUtcMidnight(new Date())).then((y) => {
       setCurrentCopticYear(y);
       setYear(y);
     });
@@ -139,7 +144,7 @@ export default function SeasonSelectorScreen() {
     };
   }, [year, isArabic]);
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = localDateAtUtcMidnight(new Date()).toISOString().slice(0, 10);
   const todayInViewedYear = Boolean(yearRange && todayIso >= yearRange.startDate && todayIso < yearRange.endDate);
 
   const { liveTopKey, liveChildKey, lineAfterKey } = useMemo(() => {
