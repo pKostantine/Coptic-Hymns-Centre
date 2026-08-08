@@ -27,6 +27,8 @@ interface DocumentWebViewProps {
   copticRecitedPrayers?: boolean;
   copticGospelRite?: boolean;
   onAction?: (action: DocumentAction) => void;
+  /** Section to scroll to the moment this WebView finishes its first load — e.g. wherever the user was reading in slideshow mode just before switching, or the last remembered position for a brand-new mount. Only consulted once, at mount; changing it on a later render has no effect (use the imperative scrollToSection handle for that). */
+  initialSectionId?: string | null;
 }
 
 /**
@@ -48,6 +50,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       copticRecitedPrayers = true,
       copticGospelRite = false,
       onAction,
+      initialSectionId,
     },
     ref,
   ) => {
@@ -57,13 +60,15 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     // documentHtml.ts) most recently reported. A settings change (font size,
     // a language toggle, comments/silent-prayers, Bishop Present) rebuilds
     // the whole HTML document, which reloads the WebView and resets scroll
-    // to the top — restoring to this section on load is what brings the
-    // user back to where they were instead.
-    const preservedSectionIdRef = useRef<string | null>(null);
-    // Verse-granular position, reported alongside the section — preferred
-    // over preservedSectionIdRef when restoring (falls back to the section
-    // if that exact verse can't be found, e.g. hidden by a settings change).
-    const preservedVerseIdRef = useRef<string | null>(null);
+    // to the top — restoring to this section's START on load is what brings
+    // the user back to where they were instead. Deliberately section-
+    // granular, not the exact verse — matches slideshow mode's own
+    // settings-change restore. Seeded from initialSectionId (not null) so a
+    // freshly mounted WebView (e.g. switching from slideshow mode, or a
+    // brand-new document load) already knows where to land on its very
+    // first load, rather than only being able to correct itself starting
+    // from its *second* reload onward.
+    const preservedSectionIdRef = useRef<string | null>(initialSectionId ?? null);
 
     useImperativeHandle(ref, () => ({
       scrollToSection: (id: string) => {
@@ -82,7 +87,6 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         const action = JSON.parse(event.nativeEvent.data);
         if (action?.type === 'currentSection' && action.sectionId) {
           preservedSectionIdRef.current = action.sectionId;
-          preservedVerseIdRef.current = action.verseId || null;
         }
         onAction?.(action);
       } catch {
@@ -91,13 +95,8 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     };
 
     const handleLoadEnd = () => {
-      const verseId = preservedVerseIdRef.current;
       const sectionId = preservedSectionIdRef.current;
-      if (verseId) {
-        webviewRef.current?.injectJavaScript(
-          `if (!(window.scrollToVerse && window.scrollToVerse(${JSON.stringify(verseId)})) && window.scrollToSection) { window.scrollToSection(${JSON.stringify(sectionId)}); } true;`,
-        );
-      } else if (sectionId) {
+      if (sectionId) {
         webviewRef.current?.injectJavaScript(
           `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(sectionId)}); } true;`,
         );

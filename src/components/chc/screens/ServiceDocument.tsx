@@ -96,6 +96,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // whichever section id the toggle button itself reported — consumed by
   // the re-anchor effect right after.
   const gospelRiteAnchorSectionIdRef = useRef<string | null>(null);
+  // A freshly (re)mounted WebView's own scroll-tracking script starts
+  // reporting "currentSection" as soon as content paints -- for the very
+  // first frame or two that's just wherever it naturally loaded (the top),
+  // not wherever an explicit scrollToSection restore is about to send it.
+  // Whenever a restore is in flight (initial load, a mode switch, the
+  // gospel-rite/dimension-change re-anchors), this holds the section it's
+  // headed for; handleAction's 'currentSection' case ignores any report that
+  // doesn't match it yet, so that premature "still at the top" reading can
+  // never overwrite the real remembered position.
+  const pendingScrollRestoreSectionIdRef = useRef<string | null>(null);
 
   const bookmarked = isBookmarked(bookmarkId);
 
@@ -152,13 +162,28 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // option (scrollToSection is imperative and needs the WebView mounted
   // first), so it still restores via an effect once a freshly (re)hydrated
   // document is ready.
+  // The actual scroll-on-first-load itself is handled declaratively by
+  // DocumentWebView's own initialSectionId prop (see initialScrollSectionId
+  // below) -- it waits for the WebView's real load-complete event rather
+  // than guessing a timeout, which an imperative scrollToSection call fired
+  // from here never could (this screen has no way to know when the WebView
+  // has actually finished loading). This effect only needs to guard against
+  // that same freshly-mounted WebView's own natural "just loaded, still at
+  // the top" report racing ahead of initialSectionId's correction and
+  // overwriting the store before it lands.
   useEffect(() => {
     if (!sections || hasRestoredScrollPositionRef.current || preferences.slideshowMode) return;
     hasRestoredScrollPositionRef.current = true;
 
     const lastSectionId = getLastDocumentPosition(documentPositionKey);
     if (!lastSectionId || !sections.some((s) => s.id === lastSectionId)) return;
-    documentRef.current?.scrollToSection(lastSectionId);
+    pendingScrollRestoreSectionIdRef.current = lastSectionId;
+    const clearGuardTimeoutId = setTimeout(() => {
+      if (pendingScrollRestoreSectionIdRef.current === lastSectionId) {
+        pendingScrollRestoreSectionIdRef.current = null;
+      }
+    }, 2000);
+    return () => clearTimeout(clearGuardTimeoutId);
   }, [sections, documentPositionKey, preferences.slideshowMode]);
 
   // Rotating the device (or, on web, resizing the window) reflows the
@@ -202,6 +227,56 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => clearTimeout(timeoutId);
   }, [copticGospelRite, preferences.slideshowMode]);
 
+  // Flipping the Slideshow Mode toggle unmounts one renderer and mounts the
+  // other (DocumentSurface.tsx renders either SlideshowContainer or
+  // DocumentWebView, never both) — neither one's internal "where was the
+  // user" tracking survives that swap on its own. currentSectionId is kept
+  // live by both renderers (handleAction's 'currentSection' case for scroll
+  // mode, onCurrentSectionChange for slideshow below), so it's always
+  // whatever hymn the user was just looking at regardless of which mode
+  // reported it — jump the *other* mode there the moment the toggle flips.
+  // Only reacts to an actual flip (this ref starts equal to the current
+  // value, so it never fires on mount) — same "settings change -> start of
+  // the hymn, not the exact spot" behavior as every other settings change,
+  // just triggered by this one specific setting.
+  const previousSlideshowModeRef = useRef(preferences.slideshowMode);
+  useEffect(() => {
+    if (previousSlideshowModeRef.current === preferences.slideshowMode) return;
+    previousSlideshowModeRef.current = preferences.slideshowMode;
+    if (!currentSectionId) return;
+
+    if (preferences.slideshowMode) {
+      setSelectedSlideSectionId(currentSectionId);
+      return;
+    }
+
+    // Write the target synchronously, immediately, so the persisted store
+    // already has the right answer no matter what happens next -- Settings
+    // can be reached from a screen that stays mounted in the background
+    // (this effect firing at all is proof of that), so a fresh WebView can
+    // mount here before this screen is even navigated back to. The actual
+    // scroll happens declaratively, via initialScrollSectionId seeding the
+    // new WebView's initialSectionId prop below (see its own doc comment) --
+    // that waits for the real load-complete event instead of guessing a
+    // timeout. pendingScrollRestoreSectionIdRef blocks handleAction from
+    // trusting anything else until this exact section is confirmed, so the
+    // WebView's own natural "just loaded, still at the top" report can't
+    // beat that correction and overwrite the store with a stray position
+    // before this screen is even visible again.
+    setLastDocumentPosition(documentPositionKey, currentSectionId);
+    pendingScrollRestoreSectionIdRef.current = currentSectionId;
+    // The target section might never actually get reported back (e.g. it
+    // got hidden by some other setting in the meantime) -- don't leave the
+    // guard blocking every future report forever if that happens.
+    const clearGuardTimeoutId = setTimeout(() => {
+      if (pendingScrollRestoreSectionIdRef.current === currentSectionId) {
+        pendingScrollRestoreSectionIdRef.current = null;
+      }
+    }, 2000);
+    return () => clearTimeout(clearGuardTimeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferences.slideshowMode]);
+
   const handleAction = (action: DocumentAction) => {
     if (action.type === 'toggleCopticGospelRite') {
       gospelRiteAnchorSectionIdRef.current = action.sectionId || currentSectionId;
@@ -212,6 +287,15 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     if (!sections) return;
 
     if (action.type === 'currentSection') {
+      const pendingTarget = pendingScrollRestoreSectionIdRef.current;
+      if (pendingTarget && action.sectionId !== pendingTarget) {
+        // Still mid-restore and this isn't the target yet -- almost
+        // certainly the WebView's own natural "just loaded, still at the
+        // top" report racing the explicit scroll that's about to correct
+        // it. Ignore it rather than let it clobber the real position.
+        return;
+      }
+      pendingScrollRestoreSectionIdRef.current = null;
       if (action.sectionId) {
         setCurrentSectionId(action.sectionId);
         setLastDocumentPosition(documentPositionKey, action.sectionId);
@@ -306,6 +390,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             }}
             onOpenSelector={() => setSelectorOpen(true)}
             copticGospelRite={copticGospelRite}
+            initialScrollSectionId={currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
           />
           <ContentSelectorDrawer
             visible={selectorOpen}

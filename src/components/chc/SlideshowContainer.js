@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -22,6 +22,7 @@ export default function SlideshowContainer({
   onToggleCollapse,
   bishopPresent,
   onAction,
+  copticGospelRite,
 }) {
   const safeAreaInsets = useSafeAreaInsets();
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -45,23 +46,25 @@ export default function SlideshowContainer({
   const pendingHeightsRef = useRef({});
   const pendingLanguageHeightsRef = useRef({});
   const pendingMeasurementFrameRef = useRef(null);
-  // Whatever section the user is actually looking at right now, kept up to
-  // date by the onCurrentSectionChange effect below. A settings change
+  // Whatever section (hymn) the user is actually looking at right now, kept
+  // up to date by the onCurrentSectionChange effect below. A settings change
   // (font size, a language toggle, minimizing a hymn, Bishop Present, ...)
   // forces a full repagination — without remembering this, the reset effect
   // below used to always snap back to slide 0, sending the user back to the
-  // very start of the document every time they changed anything.
+  // very start of the document every time they changed anything. Restoring
+  // always lands on the START of that hymn (its title's own slide), never
+  // partway through it — deliberately less precise than tracking the exact
+  // verse, matching scroll mode's own settings-change behavior.
   const preservedSectionIdRef = useRef(null);
   const pendingRestoreSectionIdRef = useRef(null);
-  // Same idea, but at verse granularity — a section can span many slides
-  // (or a single verse can itself split across slides), so restoring to
-  // "some slide in this section" after a rotation/resize repagination can
-  // land several slides away from the exact verse the user had been
-  // reading. This is tried first; the section-level ref above is the
-  // fallback if that specific verse no longer exists after the change
-  // (e.g. a settings toggle hid it).
-  const preservedVerseIdRef = useRef(null);
-  const pendingRestoreVerseIdRef = useRef(null);
+  // Tracks what every item's own height was last measured against, so a
+  // change that only touches a handful of items (minimizing one hymn, which
+  // just removes that section's verse items -- see buildSlideshowSections in
+  // DocumentSurface.tsx) can keep every OTHER item's already-known height
+  // instead of wiping the whole document's measurements and re-rendering
+  // everything off-screen from scratch just because one thing changed.
+  const lastGlobalMeasurementKeyRef = useRef(null);
+  const lastItemSignaturesRef = useRef(new Map());
 
   const items = useMemo(() => flattenSections(sections, bishopPresent), [sections, bishopPresent]);
   const itemsSignature = useMemo(
@@ -71,7 +74,10 @@ export default function SlideshowContainer({
   const slideTableWidth = Math.max(viewportWidth || tableWidth || 1, 1);
   const slideColumnWidth =
     slideTableWidth / Math.max(getVisibleLanguageCount(visibleLanguages), 1);
-  const measuredKey = useMemo(
+  // Everything that affects EVERY item's height at once -- as opposed to
+  // itemsSignature, where a single item changing (e.g. minimizing one hymn)
+  // only ever affects that one item and whatever it contained.
+  const globalMeasurementKey = useMemo(
     () =>
       [
         fontSize,
@@ -85,11 +91,11 @@ export default function SlideshowContainer({
         Math.round(viewportHeightOverride || 0),
         Math.round(safeAreaInsets.top || 0),
         Math.round(safeAreaInsets.bottom || 0),
-        itemsSignature,
+        refreshKey,
       ].join(":"),
     [
       fontSize,
-      itemsSignature,
+      refreshKey,
       safeAreaInsets.bottom,
       safeAreaInsets.top,
       slideTableWidth,
@@ -99,6 +105,7 @@ export default function SlideshowContainer({
       visibleLanguages,
     ],
   );
+  const measuredKey = `${globalMeasurementKey}:${itemsSignature}`;
   measurementSignatureRef.current = measuredKey;
 
   useLayoutEffect(() => {
@@ -110,9 +117,29 @@ export default function SlideshowContainer({
       pendingMeasurementFrameRef.current = null;
     }
     pendingRestoreSectionIdRef.current = preservedSectionIdRef.current;
-    pendingRestoreVerseIdRef.current = preservedVerseIdRef.current;
-    setMeasuredHeights({});
-    setMeasuredLanguageHeights({});
+
+    const newSignatures = new Map(items.map((item) => [item.id, getItemSignature(item)]));
+    // Nothing that affects every item's height changed -- only the item set
+    // itself did (most commonly: minimizing/expanding one hymn, which just
+    // adds or removes that section's verse items). Keep every item whose own
+    // signature is unchanged rather than wiping the whole document, so only
+    // the handful of items that actually differ need to remeasure.
+    const onlyItemsChanged = lastGlobalMeasurementKeyRef.current === globalMeasurementKey;
+    const keepUnchanged = (current) => {
+      if (!onlyItemsChanged) return {};
+      const next = {};
+      items.forEach((item) => {
+        if (current[item.id] != null && lastItemSignaturesRef.current.get(item.id) === newSignatures.get(item.id)) {
+          next[item.id] = current[item.id];
+        }
+      });
+      return next;
+    };
+
+    setMeasuredHeights(keepUnchanged);
+    setMeasuredLanguageHeights(keepUnchanged);
+    lastGlobalMeasurementKeyRef.current = globalMeasurementKey;
+    lastItemSignaturesRef.current = newSignatures;
     setCurrentSlideIndex(0);
     lastAppliedSelectedSectionId.current = null;
   }, [measuredKey, refreshKey]);
@@ -291,33 +318,16 @@ export default function SlideshowContainer({
     // — the jump effect right below, which shares this same trigger.
     if (selectedSectionId) {
       pendingRestoreSectionIdRef.current = null;
-      pendingRestoreVerseIdRef.current = null;
     }
   }, [selectedSectionId]);
 
   useEffect(() => {
     // An explicit content-selector jump (selectedSectionId) takes priority;
-    // otherwise, if a rotation/settings/minimization change just forced a
-    // repagination, prefer restoring to the exact verse the user had been
-    // reading (pendingRestoreVerseIdRef), falling back to just the section
-    // if that specific verse fragment no longer exists after the change.
-    if (!selectedSectionId && pendingRestoreVerseIdRef.current) {
-      const targetVerseId = pendingRestoreVerseIdRef.current;
-      if (lastAppliedSelectedSectionId.current !== targetVerseId) {
-        const verseSlideIndex = slides.findIndex((slide) =>
-          slide.some((item) => item.id === targetVerseId || (item.type === "verse" && item.id.split("-segment-")[0] === targetVerseId)),
-        );
-        if (verseSlideIndex >= 0) {
-          setCurrentSlideIndex(verseSlideIndex);
-          lastAppliedSelectedSectionId.current = targetVerseId;
-          pendingRestoreVerseIdRef.current = null;
-          pendingRestoreSectionIdRef.current = null;
-          return;
-        }
-      }
-      pendingRestoreVerseIdRef.current = null;
-    }
-
+    // otherwise, if a settings/rotation/minimization change just forced a
+    // repagination, jump back to the START of whatever hymn the user had
+    // been reading (pendingRestoreSectionIdRef) — always its title's own
+    // slide, never partway through it, matching scroll mode's own
+    // settings-change behavior.
     const targetSectionId = selectedSectionId || pendingRestoreSectionIdRef.current;
 
     if (
@@ -347,6 +357,14 @@ export default function SlideshowContainer({
   }, [selectedSectionId, slides]);
 
   useEffect(() => {
+    // A transient viewport collapse -- the container's own height briefly
+    // reporting 0, e.g. for a single frame during a screen-transition
+    // animation while navigating away -- makes the `slides` memo above fall
+    // back to a single-item "slide 0" that has nothing to do with where the
+    // user actually is. Reporting (and persisting) that would silently
+    // overwrite the real remembered position right as the user leaves.
+    if (!(viewportHeight || viewportHeightOverride)) return;
+
     const currentSlide = slides[currentSlideIndex];
     const currentSectionId = findSlideSectionId(currentSlide);
     if (!currentSectionId) return;
@@ -355,31 +373,22 @@ export default function SlideshowContainer({
     // or even just the surrounding layout shifting while navigating to
     // another screen) always snaps currentSlideIndex to 0 for a moment
     // before the jump effect above can correct it back to
-    // pendingRestoreSectionIdRef/pendingRestoreVerseIdRef.current. That
-    // transient "slide 0" is not where the user actually is — reporting it
-    // here (and to the host app, which persists it as "last known position")
-    // would overwrite the real position with a reset artifact before the
-    // correction even gets a chance to land.
+    // pendingRestoreSectionIdRef.current. That transient "slide 0" is not
+    // where the user actually is — reporting it here (and to the host app,
+    // which persists it as "last known position") would overwrite the real
+    // position with a reset artifact before the correction even gets a
+    // chance to land.
     if (pendingRestoreSectionIdRef.current && pendingRestoreSectionIdRef.current !== currentSectionId) {
       return;
-    }
-    if (pendingRestoreVerseIdRef.current) {
-      const targetVerseId = pendingRestoreVerseIdRef.current;
-      const stillPending = currentSlide?.some(
-        (item) => item.id === targetVerseId || (item.type === "verse" && item.id.split("-segment-")[0] === targetVerseId),
-      );
-      if (!stillPending) return;
     }
 
     // The pending restore (if any) has now been confirmed reached — clear it
     // so it doesn't keep gating every future report once selectedSectionId
     // stops changing (it never resets back to undefined on its own).
     pendingRestoreSectionIdRef.current = null;
-    pendingRestoreVerseIdRef.current = null;
     preservedSectionIdRef.current = currentSectionId;
-    preservedVerseIdRef.current = findSlidePositionId(currentSlide);
     onCurrentSectionChange?.(currentSectionId);
-  }, [currentSlideIndex, onCurrentSectionChange, slides]);
+  }, [currentSlideIndex, onCurrentSectionChange, slides, viewportHeight, viewportHeightOverride]);
 
   const goToPreviousSlide = useCallback(() => {
     setCurrentSlideIndex((current) => Math.max(current - 1, 0));
@@ -388,6 +397,29 @@ export default function SlideshowContainer({
   const goToNextSlide = useCallback(() => {
     setCurrentSlideIndex((current) => Math.min(current + 1, Math.max(slides.length - 1, 0)));
   }, [slides.length]);
+
+  // Stable across renders (unlike an inline arrow function) so SlideView --
+  // memoized below -- doesn't see a "changed" prop and re-render its entire
+  // subtree just because a title/button landed at a new y offset on the
+  // slide that's already on screen; that used to mean every slide
+  // navigation actually rendered the new slide's content TWICE (once to
+  // mount it, once more the instant its own layout callbacks fired back up
+  // here), which is most of why paging felt slow.
+  const handleTitleLayout = useCallback((sectionId, y, height) => {
+    setCollapsibleTitleLayouts((current) =>
+      current[sectionId]?.y === y && current[sectionId]?.height === height
+        ? current
+        : { ...current, [sectionId]: { y, height } }
+    );
+  }, []);
+
+  const handleButtonLayout = useCallback((sectionId, y, height) => {
+    setButtonLayouts((current) =>
+      current[sectionId]?.y === y && current[sectionId]?.height === height
+        ? current
+        : { ...current, [sectionId]: { y, height } }
+    );
+  }, []);
 
   useEffect(() => {
     if (
@@ -429,26 +461,34 @@ export default function SlideshowContainer({
     >
       {!isMeasurementComplete ? (
         <View pointerEvents="none" style={styles.measurementLayer}>
-          {items.map((item) => (
-            <SlideItem
-              key={item.id}
-              item={item}
-              visibleLanguages={visibleLanguages}
-              fontSize={fontSize}
-              theme={theme}
-              columnWidth={slideColumnWidth}
-              tableWidth={slideTableWidth}
-              titleHelpers={titleHelpers}
-              measurementSignature={measuredKey}
-              onMeasured={(height, signature) =>
-                queueMeasuredHeight(item.id, height, signature)
-              }
-              onLanguageMeasured={(language, metric, signature) =>
-                queueMeasuredLanguage(item.id, language, metric, signature)
-              }
-              onToggleCollapse={onToggleCollapse}
-            />
-          ))}
+          {/* Only items missing a cached height actually need to mount and
+              measure here -- most of the time (e.g. minimizing one hymn)
+              that's a small handful of items, not the whole document; see
+              the reset effect above, which preserves cached heights for
+              every item whose own signature didn't change. */}
+          {items
+            .filter((item) => typeof measuredHeights[item.id] !== "number")
+            .map((item) => (
+              <SlideItem
+                key={item.id}
+                item={item}
+                visibleLanguages={visibleLanguages}
+                fontSize={fontSize}
+                theme={theme}
+                columnWidth={slideColumnWidth}
+                tableWidth={slideTableWidth}
+                titleHelpers={titleHelpers}
+                measurementSignature={measuredKey}
+                onMeasured={(height, signature) =>
+                  queueMeasuredHeight(item.id, height, signature)
+                }
+                onLanguageMeasured={(language, metric, signature) =>
+                  queueMeasuredLanguage(item.id, language, metric, signature)
+                }
+                onToggleCollapse={onToggleCollapse}
+                copticGospelRite={copticGospelRite}
+              />
+            ))}
         </View>
       ) : null}
 
@@ -463,20 +503,9 @@ export default function SlideshowContainer({
         slidePadding={slidePadding}
         onToggleCollapse={onToggleCollapse}
         onAction={onAction}
-        onTitleLayout={(sectionId, y, height) =>
-          setCollapsibleTitleLayouts((current) =>
-            current[sectionId]?.y === y && current[sectionId]?.height === height
-              ? current
-              : { ...current, [sectionId]: { y, height } }
-          )
-        }
-        onButtonLayout={(sectionId, y, height) =>
-          setButtonLayouts((current) =>
-            current[sectionId]?.y === y && current[sectionId]?.height === height
-              ? current
-              : { ...current, [sectionId]: { y, height } }
-          )
-        }
+        onTitleLayout={handleTitleLayout}
+        onButtonLayout={handleButtonLayout}
+        copticGospelRite={copticGospelRite}
       />
 
       <NavigationOverlay
@@ -487,14 +516,18 @@ export default function SlideshowContainer({
 
       {onAction
         ? (slides[currentSlideIndex] || [])
-            .filter((item) => item.type === "button" && buttonLayouts[item.sectionId])
+            .filter((item) => (item.type === "button" || item.type === "gospelRiteToggle") && buttonLayouts[item.sectionId])
             .map((item) => {
               const layout = buttonLayouts[item.sectionId];
+              const action =
+                item.type === "gospelRiteToggle"
+                  ? { type: "toggleCopticGospelRite", sectionId: item.sectionId }
+                  : { type: item.buttonAction, sectionId: item.sectionId };
               return (
                 <Pressable
                   key={item.sectionId}
                   style={[styles.openButtonOverlay, { top: layout.y, height: layout.height }]}
-                  onPress={() => onAction({ type: item.buttonAction, sectionId: item.sectionId })}
+                  onPress={() => onAction(action)}
                 />
               );
             })
@@ -523,7 +556,11 @@ export default function SlideshowContainer({
   );
 }
 
-export function SlideView({
+// Memoized so a parent re-render that doesn't actually change any of these
+// props (e.g. the title/button layout-overlay state settling right after
+// this same slide's own content just mounted) skips re-rendering the whole
+// slide a second time -- see handleTitleLayout/handleButtonLayout above.
+export const SlideView = memo(function SlideView({
   items,
   visibleLanguages,
   fontSize,
@@ -536,6 +573,7 @@ export function SlideView({
   onTitleLayout,
   onButtonLayout,
   onAction,
+  copticGospelRite,
 }) {
   return (
     <View
@@ -562,11 +600,12 @@ export function SlideView({
           onTitleLayout={onTitleLayout}
           onButtonLayout={onButtonLayout}
           onAction={onAction}
+          copticGospelRite={copticGospelRite}
         />
       ))}
     </View>
   );
-}
+});
 
 export function NavigationOverlay({
   onPrevious,
@@ -649,7 +688,12 @@ function CollapseButton({ collapsed, onPress }) {
   );
 }
 
-function SlideItem({
+// Memoized so, on the visible (non-measurement-layer) path, a re-render
+// triggered by unrelated sibling state (e.g. an overlay's layout tracking
+// settling) doesn't re-render every verse on the current slide -- `item`
+// itself keeps the same reference across those renders since `slides`
+// doesn't change from state that isn't its own useMemo dependency.
+const SlideItem = memo(function SlideItem({
   item,
   visibleLanguages,
   fontSize,
@@ -664,7 +708,39 @@ function SlideItem({
   onTitleLayout,
   onButtonLayout,
   onAction,
+  copticGospelRite,
 }) {
+  if (item.type === "gospelRiteToggle") {
+    return (
+      <View
+        style={styles.gospelRiteToggleRow}
+        onLayout={(event) => {
+          onMeasured?.(event.nativeEvent.layout.height, measurementSignature);
+          onButtonLayout?.(item.sectionId, event.nativeEvent.layout.y, event.nativeEvent.layout.height);
+        }}
+      >
+        {/* Same full-screen-swipe-layer problem as the Subdocument/Antiphonary
+            open button below -- this Pressable is not actually reachable by
+            touch on its own; the real tap target is the overlay rendered
+            after NavigationOverlay, using the y/height reported above. */}
+        <Pressable
+          style={[styles.gospelRiteToggle, copticGospelRite && styles.gospelRiteToggleOn]}
+          onPress={() => onAction?.({ type: "toggleCopticGospelRite", sectionId: item.sectionId })}
+        >
+          <View style={[styles.gospelRiteToggleDot, copticGospelRite && styles.gospelRiteToggleDotOn]} />
+          <Text
+            style={[
+              styles.gospelRiteToggleText,
+              { fontSize: Math.round(fontSize * 0.65), color: copticGospelRite ? COLORS.black : theme.colors.text },
+            ]}
+          >
+            Coptic Gospel Rite
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   if (item.type === "button") {
     const label = titleHelpers.shouldShowEnglishTitle(item.title) ? titleHelpers.getTitleText(item.title) : "";
     const arabicLabel =
@@ -796,7 +872,7 @@ function SlideItem({
       />
     </View>
   );
-}
+});
 
 // Speaker-label suppression is a whole-document decision, not a per-hymn
 // one — computeGlobalSuppressSpeakerLabelFlags is the exact same function
@@ -816,6 +892,20 @@ function flattenSections(sections, bishopPresent) {
           type: "button",
           title: section.title,
           buttonAction: section.isAntiphonaryButton ? "openAntiphonary" : "openSubdocument",
+        },
+      ];
+    }
+
+    if (section.startsGospelRiteToggle) {
+      // Never forces its own page break (unlike a real button) — it's meant
+      // to sit right alongside whatever title it was spliced after (see
+      // pushWholeTableInlineSections in hymnLibrary.js), not interrupt the
+      // flow the way opening a subdocument does.
+      return [
+        {
+          id: `${section.id}-gospel-rite-toggle`,
+          sectionId: section.id,
+          type: "gospelRiteToggle",
         },
       ];
     }
@@ -938,12 +1028,6 @@ function findSlideSectionId(slide = []) {
   return slide.find((item) => item.sectionId)?.sectionId;
 }
 
-/** The specific verse item id (falling back to whatever other item — title/button — is present) representing this slide's reading position, for verse-granular restore after a repagination. */
-function findSlidePositionId(slide = []) {
-  const verseItem = slide.find((item) => item.type === "verse");
-  return verseItem ? verseItem.id : findSlideSectionId(slide);
-}
-
 function getItemSignature(item) {
   if (item.type === "title") {
     const title = typeof item.title === "string"
@@ -956,6 +1040,14 @@ function getItemSignature(item) {
   if (item.type === "button") {
     const title = [item.title?.english, item.title?.arabic].filter(Boolean).join("/");
     return `${item.id}:button:${title.length}`;
+  }
+
+  if (item.type === "gospelRiteToggle") {
+    // Its own height never depends on whether the toggle is currently on or
+    // off (only its fill color does, which SlideItem re-renders from the
+    // live copticGospelRite prop directly, not from a cached measurement) —
+    // a fixed signature is enough to skip remeasuring it.
+    return `${item.id}:gospelRiteToggle`;
   }
 
   const verse = item.verse || {};
@@ -1029,7 +1121,7 @@ const EASTERN_ARABIC_DIGITS = {
 // slides are dropped entirely.
 function slideHasVisibleContent(slide = []) {
   return slide.some((item) => {
-    if (item.type === "button") {
+    if (item.type === "button" || item.type === "gospelRiteToggle") {
       return true;
     }
 
@@ -1063,6 +1155,37 @@ function hasVisibleTitleText(title) {
   return Boolean(title?.english || title?.arabic);
 }
 
+/**
+ * Groups a *visible* title together with its own immediately-following verse
+ * into one atomic pagination unit, up front — structurally guaranteeing a
+ * title is never placed somewhere its own content can't follow it, rather
+ * than trying to protect against that after the fact with a reservation
+ * heuristic bolted onto a generic per-item loop (the old approach, which
+ * kept needing more special cases: blank titles wrongly triggering the same
+ * protection, forcing needless breaks). A blank title has nothing to
+ * protect and is left as its own trivial (near-zero height) unit, same as
+ * any other single item.
+ */
+function buildPaginationUnits(items) {
+  const units = [];
+  let index = 0;
+  while (index < items.length) {
+    const item = items[index];
+    const isVisibleTitle = item.type === "title" && !item.isCollapsed && hasVisibleTitleText(item.title);
+    const next = items[index + 1];
+
+    if (isVisibleTitle && next?.type === "verse") {
+      units.push({ items: [item, next], breakBefore: true });
+      index += 2;
+      continue;
+    }
+
+    units.push({ items: [item], breakBefore: isVisibleTitle || item.type === "button" });
+    index += 1;
+  }
+  return units;
+}
+
 function paginateItems(
   items,
   heights,
@@ -1072,87 +1195,97 @@ function paginateItems(
   visibleLanguages,
   tableWidth,
 ) {
+  const units = buildPaginationUnits(items);
   const slides = [];
   let currentSlide = [];
   let currentHeight = 0;
 
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    if (
-      currentSlide.length &&
-      ((item.type === "title" && !item.isCollapsed && hasVisibleTitleText(item.title)) || item.type === "button")
-    ) {
-      slides.push(currentSlide);
-      currentSlide = [];
-      currentHeight = 0;
+  const flushSlide = () => {
+    if (currentSlide.length) slides.push(currentSlide);
+    currentSlide = [];
+    currentHeight = 0;
+  };
+
+  // `startedFreshHere` is true only for a verse that's the second half of a
+  // title+verse unit: we've already committed to keeping it right after its
+  // title (never moved to "yet another" fresh slide looking for more room),
+  // so a verse that still doesn't fit there just starts splitting on the
+  // spot, using whatever's left after the (always tiny) title — in every
+  // realistic case that's most of a full page, so the first split segment
+  // is never actually starved for room.
+  const placeVerse = (verseItem, startedFreshHere) => {
+    const verseHeight = Math.ceil((heights[verseItem.id] || 0) + 2);
+
+    if (currentHeight + verseHeight <= availableHeight) {
+      currentSlide.push(verseItem);
+      currentHeight += verseHeight;
+      return;
     }
 
-    const itemHeight = Math.ceil((heights[item.id] || 0) + 2);
-    // Reserving room for the next verse's first line exists only to avoid a
-    // *visible* title sitting orphaned at the bottom of a page with none of
-    // its own content in sight until the next page. A blank title has
-    // nothing to orphan — reserving space for it anyway was forcing an early
-    // break (pushing everything since the last break to a new page) purely
-    // because the next verse's first line didn't fit, even when the blank
-    // title itself trivially would have.
-    const followingMinimumHeight =
-      item.type === "title" && hasVisibleTitleText(item.title)
-        ? getMinimumFollowingVerseHeight(items[index + 1], languageHeights, fontSize)
-        : 0;
-    const requiredHeight = itemHeight + followingMinimumHeight;
-
-    const currentSlideHasVerse = currentSlide.some((slideItem) => slideItem.type === "verse");
-    const canSplitTallVerseAfterTitle =
-      item.type === "verse" &&
-      itemHeight > availableHeight &&
-      !currentSlideHasVerse;
-
-    if (
-      currentSlide.length &&
-      currentHeight + Math.max(itemHeight, requiredHeight) > availableHeight &&
-      !canSplitTallVerseAfterTitle
-    ) {
-      slides.push(currentSlide);
-      currentSlide = [];
-      currentHeight = 0;
+    if (!startedFreshHere && currentSlide.length && verseHeight <= availableHeight) {
+      // Doesn't fit in what's left, but comfortably fits a whole fresh
+      // page on its own — just move it there instead of splitting.
+      flushSlide();
+      currentSlide.push(verseItem);
+      currentHeight += verseHeight;
+      return;
     }
 
-    if (
-      item.type === "verse" &&
-      itemHeight > availableHeight
-    ) {
-      const languageMetric = hasMeasuredVerseLines(languageHeights[item.id])
-        ? languageHeights[item.id]
-        : createEstimatedVerseMetric(item, fontSize, visibleLanguages, tableWidth);
+    const languageMetric = hasMeasuredVerseLines(languageHeights[verseItem.id])
+      ? languageHeights[verseItem.id]
+      : createEstimatedVerseMetric(verseItem, fontSize, visibleLanguages, tableWidth);
 
-      if (!hasMeasuredVerseLines(languageMetric)) {
-        currentSlide.push(item);
-        currentHeight += itemHeight;
-        continue;
-      }
+    if (!hasMeasuredVerseLines(languageMetric)) {
+      currentSlide.push(verseItem);
+      currentHeight += verseHeight;
+      return;
+    }
 
-      const result = appendTallVerseSegments({
-        item,
-        languageMetric,
-        slides,
-        currentSlide,
-        currentHeight,
-        availableHeight,
-        fontSize,
-      });
-      currentSlide = result.currentSlide;
-      currentHeight = result.currentHeight;
+    const result = appendTallVerseSegments({
+      item: verseItem,
+      languageMetric,
+      slides,
+      currentSlide,
+      currentHeight,
+      availableHeight,
+      fontSize,
+    });
+    currentSlide = result.currentSlide;
+    currentHeight = result.currentHeight;
+  };
+
+  for (const unit of units) {
+    if (currentSlide.length && unit.breakBefore) {
+      flushSlide();
+    }
+
+    if (unit.items.length === 2) {
+      // breakBefore is always true for a paired unit, so by this point
+      // currentSlide is always empty — the title always gets the room it
+      // needs before we even ask whether the verse fits alongside it.
+      const [titleItem, verseItem] = unit.items;
+      const titleHeight = Math.ceil((heights[titleItem.id] || 0) + 2);
+      currentSlide.push(titleItem);
+      currentHeight += titleHeight;
+      placeVerse(verseItem, true);
       continue;
     }
 
+    const item = unit.items[0];
+    if (item.type === "verse") {
+      placeVerse(item, false);
+      continue;
+    }
+
+    const itemHeight = Math.ceil((heights[item.id] || 0) + 2);
+    if (currentSlide.length && currentHeight + itemHeight > availableHeight) {
+      flushSlide();
+    }
     currentSlide.push(item);
     currentHeight += itemHeight;
   }
 
-  if (currentSlide.length) {
-    slides.push(currentSlide);
-  }
-
+  flushSlide();
   return slides.length ? slides : [[]];
 }
 
@@ -1344,27 +1477,6 @@ function getVerseLineSegmentHeight(segment, fontSize) {
   return languageHeights.length ? Math.max(...languageHeights) : 0;
 }
 
-function getMinimumFollowingVerseHeight(item, languageHeights, fontSize) {
-  if (item?.type !== "verse" || !hasMeasuredVerseLines(languageHeights[item.id])) {
-    return 0;
-  }
-
-  const state = createVerseLineState(languageHeights[item.id] || {}, fontSize, item);
-  const minimumLineHeight = Math.max(
-    0,
-    Math.max(
-      ...state.languages.map(
-        (entry) =>
-          entry.lineHeight +
-          getLanguageExtraTopPadding(entry.language, item, fontSize) +
-          getVerseVerticalPadding(item),
-      ),
-    ),
-  );
-
-  return minimumLineHeight;
-}
-
 function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
   if (item.type === "title") {
     return Math.max(Math.round(fontSize * 0.8), 20) + SPACING.sm * 2;
@@ -1372,6 +1484,10 @@ function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
 
   if (item.type === "button") {
     return 96 + SPACING.md * 2;
+  }
+
+  if (item.type === "gospelRiteToggle") {
+    return Math.round(fontSize * 0.8) + SPACING.sm * 2 + SPACING.lg;
   }
 
   const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
@@ -1748,6 +1864,43 @@ const styles = StyleSheet.create({
     fontFamily: "Arial",
     textAlign: "center",
     writingDirection: "rtl",
+  },
+  // Mirrors documentHtml.ts's .gospel-rite-toggle* CSS classes (the same
+  // toggle in scroll mode) — pill button, gold border/dot when off, filled
+  // gold with a black dot when on.
+  gospelRiteToggleRow: {
+    alignItems: "center",
+    flexShrink: 0,
+    paddingVertical: SPACING.sm,
+  },
+  gospelRiteToggle: {
+    alignItems: "center",
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.gold,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+  },
+  gospelRiteToggleOn: {
+    backgroundColor: COLORS.gold,
+  },
+  gospelRiteToggleDot: {
+    backgroundColor: COLORS.white,
+    borderRadius: 999,
+    height: 10,
+    opacity: 0.4,
+    width: 10,
+  },
+  gospelRiteToggleDotOn: {
+    backgroundColor: COLORS.black,
+    opacity: 1,
+  },
+  gospelRiteToggleText: {
+    fontFamily: "Georgia",
+    fontWeight: "700",
   },
   // Rendered as a sibling AFTER NavigationOverlay (same reasoning as
   // collapseButtonOverlay above) so the Subdocument/Antiphonary open-button

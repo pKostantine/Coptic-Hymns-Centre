@@ -13,6 +13,8 @@ interface DocumentSurfaceProps {
   selectedSectionId?: string | null;
   onCurrentSectionChange?: (id: string) => void;
   onOpenSelector?: () => void;
+  /** Where a freshly mounted WebView (scroll mode) should scroll to on its very first load — see DocumentWebView's initialSectionId. Slideshow mode has its own equivalent via selectedSectionId, which (unlike this) can also drive jumps after the initial mount. */
+  initialScrollSectionId?: string | null;
   /** Scales the reading font size relative to the user's normal preference. Defaults to 1 — subdocuments intentionally match the main document's font size exactly, same as every other reading preference. */
   fontScaleMultiplier?: number;
   /** Current on/off state of the in-document "Coptic Gospel Rite" toggle button (only rendered where GOSPEL_RITE content is spliced in). */
@@ -54,12 +56,6 @@ function buildSlideshowSections(
   collapsedSectionIds: Record<string, boolean>,
 ): DocumentSection[] {
   return sections
-    // The "Coptic Gospel Rite" toggle button is a WebView(scroll)-mode-only
-    // control (documentHtml.ts renders it inline via startsGospelRiteToggle)
-    // — its anchor is a dedicated zero-verse, untitled pseudo-section that
-    // exists purely to carry that flag, and would otherwise show up here as
-    // a blank slide with nothing on it.
-    .filter((section) => !section.startsGospelRiteToggle)
     .filter((section) => displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer')
     .filter((section) => !(section.bishopOnly && !bishopPresent) && !(section.priestOnly && bishopPresent))
     .filter(
@@ -100,7 +96,17 @@ function buildSlideshowSections(
  */
 const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
   (
-    { sections, preferences, onAction, selectedSectionId, onCurrentSectionChange, onOpenSelector, fontScaleMultiplier = 1, copticGospelRite = false },
+    {
+      sections,
+      preferences,
+      onAction,
+      selectedSectionId,
+      onCurrentSectionChange,
+      onOpenSelector,
+      fontScaleMultiplier = 1,
+      copticGospelRite = false,
+      initialScrollSectionId,
+    },
     ref,
   ) => {
     const { width: screenWidth } = useWindowDimensions();
@@ -159,6 +165,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           viewportHeightOverride={undefined}
           bishopPresent={preferences.bishopPresent}
           onAction={onAction}
+          copticGospelRite={copticGospelRite}
           onToggleCollapse={(sectionId: string) =>
             setCollapsedSectionIds((current) => ({
               ...current,
@@ -187,6 +194,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         copticGospelRite={copticGospelRite}
         copticRecitedPrayers={preferences.visibleLanguages.copticRecitedPrayers}
         onAction={onAction}
+        initialSectionId={initialScrollSectionId}
       />
     );
   },

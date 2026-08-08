@@ -3,6 +3,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
 import { resolveRubricKey } from "../../utils/verseRubric";
+import JustifiedText from "./JustifiedText";
 
 const REFRAIN_TAN = "#9FFFD0";
 const COMMENT_GREEN = "#8FD19E";
@@ -170,65 +171,141 @@ export default function VerseBlock({
 
   return (
     <View style={styles.row}>
-      {rowLanguages.map((language) => (
-        <View
-          key={language.key}
-          style={[
-            styles.cell,
-            isSeasonalHoosVerse && styles.seasonalHoosCell,
-            isCenteredAcrossPage && styles.centeredCell,
-            language.key === "coptic" && hasSpeakerLabel
-              ? { paddingTop: SPACING.sm + language.lineHeight }
-              : null,
-            { flexBasis: rowColumnWidth, maxWidth: rowColumnWidth },
-          ]}
-        >
-          <Text
-            selectable={selectableText}
+      {rowLanguages.map((language) => {
+        const isJustified = language.textAlign === "justify";
+        // On web, react-native-web renders straight to real DOM/CSS, so the
+        // browser's own text-align:justify already does true word-only
+        // justification as long as text-justify:inter-word rides along (see
+        // styles.text below) -- exactly the mechanism scroll mode's WebView
+        // already uses. Only native (iOS/Android) needs the synthetic
+        // per-word-Flexbox reconstruction in JustifiedText, since RN's own
+        // native justify stretches letter tracking too. Routing web through
+        // the plain single-Text path instead keeps it exactly as cheap as
+        // every non-justified verse -- no extra components, no per-word
+        // layout -- which is also why it's the fast path worth preferring
+        // whenever it's actually correct to use.
+        const useCssJustify = isJustified && Platform.OS === "web";
+        const textStyle = [
+          styles.text,
+          ...language.styles,
+          {
+            color: rowTextColor,
+            fontFamily: language.fontFamily,
+            fontSize: language.fontSize,
+            fontStyle: isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal",
+            fontWeight: isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400",
+            letterSpacing: 0,
+            lineHeight: language.lineHeight,
+            ...(Platform.OS === "web"
+              ? {
+                  overflowWrap: "break-word",
+                  wordBreak: "break-word",
+                }
+              : null),
+          },
+        ];
+
+        return (
+          <View
+            key={language.key}
             style={[
-              styles.text,
-              ...language.styles,
-              {
-                color: rowTextColor,
-                fontFamily: language.fontFamily,
-                fontSize: language.fontSize,
-                fontStyle: isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal",
-                fontWeight: isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400",
-                letterSpacing: 0,
-                lineHeight: language.lineHeight,
-                ...(Platform.OS === "web"
-                  ? {
-                      overflowWrap: "break-word",
-                      wordBreak: "break-word",
-                    }
-                  : null),
-                textAlign: getSafeTextAlign(language),
-              },
+              styles.cell,
+              isSeasonalHoosVerse && styles.seasonalHoosCell,
+              isCenteredAcrossPage && styles.centeredCell,
+              language.key === "coptic" && hasSpeakerLabel
+                ? { paddingTop: SPACING.sm + language.lineHeight }
+                : null,
+              { flexBasis: rowColumnWidth, maxWidth: rowColumnWidth },
             ]}
-            onLayout={(event) =>
-              reportLanguageMetric(language.key, {
-                height: event.nativeEvent.layout.height,
-              })
-            }
-            onTextLayout={(event) =>
-              reportLanguageMetric(language.key, {
-                lines: event.nativeEvent.lines || [],
-              })
-            }
           >
             {language.speakerLabel ? (
-              <>
-                <Text style={{ color: getSpeakerColor(rubricType, bishopPresent) }}>
-                  {language.speakerLabel}
-                </Text>
-                {"\n"}
-              </>
+              <Text style={[textStyle, { textAlign: getSafeTextAlign(language), color: getSpeakerColor(rubricType, bishopPresent) }]}>
+                {language.speakerLabel}
+              </Text>
             ) : null}
-            {renderLanguageText(language)}
-          </Text>
-        </View>
-      ))}
+            {isJustified && !useCssJustify ? (
+              <JustifiedVerseBody
+                language={language}
+                textStyle={textStyle}
+                selectableText={selectableText}
+                columnWidth={rowColumnWidth - SPACING.xs * 2}
+                onMetric={(metric) => reportLanguageMetric(language.key, metric)}
+              />
+            ) : (
+              <Text
+                selectable={selectableText}
+                style={[...textStyle, { textAlign: useCssJustify ? "justify" : getSafeTextAlign(language) }]}
+                onLayout={(event) =>
+                  reportLanguageMetric(language.key, {
+                    height: event.nativeEvent.layout.height,
+                  })
+                }
+                onTextLayout={(event) =>
+                  reportLanguageMetric(language.key, {
+                    lines: event.nativeEvent.lines || [],
+                  })
+                }
+              >
+                {renderLanguageText(language)}
+              </Text>
+            )}
+          </View>
+        );
+      })}
     </View>
+  );
+}
+
+/**
+ * The synthetic (per-word Flexbox) justified render path — only reached on
+ * native (see useCssJustify above; web gets true CSS justify through the
+ * plain Text path instead, Metropolitan highlighting included, at no extra
+ * cost). Still renders a seasonal Hoos prefix line (own line, untouched by
+ * justification, exactly like the plain path) ahead of the actual justified
+ * body.
+ *
+ * Metropolitan-bracket highlighting (see documentHtml.ts's
+ * highlightMetropolitanBrackets) is intentionally not reproduced here — it's
+ * a rare, purely cosmetic color accent, and correctly preserving it would
+ * mean tracking highlighted character ranges across words that a real line
+ * break can land in the middle of; not worth the risk of a subtly wrong
+ * split for how rarely it fires. It's unaffected everywhere else (scroll
+ * mode, and every non-justified slideshow verse type).
+ */
+function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, onMetric }) {
+  const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
+  const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
+  const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
+
+  let prefixNode = null;
+  let bodyText = language.text;
+
+  if (parts) {
+    prefixNode = <Text style={[prefixStyle, { color: REFRAIN_TAN }]}>{parts.prefix}</Text>;
+    bodyText = parts.body;
+  } else if (language.seasonalHoosVersePrefixSpacer) {
+    prefixNode = (
+      <Text style={[prefixStyle, { color: "transparent" }]}>{language.seasonalHoosVersePrefixSpacer}</Text>
+    );
+  }
+
+  const fullText = bibleVerseNumber ? `${bibleVerseNumber} ${bodyText}` : bodyText;
+
+  return (
+    <>
+      {prefixNode}
+      <JustifiedText
+        text={fullText}
+        style={textStyle}
+        fontSize={language.fontSize}
+        fontFamily={language.fontFamily}
+        width={columnWidth}
+        rtl={language.key === "arabic"}
+        firstWordStyle={bibleVerseNumber ? { color: COLORS.gold } : null}
+        onLayout={(event) => onMetric({ height: event.nativeEvent.layout.height })}
+        onLines={(lines) => onMetric({ lines })}
+      />
+    </>
   );
 }
 
@@ -538,22 +615,11 @@ const styles = StyleSheet.create({
   },
 });
 
+// Only ever called for center-aligned types (refrainLabel/readingReference/
+// invincibleCoptic) — every regular paragraph verse ("justify") now renders
+// through JustifiedVerseBody instead, which reproduces true word-only
+// justification itself (React Native's own textAlign:"justify" has no
+// inter-word-only mode — see JustifiedText.js).
 function getSafeTextAlign(language) {
-  if (language.textAlign === "center") {
-    return "center";
-  }
-
-  // Real CSS justify (web, via WebView in scroll mode) honors
-  // textJustify:"inter-word" and only stretches the gaps between words.
-  // React Native's Text has no equivalent property — native "justify" on
-  // iOS (NSTextAlignment.justified) and Android alike stretch tracking
-  // between individual LETTERS too, which reads as broken, uneven type.
-  // There's no RN style prop to restrict it to inter-word only, so plain
-  // left/right alignment is the only option that doesn't look broken on
-  // native, on either platform.
-  if (Platform.OS === "web") {
-    return language.textAlign;
-  }
-
-  return language.key === "arabic" ? "right" : "left";
+  return language.textAlign === "center" ? "center" : language.key === "arabic" ? "right" : "left";
 }

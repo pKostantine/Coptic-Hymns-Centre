@@ -75,8 +75,9 @@ function humanizeSentinelKey(key) {
 
 /**
  * GOSPEL_RITE always gets its "Coptic Gospel Rite" toggle button rendered
- * immediately before its content, wherever it's spliced in. This is its own
- * dedicated zero-verse pseudo-section (rather than a flag mutated onto
+ * immediately after its content's own title (see
+ * pushWholeTableInlineSections below), wherever it's spliced in. This is its
+ * own dedicated zero-verse pseudo-section (rather than a flag mutated onto
  * whichever nested section happens to end up first) specifically so the
  * button's own visibility is never coupled to whether that particular piece
  * of content happens to be copticGospelRiteOnly/nonCopticGospelRiteOnly —
@@ -94,6 +95,22 @@ function buildGospelRiteToggleSection(hymnKey, anchorId) {
     forceWhiteVerses: true,
     startsGospelRiteToggle: true,
   };
+}
+
+/**
+ * Places the Coptic Gospel Rite toggle right after its own content's title
+ * (the first section buildWholeTableInlineSections produced — either a
+ * title-only header or a title+verses section merged into one, depending on
+ * whether the nested content had titles of its own) instead of before it, so
+ * the reader sees "Psalm and Gospel" before being asked to pick a rite.
+ */
+function pushWholeTableInlineSections(hydrated, toggleSection, contentSections) {
+  if (toggleSection && contentSections.length) {
+    hydrated.push(contentSections[0], toggleSection, ...contentSections.slice(1));
+    return;
+  }
+  if (toggleSection) hydrated.push(toggleSection);
+  hydrated.push(...contentSections);
 }
 
 // Sentinels that resolve through the Lectionary/Bible reading flow rather
@@ -1132,8 +1149,7 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
       if (!target || depth >= 3) continue;
       const nestedSections = await hydrateWholeTableInlineNested(section.hymn_key, target, flags, depth + 1, isoDate);
       const toggleSection = buildGospelRiteToggleSection(section.hymn_key, section.id);
-      if (toggleSection) hydrated.push(toggleSection);
-      hydrated.push(...buildWholeTableInlineSections(nestedSections, section));
+      pushWholeTableInlineSections(hydrated, toggleSection, buildWholeTableInlineSections(nestedSections, section));
       continue;
     }
 
@@ -1191,7 +1207,6 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
           flushVerses();
           const nestedSections = await hydrateWholeTableInlineNested(verse.inlineHymnKey, wholeTableTarget, flags, depth + 1, isoDate);
           const toggleSection = buildGospelRiteToggleSection(verse.inlineHymnKey, `${section.id}-inline-${verse.inlineHymnKey}`);
-          if (toggleSection) hydrated.push(toggleSection);
           // Same calling-schema-gives-the-title principle as the top-level
           // Inline placeholder above, just sourced from this line's own
           // inline_hymn_title_shown/inline_hymn_minimization (the type-2
@@ -1214,7 +1229,7 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
             bishopOnly: verseVisibility.bishopOnly,
             priestOnly: verseVisibility.priestOnly,
           };
-          hydrated.push(...buildWholeTableInlineSections(nestedSections, callingRow));
+          pushWholeTableInlineSections(hydrated, toggleSection, buildWholeTableInlineSections(nestedSections, callingRow));
           pushedAnything = true;
           continue;
         }

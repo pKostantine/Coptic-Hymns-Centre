@@ -78,12 +78,26 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
 
   function selectAntiphonaryGroup(group: 'introduction' | 'adam' | 'vatos') {
     if (!sections) return;
+
     if (group === 'adam' || group === 'vatos') {
+      // scrollToTune only exists on the WebView reader (it finds the first
+      // [data-tune] element) -- slideshow mode has no equivalent single-verse
+      // jump, so find whichever section holds the first verse tagged with
+      // this tune (see addTuneMarkersToAntiphonarySections in
+      // hymnLibrary.js) and jump there at section granularity instead.
+      if (preferences.slideshowMode) {
+        const targetSection = sections.find((section) => section.verses.some((verse) => verse.tune === group));
+        if (targetSection) setSelectedSlideSectionId(targetSection.id);
+        return;
+      }
       documentRef.current?.scrollToTune(group);
       return;
     }
+
     const introSection = sections.find((section) => /^introduction$/i.test(section.title?.english || ''));
-    if (introSection) documentRef.current?.scrollToSection(introSection.id);
+    if (!introSection) return;
+    if (preferences.slideshowMode) setSelectedSlideSectionId(introSection.id);
+    else documentRef.current?.scrollToSection(introSection.id);
   }
 
   // Left-edge swipe-right closes *this* modal only — same gesture ServiceDocument
