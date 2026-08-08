@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
@@ -7,7 +7,8 @@ import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
-import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { formatEnglishDisplayText } from '../../../utils/displayText';
+import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 
@@ -76,6 +77,23 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
     }
   };
 
+  function jumpToSection(id: string) {
+    if (preferences.slideshowMode) setSelectedSlideSectionId(id);
+    else documentRef.current?.scrollToSection(id);
+  }
+
+  // One tappable pill per top-level section, mirroring the old app's
+  // Doxologies/Synaxarium/Melodies/Litanies modals (every subdocument got
+  // this row there) — ported forward and made generic here instead of
+  // reimplemented per document type, and applied to every subdocument, not
+  // just those four. Antiphonary keeps its own fixed 3-group row instead
+  // (its "sections" don't line up 1:1 with the Introduction/Adam/Vatos tune
+  // groups a reader actually wants to jump between).
+  const sectionPills = useMemo(
+    () => (sections || []).filter((section) => section.title?.english || section.title?.arabic),
+    [sections],
+  );
+
   function selectAntiphonaryGroup(group: 'introduction' | 'adam' | 'vatos') {
     if (!sections) return;
 
@@ -138,12 +156,26 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
           onRightPress={() => setSelectorOpen(true)}
         />
         {isAntiphonary ? (
-          <View style={styles.selectorRow}>
-            {ANTIPHONARY_GROUPS.map((group) => (
-              <Pressable key={group.key} style={styles.selectorItem} onPress={() => selectAntiphonaryGroup(group.key)}>
-                <Text style={styles.selectorText}>{group.label}</Text>
-              </Pressable>
-            ))}
+          <View style={styles.selectorBar}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorContent}>
+              {ANTIPHONARY_GROUPS.map((group) => (
+                <Pressable key={group.key} style={styles.selectorPill} onPress={() => selectAntiphonaryGroup(group.key)}>
+                  <Text numberOfLines={1} style={styles.selectorPillText}>{group.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : sectionPills.length > 1 ? (
+          <View style={styles.selectorBar}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorContent}>
+              {sectionPills.map((section) => (
+                <Pressable key={section.id} style={styles.selectorPill} onPress={() => jumpToSection(section.id)}>
+                  <Text numberOfLines={1} style={styles.selectorPillText}>
+                    {formatEnglishDisplayText(section.title.english) || section.title.arabic}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
         ) : null}
         {!sections ? (
@@ -164,13 +196,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
               sections={sections}
               currentSectionId={currentSectionId}
               onClose={() => setSelectorOpen(false)}
-              onSelectSection={(id) => {
-                if (preferences.slideshowMode) {
-                  setSelectedSlideSectionId(id);
-                } else {
-                  documentRef.current?.scrollToSection(id);
-                }
-              }}
+              onSelectSection={jumpToSection}
               displaySilentPrayers={preferences.displaySilentPrayers}
               appLanguage={preferences.appLanguage}
               bishopPresent={preferences.bishopPresent}
@@ -217,21 +243,37 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
   loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
-  selectorRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
+  // Ported from the old app's modalSelector/modalSelectorContent/
+  // modalSelectorItem/modalSelectorText (HymnDisplayScreen.js) — same dark
+  // bar of scrollable, outlined pills, one per top-level section, used
+  // there for Doxologies/Synaxarium/Melodies/Litanies (and Antiphonary's
+  // fixed 3 groups); ported forward as a single generic row so every
+  // subdocument gets it, not just those specific document types.
+  selectorBar: {
+    backgroundColor: '#111111',
     borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.navyDark,
+    borderBottomWidth: 1,
+    maxHeight: 58,
   },
-  selectorItem: {
-    flex: 1,
+  selectorContent: {
     alignItems: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
   },
-  selectorText: {
-    color: COLORS.gold,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 15,
-    fontWeight: '700',
+  selectorPill: {
+    borderColor: COLORS.border,
+    borderRadius: RADII.md,
+    borderWidth: 1,
+    flexShrink: 0,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: SPACING.md,
+  },
+  selectorPillText: {
+    color: COLORS.text,
+    flexShrink: 0,
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
