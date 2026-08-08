@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { hydrateSupabaseServiceHymn } from './hymnLibrary';
 import { mapHebrewPsalmReferenceToSeptuagint, mapSeptuagintPsalmReferenceToHebrew } from './bibleService';
 import { FIXED_FEASTS } from './fixedFeasts';
+import { toIsoDate as toIsoDateString } from './dateUtils';
 import type { DocumentSection } from '../components/chc/documentHtml';
 
 // calendar.reading_rules' Psalm references (calendar book number 19) use
@@ -620,10 +621,6 @@ function buildProphecyPlaceholderSection(rule: ReadingRule): DocumentSection {
 export interface ReadingsResult {
   sections: DocumentSection[];
   isEmpty: boolean;
-}
-
-function toIsoDateString(date: Date): string {
-  return date.toISOString().slice(0, 10);
 }
 
 /**

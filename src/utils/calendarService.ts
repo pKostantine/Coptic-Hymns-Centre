@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { computeMovableFeastDates, FIXED_FEASTS } from './fixedFeasts';
+import { toIsoDate } from './dateUtils';
 
 export interface CalendarDay {
   gregorianDate: string;
@@ -15,10 +16,6 @@ export interface SeasonRange {
   endDate: string;
   startEvent: string;
   endEvent: string;
-}
-
-function toIsoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
 }
 
 /** Gregorian calendar-month grid: every row in `calendar.coptic_date_conversions` for the given Gregorian year/month. */

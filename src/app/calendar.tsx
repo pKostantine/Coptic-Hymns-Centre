@@ -7,8 +7,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { getSeasonFormalName, getSeasonShortName } from '@/constants/seasonNames';
-import { localDateAtUtcMidnight, useCalendar } from '@/context/CalendarContext';
+import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { todayIsoDate } from '@/utils/dateUtils';
 import {
   CalendarDay,
   getAdjacentCopticMonth,
@@ -57,7 +58,7 @@ export default function CalendarScreen() {
   // the liturgical day has rolled forward past 5pm — only the day/night
   // toggle communicates that content is now for the evening.
   const selectedIso = rawDate.toISOString().slice(0, 10);
-  const todayIso = localDateAtUtcMidnight(new Date()).toISOString().slice(0, 10);
+  const todayIso = todayIsoDate();
 
   // Keeps the visible month grid following `rawDate` when it changes from
   // outside this screen (e.g. teleporting here via the season selector, which

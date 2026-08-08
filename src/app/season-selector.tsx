@@ -7,7 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { getEventFormalName, getSeasonFormalName } from '@/constants/seasonNames';
-import { localDateAtUtcMidnight, useCalendar } from '@/context/CalendarContext';
+import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
   getCopticYearForDate,
@@ -15,6 +15,7 @@ import {
   getSeasonRanges,
   getSingleDayEventsForCopticYear,
 } from '@/utils/calendarService';
+import { localDateAtUtcMidnight, todayIsoDate } from '@/utils/dateUtils';
 import { formatCopticYear, formatGregorianDate, formatGregorianDateRange } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
 
@@ -144,7 +145,7 @@ export default function SeasonSelectorScreen() {
     };
   }, [year, isArabic]);
 
-  const todayIso = localDateAtUtcMidnight(new Date()).toISOString().slice(0, 10);
+  const todayIso = todayIsoDate();
   const todayInViewedYear = Boolean(yearRange && todayIso >= yearRange.startDate && todayIso < yearRange.endDate);
 
   const { liveTopKey, liveChildKey, lineAfterKey } = useMemo(() => {

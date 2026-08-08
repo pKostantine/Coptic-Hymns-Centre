@@ -1,4 +1,5 @@
 import { evaluateCondition, getContextFlags } from "./conditionEngine";
+import { toIsoDate as toIsoDateString } from "./dateUtils";
 import { supabase } from "./supabase";
 
 // ─── Subdocument sentinel → schema.table registry ────────────────────────────
@@ -858,12 +859,6 @@ export async function hydrateSupabaseServiceHymn(schema, table, date, extraConte
   const flags = await getContextFlags(date, { ...structuralFlags, ...extraContext }, weekdayDate);
   const isoDate = toIsoDateString(date);
   return hydrateWithFlags(schema, table, flags, depth, isoDate);
-}
-
-function toIsoDateString(date) {
-  if (typeof date === "string") return date;
-  const d = date instanceof Date ? date : new Date(date);
-  return d.toISOString().slice(0, 10);
 }
 
 // A single misconfigured or inaccessible nested schema (e.g. one not yet
