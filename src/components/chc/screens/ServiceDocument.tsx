@@ -33,6 +33,7 @@ interface ServiceDocumentProps {
 interface SubdocumentModalTarget {
   title: { english: string; arabic: string };
   sections: DocumentSection[];
+  subdocumentKey?: string;
 }
 
 const isMobileDocument = Platform.OS !== 'web';
@@ -343,7 +344,11 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     }
 
     if (action.type === 'openSubdocument') {
-      setSubdocumentModal({ title: triggerSection.title, sections: triggerSection.subdocumentSections });
+      setSubdocumentModal({
+        title: triggerSection.title,
+        sections: triggerSection.subdocumentSections,
+        subdocumentKey: triggerSection.subdocumentKey,
+      });
     }
   };
 
@@ -455,6 +460,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             visible={Boolean(subdocumentModal)}
             title={subdocumentModal?.title ?? null}
             sections={subdocumentModal?.sections ?? null}
+            subdocumentKey={subdocumentModal?.subdocumentKey}
             onClose={() => setSubdocumentModal(null)}
           />
           <AntiphonaryModal

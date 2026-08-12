@@ -16,6 +16,7 @@ interface DocumentModalTarget {
   title: { english: string; arabic: string };
   sections: DocumentSection[];
   isAntiphonary?: boolean;
+  subdocumentKey?: string;
 }
 
 interface DocumentModalProps {
@@ -23,6 +24,7 @@ interface DocumentModalProps {
   title: { english: string; arabic: string } | null;
   sections: DocumentSection[] | null;
   isAntiphonary?: boolean;
+  subdocumentKey?: string;
   onClose: () => void;
 }
 
@@ -31,6 +33,25 @@ const ANTIPHONARY_GROUPS: { key: 'introduction' | 'adam' | 'vatos'; label: strin
   { key: 'adam', label: 'Adam' },
   { key: 'vatos', label: 'Vatos' },
 ];
+
+// COPTIC_PAULINE_EPISTLE/COPTIC_CATHOLIC_EPISTLE/COPTIC_PRAXIS (see
+// SUBDOCUMENT_MAP in hymnLibrary.js) are always exactly 3 sections —
+// introduction, the day's reading itself, conclusion — short enough that
+// the vertical content-list drawer is redundant chrome; the pill row is
+// the only navigation they get. The reading section itself carries no
+// hymn_titles row (its citation, e.g. "Romans 1:1-7", is a readingReference
+// verse *inside* it, not a section title) — the pill row's fallback label
+// below is what actually gives it a pill.
+const COPTIC_READINGS_SUBDOCUMENT_KEYS = new Set(['COPTIC_PAULINE_EPISTLE', 'COPTIC_CATHOLIC_EPISTLE', 'COPTIC_PRAXIS']);
+
+/** A section's own title, or — for the untitled reading section in a Coptic readings subdocument — its reading-reference citation verse, so the pill row can represent it without ever giving that section a real title (which would render as its own yellow header in the document body). */
+function getPillLabel(section: DocumentSection, includeReadingReference: boolean): string | null {
+  const title = section.title?.english ? formatEnglishDisplayText(section.title.english) : section.title?.arabic;
+  if (title) return title;
+  if (!includeReadingReference) return null;
+  const reference = section.verses.find((v) => v.type === 'readingReference');
+  return reference ? reference.english || reference.arabic || null : null;
+}
 
 /**
  * Full-screen modal that renders a subdocument or the Antiphonary using the
@@ -46,13 +67,15 @@ const ANTIPHONARY_GROUPS: { key: 'introduction' | 'adam' | 'vatos'; label: strin
  * no fixed nesting cap, it's bounded only by how many buttons a user taps
  * through and the depth-3 guard hydrateWithFlags applies while prefetching.
  */
-function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: DocumentModalProps) {
+function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, onClose }: DocumentModalProps) {
   const { preferences } = useReadingPreferences();
   const [nestedModal, setNestedModal] = useState<DocumentModalTarget | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
   const documentRef = useRef<DocumentWebViewHandle>(null);
+
+  const isCopticReadingsSubdocument = Boolean(subdocumentKey && COPTIC_READINGS_SUBDOCUMENT_KEYS.has(subdocumentKey));
 
   const handleAction = (action: DocumentAction) => {
     if (!sections) return;
@@ -72,7 +95,11 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
     if (action.type === 'openSubdocument') {
       const triggerSection = sections.find((s) => s.id === action.sectionId);
       if (triggerSection?.subdocumentSections) {
-        setNestedModal({ title: triggerSection.title, sections: triggerSection.subdocumentSections });
+        setNestedModal({
+          title: triggerSection.title,
+          sections: triggerSection.subdocumentSections,
+          subdocumentKey: triggerSection.subdocumentKey,
+        });
       }
     }
   };
@@ -88,10 +115,16 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
   // reimplemented per document type, and applied to every subdocument, not
   // just those four. Antiphonary keeps its own fixed 3-group row instead
   // (its "sections" don't line up 1:1 with the Introduction/Adam/Vatos tune
-  // groups a reader actually wants to jump between).
+  // groups a reader actually wants to jump between). In a Coptic readings
+  // subdocument specifically, the untitled reading section also gets a pill
+  // (via its own readingReference citation as a fallback label) — everywhere
+  // else, an untitled section stays exactly that: not a navigable stop.
   const sectionPills = useMemo(
-    () => (sections || []).filter((section) => section.title?.english || section.title?.arabic),
-    [sections],
+    () =>
+      (sections || [])
+        .map((section) => ({ section, label: getPillLabel(section, isCopticReadingsSubdocument) }))
+        .filter((entry): entry is { section: DocumentSection; label: string } => Boolean(entry.label)),
+    [sections, isCopticReadingsSubdocument],
   );
 
   function selectAntiphonaryGroup(group: 'introduction' | 'adam' | 'vatos') {
@@ -151,9 +184,9 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
           title={title || ''}
           canGoBack
           onBack={onClose}
-          rightIcon="list-outline"
+          rightIcon={isCopticReadingsSubdocument ? undefined : 'list-outline'}
           rightAccessibilityLabel="Open content list"
-          onRightPress={() => setSelectorOpen(true)}
+          onRightPress={isCopticReadingsSubdocument ? undefined : () => setSelectorOpen(true)}
         />
         {isAntiphonary ? (
           <View style={styles.selectorBar}>
@@ -168,11 +201,9 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
         ) : sectionPills.length > 1 ? (
           <View style={styles.selectorBar}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorContent}>
-              {sectionPills.map((section) => (
+              {sectionPills.map(({ section, label }) => (
                 <Pressable key={section.id} style={styles.selectorPill} onPress={() => jumpToSection(section.id)}>
-                  <Text numberOfLines={1} style={styles.selectorPillText}>
-                    {formatEnglishDisplayText(section.title.english) || section.title.arabic}
-                  </Text>
+                  <Text numberOfLines={1} style={styles.selectorPillText}>{label}</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -189,18 +220,20 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
               onAction={handleAction}
               selectedSectionId={selectedSlideSectionId}
               onCurrentSectionChange={setCurrentSectionId}
-              onOpenSelector={() => setSelectorOpen(true)}
+              onOpenSelector={isCopticReadingsSubdocument ? undefined : () => setSelectorOpen(true)}
             />
-            <ContentSelectorDrawer
-              visible={selectorOpen}
-              sections={sections}
-              currentSectionId={currentSectionId}
-              onClose={() => setSelectorOpen(false)}
-              onSelectSection={jumpToSection}
-              displaySilentPrayers={preferences.displaySilentPrayers}
-              appLanguage={preferences.appLanguage}
-              bishopPresent={preferences.bishopPresent}
-            />
+            {isCopticReadingsSubdocument ? null : (
+              <ContentSelectorDrawer
+                visible={selectorOpen}
+                sections={sections}
+                currentSectionId={currentSectionId}
+                onClose={() => setSelectorOpen(false)}
+                onSelectSection={jumpToSection}
+                displaySilentPrayers={preferences.displaySilentPrayers}
+                appLanguage={preferences.appLanguage}
+                bishopPresent={preferences.bishopPresent}
+              />
+            )}
           </>
         )}
         <DocumentModal
@@ -208,6 +241,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, onClose }: Doc
           title={nestedModal?.title ?? null}
           sections={nestedModal?.sections ?? null}
           isAntiphonary={nestedModal?.isAntiphonary}
+          subdocumentKey={nestedModal?.subdocumentKey}
           onClose={() => setNestedModal(null)}
         />
       </SafeAreaView>
