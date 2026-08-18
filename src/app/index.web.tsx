@@ -3,6 +3,7 @@ import Head from 'expo-router/head';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import CategoryCard from '@/components/chc/ui/CategoryCard';
 import Icon from '@/components/chc/ui/Icon';
@@ -14,11 +15,13 @@ import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { useIsMobileWeb } from '@/utils/useIsMobileWeb';
 
 /**
- * Web home page — wide/horizontal layout: a single full-width header row
- * (logo + title on the left, the toolbar on the right) instead of mobile's
- * stacked header-then-centered-buttons, and shallow wide category rows
- * (English left / Arabic right / chevron) instead of mobile's tall cards.
- * Web uses width; mobile uses depth — see index.tsx for the mobile layout.
+ * Web home page. Phone-width web (isMobileWeb) renders the exact same
+ * stacked header-then-centered-buttons layout as index.tsx (same AppHeader,
+ * same actionRow) so the mobile website looks like the mobile app -- a phone
+ * browser is still a phone. Only desktop-width web gets the wide/horizontal
+ * layout below: a single full-width header row (logo + title on the left,
+ * the toolbar on the right), which has room to spare that a phone-width
+ * header doesn't.
  */
 export default function MainMenuWeb() {
   const router = useRouter();
@@ -37,49 +40,55 @@ export default function MainMenuWeb() {
         <title>{appTitle}</title>
       </Head>
 
-      <View style={[styles.header, isMobileWeb && styles.headerMobile]}>
-        <View style={styles.brand}>
-          <Image source={require('../../assets/images/CHC_sm_web.png')} style={[styles.logo, isMobileWeb && styles.logoMobile]} />
-          <Text
-            style={[styles.brandText, isMobileWeb && styles.brandTextMobile, showArabic && styles.brandTextArabic]}
-            numberOfLines={1}
-          >
-            {appTitle}
-          </Text>
-        </View>
-        <View style={styles.toolbar}>
-          {shouldShowFullscreen ? (
-            <Pressable
-              accessibilityLabel="Toggle full screen"
-              style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
-              onPress={toggleFullscreen}
-            >
-              <Icon name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={iconSize} color={COLORS.gold} />
+      {isMobileWeb ? (
+        <>
+          <AppHeader
+            title={{ english: 'Coptic Hymns Centre', arabic: 'كوبتك هيمنز سنتر' }}
+            visibleLanguages={{ english: showEnglish, arabic: showArabic }}
+          />
+          <View style={styles.actionRow}>
+            {shouldShowFullscreen ? (
+              <Pressable accessibilityLabel="Toggle full screen" style={styles.actionButton} onPress={toggleFullscreen}>
+                <Icon name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={24} color={COLORS.gold} />
+              </Pressable>
+            ) : null}
+            <Pressable accessibilityLabel="Open bookmarks" style={styles.actionButton} onPress={() => router.push('/bookmarks')}>
+              <Icon name="bookmark-outline" size={26} color={COLORS.gold} />
             </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityLabel="Open bookmarks"
-            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
-            onPress={() => router.push('/bookmarks')}
-          >
-            <Icon name="bookmark-outline" size={iconSize} color={COLORS.gold} />
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Open calendar"
-            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
-            onPress={() => router.push('/calendar')}
-          >
-            <Icon name="calendar-outline" size={iconSize} color={COLORS.gold} />
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Open settings"
-            style={[styles.toolbarButton, isMobileWeb && styles.toolbarButtonMobile]}
-            onPress={() => router.push('/settings')}
-          >
-            <Icon name="settings-outline" size={iconSize} color={COLORS.gold} />
-          </Pressable>
+            <Pressable accessibilityLabel="Open calendar" style={styles.actionButton} onPress={() => router.push('/calendar')}>
+              <Icon name="calendar-outline" size={27} color={COLORS.gold} />
+            </Pressable>
+            <Pressable accessibilityLabel="Open settings" style={styles.actionButton} onPress={() => router.push('/settings')}>
+              <Icon name="settings-outline" size={27} color={COLORS.gold} />
+            </Pressable>
+          </View>
+        </>
+      ) : (
+        <View style={styles.header}>
+          <View style={styles.brand}>
+            <Image source={require('../../assets/images/CHC_sm_web.png')} style={styles.logo} />
+            <Text style={[styles.brandText, showArabic && styles.brandTextArabic]} numberOfLines={1}>
+              {appTitle}
+            </Text>
+          </View>
+          <View style={styles.toolbar}>
+            {shouldShowFullscreen ? (
+              <Pressable accessibilityLabel="Toggle full screen" style={styles.toolbarButton} onPress={toggleFullscreen}>
+                <Icon name={isFullscreen ? 'close-fullscreen' : 'open-in-full'} size={iconSize} color={COLORS.gold} />
+              </Pressable>
+            ) : null}
+            <Pressable accessibilityLabel="Open bookmarks" style={styles.toolbarButton} onPress={() => router.push('/bookmarks')}>
+              <Icon name="bookmark-outline" size={iconSize} color={COLORS.gold} />
+            </Pressable>
+            <Pressable accessibilityLabel="Open calendar" style={styles.toolbarButton} onPress={() => router.push('/calendar')}>
+              <Icon name="calendar-outline" size={iconSize} color={COLORS.gold} />
+            </Pressable>
+            <Pressable accessibilityLabel="Open settings" style={styles.toolbarButton} onPress={() => router.push('/settings')}>
+              <Icon name="settings-outline" size={iconSize} color={COLORS.gold} />
+            </Pressable>
+          </View>
         </View>
-      </View>
+      )}
 
       {!isLive ? (
         <Pressable style={styles.notLiveBanner} onPress={goLive}>
@@ -91,6 +100,7 @@ export default function MainMenuWeb() {
       ) : null}
 
       <FlatList
+        style={styles.list}
         contentContainerStyle={[styles.listContent, isMobileWeb && styles.listContentMobile]}
         data={CATEGORIES}
         keyExtractor={(item) => item.id}
@@ -111,6 +121,30 @@ export default function MainMenuWeb() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
+  // Web-only: react-native-web's browser-flexbox layout doesn't give this
+  // FlatList the remaining column height the way native Yoga does without an
+  // explicit flex:1, leaving a sliver of unfilled background between the
+  // scrolled content and BottomTabBar's top border -- which reads as a
+  // stray thin line floating above the tab bar.
+  list: { flex: 1 },
+  // Mobile-web's stacked header-then-centered-buttons layout, identical to
+  // index.tsx's own actionRow/actionButton.
+  actionButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+  },
   header: {
     alignItems: 'center',
     backgroundColor: COLORS.navy,

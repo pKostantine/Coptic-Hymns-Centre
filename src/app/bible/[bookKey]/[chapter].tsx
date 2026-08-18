@@ -161,18 +161,19 @@ export default function BibleChapterDocument() {
       <Head>
         <title>{`CHC ${title || bookKey || 'Bible'} ${chapter}`}</title>
       </Head>
-      {!isMobileDocument ? (
-        <AppHeader
-          title={{ english: `${title || bookKey || ''} ${chapter}`, arabic: `الإصحاح ${chapter}` }}
-          canGoBack
-          onBack={goBackALevel}
-          rightIcon="list-outline"
-          rightAccessibilityLabel="Open verse selector"
-          onRightPress={() => setIsSelectorOpen(true)}
-          rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
-          onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
-        />
-      ) : null}
+      {/* Unlike every other document screen, the Bible reader's header is
+          NEVER hidden -- not even natively -- because it's the only place
+          showing the user which book/chapter they're actually reading. */}
+      <AppHeader
+        title={{ english: `${title || bookKey || ''} ${chapter}`, arabic: `الإصحاح ${chapter}` }}
+        canGoBack
+        onBack={goBackALevel}
+        rightIcon="list-outline"
+        rightAccessibilityLabel="Open verse selector"
+        onRightPress={() => setIsSelectorOpen(true)}
+        rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+        onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
+      />
       {error ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
