@@ -26,6 +26,8 @@ interface DocumentWebViewProps {
   bishopPresent?: boolean;
   copticRecitedPrayers?: boolean;
   copticGospelRite?: boolean;
+  /** Forces every verse's person-type indicator hidden — see documentHtml.ts's buildDocumentHtml. */
+  suppressAllSpeakerLabels?: boolean;
   onAction?: (action: DocumentAction) => void;
   /** Section to scroll to the moment this WebView finishes its first load — e.g. wherever the user was reading in slideshow mode just before switching, or the last remembered position for a brand-new mount. Only consulted once, at mount; changing it on a later render has no effect (use the imperative scrollToSection handle for that). */
   initialSectionId?: string | null;
@@ -49,6 +51,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       bishopPresent = false,
       copticRecitedPrayers = true,
       copticGospelRite = false,
+      suppressAllSpeakerLabels = false,
       onAction,
       initialSectionId,
     },
@@ -117,6 +120,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               bishopPresent,
               copticRecitedPrayers,
               copticGospelRite,
+              suppressAllSpeakerLabels,
             })
           : null,
       [
@@ -131,6 +135,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         bishopPresent,
         copticRecitedPrayers,
         copticGospelRite,
+        suppressAllSpeakerLabels,
       ],
     );
 

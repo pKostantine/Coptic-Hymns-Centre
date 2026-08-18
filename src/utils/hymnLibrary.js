@@ -210,24 +210,38 @@ function buildReadingVerses(readingRow, withCoptic, isPsalm) {
   const flatVerses = (readingRow.resolved_verses || []).flatMap((segment) => segment.verses || []);
   if (!flatVerses.length) return [];
 
+  // A reading is treated like its own hymn for Coptic casing purposes: one
+  // capitalized opening letter for the whole reading (its single Psalm
+  // paragraph, or its first verse), not per individual verse — see
+  // applyCopticCaseToReadingVerses below.
+  //
+  // Psalm readings also get "Alleluia" (and its Coptic/Arabic equivalents)
+  // stripped out — see stripAlleluiaFromPsalmVerse below. Vespers, Matins,
+  // and Liturgy each already have their own dedicated Alleluia response
+  // elsewhere in the service; when the day's Psalm reading happens to land
+  // on a verse that itself contains "Alleluia" in the source text (bible.verses
+  // has it on roughly every other Psalm verse), showing it again here reads
+  // as a duplicated, out-of-place acclamation.
   if (isPsalm) {
-    return [
-      {
+    return applyCopticCaseToReadingVerses([
+      stripAlleluiaFromPsalmVerse({
         english: flatVerses.map((v) => v.english || "").filter(Boolean).join(" "),
         coptic: withCoptic ? flatVerses.map((v) => v.coptic || "").filter(Boolean).join(" ") : "",
         arabic: flatVerses.map((v) => v.arabic || "").filter(Boolean).join(" "),
         type: "text",
-      },
-    ];
+      }),
+    ]);
   }
 
-  return flatVerses.map((v) => ({
-    english: v.english || "",
-    coptic: withCoptic ? v.coptic || "" : "",
-    arabic: v.arabic || "",
-    type: "text",
-    bibleVerseNumber: String(v.verse_number),
-  }));
+  return applyCopticCaseToReadingVerses(
+    flatVerses.map((v) => ({
+      english: v.english || "",
+      coptic: withCoptic ? v.coptic || "" : "",
+      arabic: v.arabic || "",
+      type: "text",
+      bibleVerseNumber: String(v.verse_number),
+    })),
+  );
 }
 
 const bibleBookTitleCache = new Map();
@@ -1422,6 +1436,77 @@ function uppercaseFirstCopticChar(text) {
   const index = text.search(COPTIC_CHAR_PATTERN);
   if (index === -1) return text;
   return text.slice(0, index) + text[index].toLocaleUpperCase() + text.slice(index + 1);
+}
+
+// Readings (buildReadingVerses above) source Coptic text from bible.verses,
+// not hymn_texts -- same underlying data/case convention the standalone
+// Bible reader already normalizes (see lowercaseCopticCharacters in
+// bibleDocumentHtml.ts), which additionally restores the "Ⲋ" numeral-6 glyph
+// after the blanket lowercase pass since it has no true lowercase form. This
+// mirrors that Bible-reader normalization rather than reusing
+// lowercaseCoptic above, which is tuned for hymn_texts's own convention and
+// lacks the "Ⲋ" fix-up.
+function lowercaseBibleCoptic(text) {
+  return text.replace(COPTIC_CHAR_GLOBAL_PATTERN, (char) => char.toLocaleLowerCase()).replace(/ⲋ/g, "Ⲋ");
+}
+
+function applyCopticCaseToReadingVerses(verses) {
+  const normalized = verses.map((verse) =>
+    verse.coptic ? { ...verse, coptic: lowercaseBibleCoptic(verse.coptic) } : verse,
+  );
+  const firstIndex = normalized.findIndex((verse) => verse.coptic && verse.coptic.trim());
+  if (firstIndex !== -1) {
+    normalized[firstIndex] = { ...normalized[firstIndex], coptic: uppercaseFirstCopticChar(normalized[firstIndex].coptic) };
+  }
+  return normalized;
+}
+
+// ─── Alleluia stripping for Psalm readings ─────────────────────────────────
+// Vespers/Matins/Liturgy each already have their own dedicated Alleluia
+// response elsewhere in the service; a Psalm reading whose bible.verses
+// source text happens to already contain "Alleluia" (true of roughly every
+// other Psalm verse) would otherwise duplicate it. Confirmed against the
+// live DB: English always spells it "Alleluia"; Coptic is
+// "Ⲁⲗⲗⲏⲗⲟⲩⲓⲁ̀"/"ⲁⲗⲗⲏⲗⲟⲩⲓⲁ̀" (case follows sentence position, always with a
+// trailing combining grave accent, U+0300); Arabic has three transliterations
+// in live use -- "هلليلويا"/"الليلويا"/"هللويا" -- sometimes with interspersed
+// tashkeel diacritics (e.g. "هَلِّلُويَا"). It can appear either as its own
+// trailing sentence ("...for He is good. Alleluia.") or as a mid-sentence
+// interjection (Psalm 135/136's refrain: "...for He is good, Alleluia His
+// mercy endures forever.") -- both are handled, and since a multi-verse
+// Psalm reading is joined into one paragraph before this runs, an occurrence
+// anywhere in that paragraph (not just the last verse) is removed.
+const ARABIC_DIACRITIC_PATTERN = "[ً-ْٰ]*";
+function arabicWordPattern(word) {
+  return Array.from(word)
+    .map((char) => char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join(ARABIC_DIACRITIC_PATTERN);
+}
+const ARABIC_ALLELUIA_FORMS = ["هلليلويا", "الليلويا", "هللويا"];
+const ARABIC_ALLELUIA_CORE = `(?:${ARABIC_ALLELUIA_FORMS.map(arabicWordPattern).join("|")})${ARABIC_DIACRITIC_PATTERN}`;
+const ENGLISH_ALLELUIA_TRAILING = /\.\s*Alleluia\.?\s*$/i;
+const ENGLISH_ALLELUIA_WORD = /\bAlleluia\b\.?\s*/gi;
+const COPTIC_ALLELUIA_TRAILING = /\.\s*[Ⲁⲁ]ⲗⲗⲏⲗⲟⲩⲓⲁ̀?\.?\s*$/;
+const COPTIC_ALLELUIA_WORD = /[Ⲁⲁ]ⲗⲗⲏⲗⲟⲩⲓⲁ̀?\s*/g;
+const ARABIC_ALLELUIA_TRAILING = new RegExp(`[.,]?\\s*${ARABIC_ALLELUIA_CORE}\\.?\\s*$`);
+const ARABIC_ALLELUIA_WORD = new RegExp(ARABIC_ALLELUIA_CORE, "g");
+
+function stripAlleluia(text, trailingPattern, wordPattern) {
+  if (!text) return text;
+  let result = text;
+  if (trailingPattern.test(text)) {
+    result = result.replace(trailingPattern, ".");
+  }
+  return result.replace(wordPattern, "").replace(/\s{2,}/g, " ").trim();
+}
+
+function stripAlleluiaFromPsalmVerse(verse) {
+  return {
+    ...verse,
+    english: stripAlleluia(verse.english, ENGLISH_ALLELUIA_TRAILING, ENGLISH_ALLELUIA_WORD),
+    coptic: stripAlleluia(verse.coptic, COPTIC_ALLELUIA_TRAILING, COPTIC_ALLELUIA_WORD),
+    arabic: stripAlleluia(verse.arabic, ARABIC_ALLELUIA_TRAILING, ARABIC_ALLELUIA_WORD),
+  };
 }
 
 const INLINE_TEXT_FIELDS =

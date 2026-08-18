@@ -24,10 +24,13 @@ export default function LectionaryDocument() {
   const { effectiveDate } = useCalendar();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth } = useWindowDimensions();
-  // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
-  // get the same headerless, gesture-nav UI as the native app, same as
-  // ServiceDocument.tsx.
-  const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
+  // Header visibility is Platform-only, not width-aware -- web always keeps
+  // its header (on every device width), unlike the native app, which is
+  // gesture-only navigation. See ServiceDocument.tsx's doc comment. The
+  // swipe gestures themselves stay width-aware (isCompactViewport) since
+  // they don't remove anything the header already provides.
+  const isMobileDocument = Platform.OS !== 'web';
+  const isCompactViewport = isMobileDocument || screenWidth < MOBILE_WEB_BREAKPOINT;
   const bookmarkId = `lectionary:${effectiveDate.toISOString().slice(0, 10)}`;
 
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
@@ -78,7 +81,7 @@ export default function LectionaryDocument() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}>
+    <SafeAreaView style={styles.safeArea} {...(isCompactViewport ? gesturePanResponder.panHandlers : {})}>
       <Head>
         <title>CHC Daily Readings</title>
       </Head>

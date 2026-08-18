@@ -38,13 +38,16 @@ interface SubdocumentModalTarget {
 }
 
 /**
- * Generic document reader — ported from HymnDisplayScreen.js. Desktop-width
- * web keeps the Header (fullscreen toggle + content-list icon); native, and
- * web narrow enough to actually be a phone, show no header at all, matching
- * the app exactly — navigation is gesture-only (right-edge swipe-left opens
- * the Content selector, left-edge swipe-right goes back). Gated on viewport
- * width, not just Platform.OS, so the mobile *website* looks like the mobile
- * *app* — a phone browser is still a phone.
+ * Generic document reader — ported from HymnDisplayScreen.js. Web ALWAYS
+ * keeps the Header (fullscreen toggle + content-list icon), on every device
+ * width -- unlike the native app, which shows no header at all and is
+ * gesture-only navigation (right-edge swipe-left opens the Content
+ * selector, left-edge swipe-right goes back). This is a deliberate
+ * difference, not a gap to close: the header is web's only affordance for
+ * "how do I get back/open the content list" since a phone browser has no
+ * native swipe-back gesture of its own to conflict with. The swipe gestures
+ * themselves are still enabled on narrow web (isCompactViewport) since they
+ * don't remove anything the header already provides.
  */
 export default function ServiceDocument({ schema, table, title, arabic, extraContext, backHref }: ServiceDocumentProps) {
   const router = useRouter();
@@ -58,7 +61,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true);
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
+  const isMobileDocument = Platform.OS !== 'web';
+  const isCompactViewport = isMobileDocument || screenWidth < MOBILE_WEB_BREAKPOINT;
   const bookmarkId = `${schema}:${table}`;
   // Navigating to Settings and back unmounts this screen (React Navigation
   // doesn't keep off-screen web routes mounted), which would otherwise wipe
@@ -357,16 +361,30 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
   const selectorSwipeStartX = Math.max(screenWidth - selectorEdgeWidth, 0);
 
+  // A subdocument/Antiphonary modal (or the content selector) stacks visually
+  // on top of this screen but never unmounts it -- so without this guard, a
+  // left-edge swipe made while e.g. Doxologies is open can ALSO be seen by
+  // this responder (native Modal presentation isn't a guaranteed touch
+  // barrier against a screen's own JS PanResponder on every platform) and
+  // fire goBack on the document underneath, popping the whole document out
+  // from under the subdocument instead of just closing the subdocument.
+  // DocumentModal.tsx's own closeSwipePanResponder already correctly scopes
+  // itself to close only the topmost modal; this ensures the document
+  // BEHIND it never competes for the same gesture while anything covers it.
+  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonarySections) || selectorOpen;
+
   const gesturePanResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) => {
+          if (isCoveredByModal) return false;
           const startsInRightEdge = gestureState.x0 >= selectorSwipeStartX;
           const startsInLeftEdge = gestureState.x0 < 56;
           const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
           return (startsInRightEdge || startsInLeftEdge) && isHorizontal && Math.abs(gestureState.dx) > 18;
         },
         onPanResponderRelease: (_, gestureState) => {
+          if (isCoveredByModal) return;
           if (gestureState.x0 >= selectorSwipeStartX && gestureState.dx <= -36) {
             setSelectorOpen(true);
             return;
@@ -376,13 +394,13 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           }
         },
       }),
-    [router, selectorSwipeStartX, backHref],
+    [router, selectorSwipeStartX, backHref, isCoveredByModal],
   );
 
   return (
     <SafeAreaView
       style={styles.safeArea}
-      {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}
+      {...(isCompactViewport ? gesturePanResponder.panHandlers : {})}
     >
       {/* The native stack's own default edge-swipe-to-go-back gesture isn't
           scoped to whether a subdocument modal is currently covering this
@@ -434,6 +452,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             }}
             onOpenSelector={() => setSelectorOpen(true)}
             copticGospelRite={copticGospelRite}
+            suppressAllSpeakerLabels={schema === 'agpeya'}
             initialScrollSectionId={currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
           />
           <ContentSelectorDrawer

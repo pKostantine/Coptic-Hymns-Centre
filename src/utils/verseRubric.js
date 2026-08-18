@@ -62,11 +62,28 @@ export function isRubricType(resolvedType) {
  * Returns a Map from verse object to a suppress boolean, keyed by object
  * reference — verse objects are stable within one render pass, so callers
  * look their own verses up directly rather than by index.
+ *
+ * `forceSuppressAll`, when true, skips the whole walk and marks every verse
+ * suppressed unconditionally — the Agpeya's own person-type indicators
+ * (Priest:/Deacon:/etc.) are hidden by default (the Hours are meant to be
+ * prayed by one person, so a speaker-role indicator has no audience to
+ * address), but reappear when an Hour is opened as a subdocument from within
+ * a liturgical service (Vespers/Matins/Liturgy), where those roles are real
+ * again — see ServiceDocument.tsx's `suppressAllSpeakerLabels`.
  */
-export function computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent) {
+export function computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent, forceSuppressAll = false) {
   const suppressMap = new Map();
   let lastType = null;
   let lastSection = null;
+
+  if (forceSuppressAll) {
+    for (const section of sections) {
+      for (const verse of section.verses || []) {
+        suppressMap.set(verse, true);
+      }
+    }
+    return suppressMap;
+  }
 
   for (const section of sections) {
     const sectionHasTitle = Boolean(section.title?.english || section.title?.arabic);

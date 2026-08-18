@@ -19,6 +19,8 @@ interface DocumentSurfaceProps {
   fontScaleMultiplier?: number;
   /** Current on/off state of the in-document "Coptic Gospel Rite" toggle button (only rendered where GOSPEL_RITE content is spliced in). */
   copticGospelRite?: boolean;
+  /** Forces every verse's person-type indicator (Priest:/Deacon:/etc.) hidden, in both the scroll and slideshow renderers — the Agpeya's own top-level documents default to this (see ServiceDocument.tsx), since the Hours are prayed by one person with no one to address a speaker role to; a subdocument/Antiphonary modal (DocumentModal.tsx) never sets this, so an Hour opened as a subdocument of a liturgical service keeps its real speaker roles. */
+  suppressAllSpeakerLabels?: boolean;
 }
 
 /** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer/silentComment — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
@@ -105,6 +107,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       onOpenSelector,
       fontScaleMultiplier = 1,
       copticGospelRite = false,
+      suppressAllSpeakerLabels = false,
       initialScrollSectionId,
     },
     ref,
@@ -166,6 +169,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           bishopPresent={preferences.bishopPresent}
           onAction={onAction}
           copticGospelRite={copticGospelRite}
+          suppressAllSpeakerLabels={suppressAllSpeakerLabels}
           onToggleCollapse={(sectionId: string) =>
             setCollapsedSectionIds((current) => ({
               ...current,
@@ -193,6 +197,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         bishopPresent={preferences.bishopPresent}
         copticGospelRite={copticGospelRite}
         copticRecitedPrayers={preferences.visibleLanguages.copticRecitedPrayers}
+        suppressAllSpeakerLabels={suppressAllSpeakerLabels}
         onAction={onAction}
         initialSectionId={initialScrollSectionId}
       />

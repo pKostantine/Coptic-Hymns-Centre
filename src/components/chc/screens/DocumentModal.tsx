@@ -161,22 +161,29 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   // uses to go back, but scoped to `onClose` instead of the parent screen's own
   // back navigation, so swiping out of a subdocument never also exits the
   // document underneath it (nested modals stack the same way: each one's own
-  // gesture only closes itself).
+  // gesture only closes itself). Disabled entirely while `nestedModal` is open
+  // (a subdocument opened from within this one, e.g. an Antiphonary button
+  // inside a subdocument) — same reasoning as ServiceDocument.tsx's
+  // isCoveredByModal: this modal never unmounts while a nested one covers it,
+  // so without this guard the same swipe could close BOTH levels at once
+  // instead of just the topmost (nested) one.
   const closeSwipePanResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) => {
+          if (nestedModal || selectorOpen) return false;
           const startsInLeftEdge = gestureState.x0 < 56;
           const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
           return startsInLeftEdge && isHorizontal && Math.abs(gestureState.dx) > 18;
         },
         onPanResponderRelease: (_, gestureState) => {
+          if (nestedModal || selectorOpen) return;
           if (gestureState.x0 < 56 && gestureState.dx > 60) {
             onClose();
           }
         },
       }),
-    [onClose],
+    [onClose, nestedModal, selectorOpen],
   );
 
   return (
@@ -186,14 +193,15 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         style={styles.screen}
         {...(isMobileDocument ? closeSwipePanResponder.panHandlers : {})}
       >
-        {/* Unlike ServiceDocument.tsx/lectionary/index.tsx/[chapter].tsx, this
-            header is never hidden on mobile -- outside Slideshow Mode (see
-            DocumentSurface.tsx: onOpenSelector only reaches
+        {/* Web already always shows this header regardless of width (see
+            ServiceDocument.tsx's doc comment), but unlike those screens this
+            one is never hidden on the NATIVE APP either -- outside Slideshow
+            Mode (see DocumentSurface.tsx: onOpenSelector only reaches
             SlideshowContainer, never the scroll-mode WebView reader), the
             list icon here is the ONLY way to open ContentSelectorDrawer, so
-            hiding it on mobile web would strand the user with no way to
-            navigate this modal's sections. isMobileDocument still applies to
-            the swipe-to-close gesture below. */}
+            hiding it natively would strand the user with no way to navigate
+            this modal's sections. isMobileDocument still applies to the
+            swipe-to-close gesture below. */}
         <AppHeader
           title={title || ''}
           canGoBack

@@ -107,6 +107,7 @@ export function buildDocumentHtml(
     bishopPresent = false,
     copticRecitedPrayers = true,
     copticGospelRite = false,
+    suppressAllSpeakerLabels = false,
   }: {
     copticFontDataUri: string;
     fontSize: number;
@@ -119,6 +120,8 @@ export function buildDocumentHtml(
     bishopPresent?: boolean;
     copticRecitedPrayers?: boolean;
     copticGospelRite?: boolean;
+    /** Forces every verse's person-type indicator hidden, regardless of the normal per-document rules — the Agpeya's own top-level documents (see ServiceDocument.tsx). */
+    suppressAllSpeakerLabels?: boolean;
   },
 ) {
   const sectionTitleFontSize = Math.max(Math.round(fontSize * 0.5), 14);
@@ -145,7 +148,7 @@ export function buildDocumentHtml(
     ...section,
     verses: getDisplayedVerseEntries(section, displayFilterOpts).map(({ verse }) => verse),
   }));
-  const suppressMap = computeGlobalSuppressSpeakerLabelFlags(displayedSectionsForSuppress, bishopPresent);
+  const suppressMap = computeGlobalSuppressSpeakerLabelFlags(displayedSectionsForSuppress, bishopPresent, suppressAllSpeakerLabels);
   const htmlSections = visibleSections
     .map((section) =>
       renderSection(section, {
@@ -632,10 +635,16 @@ function renderVerse(
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveVerseRubricType(verse, bishopPresent)];
-  // Invincible Coptic lines have no English/Arabic counterpart by design —
-  // they render as a single column and should read centered, not justified
-  // against a column width that no longer has anything to justify against.
-  const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference' || verse.prayerType === 'Invincible Coptic';
+  const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
+  // "Invincible Coptic" only means "this Coptic must always render" -- some
+  // rows tagged this way still carry a real English/Arabic translation, so
+  // Coptic only centers when there's truly no translation text to justify
+  // against; when there is, it (and any speaker label on the row) renders in
+  // its normal per-language spot like any other verse, same as everywhere
+  // else -- never centered just because the row happens to be Invincible
+  // Coptic.
+  const hasTranslationText = Boolean((verse.english || '').trim()) || Boolean((verse.arabic || '').trim());
+  const isCopticCentered = isCentered || (verse.prayerType === 'Invincible Coptic' && !hasTranslationText);
   // "Coptic Recited Prayers" hides just this verse's Coptic text when the
   // verse is a Recited Prayer or Silent Prayer (spoken/prayed silently, both
   // conventionally read from Coptic-transliterated-into-English/Arabic
@@ -697,9 +706,10 @@ function renderVerse(
             ? formatCopticNumbers(verse.bibleVerseNumber)
             : verse.bibleVerseNumber
         : '';
+      const centered = language.key === 'coptic' ? isCopticCentered : isCentered;
       return `
         <div class="cell">
-          <p class="verse-text ${language.className} ${isCentered ? 'centered' : ''}" style="${textStyle}">${
+          <p class="verse-text ${language.className} ${centered ? 'centered' : ''}" style="${textStyle}">${
             language.speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(language.speakerLabel)}</span><br/>` : ''
           }${verseNumberText ? `<span class="bible-verse-number">${escapeHtml(verseNumberText)}</span> ` : ''}${highlightMetropolitanBrackets(language.text)}</p>
         </div>

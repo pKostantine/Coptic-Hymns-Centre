@@ -63,86 +63,70 @@ export default function VerseBlock({
   const titleFontSize = Math.max(Math.round(fontSize * 0.5), 11);
   const titleLineHeight = Math.max(Math.round(fontSize * 0.7), 15);
   const hasSeasonalPrefixLine = doesVerseHaveSeasonalPrefixLine(verse);
-  const rowLanguages = (verse.invincibleCoptic
-    ? [
-        {
-          key: "coptic",
-          text: formatCopticNumbers(verse.coptic, verse.preserveCopticDigits),
-          seasonalHoosVersePrefixSpacer: "",
-          fontSize: isRefrainLabel ? titleFontSize : copticFontSize,
-          fontFamily: TYPOGRAPHY.coptic,
-          lineHeight:
-            isRefrainLabel
-              ? titleLineHeight
-              : Math.round(copticFontSize * 1),
-          styles: [styles.coptic],
-          // Invincible Coptic never has parallel English/Arabic text to
-          // justify against — it should always read centered in its column,
-          // not just when centeredAcrossPage happens to also be set.
-          textAlign: "center",
-        },
-      ]
-    : [
-        {
-          key: "english",
-          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "english", bishopPresent),
-          text: formatEnglishDisplayText(verse.english),
-          bibleVerseNumber: verse.bibleVerseNumber,
-          seasonalHoosVersePrefix: verse.seasonalHoosVersePrefix,
-          fontSize: isRefrainLabel ? titleFontSize : fontSize,
-          fontFamily: "Georgia",
-          lineHeight:
-            isRefrainLabel
-              ? titleLineHeight
-              : Math.round(fontSize * 1.25),
-          styles: [styles.english],
-          textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
-          forceLines: verse.slideshowForcedLines?.english,
-        },
-        {
-          key: "coptic",
-          text: formatCopticNumbers(verse.coptic, verse.preserveCopticDigits),
-          bibleVerseNumber: verse.bibleVerseNumber,
-          seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine
-            ? verse.seasonalHoosVersePrefix
-            : "",
-          fontSize: isRefrainLabel ? titleFontSize : copticFontSize,
-          fontFamily: TYPOGRAPHY.coptic,
-          lineHeight:
-            isRefrainLabel
-              ? titleLineHeight
-              : Math.round(copticFontSize * 1),
-          styles: [styles.coptic],
-          textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
-          forceLines: verse.slideshowForcedLines?.coptic,
-        },
-        {
-          key: "arabic",
-          speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "arabic", bishopPresent),
-          text: formatArabicNumbers(verse.arabic),
-          bibleVerseNumber: verse.bibleVerseNumber,
-          seasonalHoosVersePrefix: formatArabicNumbers(verse.seasonalHoosVersePrefix),
-          fontSize:
-            isRefrainLabel
-              ? titleFontSize
-              : Math.round(fontSize * 1.15),
-          fontFamily: "Arial",
-          lineHeight:
-            isRefrainLabel
-              ? titleLineHeight
-              : Math.round(fontSize * 1.25),
-          styles: [styles.arabic],
-          textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
-          forceLines: verse.slideshowForcedLines?.arabic,
-        },
-      ]).filter((language) => {
-    // A language column collapses per verse (not per whole hymn) whenever
-    // this specific verse has no text in it — matching documentHtml.ts's
-    // scroll-mode behavior exactly, so a Coptic-less verse (e.g. a
-    // Reader-labeled verse with no Coptic in the DB) doesn't reserve a
-    // blank column here while correctly dropping it in scroll mode.
-    if (verse.invincibleCoptic) return true;
-
+  // "Invincible Coptic" only means "this Coptic must always render, even if
+  // the language toggle or a translation is missing" -- it does NOT mean the
+  // line structurally has no English/Arabic (some DB rows tagged this way do
+  // carry a translation). So the row is always built with the normal
+  // three-language shape below; Coptic is centered in its own column only
+  // when there's truly no accompanying translation text to justify against,
+  // and the speaker label (if any) renders in its normal per-language spot
+  // like any other verse, never specially centered.
+  const hasTranslationText = Boolean((verse.english && verse.english.trim()) || (verse.arabic && verse.arabic.trim()));
+  const copticStandsAlone = verse.invincibleCoptic && !hasTranslationText;
+  const rowLanguages = [
+    {
+      key: "english",
+      speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "english", bishopPresent),
+      text: formatEnglishDisplayText(verse.english),
+      bibleVerseNumber: verse.bibleVerseNumber,
+      seasonalHoosVersePrefix: verse.seasonalHoosVersePrefix,
+      fontSize: isRefrainLabel ? titleFontSize : fontSize,
+      fontFamily: "Georgia",
+      lineHeight:
+        isRefrainLabel
+          ? titleLineHeight
+          : Math.round(fontSize * 1.25),
+      styles: [styles.english],
+      textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
+      forceLines: verse.slideshowForcedLines?.english,
+    },
+    {
+      key: "coptic",
+      text: formatCopticNumbers(verse.coptic, verse.preserveCopticDigits),
+      bibleVerseNumber: verse.bibleVerseNumber,
+      seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine
+        ? verse.seasonalHoosVersePrefix
+        : "",
+      fontSize: isRefrainLabel ? titleFontSize : copticFontSize,
+      fontFamily: TYPOGRAPHY.coptic,
+      lineHeight:
+        isRefrainLabel
+          ? titleLineHeight
+          : Math.round(copticFontSize * 1),
+      styles: [styles.coptic],
+      textAlign: isRefrainLabel || isReadingReference || copticStandsAlone ? "center" : "justify",
+      forceLines: verse.slideshowForcedLines?.coptic,
+    },
+    {
+      key: "arabic",
+      speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "arabic", bishopPresent),
+      text: formatArabicNumbers(verse.arabic),
+      bibleVerseNumber: verse.bibleVerseNumber,
+      seasonalHoosVersePrefix: formatArabicNumbers(verse.seasonalHoosVersePrefix),
+      fontSize:
+        isRefrainLabel
+          ? titleFontSize
+          : Math.round(fontSize * 1.15),
+      fontFamily: "Arial",
+      lineHeight:
+        isRefrainLabel
+          ? titleLineHeight
+          : Math.round(fontSize * 1.25),
+      styles: [styles.arabic],
+      textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
+      forceLines: verse.slideshowForcedLines?.arabic,
+    },
+  ].filter((language) => {
     // A verse split across multiple slides (see appendTallVerseSegments in
     // SlideshowContainer.js) can have a language finish its own lines on an
     // earlier segment while others still have more to show — that language's
@@ -155,10 +139,10 @@ export default function VerseBlock({
     if (isPartOfSplitVerse && verse.slideshowLanguageKeys.includes(language.key)) return true;
 
     if (language.key === "coptic") {
-      const copticHiddenByToggle =
-        isRecitedPrayer && !visibleLanguages.copticRecitedPrayers && !verse.forceCopticVisible;
+      const forceCoptic = verse.forceCopticVisible || verse.invincibleCoptic;
+      const copticHiddenByToggle = isRecitedPrayer && !visibleLanguages.copticRecitedPrayers && !forceCoptic;
       if (copticHiddenByToggle) return false;
-      if (!visibleLanguages.coptic && !verse.forceCopticVisible) return false;
+      if (!visibleLanguages.coptic && !forceCoptic) return false;
       return Boolean(language.text && language.text.trim());
     }
 

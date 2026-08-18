@@ -23,6 +23,7 @@ export default function SlideshowContainer({
   bishopPresent,
   onAction,
   copticGospelRite,
+  suppressAllSpeakerLabels,
 }) {
   const safeAreaInsets = useSafeAreaInsets();
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -66,7 +67,10 @@ export default function SlideshowContainer({
   const lastGlobalMeasurementKeyRef = useRef(null);
   const lastItemSignaturesRef = useRef(new Map());
 
-  const items = useMemo(() => flattenSections(sections, bishopPresent), [sections, bishopPresent]);
+  const items = useMemo(
+    () => flattenSections(sections, bishopPresent, suppressAllSpeakerLabels),
+    [sections, bishopPresent, suppressAllSpeakerLabels],
+  );
   const itemsSignature = useMemo(
     () => items.map(getItemSignature).join("|"),
     [items],
@@ -880,8 +884,8 @@ const SlideItem = memo(function SlideItem({
 // verse show its Priest:/Deacon:/etc. indicator". `sections` here is already
 // the pre-filtered, displayed-only view (see DocumentSurface's
 // buildSlideshowSections), so it can be passed straight through.
-function flattenSections(sections, bishopPresent) {
-  const suppressMap = computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent);
+function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
+  const suppressMap = computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent, suppressAllSpeakerLabels);
 
   return sections.flatMap((section, sectionIndex) => {
     if (section.isSubdocumentButton || section.isAntiphonaryButton) {

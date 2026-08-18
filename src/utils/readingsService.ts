@@ -605,6 +605,37 @@ const READING_TYPE_LABELS: Record<string, { english: string; arabic: string }> =
   Prophecy: { english: 'Prophecy', arabic: 'النبوخة' },
 };
 
+// A reading is treated like its own hymn for Coptic casing purposes: one
+// capitalized opening letter for the whole reading (its single Psalm
+// paragraph, or its first verse), not per individual verse. Mirrors
+// buildReadingVerses/applyCopticCaseToReadingVerses in hymnLibrary.js (the
+// same readings when spliced into Vespers/Matins/Liturgy) and
+// bibleDocumentHtml.ts's lowercaseCopticCharacters (the standalone Bible
+// reader) — all three read the same bible.verses data and case convention,
+// including restoring the "Ⲋ" numeral-6 glyph, which has no true lowercase
+// form, after the blanket lowercase pass.
+const COPTIC_CHARACTER_PATTERN = /[Ϣ-ϯⲀ-⳿]/u;
+const COPTIC_CHARACTER_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿]/gu;
+
+function lowercaseBibleCoptic(text: string): string {
+  return text.replace(COPTIC_CHARACTER_GLOBAL_PATTERN, (character) => character.toLocaleLowerCase()).replace(/ⲋ/g, 'Ⲋ');
+}
+
+function uppercaseFirstBibleCopticCharacter(text: string): string {
+  const index = text.search(COPTIC_CHARACTER_PATTERN);
+  if (index === -1) return text;
+  return text.slice(0, index) + text[index].toLocaleUpperCase() + text.slice(index + 1);
+}
+
+function applyCopticCaseToReadingVerses<T extends { coptic?: string }>(verses: T[]): T[] {
+  const normalized = verses.map((verse) => (verse.coptic ? { ...verse, coptic: lowercaseBibleCoptic(verse.coptic) } : verse));
+  const firstIndex = normalized.findIndex((verse) => verse.coptic && verse.coptic.trim());
+  if (firstIndex !== -1) {
+    normalized[firstIndex] = { ...normalized[firstIndex], coptic: uppercaseFirstBibleCopticCharacter(normalized[firstIndex].coptic!) };
+  }
+  return normalized;
+}
+
 /**
  * Every reading shows a plain verse-number gold badge (bibleVerseNumber),
  * same as the Bible reader — never a chapter number, even when the reading
@@ -621,14 +652,14 @@ async function buildReadingSection(rule: ReadingRule): Promise<{ section: Docume
   const isPsalm = rule.reading_type === 'Psalm';
 
   const psalmVerses = isPsalm && verses.length
-    ? [
+    ? applyCopticCaseToReadingVerses([
         {
           english: verses.map((v) => v.english).filter(Boolean).join(' '),
           coptic: verses.map((v) => v.coptic || '').filter(Boolean).join(' '),
           arabic: verses.map((v) => v.arabic).filter(Boolean).join(' '),
           type: 'text',
         },
-      ]
+      ])
     : null;
 
   // The citation ("Matthew 25:1-13") sits right before the actual verse
@@ -649,13 +680,15 @@ async function buildReadingSection(rule: ReadingRule): Promise<{ section: Docume
     verses: [
       ...citationVerse,
       ...(psalmVerses ??
-        verses.map((v) => ({
-          english: v.english,
-          coptic: v.coptic || '',
-          arabic: v.arabic,
-          type: 'text',
-          bibleVerseNumber: `${v.displayVerse}${v.partLabel ?? ''}`,
-        }))),
+        applyCopticCaseToReadingVerses(
+          verses.map((v) => ({
+            english: v.english,
+            coptic: v.coptic || '',
+            arabic: v.arabic,
+            type: 'text',
+            bibleVerseNumber: `${v.displayVerse}${v.partLabel ?? ''}`,
+          })),
+        )),
     ],
     forceWhiteVerses: true,
   };
