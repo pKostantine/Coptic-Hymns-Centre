@@ -132,7 +132,7 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
           <ToggleRow label={labelText(SETTINGS_LABELS.slideshowMode)} isArabic={isArabicChrome} active={preferences.slideshowMode} onPress={toggleSlideshowMode} />
-          <ToggleRow label={labelText(SETTINGS_LABELS.selectText)} isArabic={isArabicChrome} active={preferences.selectText} onPress={toggleSelectText} />
+          <ToggleRow label={labelText(SETTINGS_LABELS.selectText)} isArabic={isArabicChrome} active={preferences.selectText} disabled={preferences.slideshowMode} onPress={toggleSelectText} />
           <ToggleRow label={labelText(SETTINGS_LABELS.displayComments)} isArabic={isArabicChrome} active={preferences.displayComments} onPress={toggleDisplayComments} />
           <ToggleRow
             label={labelText(SETTINGS_LABELS.displaySilentPrayers)}

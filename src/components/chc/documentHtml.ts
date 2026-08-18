@@ -22,6 +22,8 @@ export interface DocumentVerse {
   bibleVerseNumber?: string;
   /** Pre-Refrain lines only — forces italic on top of whatever color/role the verse naturally resolves to, without changing that role. */
   italic?: boolean;
+  /** Forces this verse to render white and excludes it from the alternating parity count in both renderers — used for hymns like vocKyrieEleison that sit outside the enclosing section's alternating cadence. */
+  forceWhiteText?: boolean;
 }
 
 export interface DocumentSection {
@@ -741,7 +743,7 @@ function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number, bi
     // A "White"/"Blue" prayer_type forces that exact color on this one verse
     // — it never consumes a parity slot, so the verses around it alternate
     // exactly as if it weren't there at all (see resolveVerseColorBase).
-    if (verses[i].prayerType === 'White' || verses[i].prayerType === 'Blue') continue;
+    if (verses[i].prayerType === 'White' || verses[i].prayerType === 'Blue' || verses[i].forceWhiteText) continue;
     if (!NON_ALTERNATING_TYPES.has(verses[i].type)) count += 1;
   }
   return count;
@@ -763,7 +765,7 @@ function resolveVerseColorBase(verse: DocumentVerse, index: number, section: Doc
   // bypassing the normal alternation computation for this verse entirely —
   // getEffectiveAlternatingIndex above excludes it from the count so
   // surrounding verses keep alternating exactly as if it weren't there.
-  if (verse.prayerType === 'White') return { color: COLORS.white, italic: false };
+  if (verse.prayerType === 'White' || verse.forceWhiteText) return { color: COLORS.white, italic: false };
   if (verse.prayerType === 'Blue') return { color: COLORS.rowBlue, italic: false };
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 

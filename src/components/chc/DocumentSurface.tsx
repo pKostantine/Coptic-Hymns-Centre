@@ -21,6 +21,8 @@ interface DocumentSurfaceProps {
   copticGospelRite?: boolean;
   /** Forces every verse's person-type indicator (Priest:/Deacon:/etc.) hidden, in both the scroll and slideshow renderers — the Agpeya's own top-level documents default to this (see ServiceDocument.tsx), since the Hours are prayed by one person with no one to address a speaker role to; a subdocument/Antiphonary modal (DocumentModal.tsx) never sets this, so an Hour opened as a subdocument of a liturgical service keeps its real speaker roles. */
   suppressAllSpeakerLabels?: boolean;
+  /** Called (in slideshow mode only) immediately after a collapse/expand toggle fires, with the toggled section's own id — lets the parent navigate to that section's title slide. */
+  onCollapseToggle?: (sectionId: string) => void;
 }
 
 /** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer/silentComment — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
@@ -109,6 +111,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       copticGospelRite = false,
       suppressAllSpeakerLabels = false,
       initialScrollSectionId,
+      onCollapseToggle,
     },
     ref,
   ) => {
@@ -170,12 +173,13 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           onAction={onAction}
           copticGospelRite={copticGospelRite}
           suppressAllSpeakerLabels={suppressAllSpeakerLabels}
-          onToggleCollapse={(sectionId: string) =>
+          onToggleCollapse={(sectionId: string) => {
             setCollapsedSectionIds((current) => ({
               ...current,
               [sectionId]: !(current[sectionId] ?? sections.find((s) => s.id === sectionId)?.defaultCollapsed ?? false),
-            }))
-          }
+            }));
+            onCollapseToggle?.(sectionId);
+          }}
         />
       );
     }

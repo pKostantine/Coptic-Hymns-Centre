@@ -7,18 +7,24 @@ interface ToggleRowProps {
   isArabic?: boolean;
   active: boolean;
   onPress: () => void;
+  disabled?: boolean;
 }
 
 /** CHC ToggleRow — ported 1:1 from LanguageToggleBar.js's `languageOption` row + hand-drawn switch. */
-export default function ToggleRow({ label, isArabic = false, active, onPress }: ToggleRowProps) {
+export default function ToggleRow({ label, isArabic = false, active, onPress, disabled = false }: ToggleRowProps) {
+  const effectiveActive = active && !disabled;
   return (
-    <Pressable accessibilityLabel={`Toggle ${label}`} onPress={onPress} style={styles.languageOption}>
-      <Text style={[styles.languageLabel, isArabic && styles.languageLabelArabic]}>{label}</Text>
-      <View style={[styles.switchTrack, { backgroundColor: active ? COLORS.navy : '#1C1C1C', borderColor: active ? COLORS.gold : COLORS.border }]}>
+    <Pressable
+      accessibilityLabel={`Toggle ${label}`}
+      onPress={disabled ? undefined : onPress}
+      style={[styles.languageOption, disabled && styles.languageOptionDisabled]}
+    >
+      <Text style={[styles.languageLabel, isArabic && styles.languageLabelArabic, disabled && styles.languageLabelDisabled]}>{label}</Text>
+      <View style={[styles.switchTrack, { backgroundColor: effectiveActive ? COLORS.navy : '#1C1C1C', borderColor: effectiveActive ? COLORS.gold : COLORS.border, opacity: disabled ? 0.35 : 1 }]}>
         <View
           style={[
             styles.switchThumb,
-            { backgroundColor: active ? COLORS.gold : COLORS.muted, alignSelf: active ? 'flex-end' : 'flex-start' },
+            { backgroundColor: effectiveActive ? COLORS.gold : COLORS.muted, alignSelf: effectiveActive ? 'flex-end' : 'flex-start' },
           ]}
         />
       </View>
@@ -38,12 +44,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
+  languageOptionDisabled: {
+    opacity: 0.5,
+  },
   languageLabel: {
     flex: 1,
     fontSize: 15,
     fontWeight: '800',
     color: COLORS.white,
     paddingRight: 16,
+  },
+  languageLabelDisabled: {
+    color: COLORS.muted,
   },
   languageLabelArabic: {
     fontFamily: TYPOGRAPHY.arabic,

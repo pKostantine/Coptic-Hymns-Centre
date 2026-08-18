@@ -7,7 +7,6 @@ import { resolveRubricKey } from "../../utils/verseRubric";
 import JustifiedText, { measureJustifiedLinesWeb } from "./JustifiedText";
 
 const REFRAIN_TAN = "#9FFFD0";
-const COMMENT_GREEN = "#8FD19E";
 const LIGHT_YELLOW = "#FFFF00";
 const SILENT_PRAYER_GRAY = "#C5CBD2";
 
@@ -41,7 +40,7 @@ export default function VerseBlock({
   const isSeasonalHoosVerse = Boolean(verse.seasonalHoosVersePrefix);
   const rowTextColor =
     isComment
-      ? COMMENT_GREEN
+      ? COLORS.comment
       : isSilentPrayer
       ? SILENT_PRAYER_GRAY
       : isRefrainLabel || isRefrain

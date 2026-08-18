@@ -1495,7 +1495,21 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
         continue;
       }
 
-      verses.push({ ...verse, bishopOnly: verseVisibility.bishopOnly, priestOnly: verseVisibility.priestOnly });
+      // Combine the verse's own condition with the enclosing section's
+      // bishop visibility — if the ORDER ROW that produced this section has
+      // condition=BishopPresent, the section gets bishopOnly:true, but the
+      // individual verse (which has no condition of its own) gets
+      // bishopOnly:false from verseVisibility alone. Without combining,
+      // mergeIntoOneInlineSection (VOC, etc.) loses the restriction because
+      // it inherits only the calling-row's flags, not the nested sections'.
+      const sectionVisibility = { visible: true, bishopOnly: section.bishopOnly || false, priestOnly: section.priestOnly || false };
+      const combined = combineBishopVisibility(sectionVisibility, verseVisibility);
+      // vocKyrieEleison is a refrain-style response that always stands on its
+      // own outside the Single Alternating cadence regardless of where it falls
+      // in the merged VOC section — force white so it's excluded from the
+      // alternating parity count in both renderers.
+      const forceWhiteText = section.hymn_key === "vocKyrieEleison" ? true : (verse.forceWhiteText || false);
+      verses.push({ ...verse, bishopOnly: combined.bishopOnly, priestOnly: combined.priestOnly, forceWhiteText });
     }
 
     flushVerses();

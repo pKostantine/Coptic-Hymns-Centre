@@ -265,6 +265,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
               selectedSectionId={selectedSlideSectionId}
               onCurrentSectionChange={setCurrentSectionId}
               onOpenSelector={isCopticReadingsSubdocument ? undefined : () => setSelectorOpen(true)}
+              onCollapseToggle={setSelectedSlideSectionId}
             />
             {isCopticReadingsSubdocument ? null : (
               <ContentSelectorDrawer

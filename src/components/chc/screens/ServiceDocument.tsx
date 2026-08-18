@@ -324,6 +324,13 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const handleAction = (action: DocumentAction) => {
     if (action.type === 'toggleCopticGospelRite') {
       gospelRiteAnchorSectionIdRef.current = action.sectionId || currentSectionId;
+      // In slideshow mode, jump to the "Psalm and Gospel" title section —
+      // pushWholeTableInlineSections always places it one slot before the toggle
+      // button, so find the toggle's index and step back by one.
+      if (preferences.slideshowMode && action.sectionId && sections) {
+        const toggleIdx = sections.findIndex((s) => s.id === action.sectionId);
+        if (toggleIdx > 0) setSelectedSlideSectionId(sections[toggleIdx - 1].id);
+      }
       setCopticGospelRite((current) => !current);
       return;
     }
@@ -471,6 +478,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             copticGospelRite={copticGospelRite}
             suppressAllSpeakerLabels={schema === 'agpeya'}
             initialScrollSectionId={currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
+            onCollapseToggle={setSelectedSlideSectionId}
           />
           <ContentSelectorDrawer
             visible={selectorOpen}
