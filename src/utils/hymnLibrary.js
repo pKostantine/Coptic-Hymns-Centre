@@ -1509,7 +1509,14 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
       // in the merged VOC section — force white so it's excluded from the
       // alternating parity count in both renderers.
       const forceWhiteText = section.hymn_key === "vocKyrieEleison" ? true : (verse.forceWhiteText || false);
-      verses.push({ ...verse, bishopOnly: combined.bishopOnly, priestOnly: combined.priestOnly, forceWhiteText });
+      // copticPsalm's own fixed intro line ("Ⲯⲁⲗⲙⲟⲥ ⲧⲱ ⲇⲁⲩⲓⲇ...") announces the
+      // psalm that follows — the section's one capital letter belongs to the
+      // actual (spliced-in, live) Psalm text after it, not to this framing
+      // line, so it's excluded from applyCopticCaseToSection's search for
+      // which verse to capitalize (it still gets lowercased normally).
+      const skipHymnCapitalization =
+        section.hymn_key === "copticPsalm" ? true : (verse.skipHymnCapitalization || false);
+      verses.push({ ...verse, bishopOnly: combined.bishopOnly, priestOnly: combined.priestOnly, forceWhiteText, skipHymnCapitalization });
     }
 
     flushVerses();
@@ -1551,13 +1558,28 @@ export function addTuneMarkersToAntiphonarySections(sections) {
 const COPTIC_CHAR_PATTERN = /[Ϣ-ϯⲀ-⳿]/;
 const COPTIC_CHAR_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿]/g;
 
+// A reading spliced inline into a hymn (e.g. "Coptic Psalm" housing the
+// day's live Psalm text via resolveReadingSentinelSplice) has ALREADY been
+// through its own independent Coptic case pass -- applyCopticCaseToReadingVerses,
+// which capitalizes the reading's own first letter, not the housing hymn's.
+// Without excluding those verses here, this section-wide pass would
+// re-lowercase them (undoing that) and could hand the ONE capital this hymn
+// gets to whatever the housing hymn's own leading verse happens to be
+// instead of the actual reading text -- see buildReadingVerses.
+//
+// skipHymnCapitalization (set on copticPsalm's own framing verse -- see
+// hydrateWholeTableInlineNested) opts a verse OUT of ever receiving that one
+// capital, without exempting it from the ordinary lowercase pass -- unlike
+// readingCaseNormalized, which is fully hands-off (already correctly cased).
 function applyCopticCaseToSection(section) {
   const verses = section.verses.map((verse) =>
-    verse.coptic ? { ...verse, coptic: lowercaseCoptic(verse.coptic) } : verse,
+    verse.coptic && !verse.readingCaseNormalized ? { ...verse, coptic: lowercaseCoptic(verse.coptic) } : verse,
   );
 
   if (section.title?.english) {
-    const firstIndex = verses.findIndex((verse) => verse.coptic && verse.coptic.trim());
+    const firstIndex = verses.findIndex(
+      (verse) => !verse.readingCaseNormalized && !verse.skipHymnCapitalization && verse.coptic && verse.coptic.trim(),
+    );
     if (firstIndex !== -1) {
       verses[firstIndex] = { ...verses[firstIndex], coptic: uppercaseFirstCopticChar(verses[firstIndex].coptic) };
     }
@@ -1589,8 +1611,15 @@ function lowercaseBibleCoptic(text) {
 }
 
 function applyCopticCaseToReadingVerses(verses) {
+  // readingCaseNormalized marks every verse (not just the capitalized one) so
+  // applyCopticCaseToSection never re-lowercases them if this reading is
+  // later spliced into a housing hymn (e.g. "Coptic Psalm") — re-running the
+  // hymn-oriented lowercase pass would both undo the capital below and, for
+  // any verse containing "Ⲋ", silently corrupt it (lowercaseCoptic lacks the
+  // "Ⲋ" fix-up lowercaseBibleCoptic applies, since that glyph has no true
+  // lowercase form).
   const normalized = verses.map((verse) =>
-    verse.coptic ? { ...verse, coptic: lowercaseBibleCoptic(verse.coptic) } : verse,
+    verse.coptic ? { ...verse, coptic: lowercaseBibleCoptic(verse.coptic), readingCaseNormalized: true } : verse,
   );
   const firstIndex = normalized.findIndex((verse) => verse.coptic && verse.coptic.trim());
   if (firstIndex !== -1) {
