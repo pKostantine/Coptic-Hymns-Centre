@@ -15,8 +15,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { getReadingsForDate } from '@/utils/readingsService';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { goBack } from '@/utils/navigation';
-
-const isMobileDocument = Platform.OS !== 'web';
+import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 
 /** Daily Readings screen — resolves calendar.reading_rules for the current effective date and renders the result through the exact same DocumentSurface/ContentSelectorDrawer pipeline as every other service document, so slideshow mode, font size, bookmarking, and gesture nav all work identically. */
 export default function LectionaryDocument() {
@@ -25,6 +24,10 @@ export default function LectionaryDocument() {
   const { effectiveDate } = useCalendar();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth } = useWindowDimensions();
+  // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
+  // get the same headerless, gesture-nav UI as the native app, same as
+  // ServiceDocument.tsx.
+  const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
   const bookmarkId = `lectionary:${effectiveDate.toISOString().slice(0, 10)}`;
 
   const [sections, setSections] = useState<DocumentSection[] | null>(null);

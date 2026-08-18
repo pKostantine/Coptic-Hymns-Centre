@@ -1425,6 +1425,16 @@ function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
     slideshowLanguageKeys: languageKeys,
   };
   const lineCounts = {};
+  // The exact pre-measured lines handed to each language's render, keyed the
+  // same way onLines/onTextLayout report them -- see VerseBlock.js's
+  // forceLines plumbing (JustifiedVerseBody -> JustifiedText). Rendering
+  // these directly, instead of joining them into one text blob and asking a
+  // fresh JustifiedText/canvas pass to re-wrap it, is what keeps a split
+  // segment's actual rendered line breaks identical to what pagination
+  // measured and budgeted room for -- a shorter re-wrapped string can
+  // legitimately break at different word boundaries than the original did,
+  // which is what produces visibly wrong splits.
+  const forcedLines = {};
   // A language that wraps to fewer total lines than its siblings (Coptic at
   // a larger font routinely does, since its words/glyphs run wider) can
   // finish displaying all of its content in an earlier segment while
@@ -1441,8 +1451,10 @@ function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
 
     verse[entry.language] = joinRenderedLines(lines);
     lineCounts[entry.language] = lines.length;
+    forcedLines[entry.language] = lines;
     entry.offset += takeCount;
   });
+  verse.slideshowForcedLines = forcedLines;
 
   return {
     item: {

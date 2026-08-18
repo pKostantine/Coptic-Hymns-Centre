@@ -21,7 +21,7 @@
       "package": "com.pkostantine.CopticHymnsCentre"
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/CHC_sm_web.png"
     },
     "plugins": [

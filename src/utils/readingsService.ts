@@ -3,6 +3,7 @@ import { hydrateSupabaseServiceHymn } from './hymnLibrary';
 import { mapHebrewPsalmReferenceToSeptuagint, mapSeptuagintPsalmReferenceToHebrew } from './bibleService';
 import { FIXED_FEASTS } from './fixedFeasts';
 import { toIsoDate as toIsoDateString } from './dateUtils';
+import { formatVerses } from './verseFormatting';
 import type { DocumentSection } from '../components/chc/documentHtml';
 
 // calendar.reading_rules' Psalm references (calendar book number 19) use
@@ -514,15 +515,23 @@ async function fetchReadingReferenceVerses(reference: string): Promise<{ verses:
 
 /**
  * Builds the citation-style title for a reading ("Matthew 25:1-13",
- * "Philippians 1:27-2:11") straight from reading_reference's own segments —
- * the FIRST segment's start through the LAST segment's end, so a reading
- * spanning multiple chapters/segments still gets exactly ONE citation, never
- * one per chapter. For Psalms, the cited chapter:verse is converted to
- * Septuagint numbering (mapHebrewPsalmReferenceToSeptuagint) rather than the
- * Masoretic numbering reading_reference itself uses — matching the
- * Septuagint numbering already native to bible.verses, and deliberately NOT
- * the Masoretic toDisplayReference conversion used elsewhere in this file
- * for per-verse display.
+ * "Philippians 1:27-2:11", "Psalm 131:7,12-13") from reading_reference's own
+ * segments. calendar.reading_rules joins discrete/non-contiguous verses with
+ * "@", one segment per verse (e.g. Psalm 131:7,12-13 is written as three
+ * separate one-verse segments) — every verse actually present, across every
+ * segment, is what the citation is built from (via formatVerses), never
+ * just the first segment's start and the last segment's end collapsed into
+ * a min-max range: 7,12,13 is not the same reading as 7-13, which would
+ * also silently claim verses 8-11 that were never part of it. The one
+ * exception is a genuine cross-chapter span (e.g. "1:27-2:11"), always a
+ * single continuous passage in this data model, never a discrete list —
+ * detected below and kept as its own start-end dash citation. For Psalms,
+ * the cited chapter:verse is converted to Septuagint numbering
+ * (mapHebrewPsalmReferenceToSeptuagint) rather than the Masoretic numbering
+ * reading_reference itself uses — matching the Septuagint numbering already
+ * native to bible.verses, and deliberately NOT the Masoretic
+ * toDisplayReference conversion used elsewhere in this file for per-verse
+ * display.
  */
 function buildReadingCitation(reference: string, bookTitle: { english: string; arabic: string }, isPsalm: boolean): { english: string; arabic: string } | null {
   if (!bookTitle.english && !bookTitle.arabic) return null;
@@ -534,33 +543,37 @@ function buildReadingCitation(reference: string, bookTitle: { english: string; a
   const first = segments[0];
   const last = segments[segments.length - 1];
 
-  if (segments.length === 1 && first.kind === 'verses') {
-    const converted = isPsalm
-      ? first.verses.map((v) => ({ ...mapHebrewPsalmReferenceToSeptuagint(first.chapter, v.verseNum), partLabel: v.partLabel }))
-      : first.verses.map((v) => ({ chapter: first.chapter, verse: v.verseNum, partLabel: v.partLabel }));
-    const chapter = converted[0]?.chapter ?? first.chapter;
-    const verseList = converted.map((c) => `${c.verse}${c.partLabel ?? ''}`).join(',');
+  const firstStartRaw = first.kind === 'range' ? { chapter: first.startChapter, verse: first.startVerse } : { chapter: first.chapter, verse: first.verses[0].verseNum };
+  const lastEndRaw = last.kind === 'range' ? { chapter: last.endChapter, verse: last.endVerse } : { chapter: last.chapter, verse: last.verses[last.verses.length - 1].verseNum };
+  const firstStart = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(firstStartRaw.chapter, firstStartRaw.verse) : firstStartRaw;
+  const lastEnd = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(lastEndRaw.chapter, lastEndRaw.verse) : lastEndRaw;
+
+  if (firstStart.chapter !== lastEnd.chapter) {
+    const citation = `${firstStart.chapter}:${firstStart.verse}-${lastEnd.chapter}:${lastEnd.verse}`;
     return {
-      english: `${citationBookTitle.english} ${chapter}:${verseList}`.trim(),
-      arabic: `${citationBookTitle.arabic} ${chapter}:${verseList}`.trim(),
+      english: `${citationBookTitle.english} ${citation}`.trim(),
+      arabic: `${citationBookTitle.arabic} ${citation}`.trim(),
     };
   }
 
-  const startRaw = first.kind === 'range' ? { chapter: first.startChapter, verse: first.startVerse } : { chapter: first.chapter, verse: first.verses[0].verseNum };
-  const endRaw = last.kind === 'range' ? { chapter: last.endChapter, verse: last.endVerse } : { chapter: last.chapter, verse: last.verses[last.verses.length - 1].verseNum };
-  const start = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(startRaw.chapter, startRaw.verse) : startRaw;
-  const end = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(endRaw.chapter, endRaw.verse) : endRaw;
+  const entries: { verse: number; partLabel: string | null }[] = [];
+  for (const segment of segments) {
+    if (segment.kind === 'verses') {
+      for (const v of segment.verses) {
+        const pos = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(segment.chapter, v.verseNum) : { chapter: segment.chapter, verse: v.verseNum };
+        entries.push({ verse: pos.verse, partLabel: v.partLabel });
+      }
+    } else {
+      const start = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(segment.startChapter, segment.startVerse) : { chapter: segment.startChapter, verse: segment.startVerse };
+      const end = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(segment.endChapter, segment.endVerse) : { chapter: segment.endChapter, verse: segment.endVerse };
+      for (let verse = start.verse; verse <= end.verse; verse++) entries.push({ verse, partLabel: null });
+    }
+  }
 
-  const citation =
-    start.chapter === end.chapter
-      ? start.verse === end.verse
-        ? `${start.chapter}:${start.verse}`
-        : `${start.chapter}:${start.verse}-${end.verse}`
-      : `${start.chapter}:${start.verse}-${end.chapter}:${end.verse}`;
-
+  const verseList = formatVerses(entries);
   return {
-    english: `${citationBookTitle.english} ${citation}`.trim(),
-    arabic: `${citationBookTitle.arabic} ${citation}`.trim(),
+    english: `${citationBookTitle.english} ${firstStart.chapter}:${verseList}`.trim(),
+    arabic: `${citationBookTitle.arabic} ${firstStart.chapter}:${verseList}`.trim(),
   };
 }
 

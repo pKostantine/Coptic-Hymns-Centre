@@ -1,5 +1,6 @@
 import { evaluateCondition, getContextFlags } from "./conditionEngine";
 import { toIsoDate as toIsoDateString } from "./dateUtils";
+import { formatVerses } from "./verseFormatting";
 import { supabase } from "./supabase";
 
 // ─── Subdocument sentinel → schema.table registry ────────────────────────────
@@ -251,22 +252,26 @@ function getBibleBookTitleByKey(bookKey) {
   return cached;
 }
 
-/** "19.40:9,2" -> true — a discrete (non-contiguous) verse list rather than a chapter:verse-verse range. */
-function isDiscreteVerseListSegment(segmentRef) {
-  const versePart = String(segmentRef || "").split(":")[1] || "";
-  return versePart.includes(",");
-}
-
 /**
  * Builds the citation-style title for a reading ("Matthew 25:1-13",
- * "Philippians 1:27-2:11") from get_readings_for_date's own resolved_verses
- * — each segment's verses[] already carries the actual fetched bible.verses
- * chapter_number/verse_number, which for Psalms IS the Septuagint numbering
- * (that's the table's native numbering; no Hebrew/Masoretic conversion
- * happens anywhere in this RPC-based pipeline), matching the user's explicit
- * request to cite Psalms in Septuagint numbers. A reading spanning multiple
- * segments/chapters still gets exactly ONE citation, spanning from the very
- * first verse fetched to the very last — never one per chapter/segment.
+ * "Philippians 1:27-2:11", "Psalm 131:7,12-13") from get_readings_for_date's
+ * own resolved_verses — each segment's verses[] already carries the actual
+ * fetched bible.verses chapter_number/verse_number, which for Psalms IS the
+ * Septuagint numbering (that's the table's native numbering; no Hebrew/
+ * Masoretic conversion happens anywhere in this RPC-based pipeline),
+ * matching the user's explicit request to cite Psalms in Septuagint numbers.
+ *
+ * A reading can arrive as several segments (calendar.reading_rules joins
+ * discrete/non-contiguous verses with "@", one segment per verse — e.g.
+ * Psalm 131:7,12-13 comes back as three separate one-verse segments, not one
+ * segment carrying all three) — every verse actually present, across every
+ * segment, is what the citation is built from (via formatVerses), never
+ * just the first segment's start and the last segment's end collapsed into
+ * a min-max range, which would silently claim verses that were never part
+ * of the reading (7,12,13 is not the same reading as 7-13). The one
+ * exception is a genuine cross-chapter span (e.g. Philippians 1:27-2:11),
+ * always a single continuous passage in this data model, never a discrete
+ * list — that keeps its own start-chapter:verse-end-chapter:verse citation.
  */
 async function buildReadingCitation(readingRow) {
   const segments = readingRow?.resolved_verses || [];
@@ -283,23 +288,20 @@ async function buildReadingCitation(readingRow) {
     firstSegment.book_key === "psalms" ? { english: "Psalm", arabic: "مزمور" } : await getBibleBookTitleByKey(firstSegment.book_key);
   if (!bookTitle || (!bookTitle.english && !bookTitle.arabic)) return null;
 
-  if (segments.length === 1 && isDiscreteVerseListSegment(firstSegment.segment)) {
-    const chapter = firstVerses[0].chapter_number;
-    const verseList = firstVerses.map((v) => v.verse_number).join(",");
+  const allVerses = segments.flatMap((s) => s.verses || []);
+  const chapters = [...new Set(allVerses.map((v) => v.chapter_number))];
+
+  if (chapters.length === 1) {
+    const verseList = formatVerses(allVerses.map((v) => ({ verse: v.verse_number })));
     return {
-      english: `${bookTitle.english} ${chapter}:${verseList}`.trim(),
-      arabic: `${bookTitle.arabic} ${chapter}:${verseList}`.trim(),
+      english: `${bookTitle.english} ${chapters[0]}:${verseList}`.trim(),
+      arabic: `${bookTitle.arabic} ${chapters[0]}:${verseList}`.trim(),
     };
   }
 
   const start = firstVerses[0];
   const end = lastVerses[lastVerses.length - 1];
-  const citation =
-    start.chapter_number === end.chapter_number
-      ? start.verse_number === end.verse_number
-        ? `${start.chapter_number}:${start.verse_number}`
-        : `${start.chapter_number}:${start.verse_number}-${end.verse_number}`
-      : `${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`;
+  const citation = `${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`;
 
   return {
     english: `${bookTitle.english} ${citation}`.trim(),

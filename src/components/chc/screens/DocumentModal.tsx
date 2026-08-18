@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
@@ -11,6 +11,7 @@ import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
+import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 
 interface DocumentModalTarget {
   title: { english: string; arabic: string };
@@ -74,6 +75,11 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
   const documentRef = useRef<DocumentWebViewHandle>(null);
+  const { width: screenWidth } = useWindowDimensions();
+  // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
+  // get the same swipe-to-close gesture as the native app, same as
+  // ServiceDocument.tsx/lectionary/index.tsx.
+  const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
 
   const isCopticReadingsSubdocument = Boolean(subdocumentKey && COPTIC_READINGS_SUBDOCUMENT_KEYS.has(subdocumentKey));
 
@@ -178,8 +184,16 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       <SafeAreaView
         edges={['left', 'right', 'bottom']}
         style={styles.screen}
-        {...(Platform.OS !== 'web' ? closeSwipePanResponder.panHandlers : {})}
+        {...(isMobileDocument ? closeSwipePanResponder.panHandlers : {})}
       >
+        {/* Unlike ServiceDocument.tsx/lectionary/index.tsx/[chapter].tsx, this
+            header is never hidden on mobile -- outside Slideshow Mode (see
+            DocumentSurface.tsx: onOpenSelector only reaches
+            SlideshowContainer, never the scroll-mode WebView reader), the
+            list icon here is the ONLY way to open ContentSelectorDrawer, so
+            hiding it on mobile web would strand the user with no way to
+            navigate this modal's sections. isMobileDocument still applies to
+            the swipe-to-close gesture below. */}
         <AppHeader
           title={title || ''}
           canGoBack

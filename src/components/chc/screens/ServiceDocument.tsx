@@ -18,6 +18,7 @@ import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
 import { getEpistleConditionFlags } from '../../../utils/readingsService';
 import { getLastDocumentPosition, setLastDocumentPosition } from '../../../utils/lastDocumentPosition';
 import { goBack } from '../../../utils/navigation';
+import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 
 interface ServiceDocumentProps {
   schema: string;
@@ -36,14 +37,14 @@ interface SubdocumentModalTarget {
   subdocumentKey?: string;
 }
 
-const isMobileDocument = Platform.OS !== 'web';
-
 /**
- * Generic document reader — ported from HymnDisplayScreen.js. On web it keeps
- * the Header (fullscreen toggle + content-list icon); on native there is no
- * header at all, matching the old app exactly — navigation is gesture-only
- * (right-edge swipe-left opens the Content selector, left-edge swipe-right
- * goes back).
+ * Generic document reader — ported from HymnDisplayScreen.js. Desktop-width
+ * web keeps the Header (fullscreen toggle + content-list icon); native, and
+ * web narrow enough to actually be a phone, show no header at all, matching
+ * the app exactly — navigation is gesture-only (right-edge swipe-left opens
+ * the Content selector, left-edge swipe-right goes back). Gated on viewport
+ * width, not just Platform.OS, so the mobile *website* looks like the mobile
+ * *app* — a phone browser is still a phone.
  */
 export default function ServiceDocument({ schema, table, title, arabic, extraContext, backHref }: ServiceDocumentProps) {
   const router = useRouter();
@@ -57,6 +58,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true);
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
   const bookmarkId = `${schema}:${table}`;
   // Navigating to Settings and back unmounts this screen (React Navigation
   // doesn't keep off-screen web routes mounted), which would otherwise wipe

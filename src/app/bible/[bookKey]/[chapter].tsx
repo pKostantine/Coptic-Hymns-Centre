@@ -45,14 +45,15 @@ function normalizeInitialLanguages(visibleLanguages: { english: boolean; coptic:
   };
 }
 
-const isMobileDocument = Platform.OS !== 'web';
-
 export default function BibleChapterDocument() {
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const isCompactSelector = isMobileDocument || screenWidth < MOBILE_WEB_BREAKPOINT;
-  const selectorPanelWidth = isCompactSelector ? Math.round(screenWidth * 0.7) : Math.round(screenWidth * 0.5);
+  // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
+  // get the same headerless, gesture-nav UI as the native app, same as
+  // ServiceDocument.tsx/lectionary/index.tsx.
+  const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
+  const selectorPanelWidth = isMobileDocument ? Math.round(screenWidth * 0.7) : Math.round(screenWidth * 0.5);
   const { bookKey, chapter, title, psalmNumbering: psalmNumberingParam } = useLocalSearchParams<{
     bookKey: string;
     chapter: string;
@@ -156,20 +157,22 @@ export default function BibleChapterDocument() {
   );
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...gesturePanResponder.panHandlers}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}>
       <Head>
         <title>{`CHC ${title || bookKey || 'Bible'} ${chapter}`}</title>
       </Head>
-      <AppHeader
-        title={{ english: `${title || bookKey || ''} ${chapter}`, arabic: `الإصحاح ${chapter}` }}
-        canGoBack
-        onBack={goBackALevel}
-        rightIcon="list-outline"
-        rightAccessibilityLabel="Open verse selector"
-        onRightPress={() => setIsSelectorOpen(true)}
-        rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
-        onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
-      />
+      {!isMobileDocument ? (
+        <AppHeader
+          title={{ english: `${title || bookKey || ''} ${chapter}`, arabic: `الإصحاح ${chapter}` }}
+          canGoBack
+          onBack={goBackALevel}
+          rightIcon="list-outline"
+          rightAccessibilityLabel="Open verse selector"
+          onRightPress={() => setIsSelectorOpen(true)}
+          rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+          onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
+        />
+      ) : null}
       {error ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>

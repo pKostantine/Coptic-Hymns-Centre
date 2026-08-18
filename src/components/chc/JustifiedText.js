@@ -88,13 +88,87 @@ function measureWidthWeb(token, fontSize, fontFamily) {
   return measured;
 }
 
+// Unicode-codepoint iteration (Array.from/split) would cut a Coptic base
+// letter apart from its own combining overline (e.g. "ⲁ̅" = U+2C81 + U+0305)
+// mid-character. Intl.Segmenter's grapheme granularity keeps every such pair
+// together -- the same unit the CSS overflow-wrap/word-break spec requires a
+// browser to treat as unbreakable, so chunking on the same boundaries here
+// keeps this measurement consistent with what word-break:"break-word" (see
+// VerseBlock.js's textStyle) will actually render.
+function getGraphemes(text) {
+  if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+    return Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text), (entry) => entry.segment);
+  }
+  return Array.from(text);
+}
+
+// A single "word" (no internal whitespace) wider than the whole column --
+// routine for Coptic at larger font sizes in a narrow phone-width column --
+// still has to land somewhere: the browser's own word-break:"break-word"
+// (see VerseBlock.js) hard-breaks it at a grapheme boundary once it runs out
+// of room. wrapWordsIntoLines alone never breaks within a word, so without
+// this a verse containing one such word was measured as a single
+// (impossibly wide) line while the browser silently rendered it as several
+// -- undercounting that verse's real line/height needs and, for a verse
+// split across slides, potentially budgeting room for a segment that
+// doesn't actually fit.
+function splitOverwidthWord(word, maxWidth, fontSize, fontFamily) {
+  const graphemes = getGraphemes(word);
+  const chunks = [];
+  let current = "";
+
+  for (const grapheme of graphemes) {
+    const candidate = current + grapheme;
+    if (current && measureWidthWeb(candidate, fontSize, fontFamily) > maxWidth) {
+      chunks.push(current);
+      current = grapheme;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
 function computeLinesWeb(words, fontSize, fontFamily, maxWidth) {
   const widths = new Map();
   for (const word of words) {
     if (!widths.has(word)) widths.set(word, measureWidthWeb(word, fontSize, fontFamily));
   }
+
+  const expandedWords = words.flatMap((word) => {
+    const width = widths.get(word);
+    if (width <= maxWidth) return [word];
+
+    const chunks = splitOverwidthWord(word, maxWidth, fontSize, fontFamily);
+    chunks.forEach((chunk) => {
+      if (!widths.has(chunk)) widths.set(chunk, measureWidthWeb(chunk, fontSize, fontFamily));
+    });
+    return chunks;
+  });
+
   const spaceWidth = measureWidthWeb(" ", fontSize, fontFamily);
-  return wrapWordsIntoLines(words, widths, spaceWidth, maxWidth);
+  return wrapWordsIntoLines(expandedWords, widths, spaceWidth, maxWidth);
+}
+
+// Web-only line measurement for text that is NOT rendered through this
+// component -- namely VerseBlock.js's plain-Text justified path, which uses
+// real CSS text-align:justify (cheaper and more accurate than this
+// component's synthetic per-word Flexbox reconstruction, see useCssJustify in
+// VerseBlock.js) and so never mounts JustifiedText/gets onLines at all.
+// react-native-web's Text has no onTextLayout equivalent (confirmed: no
+// occurrence anywhere in the package), so without this, slideshow pagination
+// has literally no way to learn real line breaks for web verse text and
+// always falls back to rough character-count estimation for every tall-verse
+// split -- this reuses the same canvas measurement this component's own web
+// path already relies on, just exposed standalone.
+export function measureJustifiedLinesWeb(text, fontSize, fontFamily, maxWidth) {
+  if (!IS_WEB) return null;
+  const words = splitWords(text);
+  if (!words.length) return [];
+  return computeLinesWeb(words, fontSize, fontFamily, maxWidth).map((lineWords) => ({
+    text: lineWords.join(" "),
+  }));
 }
 
 // ---- Native: one hidden Text per paragraph (not per word) ----
@@ -165,31 +239,61 @@ function useNativeLines(text, style, fontSize, fontFamily, width) {
  * expected to already be part of `text` (as its own leading "word",
  * separated by a space), not passed separately, so it naturally
  * participates in wrapping and justification like any other word.
+ *
+ * `forceLines`, if given (the exact `{ text }[]` shape this component's own
+ * `onLines` reports), skips wrapping entirely and renders precisely those
+ * lines instead of re-deriving line breaks from `text`. This is what makes
+ * slideshow mode's tall-verse splitting safe: pagination decides how many of
+ * THIS component's own already-measured lines fit in the space left on a
+ * slide, slices that exact array, and hands it back here for the actual
+ * segment -- rather than joining the sliced lines' text back into one blob
+ * and asking a fresh instance to re-wrap it, which can legitimately wrap
+ * differently the second time (a shorter string can break at different word
+ * boundaries than the original did), silently desyncing what pagination
+ * measured from what actually renders. See SlideshowContainer.js's
+ * appendTallVerseSegments.
  */
-export default function JustifiedText({ text, style, fontSize, fontFamily, width, rtl = false, firstWordStyle, onLayout, onLines }) {
+export default function JustifiedText({ text, style, fontSize, fontFamily, width, rtl = false, firstWordStyle, onLayout, onLines, forceLines }) {
   const words = useMemo(() => splitWords(text), [text]);
   const fallbackAlign = rtl ? "right" : "left";
   const reportedLinesForRef = useRef(null);
 
   const webLines = useMemo(
-    () => (IS_WEB ? computeLinesWeb(words, fontSize, fontFamily, width) : null),
-    [words, fontSize, fontFamily, width],
+    () => (IS_WEB && !forceLines ? computeLinesWeb(words, fontSize, fontFamily, width) : null),
+    [words, fontSize, fontFamily, width, forceLines],
   );
-  // Always called (never skipped), even on web where its result goes
-  // unused -- Platform.OS itself never changes within a running app, but
-  // calling a hook conditionally is still a Rules-of-Hooks violation.
+  // Always called (never skipped), even when its result goes unused (web,
+  // or forceLines supplied) -- calling a hook conditionally is a
+  // Rules-of-Hooks violation regardless of whether the branch it feeds ever
+  // actually runs.
   const native = useNativeLines(text, style, fontSize, fontFamily, width);
 
-  const lines = IS_WEB ? webLines : native.lines;
+  const forcedLines = useMemo(
+    () => (forceLines ? forceLines.map((line) => splitWords(line.text)) : null),
+    [forceLines],
+  );
+  const lines = forcedLines ?? (IS_WEB ? webLines : native.lines);
 
-  if (lines && onLines && reportedLinesForRef.current !== text) {
+  if (lines && onLines && !forceLines && reportedLinesForRef.current !== text) {
     reportedLinesForRef.current = text;
     onLines(lines.map((lineWords) => ({ text: lineWords.join(" ") })));
   }
 
-  if (!IS_WEB && native.isMeasuring) {
+  if (!forceLines && !IS_WEB && native.isMeasuring) {
+    // No onLayout here (deliberately -- see native.measuringNode's own
+    // definition): the measuring node is absolutely positioned and
+    // contributes ~0 to this View's height, so calling onLayout now would
+    // report a bogus near-zero height for this language before its real
+    // content (and onTextLayout's line data, reported below once measuring
+    // finishes) ever exists. SlideshowContainer.js's pagination distinguishes
+    // "no lines because this metric doesn't need them" from "lines not in
+    // yet" purely by whether a metric was reported at all -- a premature
+    // height-only report here would satisfy that check too early, unmounting
+    // this item from the off-screen measurement layer before its line data
+    // arrives and silently falling back to much-less-accurate
+    // character-count estimation for tall-verse splitting.
     return (
-      <View style={{ width }} onLayout={onLayout}>
+      <View style={{ width }}>
         {native.measuringNode}
       </View>
     );
