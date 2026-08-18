@@ -47,6 +47,7 @@ export const SUBDOCUMENT_MAP = {
   MIDNIGHT_HOUR: { schema: "agpeya", table: "midnight_hour" },
   OTHER_PRAYERS: { schema: "agpeya", table: "other_prayers" },
   PROCESSION_OF_THE_CROSS: null, // not yet in database
+  VENERATION: { schema: "veneration", table: "veneration" },
   VENERATION_MELODIES: null, // target table unclear, see project memory
 };
 
@@ -182,6 +183,7 @@ const READING_SENTINEL_MAP = {
 };
 
 let readingsForDateCache = null; // { isoDate, promise }
+let synaxariumCache = null; // { isoDate, promise }
 
 function getReadingsForDate(isoDate) {
   if (readingsForDateCache?.isoDate === isoDate) return readingsForDateCache.promise;
@@ -383,6 +385,110 @@ async function resolveReadingSentinelSplice(sentinel, isoDate, titleShown, minim
   }
 
   return { kind: "flat", verses: [...citationVerse, ...verses] };
+}
+
+function getSynaxariumForDate(isoDate) {
+  if (synaxariumCache?.isoDate === isoDate) return synaxariumCache.promise;
+  const promise = supabase
+    .schema("synaxarium")
+    .rpc("get_day_json", { p_date: isoDate })
+    .then(({ data, error }) => {
+      if (error) throw new Error(`Unable to load synaxarium for ${isoDate}: ${error.message}`);
+      return data || { entries: [] };
+    });
+  synaxariumCache = { isoDate, promise };
+  return promise;
+}
+
+/** Pairs English and Arabic paragraphs by index; whichever runs out first
+ *  just contributes an empty string for its remaining rows. */
+function pairSynaxariumParagraphs(english, arabic) {
+  const enParagraphs = (english || "").split("\n\n").map((s) => s.trim()).filter(Boolean);
+  const arParagraphs = (arabic || "").split("\n\n").map((s) => s.trim()).filter(Boolean);
+  const length = Math.max(enParagraphs.length, arParagraphs.length);
+  const pairs = [];
+  for (let i = 0; i < length; i++) {
+    pairs.push([enParagraphs[i] || "", arParagraphs[i] || ""]);
+  }
+  return pairs;
+}
+
+/** Fetches today's Synaxarium via get_day_json and maps it to hydrated sections:
+ *  one title-only header for the Coptic date, then one section per saint entry
+ *  with its long body text split on double-newlines for slide pagination. */
+async function resolveSynaxariumSections(isoDate) {
+  let dayData;
+  try {
+    dayData = await getSynaxariumForDate(isoDate);
+  } catch {
+    return [];
+  }
+  if (!dayData?.entries?.length) return [];
+
+  const sections = [];
+
+  if (dayData.coptic_date) {
+    sections.push({
+      id: `synaxarium-date-${isoDate}`,
+      title: { english: dayData.coptic_date, arabic: "" },
+      titlePrayerType: null,
+      collapsible: false,
+      defaultCollapsed: false,
+      verses: [],
+      isReading: false,
+      forceWhiteVerses: true,
+      prayerType: null,
+      alternateEvery: null,
+    });
+  }
+
+  if (dayData.intro) {
+    sections.push({
+      id: "synaxarium-intro",
+      title: { english: "", arabic: "" },
+      titlePrayerType: null,
+      collapsible: false,
+      defaultCollapsed: false,
+      verses: [{
+        english: dayData.intro.english || "",
+        arabic: dayData.intro.arabic || "",
+        coptic: null,
+        type: "text",
+        person_type: null,
+        prayer_type: null,
+      }],
+      isReading: true,
+      forceWhiteVerses: true,
+      prayerType: null,
+      alternateEvery: null,
+    });
+  }
+
+  for (const entry of dayData.entries) {
+    const pairs = pairSynaxariumParagraphs(entry.english, entry.arabic);
+    const verses = pairs.map(([en, ar]) => ({
+      english: en,
+      arabic: ar,
+      coptic: null,
+      type: "text",
+      person_type: null,
+      prayer_type: null,
+    }));
+    sections.push({
+      id: entry.entry_key,
+      title: { english: entry.title_english || "", arabic: entry.title_arabic || "" },
+      titlePrayerType: null,
+      collapsible: false,
+      defaultCollapsed: false,
+      verses,
+      isReading: true,
+      forceWhiteVerses: true,
+      prayerType: null,
+      alternateEvery: null,
+    });
+  }
+
+  return sections;
 }
 
 /** Same as resolveReadingSentinelVerses but wraps the result as a titled section (for Subdocument/order-table-level Inline placements, which need a section object, not a bare verse list). The computed Bible citation is prepended to the verses as its own readingReference line — right before the actual reading text, never before the calling table's own intro/conclusion rows, which sit outside this section entirely. */
@@ -1079,6 +1185,24 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
     if (section.isSubdocumentPlaceholder) {
       const target = SUBDOCUMENT_MAP[section.hymn_key];
       if (!target) {
+        if (section.hymn_key === "SYNAXARIUM" && isoDate) {
+          const synaxariumSections = await resolveSynaxariumSections(isoDate);
+          const label = section.title?.english || "Synaxarium";
+          hydrated.push({
+            id: section.id,
+            title: { english: label, arabic: section.title?.arabic || "السنكسار" },
+            verses: [],
+            isSubdocumentButton: true,
+            subdocumentKey: "SYNAXARIUM",
+            subdocumentTarget: null,
+            subdocumentSections: synaxariumSections,
+            alternateEvery: null,
+            forceWhiteVerses: true,
+            bishopOnly: section.bishopOnly,
+            priestOnly: section.priestOnly,
+          });
+          continue;
+        }
         if (READING_SENTINELS.has(section.hymn_key) && isoDate) {
           const readingSection = await resolveReadingSentinelSection(section, isoDate);
           if (readingSection) {

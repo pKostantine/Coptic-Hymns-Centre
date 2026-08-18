@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
@@ -71,11 +71,21 @@ export default function BibleChapterDocument() {
   const [chapterKeys, setChapterKeys] = useState<number[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [selectorSlide] = useState(() => new Animated.Value(1));
   const [enabledLanguages, setEnabledLanguages] = useState(() => normalizeInitialLanguages(preferences.visibleLanguages));
 
   useEffect(() => {
     setEnabledLanguages(normalizeInitialLanguages(preferences.visibleLanguages));
   }, [preferences.visibleLanguages]);
+
+  useEffect(() => {
+    Animated.timing(selectorSlide, {
+      toValue: isSelectorOpen ? 0 : 1,
+      duration: 220,
+      easing: isSelectorOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [isSelectorOpen, selectorSlide]);
 
   useEffect(() => {
     if (!bookKey) return;
@@ -144,17 +154,26 @@ export default function BibleChapterDocument() {
     goBack(router, bookKey ? { pathname: '/bible/[bookKey]', params: { bookKey, title } } : '/bible');
   }, [router, bookKey, title]);
 
-  const gesturePanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          gestureState.x0 < 56 && gestureState.dx > 24 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2,
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.x0 < 56 && gestureState.dx > 60) goBackALevel();
-        },
-      }),
-    [goBackALevel],
-  );
+  const gesturePanResponder = useMemo(() => {
+    const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
+        if (!isHorizontal) return false;
+        const isBackSwipe = gestureState.x0 < 56 && gestureState.dx > 24;
+        const isSelectorSwipe = !isSelectorOpen && gestureState.x0 > screenWidth - selectorEdgeWidth && gestureState.dx < -24;
+        return isBackSwipe || isSelectorSwipe;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const selectorEdge = Math.min(240, Math.max(128, screenWidth * 0.18));
+        if (gestureState.x0 < 56 && gestureState.dx > 60) {
+          goBackALevel();
+        } else if (!isSelectorOpen && gestureState.x0 > screenWidth - selectorEdge && gestureState.dx < -36) {
+          setIsSelectorOpen(true);
+        }
+      },
+    });
+  }, [goBackALevel, screenWidth, isSelectorOpen]);
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}>
@@ -201,7 +220,7 @@ export default function BibleChapterDocument() {
           >
             <View style={styles.selectorOverlay}>
               <Pressable accessibilityLabel="Close verse selector" style={styles.selectorBackdrop} onPress={() => setIsSelectorOpen(false)} />
-              <View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top }]}>
+              <Animated.View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top, transform: [{ translateX: selectorSlide.interpolate({ inputRange: [0, 1], outputRange: [0, selectorPanelWidth] }) }] }]}>
                 <View style={styles.selectorHeader}>
                   {preferences.appLanguage === 'ar' ? (
                     <Text style={[styles.selectorHeaderTitle, styles.selectorHeaderArabic]}>الآيات</Text>
@@ -256,7 +275,7 @@ export default function BibleChapterDocument() {
                     <Icon name="settings-outline" size={25} color={COLORS.gold} />
                   </Pressable>
                 </View>
-              </View>
+              </Animated.View>
             </View>
           </Modal>
         </View>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Href, Stack, useRouter } from 'expo-router';
+import { Href, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -125,6 +125,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const navigatingAwayRef = useRef(false);
 
   const bookmarked = isBookmarked(bookmarkId);
+  // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
+  // to a saved subdocument bookmark) — fire once when sections first load.
+  const { sub: initialSubdocumentKey } = useLocalSearchParams<{ sub?: string }>();
+  const initialSubOpenedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -202,6 +206,19 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     }, 2000);
     return () => clearTimeout(clearGuardTimeoutId);
   }, [sections, documentPositionKey, preferences.slideshowMode]);
+
+  useEffect(() => {
+    if (!sections || !initialSubdocumentKey || initialSubOpenedRef.current) return;
+    initialSubOpenedRef.current = true;
+    const triggerSection = sections.find((s) => s.subdocumentKey === initialSubdocumentKey);
+    if (triggerSection?.subdocumentSections) {
+      setSubdocumentModal({
+        title: triggerSection.title,
+        sections: triggerSection.subdocumentSections,
+        subdocumentKey: triggerSection.subdocumentKey,
+      });
+    }
+  }, [sections, initialSubdocumentKey]);
 
   // Rotating the device (or, on web, resizing the window) reflows the
   // WebView's CSS layout at the new width without reloading it — the scroll
@@ -482,6 +499,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             title={subdocumentModal?.title ?? null}
             sections={subdocumentModal?.sections ?? null}
             subdocumentKey={subdocumentModal?.subdocumentKey}
+            parentBookmarkId={bookmarkId}
             onClose={() => setSubdocumentModal(null)}
           />
           <AntiphonaryModal

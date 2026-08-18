@@ -130,7 +130,7 @@ export function buildDocumentHtml(
   const openButtonLineHeight = Math.max(Math.round(sectionTitleLineHeight * 1.3), 24);
   const copticFontSize = Math.round(fontSize * 1.25);
   const arabicFontSize = Math.round(fontSize * 1.15);
-  const verseLineHeight = Math.round(fontSize * 1.25);
+  const verseLineHeight = Math.round(fontSize * 1.3);
 
   const visibleSections = sections.filter((section) => {
     if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;
@@ -261,7 +261,8 @@ export function buildDocumentHtml(
       }
       .arabic {
         direction: rtl;
-        font-family: "Arial", sans-serif !important;
+        // font-family: "Arial", sans-serif !important;
+        font-family: Georgia, serif !important;
         font-size: ${arabicFontSize}px;
         line-height: ${verseLineHeight}px;
       }

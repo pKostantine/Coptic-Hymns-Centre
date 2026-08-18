@@ -101,6 +101,23 @@ export default function BookmarksScreen() {
             href: `/bible/${bookKey}/${chapter}`,
           };
         }
+        // Subdocument bookmarks: "${parentSchema}:${parentTable}:sub:${KEY}"
+        const subMatch = id.match(/^(.+):sub:([^:]+)$/);
+        if (subMatch) {
+          const [, parentId, subdocumentKey] = subMatch;
+          const parent = BOOKMARK_INDEX[parentId];
+          if (!parent) return null;
+          const subdocumentLabel = subdocumentKey
+            .split('_')
+            .map((word: string) => word.charAt(0) + word.slice(1).toLowerCase())
+            .join(' ');
+          return {
+            id,
+            title: `${parent.title} – ${subdocumentLabel}`,
+            arabic: parent.arabic ? `${parent.arabic} – ${subdocumentLabel}` : '',
+            href: `${parent.href}?sub=${subdocumentKey}`,
+          };
+        }
         return BOOKMARK_INDEX[id] || null;
       })
       .filter((entry): entry is BookmarkEntry => entry !== null);

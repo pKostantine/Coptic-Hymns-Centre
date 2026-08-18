@@ -1,7 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { COLORS, SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
 import { resolveRubricKey, computeGlobalSuppressSpeakerLabelFlags } from "../../utils/verseRubric";
@@ -25,7 +23,6 @@ export default function SlideshowContainer({
   copticGospelRite,
   suppressAllSpeakerLabels,
 }) {
-  const safeAreaInsets = useSafeAreaInsets();
   const [viewportHeight, setViewportHeight] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [measuredHeights, setMeasuredHeights] = useState({});
@@ -93,15 +90,11 @@ export default function SlideshowContainer({
         Math.round(viewportHeight || 0),
         Math.round(viewportWidth || 0),
         Math.round(viewportHeightOverride || 0),
-        Math.round(safeAreaInsets.top || 0),
-        Math.round(safeAreaInsets.bottom || 0),
         refreshKey,
       ].join(":"),
     [
       fontSize,
       refreshKey,
-      safeAreaInsets.bottom,
-      safeAreaInsets.top,
       slideTableWidth,
       viewportHeight,
       viewportHeightOverride,
@@ -261,7 +254,7 @@ export default function SlideshowContainer({
       viewportHeight && viewportHeightOverride
         ? Math.min(viewportHeight, viewportHeightOverride)
         : viewportHeight || viewportHeightOverride;
-    const slidePadding = getSlidePadding(safeAreaInsets);
+    const slidePadding = getSlidePadding();
     const effectiveViewportHeight =
       measuredViewportHeight - slidePadding.top - slidePadding.bottom;
 
@@ -293,13 +286,12 @@ export default function SlideshowContainer({
     items,
     measuredHeights,
     measuredLanguageHeights,
-    safeAreaInsets,
     slideTableWidth,
     viewportHeight,
     viewportHeightOverride,
     visibleLanguages,
   ]);
-  const slidePadding = useMemo(() => getSlidePadding(safeAreaInsets), [safeAreaInsets]);
+  const slidePadding = useMemo(() => getSlidePadding(), []);
   const isMeasurementComplete = useMemo(
     () => Boolean(viewportHeight || viewportHeightOverride) &&
       items.every((item) => typeof measuredHeights[item.id] === "number"),
@@ -1761,11 +1753,12 @@ function getSeasonalPrefixLineHeight(fontSize) {
   return Math.max(Math.round(prefixFontSize * 1.1), 9);
 }
 
-function getSlidePadding(safeAreaInsets = {}) {
-  return {
-    bottom: Math.max(safeAreaInsets.bottom || 0, SPACING.xl),
-    top: Math.max(safeAreaInsets.top || 0, SPACING.xl),
-  };
+function getSlidePadding() {
+  // SafeAreaView (in both ServiceDocument and DocumentModal) already handles
+  // all edge insets before SlideshowContainer renders, so adding safeAreaInsets
+  // here would double-count the notch/home-indicator on iOS. SPACING.xl gives
+  // visual breathing room without consuming the already-excluded safe area.
+  return { bottom: SPACING.xl, top: SPACING.xl };
 }
 
 function requestMeasurementFrame(callback) {

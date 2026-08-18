@@ -29,6 +29,7 @@ const SETTINGS_LABELS = {
   settings: { english: 'Settings', arabic: 'الإعدادات' },
   languages: { english: 'Languages', arabic: 'اللغات' },
   orientation: { english: 'Orientation', arabic: 'الاتجاه' },
+  display: { english: 'Display', arabic: 'العرض' },
   slideshowMode: { english: 'Slideshow Mode', arabic: 'وضع العرض التقديمي' },
   selectText: { english: 'Select Text', arabic: 'تحديد النص' },
   displayComments: { english: 'Display Comments', arabic: 'عرض التعليقات' },
@@ -96,18 +97,6 @@ export default function SettingsScreen() {
             ))}
           </View>
 
-          <View style={styles.fontControls}>
-            <Pressable accessibilityLabel="Decrease font size" style={styles.fontButton} onPress={() => setFontScale(-1)}>
-              <Icon name="remove" size={18} color={COLORS.gold} />
-            </Pressable>
-            <Text style={[styles.fontSize, localizedTextStyle]}>
-              {isArabicChrome ? toEasternArabicDigits(preferences.fontScale) : preferences.fontScale}
-            </Text>
-            <Pressable accessibilityLabel="Increase font size" style={styles.fontButton} onPress={() => setFontScale(1)}>
-              <Icon name="add" size={18} color={COLORS.gold} />
-            </Pressable>
-          </View>
-
           {Platform.OS !== 'web' ? (
             <View style={styles.orientationGroup}>
               <Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.orientation)}</Text>
@@ -130,6 +119,18 @@ export default function SettingsScreen() {
             </View>
           ) : null}
 
+          <Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.display)}</Text>
+          <View style={styles.fontControls}>
+            <Pressable accessibilityLabel="Decrease font size" style={styles.fontButton} onPress={() => setFontScale(-1)}>
+              <Icon name="remove" size={18} color={COLORS.gold} />
+            </Pressable>
+            <Text style={[styles.fontSize, localizedTextStyle]}>
+              {isArabicChrome ? toEasternArabicDigits(preferences.fontScale) : preferences.fontScale}
+            </Text>
+            <Pressable accessibilityLabel="Increase font size" style={styles.fontButton} onPress={() => setFontScale(1)}>
+              <Icon name="add" size={18} color={COLORS.gold} />
+            </Pressable>
+          </View>
           <ToggleRow label={labelText(SETTINGS_LABELS.slideshowMode)} isArabic={isArabicChrome} active={preferences.slideshowMode} onPress={toggleSlideshowMode} />
           <ToggleRow label={labelText(SETTINGS_LABELS.selectText)} isArabic={isArabicChrome} active={preferences.selectText} onPress={toggleSelectText} />
           <ToggleRow label={labelText(SETTINGS_LABELS.displayComments)} isArabic={isArabicChrome} active={preferences.displayComments} onPress={toggleDisplayComments} />

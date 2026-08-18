@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
@@ -26,6 +27,8 @@ interface DocumentModalProps {
   sections: DocumentSection[] | null;
   isAntiphonary?: boolean;
   subdocumentKey?: string;
+  /** Parent document's bookmark ID (e.g. "liturgy:vespers") — when provided alongside subdocumentKey, the content selector shows a bookmark button that saves "${parentBookmarkId}:sub:${subdocumentKey}". */
+  parentBookmarkId?: string;
   onClose: () => void;
 }
 
@@ -68,8 +71,9 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
  * no fixed nesting cap, it's bounded only by how many buttons a user taps
  * through and the depth-3 guard hydrateWithFlags applies while prefetching.
  */
-function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, onClose }: DocumentModalProps) {
-  const { preferences } = useReadingPreferences();
+function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, parentBookmarkId, onClose }: DocumentModalProps) {
+  const router = useRouter();
+  const { preferences, toggleBishopPresent, isBookmarked, toggleBookmark } = useReadingPreferences();
   const [nestedModal, setNestedModal] = useState<DocumentModalTarget | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
@@ -82,6 +86,13 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
 
   const isCopticReadingsSubdocument = Boolean(subdocumentKey && COPTIC_READINGS_SUBDOCUMENT_KEYS.has(subdocumentKey));
+  const subdocumentBookmarkId =
+    parentBookmarkId && subdocumentKey ? `${parentBookmarkId}:sub:${subdocumentKey}` : undefined;
+
+  function navigateAway(path: string) {
+    onClose();
+    router.push(path as never);
+  }
 
   const handleAction = (action: DocumentAction) => {
     if (!sections) return;
@@ -157,41 +168,52 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     else documentRef.current?.scrollToSection(introSection.id);
   }
 
-  // Left-edge swipe-right closes *this* modal only — same gesture ServiceDocument
-  // uses to go back, but scoped to `onClose` instead of the parent screen's own
-  // back navigation, so swiping out of a subdocument never also exits the
-  // document underneath it (nested modals stack the same way: each one's own
-  // gesture only closes itself). Disabled entirely while `nestedModal` is open
-  // (a subdocument opened from within this one, e.g. an Antiphonary button
-  // inside a subdocument) — same reasoning as ServiceDocument.tsx's
-  // isCoveredByModal: this modal never unmounts while a nested one covers it,
-  // so without this guard the same swipe could close BOTH levels at once
-  // instead of just the topmost (nested) one.
-  const closeSwipePanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          if (nestedModal || selectorOpen) return false;
-          const startsInLeftEdge = gestureState.x0 < 56;
-          const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-          return startsInLeftEdge && isHorizontal && Math.abs(gestureState.dx) > 18;
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (nestedModal || selectorOpen) return;
-          if (gestureState.x0 < 56 && gestureState.dx > 60) {
-            onClose();
-          }
-        },
-      }),
-    [onClose, nestedModal, selectorOpen],
-  );
+  // Capture-phase gesture handler for the two screen-edge swipes: left-edge
+  // right-swipe closes this modal; right-edge left-swipe opens the content
+  // selector. Using onMoveShouldSetPanResponderCapture (not the plain non-
+  // capture variant) is essential — in slideshow mode, NavigationOverlay
+  // inside SlideshowContainer also uses capture, and descendant capture fires
+  // AFTER ancestor capture, so SafeAreaView wins the gesture before
+  // NavigationOverlay can steal it. Disabled entirely while nestedModal is open
+  // so swiping only dismisses the topmost level, not both at once.
+  const swipeGesturePanResponder = useMemo(() => {
+    const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
+    return PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        if (nestedModal || selectorOpen) return false;
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        if (!isHorizontal) return false;
+        const isCloseSwipe = gestureState.x0 < 56 && gestureState.dx > 12;
+        const isSelectorSwipe =
+          !isCopticReadingsSubdocument &&
+          gestureState.x0 > screenWidth - selectorEdgeWidth &&
+          gestureState.dx < -12;
+        return isCloseSwipe || isSelectorSwipe;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (nestedModal || selectorOpen) return;
+        if (gestureState.x0 < 56 && gestureState.dx > 60) {
+          onClose();
+          return;
+        }
+        const selectorEdge = Math.min(240, Math.max(128, screenWidth * 0.18));
+        if (
+          !isCopticReadingsSubdocument &&
+          gestureState.x0 > screenWidth - selectorEdge &&
+          gestureState.dx < -36
+        ) {
+          setSelectorOpen(true);
+        }
+      },
+    });
+  }, [onClose, nestedModal, selectorOpen, screenWidth, isCopticReadingsSubdocument]);
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
       <SafeAreaView
         edges={['left', 'right', 'bottom']}
         style={styles.screen}
-        {...(isMobileDocument ? closeSwipePanResponder.panHandlers : {})}
+        {...(isMobileDocument ? swipeGesturePanResponder.panHandlers : {})}
       >
         {/* Web already always shows this header regardless of width (see
             ServiceDocument.tsx's doc comment), but unlike those screens this
@@ -251,9 +273,14 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 currentSectionId={currentSectionId}
                 onClose={() => setSelectorOpen(false)}
                 onSelectSection={jumpToSection}
+                bookmarked={subdocumentBookmarkId ? isBookmarked(subdocumentBookmarkId) : undefined}
+                onToggleBookmark={subdocumentBookmarkId ? () => toggleBookmark(subdocumentBookmarkId) : undefined}
+                onOpenCalendar={() => navigateAway('/calendar')}
+                onOpenSettings={() => navigateAway('/settings')}
+                bishopPresent={preferences.bishopPresent}
+                onToggleBishopPresent={toggleBishopPresent}
                 displaySilentPrayers={preferences.displaySilentPrayers}
                 appLanguage={preferences.appLanguage}
-                bishopPresent={preferences.bishopPresent}
               />
             )}
           </>
