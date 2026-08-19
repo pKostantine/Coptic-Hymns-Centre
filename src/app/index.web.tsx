@@ -67,10 +67,21 @@ export default function MainMenuWeb() {
         <View style={styles.header}>
           <View style={styles.brand}>
             <Image source={require('../../assets/images/CHC_sm_web.png')} style={styles.logo} />
-            <Text style={[styles.brandText, showArabic && styles.brandTextArabic]} numberOfLines={1}>
-              {appTitle}
-            </Text>
           </View>
+          {/* Absolutely positioned (spanning the full header width, independent
+              of the logo/toolbar's own widths) so the title is truly centered
+              on the header line, matching AppHeader — not just centered in
+              whatever space happens to be left between the logo and however
+              many toolbar buttons are showing. pointerEvents="none" so it
+              never intercepts a tap meant for the logo or toolbar in the rare
+              case its (untappable, decorative) bounding box overlaps them. */}
+          <Text
+            style={[styles.centeredHeaderTitle, showArabic && styles.brandTextArabic]}
+            numberOfLines={1}
+            pointerEvents="none"
+          >
+            {appTitle}
+          </Text>
           <View style={styles.toolbar}>
             {shouldShowFullscreen ? (
               <Pressable accessibilityLabel="Toggle full screen" style={styles.toolbarButton} onPress={toggleFullscreen}>
@@ -145,6 +156,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
   },
+  // Padding matches AppHeader.web.tsx's own desktop container exactly (same
+  // horizontal inset, same asymmetric top/bottom, same logo/title/button
+  // dimensions below) so this screen's custom wide header lines up pixel-for-
+  // pixel with every other screen's header — same overall height AND the
+  // logo/back-button sitting at the same x position — even though its
+  // brand-left/toolbar-right layout is structurally different from
+  // AppHeader's centered-title one.
   header: {
     alignItems: 'center',
     backgroundColor: COLORS.navy,
@@ -152,38 +170,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md + 4,
-  },
-  headerMobile: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.lg + 4,
+    paddingBottom: SPACING.md + 4,
+    position: 'relative',
   },
   brand: {
     alignItems: 'center',
     flexDirection: 'row',
-    flexShrink: 1,
-    gap: SPACING.md,
   },
   logo: {
     height: 48,
     width: 48,
     resizeMode: 'contain',
   },
-  logoMobile: {
-    height: 32,
-    width: 32,
-  },
-  brandText: {
+  // Positioned against `header` (position: "relative" above), not `brand` —
+  // spans the header's full width so centering is independent of the logo's
+  // and toolbar's own widths, same guarantee AppHeader's centered title has.
+  centeredHeaderTitle: {
     color: COLORS.white,
-    flexShrink: 1,
     fontFamily: TYPOGRAPHY.title,
     fontSize: 26,
     fontWeight: '700',
     letterSpacing: 0,
-  },
-  brandTextMobile: {
-    fontSize: 16,
+    left: SPACING.md,
+    position: 'absolute',
+    right: SPACING.md,
+    textAlign: 'center',
   },
   brandTextArabic: {
     fontFamily: TYPOGRAPHY.arabic,
@@ -202,11 +215,6 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: 'center',
     width: 48,
-  },
-  toolbarButtonMobile: {
-    borderRadius: 16,
-    height: 36,
-    width: 36,
   },
   notLiveBanner: {
     alignItems: 'center',
