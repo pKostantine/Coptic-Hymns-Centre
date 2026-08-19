@@ -139,9 +139,10 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   const sectionPills = useMemo(
     () =>
       (sections || [])
+        .filter((section) => !(section.bishopOnly && !preferences.bishopPresent) && !(section.priestOnly && preferences.bishopPresent))
         .map((section) => ({ section, label: getPillLabel(section, isCopticReadingsSubdocument) }))
         .filter((entry): entry is { section: DocumentSection; label: string } => Boolean(entry.label)),
-    [sections, isCopticReadingsSubdocument],
+    [sections, isCopticReadingsSubdocument, preferences.bishopPresent],
   );
 
   function selectAntiphonaryGroup(group: 'introduction' | 'adam' | 'vatos') {

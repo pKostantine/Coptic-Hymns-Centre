@@ -87,13 +87,17 @@ export default function CalendarScreen() {
       const grid = await getGregorianMonthGrid(gregorianYear, gregorianMonth);
       setDays(grid);
       if (grid.length) {
-        setSeasons(await getSeasonRanges(grid[0].gregorianDate, grid[grid.length - 1].gregorianDate));
+        const fromDate = grid[0].gregorianDate < todayIso ? grid[0].gregorianDate : todayIso;
+        const toDate = grid[grid.length - 1].gregorianDate > todayIso ? grid[grid.length - 1].gregorianDate : todayIso;
+        setSeasons(await getSeasonRanges(fromDate, toDate));
       }
     } else if (copticYear !== null && copticMonth !== null) {
       const grid = await getCopticMonthGrid(copticYear, copticMonth);
       setDays(grid);
       if (grid.length) {
-        setSeasons(await getSeasonRanges(grid[0].gregorianDate, grid[grid.length - 1].gregorianDate));
+        const fromDate = grid[0].gregorianDate < todayIso ? grid[0].gregorianDate : todayIso;
+        const toDate = grid[grid.length - 1].gregorianDate > todayIso ? grid[grid.length - 1].gregorianDate : todayIso;
+        setSeasons(await getSeasonRanges(fromDate, toDate));
       }
     }
   }, [mode, gregorianYear, gregorianMonth, copticYear, copticMonth]);
@@ -198,7 +202,10 @@ export default function CalendarScreen() {
             accessibilityLabel={liturgicalDayPeriod === 'morning' ? 'Switch to evening liturgical day' : 'Switch to morning liturgical day'}
             style={[
               styles.periodToggle,
-              { backgroundColor: liturgicalDayPeriod === 'evening' ? 'rgba(142, 197, 255, 0.22)' : 'rgba(255, 255, 255, 0.08)' },
+              {
+                backgroundColor: liturgicalDayPeriod === 'evening' ? 'rgba(142, 197, 255, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+                borderColor: liturgicalDayPeriod === 'morning' ? COLORS.gold : COLORS.rowBlue,
+              },
             ]}
             onPress={() => setLiturgicalDayPeriod(liturgicalDayPeriod === 'morning' ? 'evening' : 'morning')}
           >
@@ -336,7 +343,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 24,
     borderWidth: 2,
-    borderColor: COLORS.rowBlue,
     height: 48,
     justifyContent: 'center',
     width: 58,
