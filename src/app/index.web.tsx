@@ -200,7 +200,6 @@ const styles = StyleSheet.create({
   },
   brandTextArabic: {
     fontFamily: TYPOGRAPHY.arabic,
-    textAlign: 'right',
     writingDirection: 'rtl',
   },
   toolbar: {

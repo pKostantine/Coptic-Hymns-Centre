@@ -146,7 +146,6 @@ const styles = StyleSheet.create({
   },
   arabicTitle: {
     fontFamily: TYPOGRAPHY.arabic,
-    textAlign: 'right',
     writingDirection: 'rtl',
   },
   centeredTitle: {
