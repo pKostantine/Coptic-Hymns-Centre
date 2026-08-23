@@ -400,18 +400,6 @@ function getSynaxariumForDate(isoDate) {
   return promise;
 }
 
-/** Pairs English and Arabic paragraphs by index; whichever runs out first
- *  just contributes an empty string for its remaining rows. */
-function pairSynaxariumParagraphs(english, arabic) {
-  const enParagraphs = (english || "").split("\n\n").map((s) => s.trim()).filter(Boolean);
-  const arParagraphs = (arabic || "").split("\n\n").map((s) => s.trim()).filter(Boolean);
-  const length = Math.max(enParagraphs.length, arParagraphs.length);
-  const pairs = [];
-  for (let i = 0; i < length; i++) {
-    pairs.push([enParagraphs[i] || "", arParagraphs[i] || ""]);
-  }
-  return pairs;
-}
 
 /** Fetches today's Synaxarium via get_day_json and maps it to hydrated sections:
  *  one title-only header for the Coptic date, then one section per saint entry
@@ -465,10 +453,9 @@ async function resolveSynaxariumSections(isoDate) {
   }
 
   for (const entry of dayData.entries) {
-    const pairs = pairSynaxariumParagraphs(entry.english, entry.arabic);
-    const verses = pairs.map(([en, ar]) => ({
-      english: en,
-      arabic: ar,
+    const verses = (entry.paragraphs || []).map((p) => ({
+      english: p.english || "",
+      arabic: p.arabic ?? null,
       coptic: null,
       type: "text",
       person_type: null,
@@ -1514,8 +1501,10 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
       // actual (spliced-in, live) Psalm text after it, not to this framing
       // line, so it's excluded from applyCopticCaseToSection's search for
       // which verse to capitalize (it still gets lowercased normally).
+      // vocKyrieEleison is a short refrain opener; the capital belongs to the
+      // first verse of the following hymn (Adam/Vatos introduction, etc.).
       const skipHymnCapitalization =
-        section.hymn_key === "copticPsalm" ? true : (verse.skipHymnCapitalization || false);
+        section.hymn_key === "copticPsalm" || section.hymn_key === "vocKyrieEleison" ? true : (verse.skipHymnCapitalization || false);
       verses.push({ ...verse, bishopOnly: combined.bishopOnly, priestOnly: combined.priestOnly, forceWhiteText, skipHymnCapitalization });
     }
 

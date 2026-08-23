@@ -12,6 +12,8 @@ export interface DocumentWebViewHandle {
   scrollToSection: (id: string) => void;
   scrollToVerse: (id: string) => void;
   scrollToTune: (tune: string) => void;
+  /** Pre-set the section the WebView will restore to on its next load (e.g. before triggering a state change that causes a full HTML rebuild). */
+  setPreservedSection: (id: string) => void;
 }
 
 interface DocumentWebViewProps {
@@ -86,6 +88,9 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       scrollToTune: (tune: string) => {
         const win = iframeRef.current?.contentWindow as (Window & { scrollToTune?: (tune: string) => void }) | null | undefined;
         win?.scrollToTune?.(tune);
+      },
+      setPreservedSection: (id: string) => {
+        preservedSectionIdRef.current = id;
       },
     }));
 

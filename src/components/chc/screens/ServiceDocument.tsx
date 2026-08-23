@@ -99,10 +99,6 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const [antiphonarySections, setAntiphonarySections] = useState<DocumentSection[] | null>(null);
   const documentRef = useRef<DocumentWebViewHandle>(null);
   const hasRestoredScrollPositionRef = useRef(false);
-  // Set right before toggling copticGospelRite (see handleAction below) to
-  // whichever section id the toggle button itself reported — consumed by
-  // the re-anchor effect right after.
-  const gospelRiteAnchorSectionIdRef = useRef<string | null>(null);
   // A freshly (re)mounted WebView's own scroll-tracking script starts
   // reporting "currentSection" as soon as content paints -- for the very
   // first frame or two that's just wherever it naturally loaded (the top),
@@ -243,24 +239,6 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => clearTimeout(timeoutId);
   }, [screenWidth, screenHeight, preferences.slideshowMode, currentVerseId, currentSectionId]);
 
-  // Toggling "Coptic Gospel Rite" regenerates the WebView's whole HTML (its
-  // content depends on the toggle), which reloads the view and resets
-  // scroll to the top — re-anchor to the toggle button's own section (see
-  // gospelRiteAnchorSectionIdRef, set in handleAction below) once the
-  // reload has had a moment to settle, same pattern as the dimension-change
-  // re-anchor above.
-  useEffect(() => {
-    const anchorId = gospelRiteAnchorSectionIdRef.current;
-    if (!anchorId) return;
-    gospelRiteAnchorSectionIdRef.current = null;
-    if (preferences.slideshowMode) return;
-
-    const timeoutId = setTimeout(() => {
-      documentRef.current?.scrollToSection(anchorId);
-    }, 260);
-    return () => clearTimeout(timeoutId);
-  }, [copticGospelRite, preferences.slideshowMode]);
-
   // Flipping the Slideshow Mode toggle unmounts one renderer and mounts the
   // other (DocumentSurface.tsx renders either SlideshowContainer or
   // DocumentWebView, never both) — neither one's internal "where was the
@@ -323,13 +301,19 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
 
   const handleAction = (action: DocumentAction) => {
     if (action.type === 'toggleCopticGospelRite') {
-      gospelRiteAnchorSectionIdRef.current = action.sectionId || currentSectionId;
-      // In slideshow mode, jump to the "Psalm and Gospel" title section —
-      // pushWholeTableInlineSections always places it one slot before the toggle
-      // button, so find the toggle's index and step back by one.
-      if (preferences.slideshowMode && action.sectionId && sections) {
+      // The toggle marker section is empty (zero height); the real "Psalm and
+      // Gospel" section is the one immediately before it in the sections array.
+      // Pre-set the preserved section to that real section so the WebView's
+      // handleLoad/handleLoadEnd (which fires after the HTML rebuild) lands
+      // there instead of resetting to the document top.
+      let targetSectionId: string | null = action.sectionId || currentSectionId || null;
+      if (action.sectionId && sections) {
         const toggleIdx = sections.findIndex((s) => s.id === action.sectionId);
-        if (toggleIdx > 0) setSelectedSlideSectionId(sections[toggleIdx - 1].id);
+        if (toggleIdx > 0) targetSectionId = sections[toggleIdx - 1].id;
+      }
+      if (targetSectionId) documentRef.current?.setPreservedSection(targetSectionId);
+      if (preferences.slideshowMode && targetSectionId) {
+        setSelectedSlideSectionId(targetSectionId);
       }
       setCopticGospelRite((current) => !current);
       return;
