@@ -25,6 +25,8 @@ export interface ServiceDef {
   table: string;
   title: string;
   arabic: string;
+  /** Extra condition flags forced true for this entry point (e.g. Vespers/Matins/Liturgy). */
+  extraContext?: Record<string, boolean>;
 }
 
 /** A navigational group within a category's submenu (e.g. Liturgy → Raising of Incense / Divine Liturgy). Not itself bookmarkable. */
@@ -96,6 +98,12 @@ export const CATEGORIES: CategoryDef[] = [
 ];
 
 export const SERVICES_BY_CATEGORY: Record<string, ServiceDef[]> = {
+  lectionary: [
+    { id: 'antiphonary', schema: 'psalmody', table: 'antiphonary', title: 'Antiphonary', arabic: 'الدفنار' },
+    { id: 'vespers', schema: 'liturgy', table: 'lectionary_vespers', title: 'Vespers', arabic: 'العشية', extraContext: { Vespers: true } },
+    { id: 'matins', schema: 'liturgy', table: 'lectionary_matins', title: 'Matins', arabic: 'الباكر', extraContext: { Matins: true } },
+    { id: 'liturgy', schema: 'liturgy', table: 'lectionary_liturgy', title: 'Liturgy', arabic: 'قداس الكلمة', extraContext: { Liturgy: true } },
+  ],
   psalmody: [
     { id: 'vespers_praises', schema: 'psalmody', table: 'vespers_praises', title: 'Vespers Praises', arabic: 'تسبحة عشية' },
     { id: 'midnight_praises', schema: 'psalmody', table: 'midnight_praises', title: 'Midnight Praises', arabic: 'تسبحة نصف الليل' },

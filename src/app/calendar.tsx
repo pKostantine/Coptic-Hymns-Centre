@@ -207,7 +207,15 @@ export default function CalendarScreen() {
                 borderColor: liturgicalDayPeriod === 'morning' ? COLORS.gold : COLORS.rowBlue,
               },
             ]}
-            onPress={() => setLiturgicalDayPeriod(liturgicalDayPeriod === 'morning' ? 'evening' : 'morning')}
+            onPress={() => {
+              if (isLive && liturgicalDayPeriod === 'evening') {
+                // Switching from live-evening back to morning: lock to today
+                // so the live indicator clears and auto-switching stops.
+                selectDate(rawDate);
+              } else {
+                setLiturgicalDayPeriod(liturgicalDayPeriod === 'morning' ? 'evening' : 'morning');
+              }
+            }}
           >
             <Icon
               name={liturgicalDayPeriod === 'morning' ? 'sunny' : 'moon'}

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -90,7 +90,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     parentBookmarkId && subdocumentKey ? `${parentBookmarkId}:sub:${subdocumentKey}` : undefined;
 
   function navigateAway(path: string) {
-    onClose();
     router.push(path as never);
   }
 
@@ -118,6 +117,12 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           subdocumentKey: triggerSection.subdocumentKey,
         });
       }
+      return;
+    }
+
+    if (action.type === 'swipeBack') {
+      if (!nestedModal && !selectorOpen) onClose();
+      return;
     }
   };
 
@@ -169,6 +174,36 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     else documentRef.current?.scrollToSection(introSection.id);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const safeAreaRef = useRef<any>(null);
+
+  // Desktop-web left-edge swipe: attaches to the SafeAreaView's DOM node so
+  // pointer drags that start outside the iframe (e.g. in the header) also
+  // close the modal. Drags starting *inside* the iframe are handled by the
+  // swipeBack script embedded in documentHtml.ts.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || isMobileDocument || !visible) return;
+    const el = safeAreaRef.current as HTMLElement | null;
+    if (!el || typeof el.addEventListener !== 'function') return;
+    let startX: number | null = null;
+    const onDown = (e: PointerEvent) => {
+      if (nestedModal || selectorOpen || e.clientX >= 56) return;
+      startX = e.clientX;
+    };
+    const onUp = (e: PointerEvent) => {
+      if (startX === null) return;
+      const dx = e.clientX - startX;
+      startX = null;
+      if (dx > 60) onClose();
+    };
+    el.addEventListener('pointerdown', onDown);
+    document.addEventListener('pointerup', onUp);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('pointerup', onUp);
+    };
+  }, [visible, isMobileDocument, nestedModal, selectorOpen, onClose]);
+
   // Capture-phase gesture handler for the two screen-edge swipes: left-edge
   // right-swipe closes this modal; right-edge left-swipe opens the content
   // selector. Using onMoveShouldSetPanResponderCapture (not the plain non-
@@ -212,6 +247,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
       <SafeAreaView
+        ref={safeAreaRef}
         edges={['left', 'right', 'bottom']}
         style={styles.screen}
         {...(isMobileDocument ? swipeGesturePanResponder.panHandlers : {})}

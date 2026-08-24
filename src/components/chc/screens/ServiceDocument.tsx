@@ -58,7 +58,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // every other service — see CalendarContext's vespersEffectiveDate.
   const isVespersService =
     (schema === 'psalmody' && table === 'vespers_praises') ||
-    (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true);
+    (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true) ||
+    (schema === 'liturgy' && table === 'lectionary_vespers');
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
@@ -150,7 +151,9 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     // PaulineEpistleRomans/CatholicEpistle1Peter-style condition flags (see
     // getEpistleConditionFlags) to pick the right introduction line, resolved
     // here and merged into extraContext before hydrating.
-    const needsEpistleFlags = schema === 'liturgy' && table === 'liturgy_of_the_word';
+    const needsEpistleFlags =
+      (schema === 'liturgy' && table === 'liturgy_of_the_word') ||
+      (schema === 'liturgy' && table === 'lectionary_liturgy');
     const epistleFlagsPromise = needsEpistleFlags ? getEpistleConditionFlags(effectiveDate) : Promise.resolve({});
 
     epistleFlagsPromise
@@ -164,7 +167,17 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         ),
       )
       .then((result) => {
-        if (!cancelled) setSections(result as DocumentSection[]);
+        if (!cancelled) {
+          const newSections = result as DocumentSection[];
+          setSections(newSections);
+          // If a subdocument is open, refresh its sections from the new hydration
+          // so date/settings changes update the subdocument content without closing it.
+          setSubdocumentModal((current) => {
+            if (!current?.subdocumentKey) return current;
+            const trigger = newSections.find((s) => s.subdocumentKey === current.subdocumentKey && s.subdocumentSections);
+            return trigger ? { ...current, sections: trigger.subdocumentSections! } : current;
+          });
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err?.message || 'Failed to load this service.');
@@ -301,16 +314,18 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
 
   const handleAction = (action: DocumentAction) => {
     if (action.type === 'toggleCopticGospelRite') {
-      // The toggle marker section is empty (zero height); the real "Psalm and
-      // Gospel" section is the one immediately before it in the sections array.
-      // Pre-set the preserved section to that real section so the WebView's
-      // handleLoad/handleLoadEnd (which fires after the HTML rebuild) lands
-      // there instead of resetting to the document top.
-      let targetSectionId: string | null = action.sectionId || currentSectionId || null;
-      if (action.sectionId && sections) {
-        const toggleIdx = sections.findIndex((s) => s.id === action.sectionId);
-        if (toggleIdx > 0) targetSectionId = sections[toggleIdx - 1].id;
-      }
+      // The toggle button lives inside the first Gospel Rite section. Pre-set
+      // the preserved section to the always-visible section immediately before
+      // the entire gospel rite block so the WebView's handleLoad/handleLoadEnd
+      // (which fires after the HTML rebuild) scrolls there instead of the top.
+      // Find the toggle button's section in the NEW state (after the flip) —
+      // both variants are in the raw array; only the one matching the new state
+      // will exist in the rebuilt HTML, so that's the one to scroll to.
+      const newState = !copticGospelRite;
+      const newToggleSection = sections?.find(
+        (s) => s.startsGospelRiteToggle && (newState ? s.copticGospelRiteOnly : s.nonCopticGospelRiteOnly),
+      );
+      let targetSectionId: string | null = newToggleSection?.id ?? action.sectionId ?? currentSectionId ?? null;
       if (targetSectionId) documentRef.current?.setPreservedSection(targetSectionId);
       if (preferences.slideshowMode && targetSectionId) {
         setSelectedSlideSectionId(targetSectionId);

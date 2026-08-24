@@ -439,6 +439,23 @@ export function buildDocumentHtml(
         window.addEventListener('scroll', scheduleReport, { passive: true });
         scheduleReport();
       })();
+      (function () {
+        var startX = null, startY = null;
+        function onStart(x, y) { startX = x; startY = y; }
+        function onEnd(x, y) {
+          if (startX === null) return;
+          var dx = x - startX, dy = y - startY;
+          startX = startY = null;
+          if (dx > 60 && Math.abs(dy) < Math.abs(dx) * 0.6) postAction('swipeBack');
+        }
+        function onCancel() { startX = startY = null; }
+        document.addEventListener('pointerdown', function (e) { if (e.clientX < 56) onStart(e.clientX, e.clientY); });
+        document.addEventListener('pointerup', function (e) { onEnd(e.clientX, e.clientY); });
+        document.addEventListener('pointercancel', onCancel);
+        document.addEventListener('touchstart', function (e) { var t = e.touches[0]; if (t.clientX < 56) onStart(t.clientX, t.clientY); }, { passive: true });
+        document.addEventListener('touchend', function (e) { var t = e.changedTouches[0]; onEnd(t.clientX, t.clientY); }, { passive: true });
+        document.addEventListener('touchcancel', onCancel);
+      })();
     </script>
   </body>
 </html>`;
