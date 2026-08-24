@@ -1,16 +1,13 @@
 import { supabase } from './supabase';
 import { hydrateSupabaseServiceHymn } from './hymnLibrary';
-import { mapHebrewPsalmReferenceToSeptuagint, mapSeptuagintPsalmReferenceToHebrew } from './bibleService';
 import { FIXED_FEASTS } from './fixedFeasts';
 import { toIsoDate as toIsoDateString } from './dateUtils';
 import { formatVerses } from './verseFormatting';
 import type { DocumentSection } from '../components/chc/documentHtml';
 
-// calendar.reading_rules' Psalm references (calendar book number 19) use
-// traditional Masoretic chapter/verse numbering, but bible.verses stores
-// Psalms in Septuagint numbering (confirmed empirically — see bibleService.ts
-// for the same crosswalk already relied on by the Bible reader's Masoretic
-// toggle). Every Psalm reference must be converted before it's queried.
+// calendar.reading_rules stores Psalm references (calendar book number 19)
+// in Septuagint (LXX) chapter/verse numbering, matching bible.verses directly.
+// No conversion is needed at query time.
 const PSALMS_CALENDAR_NUMBER = 19;
 
 // ─── Gospel author substitution (Coptic Gospel Rite's "[AUTHOR]" placeholder) ─
@@ -129,11 +126,9 @@ export interface ReadingRule {
   reading_type: string;
   reading_code: string;
   reading_reference: string;
-  inline_hymn_key: string | null;
-  seasonal_tune: string | null;
 }
 
-const READING_RULE_FIELDS = 'reading_rule_id, cycle_type, priority, service, reading_type, reading_code, reading_reference, inline_hymn_key, seasonal_tune';
+const READING_RULE_FIELDS = 'reading_rule_id, cycle_type, priority, service, reading_type, reading_code, reading_reference';
 
 async function queryReadingRules(filters: Record<string, string | number>): Promise<ReadingRule[]> {
   let query = supabase.schema('calendar').from('reading_rules').select(READING_RULE_FIELDS);
@@ -349,7 +344,7 @@ function parseSegment(segment: string): ReadingSegment {
 }
 
 export interface ReadingVerse {
-  /** The chapter:verse actually cited by reading_reference — always in the reading's own (Masoretic, for Psalms) numbering, for display. */
+  /** The chapter:verse cited by reading_reference — in Septuagint numbering for Psalms, matching bible.verses directly. */
   displayChapter: number;
   displayVerse: number;
   /** Set when this is one editorial part of a verse (bible.verse_parts), e.g. "a" for 101:11a — append straight after displayVerse for the citation/badge, never shown on its own. */
@@ -359,12 +354,6 @@ export interface ReadingVerse {
   arabic: string;
 }
 
-/** For Psalms, maps a fetched Septuagint (chapter,verse) back to the Masoretic numbering reading_reference actually cited — for every other book this is the identity. */
-function toDisplayReference(isPsalms: boolean, chapterNumber: number, verseNumber: number): { chapter: number; verse: number } | null {
-  if (!isPsalms) return { chapter: chapterNumber, verse: verseNumber };
-  const hebrew = mapSeptuagintPsalmReferenceToHebrew(chapterNumber, verseNumber);
-  return hebrew;
-}
 
 async function loadBookKeyByCalendarNumber(bookNum: number): Promise<string | null> {
   const { data, error } = await supabase.schema('bible').rpc('get_book_key_by_calendar_number', { p_calendar_number: bookNum });
@@ -384,33 +373,24 @@ function getBookKeyByCalendarNumber(bookNum: number): Promise<string | null> {
 }
 
 async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse[]> {
-  const isPsalms = segment.bookNum === PSALMS_CALENDAR_NUMBER;
-
   if (segment.kind === 'range') {
-    const start = isPsalms ? mapHebrewPsalmReferenceToSeptuagint(segment.startChapter, segment.startVerse) : { chapter: segment.startChapter, verse: segment.startVerse };
-    const end = isPsalms ? mapHebrewPsalmReferenceToSeptuagint(segment.endChapter, segment.endVerse) : { chapter: segment.endChapter, verse: segment.endVerse };
     const { data, error } = await supabase.schema('bible').rpc('get_verses_by_calendar_range', {
       p_calendar_book_number: segment.bookNum,
-      p_start_chapter: start.chapter,
-      p_start_verse: start.verse,
-      p_end_chapter: end.chapter,
-      p_end_verse: end.verse,
+      p_start_chapter: segment.startChapter,
+      p_start_verse: segment.startVerse,
+      p_end_chapter: segment.endChapter,
+      p_end_verse: segment.endVerse,
     });
     if (error) throw new Error(`Unable to load reading verses: ${error.message}`);
     return ((data || []) as { chapter_number: number; verse_number: number; english: string; coptic: string | null; arabic: string }[])
-      .map((row): ReadingVerse | null => {
-        const display = toDisplayReference(isPsalms, row.chapter_number, row.verse_number);
-        if (!display) return null;
-        return {
-          displayChapter: display.chapter,
-          displayVerse: display.verse,
-          partLabel: null,
-          english: row.english || '',
-          coptic: row.coptic,
-          arabic: row.arabic || '',
-        };
-      })
-      .filter((v): v is ReadingVerse => v !== null);
+      .map((row): ReadingVerse => ({
+        displayChapter: row.chapter_number,
+        displayVerse: row.verse_number,
+        partLabel: null,
+        english: row.english || '',
+        coptic: row.coptic,
+        arabic: row.arabic || '',
+      }));
   }
 
   const bookKey = await getBookKeyByCalendarNumber(segment.bookNum);
@@ -418,20 +398,12 @@ async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse
 
   // A part-labeled token ("11a") names one editorial excerpt of a verse
   // (bible.verse_parts), not the whole verse — resolved individually via
-  // get_verse_part_by_calendar below, which (confirmed directly against the
-  // seeded 101:11a/101:14a rows) does its own Hebrew→Septuagint conversion
-  // internally, unlike get_verses_by_calendar_range above: it wants the
-  // *raw* calendar-native chapter/verse straight from reading_reference, not
-  // pre-converted via mapHebrewPsalmReferenceToSeptuagint.
+  // get_verse_part_by_calendar, which queries bible.verse_parts directly using
+  // the Septuagint chapter/verse from reading_reference (no conversion needed).
   const plainTokens = segment.verses.filter((v) => !v.partLabel);
   const partTokens = segment.verses.filter((v) => v.partLabel);
 
-  // Discrete verses can each land in a different Septuagint chapter (only
-  // possible right at the Psalm 9/10 merge point) — convert individually and
-  // group by the resulting chapter rather than assuming they stay together.
-  const targets = isPsalms
-    ? plainTokens.map((v) => mapHebrewPsalmReferenceToSeptuagint(segment.chapter, v.verseNum))
-    : plainTokens.map((v) => ({ chapter: segment.chapter, verse: v.verseNum }));
+  const targets = plainTokens.map((v) => ({ chapter: segment.chapter, verse: v.verseNum }));
   const verseNumbersByChapter = new Map<number, number[]>();
   for (const t of targets) {
     const list = verseNumbersByChapter.get(t.chapter) || [];
@@ -452,19 +424,14 @@ async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse
           .order('verse_number');
         if (error) throw new Error(`Unable to load reading verses: ${error.message}`);
         return (data || [])
-          .map((row): ReadingVerse | null => {
-            const display = toDisplayReference(isPsalms, row.chapter_number, row.verse_number);
-            if (!display) return null;
-            return {
-              displayChapter: display.chapter,
-              displayVerse: display.verse,
-              partLabel: null,
-              english: row.english || '',
-              coptic: row.coptic,
-              arabic: row.arabic || '',
-            };
-          })
-          .filter((v): v is ReadingVerse => v !== null);
+          .map((row): ReadingVerse => ({
+            displayChapter: row.chapter_number,
+            displayVerse: row.verse_number,
+            partLabel: null,
+            english: row.english || '',
+            coptic: row.coptic,
+            arabic: row.arabic || '',
+          }));
       }),
     ),
     Promise.all(
@@ -478,11 +445,6 @@ async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse
         if (error) throw new Error(`Unable to load verse part ${segment.chapter}:${v.verseNum}${v.partLabel}: ${error.message}`);
         const row = (data || [])[0] as { english: string; coptic: string | null; arabic: string } | undefined;
         if (!row) return null;
-        // The reference's own (calendar-native) chapter/verse, not the
-        // row's Septuagint-indexed chapter_number/verse_number — we already
-        // know exactly which verse we asked for, so no reverse conversion
-        // (toDisplayReference) is needed the way the multi-row range path
-        // above needs one.
         return {
           displayChapter: segment.chapter,
           displayVerse: v.verseNum,
@@ -525,13 +487,7 @@ async function fetchReadingReferenceVerses(reference: string): Promise<{ verses:
  * also silently claim verses 8-11 that were never part of it. The one
  * exception is a genuine cross-chapter span (e.g. "1:27-2:11"), always a
  * single continuous passage in this data model, never a discrete list —
- * detected below and kept as its own start-end dash citation. For Psalms,
- * the cited chapter:verse is converted to Septuagint numbering
- * (mapHebrewPsalmReferenceToSeptuagint) rather than the Masoretic numbering
- * reading_reference itself uses — matching the Septuagint numbering already
- * native to bible.verses, and deliberately NOT the Masoretic
- * toDisplayReference conversion used elsewhere in this file for per-verse
- * display.
+ * detected below and kept as its own start-end dash citation.
  */
 function buildReadingCitation(reference: string, bookTitle: { english: string; arabic: string }, isPsalm: boolean): { english: string; arabic: string } | null {
   if (!bookTitle.english && !bookTitle.arabic) return null;
@@ -543,10 +499,8 @@ function buildReadingCitation(reference: string, bookTitle: { english: string; a
   const first = segments[0];
   const last = segments[segments.length - 1];
 
-  const firstStartRaw = first.kind === 'range' ? { chapter: first.startChapter, verse: first.startVerse } : { chapter: first.chapter, verse: first.verses[0].verseNum };
-  const lastEndRaw = last.kind === 'range' ? { chapter: last.endChapter, verse: last.endVerse } : { chapter: last.chapter, verse: last.verses[last.verses.length - 1].verseNum };
-  const firstStart = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(firstStartRaw.chapter, firstStartRaw.verse) : firstStartRaw;
-  const lastEnd = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(lastEndRaw.chapter, lastEndRaw.verse) : lastEndRaw;
+  const firstStart = first.kind === 'range' ? { chapter: first.startChapter, verse: first.startVerse } : { chapter: first.chapter, verse: first.verses[0].verseNum };
+  const lastEnd = last.kind === 'range' ? { chapter: last.endChapter, verse: last.endVerse } : { chapter: last.chapter, verse: last.verses[last.verses.length - 1].verseNum };
 
   if (firstStart.chapter !== lastEnd.chapter) {
     const citation = `${firstStart.chapter}:${firstStart.verse}-${lastEnd.chapter}:${lastEnd.verse}`;
@@ -560,13 +514,10 @@ function buildReadingCitation(reference: string, bookTitle: { english: string; a
   for (const segment of segments) {
     if (segment.kind === 'verses') {
       for (const v of segment.verses) {
-        const pos = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(segment.chapter, v.verseNum) : { chapter: segment.chapter, verse: v.verseNum };
-        entries.push({ verse: pos.verse, partLabel: v.partLabel });
+        entries.push({ verse: v.verseNum, partLabel: v.partLabel });
       }
     } else {
-      const start = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(segment.startChapter, segment.startVerse) : { chapter: segment.startChapter, verse: segment.startVerse };
-      const end = isPsalm ? mapHebrewPsalmReferenceToSeptuagint(segment.endChapter, segment.endVerse) : { chapter: segment.endChapter, verse: segment.endVerse };
-      for (let verse = start.verse; verse <= end.verse; verse++) entries.push({ verse, partLabel: null });
+      for (let verse = segment.startVerse; verse <= segment.endVerse; verse++) entries.push({ verse, partLabel: null });
     }
   }
 
@@ -716,24 +667,6 @@ async function getGospelRiteSections(date: Date, serviceFlag: 'Vespers' | 'Matin
   return authoredSections.map((section) => ({ ...section, id: `${serviceFlag}-${section.id}` }));
 }
 
-// ─── Prophecy placeholder (Lenten Matins only — content not in the DB yet) ──
-
-function buildProphecyPlaceholderSection(rule: ReadingRule): DocumentSection {
-  return {
-    id: rule.reading_rule_id,
-    title: { english: 'Prophecy', arabic: 'النبوخة' },
-    verses: [
-      {
-        english: 'The Prophecy reading for this day is not yet available.',
-        coptic: '',
-        arabic: 'قراءة النبوخة لهذا اليوم غير متوفرة بعد.',
-        type: 'comment',
-      },
-    ],
-    forceWhiteVerses: true,
-  };
-}
-
 // ─── Orchestrator ───────────────────────────────────────────────────────────
 
 export interface ReadingsResult {
@@ -762,10 +695,6 @@ export async function getReadingsForDate(date: Date): Promise<ReadingsResult> {
   async function pushReading(service: string, readingType: string): Promise<string | null> {
     const rule = byKey.get(`${service}|${readingType}`);
     if (!rule) return null;
-    if (rule.inline_hymn_key === 'PROPHECIES') {
-      sections.push(buildProphecyPlaceholderSection(rule));
-      return null;
-    }
     const { section, bookKey } = await buildReadingSection(rule);
     sections.push(section);
     return bookKey;
