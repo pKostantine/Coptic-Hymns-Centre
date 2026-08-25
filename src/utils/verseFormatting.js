@@ -22,9 +22,7 @@ export function formatVerses(entries) {
     seen.add(key);
     return true;
   });
-  const sorted = deduped.sort(
-    (a, b) => a.verse - b.verse || String(a.partLabel || "").localeCompare(String(b.partLabel || "")),
-  );
+  const sorted = deduped;
 
   const out = [];
   let i = 0;

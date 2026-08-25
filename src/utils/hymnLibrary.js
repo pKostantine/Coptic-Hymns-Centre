@@ -308,17 +308,38 @@ async function buildReadingCitation(readingRow) {
   const chapters = [...new Set(allVerses.map((v) => v.chapter_number))];
 
   if (chapters.length === 1) {
-    const verseList = formatVerses(allVerses.map((v) => ({ verse: v.verse_number })));
+    const verseList = formatVerses(allVerses.map((v) => ({ verse: v.verse_number, partLabel: null })));
     return {
       english: `${bookTitle.english} ${chapters[0]}:${verseList}`.trim(),
       arabic: `${bookTitle.arabic} ${chapters[0]}:${verseList}`.trim(),
     };
   }
 
-  const start = firstVerses[0];
-  const end = lastVerses[lastVerses.length - 1];
-  const citation = `${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`;
+  // A single segment spanning multiple chapters is a genuine continuous passage
+  // ("Matthew 1:27-2:11") — cite as start-end range. Multiple segments in
+  // different chapters are discrete @-separated verses; list each chapter:verse
+  // separately rather than implying a continuous range that was never requested.
+  if (segments.length === 1) {
+    const start = firstVerses[0];
+    const end = lastVerses[lastVerses.length - 1];
+    return {
+      english: `${bookTitle.english} ${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`.trim(),
+      arabic: `${bookTitle.arabic} ${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`.trim(),
+    };
+  }
 
+  const chapterGroups = new Map();
+  const chapterOrder = [];
+  for (const segment of segments) {
+    for (const v of (segment.verses || [])) {
+      if (!chapterGroups.has(v.chapter_number)) {
+        chapterOrder.push(v.chapter_number);
+        chapterGroups.set(v.chapter_number, []);
+      }
+      chapterGroups.get(v.chapter_number).push({ verse: v.verse_number, partLabel: null });
+    }
+  }
+  const citation = chapterOrder.map((ch) => `${ch}:${formatVerses(chapterGroups.get(ch))}`).join(", ");
   return {
     english: `${bookTitle.english} ${citation}`.trim(),
     arabic: `${bookTitle.arabic} ${citation}`.trim(),
@@ -1544,8 +1565,14 @@ export function addTuneMarkersToAntiphonarySections(sections) {
 // print convention is all-lowercase Coptic with a single capitalized initial
 // letter opening the hymn (only when the hymn actually has an English title
 // to "open" — untitled continuation sections don't get a capital).
-const COPTIC_CHAR_PATTERN = /[Ϣ-ϯⲀ-⳿]/;
-const COPTIC_CHAR_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿]/g;
+// ⲭ/Ⲭ (U+2CAC/U+2CAD), ϭ/Ϭ (U+03EC/U+03ED), ϯ/Ϯ (U+03EE/U+03EF) are
+// Coptic letters that toLocaleLowerCase/toLocaleUpperCase do not reliably
+// case-fold in all JS engines — listed explicitly below and handled via a
+// manual lookup table rather than relying on the engine's Unicode case tables.
+const COPTIC_CHAR_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/;
+const COPTIC_CHAR_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/g;
+const COPTIC_TO_LOWER = { Ⲭ: 'ⲭ', Ϭ: 'ϭ', Ϯ: 'ϯ' };
+const COPTIC_TO_UPPER = { ⲭ: 'Ⲭ', ϭ: 'Ϭ', ϯ: 'Ϯ' };
 
 // A reading spliced inline into a hymn (e.g. "Coptic Psalm" housing the
 // day's live Psalm text via resolveReadingSentinelSplice) has ALREADY been
@@ -1578,13 +1605,14 @@ function applyCopticCaseToSection(section) {
 }
 
 function lowercaseCoptic(text) {
-  return text.replace(COPTIC_CHAR_GLOBAL_PATTERN, (char) => char.toLocaleLowerCase());
+  return text.replace(COPTIC_CHAR_GLOBAL_PATTERN, (char) => COPTIC_TO_LOWER[char] ?? char.toLocaleLowerCase());
 }
 
 function uppercaseFirstCopticChar(text) {
   const index = text.search(COPTIC_CHAR_PATTERN);
   if (index === -1) return text;
-  return text.slice(0, index) + text[index].toLocaleUpperCase() + text.slice(index + 1);
+  const upper = COPTIC_TO_UPPER[text[index]] ?? text[index].toLocaleUpperCase();
+  return text.slice(0, index) + upper + text.slice(index + 1);
 }
 
 // Readings (buildReadingVerses above) source Coptic text from bible.verses,
@@ -1596,7 +1624,7 @@ function uppercaseFirstCopticChar(text) {
 // lowercaseCoptic above, which is tuned for hymn_texts's own convention and
 // lacks the "Ⲋ" fix-up.
 function lowercaseBibleCoptic(text) {
-  return text.replace(COPTIC_CHAR_GLOBAL_PATTERN, (char) => char.toLocaleLowerCase()).replace(/ⲋ/g, "Ⲋ");
+  return text.replace(COPTIC_CHAR_GLOBAL_PATTERN, (char) => COPTIC_TO_LOWER[char] ?? char.toLocaleLowerCase()).replace(/ⲋ/g, "Ⲋ");
 }
 
 function applyCopticCaseToReadingVerses(verses) {

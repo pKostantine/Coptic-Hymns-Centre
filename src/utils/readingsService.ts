@@ -456,17 +456,15 @@ async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse
       }),
     ),
   ]);
-  // The per-chapter groups above resolve in Promise.all order, not
-  // necessarily display order — re-sort by the reference's own numbering
-  // (discrete verses are always within one requested reading, never spread
-  // across the multi-segment @ separators that must stay in their own order).
-  // A part sorts right after its parent verse number, ordered by label.
-  return [...plainResults.flat(), ...partResults.filter((v): v is ReadingVerse => v !== null)].sort(
-    (a, b) =>
-      a.displayChapter - b.displayChapter ||
-      a.displayVerse - b.displayVerse ||
-      (a.partLabel ?? '').localeCompare(b.partLabel ?? ''),
-  );
+  // Re-sort by the reference's own order (plainTokens index), not by verse
+  // number — references like "Psalm 47:6,1" must display 6 before 1.
+  const verseOrder = new Map<number, number>(plainTokens.map((v, i) => [v.verseNum, i]));
+  return [...plainResults.flat(), ...partResults.filter((v): v is ReadingVerse => v !== null)].sort((a, b) => {
+    const aOrd = verseOrder.get(a.displayVerse) ?? plainTokens.length;
+    const bOrd = verseOrder.get(b.displayVerse) ?? plainTokens.length;
+    if (aOrd !== bOrd) return aOrd - bOrd;
+    return (a.partLabel ?? '').localeCompare(b.partLabel ?? '');
+  });
 }
 
 async function fetchReadingReferenceVerses(reference: string): Promise<{ verses: ReadingVerse[]; firstBookNum: number | null }> {
@@ -503,18 +501,49 @@ function buildReadingCitation(reference: string, bookTitle: { english: string; a
   const lastEnd = last.kind === 'range' ? { chapter: last.endChapter, verse: last.endVerse } : { chapter: last.chapter, verse: last.verses[last.verses.length - 1].verseNum };
 
   if (firstStart.chapter !== lastEnd.chapter) {
-    const citation = `${firstStart.chapter}:${firstStart.verse}-${lastEnd.chapter}:${lastEnd.verse}`;
+    // A single range segment spanning chapters is a genuine continuous passage
+    // ("Matthew 1:27-2:11") — cite as start-end. Multiple @-separated segments
+    // across chapters are discrete verses; list each chapter separately.
+    if (segments.length === 1 && first.kind === 'range') {
+      const citation = `${firstStart.chapter}:${firstStart.verse}-${lastEnd.chapter}:${lastEnd.verse}`;
+      return {
+        english: `${citationBookTitle.english} ${citation}`.trim(),
+        arabic: `${citationBookTitle.arabic} ${citation}`.trim(),
+      };
+    }
+
+    const chapterGroups = new Map<number, { verse: number; partLabel: null }[]>();
+    const chapterOrder: number[] = [];
+    for (const segment of segments) {
+      if (segment.kind === 'verses') {
+        for (const v of segment.verses) {
+          if (!chapterGroups.has(segment.chapter)) {
+            chapterOrder.push(segment.chapter);
+            chapterGroups.set(segment.chapter, []);
+          }
+          chapterGroups.get(segment.chapter)!.push({ verse: v.verseNum, partLabel: null });
+        }
+      } else {
+        for (let ch = segment.startChapter; ch <= segment.endChapter; ch++) {
+          if (!chapterGroups.has(ch)) { chapterOrder.push(ch); chapterGroups.set(ch, []); }
+          const vStart = ch === segment.startChapter ? segment.startVerse : 1;
+          const vEnd = ch === segment.endChapter ? segment.endVerse : 999;
+          for (let v = vStart; v <= vEnd; v++) chapterGroups.get(ch)!.push({ verse: v, partLabel: null });
+        }
+      }
+    }
+    const citation = chapterOrder.map((ch) => `${ch}:${formatVerses(chapterGroups.get(ch)!)}`).join(', ');
     return {
       english: `${citationBookTitle.english} ${citation}`.trim(),
       arabic: `${citationBookTitle.arabic} ${citation}`.trim(),
     };
   }
 
-  const entries: { verse: number; partLabel: string | null }[] = [];
+  const entries: { verse: number; partLabel: null }[] = [];
   for (const segment of segments) {
     if (segment.kind === 'verses') {
       for (const v of segment.verses) {
-        entries.push({ verse: v.verseNum, partLabel: v.partLabel });
+        entries.push({ verse: v.verseNum, partLabel: null });
       }
     } else {
       for (let verse = segment.startVerse; verse <= segment.endVerse; verse++) entries.push({ verse, partLabel: null });
@@ -565,17 +594,20 @@ const READING_TYPE_LABELS: Record<string, { english: string; arabic: string }> =
 // reader) — all three read the same bible.verses data and case convention,
 // including restoring the "Ⲋ" numeral-6 glyph, which has no true lowercase
 // form, after the blanket lowercase pass.
-const COPTIC_CHARACTER_PATTERN = /[Ϣ-ϯⲀ-⳿]/u;
-const COPTIC_CHARACTER_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿]/gu;
+const COPTIC_CHARACTER_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/u;
+const COPTIC_CHARACTER_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/gu;
+const COPTIC_TO_LOWER: Record<string, string> = { Ⲭ: 'ⲭ', Ϭ: 'ϭ', Ϯ: 'ϯ' };
+const COPTIC_TO_UPPER: Record<string, string> = { ⲭ: 'Ⲭ', ϭ: 'Ϭ', ϯ: 'Ϯ' };
 
 function lowercaseBibleCoptic(text: string): string {
-  return text.replace(COPTIC_CHARACTER_GLOBAL_PATTERN, (character) => character.toLocaleLowerCase()).replace(/ⲋ/g, 'Ⲋ');
+  return text.replace(COPTIC_CHARACTER_GLOBAL_PATTERN, (ch) => COPTIC_TO_LOWER[ch] ?? ch.toLocaleLowerCase()).replace(/ⲋ/g, 'Ⲋ');
 }
 
 function uppercaseFirstBibleCopticCharacter(text: string): string {
   const index = text.search(COPTIC_CHARACTER_PATTERN);
   if (index === -1) return text;
-  return text.slice(0, index) + text[index].toLocaleUpperCase() + text.slice(index + 1);
+  const upper = COPTIC_TO_UPPER[text[index]] ?? text[index].toLocaleUpperCase();
+  return text.slice(0, index) + upper + text.slice(index + 1);
 }
 
 function applyCopticCaseToReadingVerses<T extends { coptic?: string }>(verses: T[]): T[] {

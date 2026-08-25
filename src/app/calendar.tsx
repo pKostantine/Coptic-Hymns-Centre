@@ -208,10 +208,15 @@ export default function CalendarScreen() {
               },
             ]}
             onPress={() => {
-              if (isLive && liturgicalDayPeriod === 'evening') {
-                // Switching from live-evening back to morning: lock to today
-                // so the live indicator clears and auto-switching stops.
+              if (isLive) {
+                // Any manual period change while live unsets live mode so the
+                // auto-clock-flip stops and the chosen period stays fixed.
+                // selectDate always resets the period to morning; only add a
+                // second call when the user wants evening instead.
                 selectDate(rawDate);
+                if (liturgicalDayPeriod === 'morning') {
+                  setLiturgicalDayPeriod('evening');
+                }
               } else {
                 setLiturgicalDayPeriod(liturgicalDayPeriod === 'morning' ? 'evening' : 'morning');
               }

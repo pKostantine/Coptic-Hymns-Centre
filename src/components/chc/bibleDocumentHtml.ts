@@ -512,8 +512,10 @@ export function buildBibleChapterHtml({
 </html>`;
 }
 
-const COPTIC_CHARACTER_PATTERN = /[Ϣ-ϯⲀ-⳿]/u;
-const COPTIC_CHARACTER_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿]/gu;
+const COPTIC_CHARACTER_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/u;
+const COPTIC_CHARACTER_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/gu;
+const COPTIC_TO_LOWER: Record<string, string> = { Ⲭ: 'ⲭ', Ϭ: 'ϭ', Ϯ: 'ϯ' };
+const COPTIC_TO_UPPER: Record<string, string> = { ⲭ: 'Ⲭ', ϭ: 'Ϭ', ϯ: 'Ϯ' };
 
 function formatVerseText(text: string, language: BibleLanguageKey, isFirstCopticVerse: boolean): string {
   if (language === 'arabic') return formatArabicDigits(text);
@@ -527,14 +529,15 @@ function formatVerseText(text: string, language: BibleLanguageKey, isFirstCoptic
 
 function lowercaseCopticCharacters(text: string): string {
   return text
-    .replace(COPTIC_CHARACTER_GLOBAL_PATTERN, (character) => character.toLocaleLowerCase())
+    .replace(COPTIC_CHARACTER_GLOBAL_PATTERN, (ch) => COPTIC_TO_LOWER[ch] ?? ch.toLocaleLowerCase())
     .replace(/ⲋ/g, 'Ⲋ');
 }
 
 function uppercaseFirstCopticCharacter(text: string): string {
   const index = text.search(COPTIC_CHARACTER_PATTERN);
   if (index === -1) return text;
-  return text.slice(0, index) + text[index].toLocaleUpperCase() + text.slice(index + 1);
+  const upper = COPTIC_TO_UPPER[text[index]] ?? text[index].toLocaleUpperCase();
+  return text.slice(0, index) + upper + text.slice(index + 1);
 }
 
 function formatVerseNumber(verseNumber: number, language: BibleLanguageKey): string {
