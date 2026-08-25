@@ -29,8 +29,10 @@ export type BibleVerseNumber = number | string;
 
 const PSALMS_KEY = 'psalms';
 const ESTHER_KEY = 'esther';
+const DANIEL_KEY = 'daniel';
 const ESTHER_ADDITION_CHAPTER_LABELS: Record<number, string> = { 0: 'A', 11: 'B', 12: 'C' };
 const ESTHER_ADDITION_CHAPTER_ARABIC_LABELS: Record<number, string> = { 0: 'أ', 11: 'ب', 12: 'ت' };
+const DANIEL_ADDITION_CHAPTERS = new Set([0, 13, 14]);
 const ARABIC_LETTER_SUFFIXES = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'];
 const EASTERN_ARABIC_DIGITS: Record<string, string> = {
   '0': '٠', '1': '١', '2': '٢', '3': '٣', '4': '٤',
@@ -117,6 +119,15 @@ export function isEstherAdditionVerse(bookKey: string | null | undefined, chapte
   return isEstherAdditionChapter(bookKey, chapterNumber) || /[a-z]/i.test(String(verseNumber));
 }
 
+export function isBibleLxxAdditionChapter(bookKey: string | null | undefined, chapterNumber: number): boolean {
+  const normalizedBookKey = normalizeBookKey(bookKey || '');
+  return isEstherAdditionChapter(bookKey, chapterNumber) || (normalizedBookKey === DANIEL_KEY && DANIEL_ADDITION_CHAPTERS.has(chapterNumber));
+}
+
+export function isBibleLxxAdditionVerse(bookKey: string | null | undefined, chapterNumber: number, verseNumber: BibleVerseNumber): boolean {
+  return isBibleLxxAdditionChapter(bookKey, chapterNumber) || isEstherAdditionVerse(bookKey, chapterNumber, verseNumber);
+}
+
 export function getBibleSpecialChapterTitle(bookKey: string | null | undefined, chapterNumber: number): BibleChapterTitle | null {
   if (!bookKey) return null;
   return SPECIAL_CHAPTER_TITLES[normalizeBookKey(bookKey)]?.[chapterNumber] || null;
@@ -129,8 +140,28 @@ export function getBibleChapterDisplayLabel(bookKey: string | null | undefined, 
       : ESTHER_ADDITION_CHAPTER_LABELS[chapterNumber];
   }
   const specialTitle = getBibleSpecialChapterTitle(bookKey, chapterNumber);
-  if (!specialTitle) return String(chapterNumber);
-  return appLanguage === 'ar' ? specialTitle.arabic : specialTitle.english;
+  if (!specialTitle) return appLanguage === 'ar' ? formatArabicDigits(String(chapterNumber)) : String(chapterNumber);
+  if (appLanguage === 'ar') return specialTitle.arabic;
+  return specialTitle.english;
+}
+
+export function getBibleChapterMenuLabel(bookKey: string | null | undefined, chapterNumber: number, appLanguage: 'en' | 'ar' = 'en'): string {
+  return getBibleChapterDisplayLabel(bookKey, chapterNumber, appLanguage);
+}
+
+export function getBibleChapterHeaderTitle(
+  book: Pick<BibleBook, 'titleEnglish' | 'titleArabic'> | null | undefined,
+  fallbackTitle: string | null | undefined,
+  fallbackArabic: string | null | undefined,
+  bookKey: string | null | undefined,
+  chapterNumber: number,
+  appLanguage: 'en' | 'ar' = 'en',
+): string {
+  const chapterLabel = getBibleChapterMenuLabel(bookKey, chapterNumber, appLanguage);
+  if (appLanguage === 'ar') {
+    return `${book?.titleArabic || fallbackArabic || fallbackTitle || bookKey || ''} ${chapterLabel}`.trim();
+  }
+  return `${book?.titleEnglish || fallbackTitle || bookKey || ''} ${chapterLabel}`.trim();
 }
 
 // ─── Book metadata (small, cached for the whole session) ──────────────────
@@ -213,7 +244,7 @@ async function loadChapterVerses(bookKey: string, chapterNumber: number): Promis
       greek: row.greek || '',
       arabic: row.arabic || '',
     }))
-    .map((verse) => ({ ...verse, isLxxAddition: isEstherAdditionVerse(bookKey, chapterNumber, verse.verseNumber) }))
+    .map((verse) => ({ ...verse, isLxxAddition: isBibleLxxAdditionVerse(bookKey, chapterNumber, verse.verseNumber) }))
     .sort((a, b) => compareBibleVerseNumbers(a.verseNumber, b.verseNumber));
 }
 

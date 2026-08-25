@@ -8,7 +8,7 @@ import HymnCard from '@/components/chc/ui/HymnCard';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { getBibleBooks, getBibleChapterDisplayLabel, getBibleChapterKeys, getBibleSpecialChapterTitle, isEstherAdditionChapter, PsalmNumbering } from '@/utils/bibleService';
+import { getBibleBooks, getBibleChapterDisplayLabel, getBibleChapterKeys, getBibleSpecialChapterTitle, isBibleLxxAdditionChapter, PsalmNumbering } from '@/utils/bibleService';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { goBack } from '@/utils/navigation';
 
@@ -137,7 +137,7 @@ export default function BibleNestedList() {
           <View style={styles.grid}>
             {chapters.map((chapterNumber) => {
               const isSpecialChapter = Boolean(getBibleSpecialChapterTitle(bookKey, chapterNumber));
-              const isLxxAdditionChapter = isEstherAdditionChapter(bookKey, chapterNumber);
+              const isLxxAdditionChapter = isBibleLxxAdditionChapter(bookKey, chapterNumber);
               const chapterLabel = getBibleChapterDisplayLabel(bookKey, chapterNumber, preferences.appLanguage);
 
               return (

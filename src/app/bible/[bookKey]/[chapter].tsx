@@ -15,9 +15,9 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
   BibleBook,
   getBibleChapterDisplayLabel,
+  getBibleChapterHeaderTitle,
   getBibleBook,
   getBibleChapterKeys,
-  getBibleSpecialChapterTitle,
   getBibleVerseDisplayLabel,
   getDisplayedChapterVerses,
   getDisplayedPsalmPreface,
@@ -115,11 +115,10 @@ export default function BibleChapterDocument() {
   const effectiveLanguageKeys = visibleLanguageKeys.length ? visibleLanguageKeys : [availableLanguages[0] || 'english'];
   const fontSize = fontScaleToPx(preferences.fontScale);
   const currentChapterNumber = Number(chapter);
-  const specialChapterTitle = getBibleSpecialChapterTitle(bookKey, currentChapterNumber);
   const chapterTitleEnglish = getBibleChapterDisplayLabel(bookKey, currentChapterNumber, 'en');
   const bookTitleEnglish = book?.titleEnglish || title || bookKey || '';
-  const headerTitleEnglish = `${bookTitleEnglish} ${chapterTitleEnglish}`.trim();
-  const headerTitleArabic = specialChapterTitle?.arabic || `الإصحاح ${getBibleChapterDisplayLabel(bookKey, currentChapterNumber, 'ar')}`;
+  const headerTitleEnglish = getBibleChapterHeaderTitle(book, title, arabic, bookKey, currentChapterNumber, 'en');
+  const headerTitleArabic = getBibleChapterHeaderTitle(book, title, arabic, bookKey, currentChapterNumber, 'ar');
   const preface = book?.bookKey === 'psalms' ? getDisplayedPsalmPreface() : null;
 
   const chapterIndex = chapterKeys ? chapterKeys.indexOf(currentChapterNumber) : -1;
