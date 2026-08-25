@@ -133,6 +133,7 @@ export function buildDocumentHtml(
   const copticFontSize = Math.round(fontSize * 1.25);
   const arabicFontSize = Math.round(fontSize * 1.15);
   const verseLineHeight = Math.round(fontSize * 1.3);
+  const arabicVerseLineHeight = Math.round(fontSize * 1.6);
 
   const visibleSections = sections.filter((section) => {
     if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;
@@ -188,7 +189,9 @@ export function buildDocumentHtml(
       }
       body {
         font-family: Georgia, serif;
+        overscroll-behavior-x: none;
         overflow-x: hidden;
+        touch-action: pan-y;
         -webkit-user-select: ${selectText ? 'text' : 'none'};
         user-select: ${selectText ? 'text' : 'none'};
       }
@@ -246,6 +249,21 @@ export function buildDocumentHtml(
         overflow-wrap: break-word;
         padding: ${SPACING.sm}px ${SPACING.xs}px;
       }
+      body.selecting-english .cell:not([data-language="english"]),
+      body.selecting-english .cell:not([data-language="english"]) *,
+      body.selecting-english .title-cell:not([data-language="english"]),
+      body.selecting-english .title-cell:not([data-language="english"]) *,
+      body.selecting-coptic .cell:not([data-language="coptic"]),
+      body.selecting-coptic .cell:not([data-language="coptic"]) *,
+      body.selecting-coptic .title-cell:not([data-language="coptic"]),
+      body.selecting-coptic .title-cell:not([data-language="coptic"]) *,
+      body.selecting-arabic .cell:not([data-language="arabic"]),
+      body.selecting-arabic .cell:not([data-language="arabic"]) *,
+      body.selecting-arabic .title-cell:not([data-language="arabic"]),
+      body.selecting-arabic .title-cell:not([data-language="arabic"]) * {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+      }
       .verse-text {
         font-size: ${fontSize}px;
         letter-spacing: 0 !important;
@@ -266,7 +284,7 @@ export function buildDocumentHtml(
         // font-family: "Arial", sans-serif !important;
         font-family: Georgia, serif !important;
         font-size: ${arabicFontSize}px;
-        line-height: ${verseLineHeight}px;
+        line-height: ${arabicVerseLineHeight}px;
       }
       .centered { text-align: center; }
       .speaker-label.priest { color: ${COLORS.priest}; }
@@ -394,6 +412,101 @@ export function buildDocumentHtml(
         button.setAttribute('aria-label', collapsed ? 'Expand section' : 'Collapse section');
       });
       (function () {
+        var languages = ['english', 'coptic', 'arabic'];
+        var selectingLanguage = null;
+        function closestLanguageCell(node) {
+          var element = node && node.nodeType === 1 ? node : node && node.parentElement;
+          return element && element.closest ? element.closest('.cell[data-language], .title-cell[data-language]') : null;
+        }
+        function setSelectingLanguage(language) {
+          languages.forEach(function (item) { document.body.classList.remove('selecting-' + item); });
+          selectingLanguage = languages.indexOf(language) >= 0 ? language : null;
+          if (selectingLanguage) document.body.classList.add('selecting-' + selectingLanguage);
+        }
+        function inferLanguage(node) {
+          var cell = closestLanguageCell(node);
+          return cell ? cell.getAttribute('data-language') : null;
+        }
+        function onSelectionStart(event) {
+          setSelectingLanguage(inferLanguage(event.target));
+        }
+        function hasSelection() {
+          var selection = window.getSelection && window.getSelection();
+          return Boolean(selection && selection.rangeCount && !selection.isCollapsed);
+        }
+        function normalizeSelectionText(text) {
+          return String(text || '')
+            .replace(/[ \\t\\f\\v]+/g, ' ')
+            .replace(/ *\\n */g, '\\n')
+            .replace(/\\n{3,}/g, '\\n\\n')
+            .trim();
+        }
+        function fragmentText(fragment) {
+          var container = document.createElement('div');
+          container.appendChild(fragment);
+          Array.prototype.slice.call(container.querySelectorAll('.bible-verse-number')).forEach(function (numberNode) {
+            var numberText = normalizeSelectionText(numberNode.textContent || '');
+            numberNode.textContent = numberText ? numberText + ' ' : '';
+          });
+          Array.prototype.slice.call(container.querySelectorAll('br')).forEach(function (br) {
+            br.parentNode.replaceChild(document.createTextNode('\\n'), br);
+          });
+          return normalizeSelectionText(container.textContent || '');
+        }
+        function rangeIntersectsNode(range, node) {
+          try {
+            return range.intersectsNode(node);
+          } catch (error) {
+            return false;
+          }
+        }
+        function clippedTextForNode(range, node) {
+          if (!rangeIntersectsNode(range, node)) return '';
+          var nodeRange = document.createRange();
+          nodeRange.selectNodeContents(node);
+          var clipped = range.cloneRange();
+          if (clipped.compareBoundaryPoints(Range.START_TO_START, nodeRange) < 0) {
+            clipped.setStart(nodeRange.startContainer, nodeRange.startOffset);
+          }
+          if (clipped.compareBoundaryPoints(Range.END_TO_END, nodeRange) > 0) {
+            clipped.setEnd(nodeRange.endContainer, nodeRange.endOffset);
+          }
+          return fragmentText(clipped.cloneContents());
+        }
+        function selectedTextForLanguage(selection, language) {
+          if (!selection || !selection.rangeCount || !language) return '';
+          var range = selection.getRangeAt(0);
+          var nodes = Array.prototype.slice.call(
+            document.querySelectorAll('.cell[data-language="' + language + '"], .title-cell[data-language="' + language + '"]')
+          );
+          return nodes
+            .map(function (node) { return clippedTextForNode(range, node); })
+            .filter(Boolean)
+            .join('\\n');
+        }
+        document.addEventListener('pointerdown', onSelectionStart, true);
+        document.addEventListener('mousedown', onSelectionStart, true);
+        document.addEventListener('touchstart', onSelectionStart, true);
+        document.addEventListener('selectionchange', function () {
+          var selection = window.getSelection && window.getSelection();
+          if (!selection || !selection.rangeCount || selection.isCollapsed) {
+            setSelectingLanguage(null);
+            return;
+          }
+          if (!selectingLanguage) {
+            setSelectingLanguage(inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode));
+          }
+        });
+        document.addEventListener('copy', function (event) {
+          var selection = window.getSelection && window.getSelection();
+          var language = selectingLanguage || (selection && (inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode)));
+          var text = selectedTextForLanguage(selection, language);
+          if (!text || !event.clipboardData) return;
+          event.clipboardData.setData('text/plain', text);
+          event.preventDefault();
+        });
+      })();
+      (function () {
         // Reports whichever section AND verse currently straddle a fixed
         // "reading line" near the top of the viewport, so the host app
         // always knows where the user actually is — used to keep the
@@ -440,20 +553,57 @@ export function buildDocumentHtml(
         scheduleReport();
       })();
       (function () {
-        var startX = null, startY = null;
-        function onStart(x, y) { startX = x; startY = y; }
-        function onEnd(x, y) {
-          if (startX === null) return;
+        var startX = null, startY = null, fired = false, lastPostAt = 0;
+        function getSelectorEdge() {
+          return Math.min(240, Math.max(128, window.innerWidth * 0.18));
+        }
+        function preventEvent(event) {
+          if (event && event.cancelable && event.preventDefault) event.preventDefault();
+        }
+        function postEdgeAction(type) {
+          var now = Date.now();
+          if (now - lastPostAt < 350) return;
+          lastPostAt = now;
+          postAction(type);
+        }
+        function onStart(x, y) { startX = x; startY = y; fired = false; }
+        function onMove(x, y, event) {
+          if (startX === null || fired) return;
           var dx = x - startX, dy = y - startY;
-          startX = startY = null;
-          if (dx > 60 && Math.abs(dy) < Math.abs(dx) * 0.6) postAction('swipeBack');
+          var absDx = Math.abs(dx), absDy = Math.abs(dy);
+          var selectorEdge = Math.min(240, Math.max(128, window.innerWidth * 0.18));
+          var startedInLeftEdge = startX < 56;
+          var startedInRightEdge = startX > window.innerWidth - selectorEdge;
+          if (absDx > 12 && absDx > absDy * 1.2) preventEvent(event);
+          if (absDy >= absDx * 0.6) return;
+          if (startedInLeftEdge && dx > 60) {
+            fired = true;
+            preventEvent(event);
+            postEdgeAction('swipeBack');
+            return;
+          }
+          if (startedInRightEdge && dx < -36) {
+            fired = true;
+            preventEvent(event);
+            postEdgeAction('openSelector');
+          }
+        }
+        function onEnd(x, y, event) {
+          onMove(x, y, event);
+          onCancel();
         }
         function onCancel() { startX = startY = null; }
-        document.addEventListener('pointerdown', function (e) { if (e.clientX < 56) onStart(e.clientX, e.clientY); });
+        function isEdgeStart(x) {
+          var selectorEdge = getSelectorEdge();
+          return x < 56 || x > window.innerWidth - selectorEdge;
+        }
+        document.addEventListener('pointerdown', function (e) { if (isEdgeStart(e.clientX)) onStart(e.clientX, e.clientY); });
+        document.addEventListener('pointermove', function (e) { onMove(e.clientX, e.clientY, e); });
         document.addEventListener('pointerup', function (e) { onEnd(e.clientX, e.clientY); });
         document.addEventListener('pointercancel', onCancel);
-        document.addEventListener('touchstart', function (e) { var t = e.touches[0]; if (t.clientX < 56) onStart(t.clientX, t.clientY); }, { passive: true });
-        document.addEventListener('touchend', function (e) { var t = e.changedTouches[0]; onEnd(t.clientX, t.clientY); }, { passive: true });
+        document.addEventListener('touchstart', function (e) { var t = e.touches[0]; if (isEdgeStart(t.clientX)) onStart(t.clientX, t.clientY); }, { passive: true });
+        document.addEventListener('touchmove', function (e) { var t = e.touches[0]; onMove(t.clientX, t.clientY, e); }, { passive: false });
+        document.addEventListener('touchend', function (e) { var t = e.changedTouches[0]; onEnd(t.clientX, t.clientY, e); }, { passive: false });
         document.addEventListener('touchcancel', onCancel);
       })();
     </script>
@@ -614,7 +764,7 @@ function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLangu
   const titleCells = languages
     .map(
       (language) => `
-        <div class="title-cell">
+        <div class="title-cell" data-language="${escapeAttribute(language.className)}">
           <p class="section-title ${language.className}${isSilentPrayerHymn ? ' silent-prayer' : ''}" style="text-align: ${language.align};">${escapeHtml(language.text)}</p>
         </div>
       `,
@@ -728,10 +878,10 @@ function renderVerse(
         : '';
       const centered = language.key === 'coptic' ? isCopticCentered : isCentered;
       return `
-        <div class="cell">
+        <div class="cell" data-language="${escapeAttribute(language.key)}">
           <p class="verse-text ${language.className} ${centered ? 'centered' : ''}" style="${textStyle}">${
             language.speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(language.speakerLabel)}</span><br/>` : ''
-          }${verseNumberText ? `<span class="bible-verse-number">${escapeHtml(verseNumberText)}</span> ` : ''}${highlightMetropolitanBrackets(language.text)}</p>
+          }${verseNumberText ? `<span class="bible-verse-number" data-copy-text="${escapeAttribute(verseNumberText)}">${escapeHtml(verseNumberText)}</span> ` : ''}${highlightMetropolitanBrackets(language.text)}</p>
         </div>
       `;
     })

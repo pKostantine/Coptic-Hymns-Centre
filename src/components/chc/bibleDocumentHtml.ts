@@ -2,19 +2,22 @@ import { COLORS } from '../../constants/theme';
 import { formatEnglishDisplayText } from '../../utils/displayText';
 
 export interface BibleDisplayVerse {
-  verseNumber: number;
+  verseNumber: number | string;
   english: string;
   coptic: string;
+  greek: string;
   arabic: string;
+  isLxxAddition?: boolean;
 }
 
 export interface BiblePreface {
   english?: string;
   coptic?: string;
+  greek?: string;
   arabic?: string;
 }
 
-export type BibleLanguageKey = 'english' | 'coptic' | 'arabic';
+export type BibleLanguageKey = 'english' | 'coptic' | 'greek' | 'arabic';
 
 /**
  * Builds the Bible chapter reader HTML — ported from the old app's
@@ -52,18 +55,19 @@ export function buildBibleChapterHtml({
       const cellHtml = effectiveLanguages
         .map((language) => {
           const text = verse[language];
+          const verseNumberText = formatVerseNumber(verse.verseNumber, language);
           if (!String(text || '').trim()) {
-            return `<div class="cell placeholder ${language}"></div>`;
+            return `<div class="cell placeholder ${language}" data-language="${language}"></div>`;
           }
           return [
-            `<div class="cell ${language}" dir="${language === 'arabic' ? 'rtl' : 'ltr'}">`,
-            `<span class="verse-number">${escapeHtml(formatVerseNumber(verse.verseNumber, language))}</span>`,
+            `<div class="cell ${language}" data-language="${language}" dir="${language === 'arabic' ? 'rtl' : 'ltr'}">`,
+            `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span> `,
             `<span class="verse-text">${escapeHtml(formatVerseText(text, language, verse === firstCopticVerse))}</span>`,
             '</div>',
           ].join('');
         })
         .join('');
-      return `<section class="verse-row" data-verse="${verse.verseNumber}">${cellHtml}</section>`;
+      return `<section class="verse-row" data-verse="${escapeHtml(String(verse.verseNumber))}">${cellHtml}</section>`;
     })
     .join('');
 
@@ -72,10 +76,10 @@ export function buildBibleChapterHtml({
         .map((language) => {
           const text = preface[language];
           if (!String(text || '').trim()) {
-            return `<div class="cell placeholder ${language}"></div>`;
+            return `<div class="cell placeholder ${language}" data-language="${language}"></div>`;
           }
           return [
-            `<div class="cell preface-cell ${language}" dir="${language === 'arabic' ? 'rtl' : 'ltr'}">`,
+            `<div class="cell preface-cell ${language}" data-language="${language}" dir="${language === 'arabic' ? 'rtl' : 'ltr'}">`,
             `<span class="verse-text">${escapeHtml(formatVerseText(text || '', language, false))}</span>`,
             '</div>',
           ].join('');
@@ -109,6 +113,7 @@ export function buildBibleChapterHtml({
         --text-color: ${COLORS.white};
         --border-color: ${COLORS.border};
         --gold: ${COLORS.gold};
+        --lxx-addition: ${COLORS.priest};
         --preface-red: #d9534f;
         --font-size: ${safeFontSize}px;
       }
@@ -149,6 +154,17 @@ export function buildBibleChapterHtml({
         text-align: justify;
         text-justify: inter-word;
       }
+      body.selecting-english .cell:not([data-language="english"]),
+      body.selecting-english .cell:not([data-language="english"]) *,
+      body.selecting-coptic .cell:not([data-language="coptic"]),
+      body.selecting-coptic .cell:not([data-language="coptic"]) *,
+      body.selecting-greek .cell:not([data-language="greek"]),
+      body.selecting-greek .cell:not([data-language="greek"]) *,
+      body.selecting-arabic .cell:not([data-language="arabic"]),
+      body.selecting-arabic .cell:not([data-language="arabic"]) * {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+      }
       .cell.coptic {
         font-family: CopticCHC, Georgia, serif;
         font-size: ${getLanguageFontSize(safeFontSize, 'coptic')}px;
@@ -160,11 +176,19 @@ export function buildBibleChapterHtml({
         line-height: ${getLanguageLineHeight(safeFontSize, 'arabic')}px;
         text-align: justify;
       }
+      .cell.greek {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: ${getLanguageFontSize(safeFontSize, 'greek')}px;
+        line-height: ${getLanguageLineHeight(safeFontSize, 'greek')}px;
+      }
       .verse-number {
         color: var(--gold);
         font-weight: 700;
-        padding-inline-end: 0.32em;
+        padding-inline-end: 0;
         white-space: nowrap;
+      }
+      .verse-number.lxx-addition {
+        color: var(--lxx-addition);
       }
       .verse-text {
         white-space: pre-line;
@@ -240,6 +264,8 @@ export function buildBibleChapterHtml({
         var pageCount = 1;
         var pageWidth = 1;
         var isSlideshow = ${JSON.stringify(Boolean(isSlideshow))};
+        var selectableLanguages = ${JSON.stringify(effectiveLanguages)};
+        var selectingLanguage = null;
         var startX = 0;
         var startY = 0;
 
@@ -251,6 +277,101 @@ export function buildBibleChapterHtml({
             window.parent.postMessage(payload, '*');
           }
         }
+
+        function closestLanguageCell(node) {
+          var element = node && node.nodeType === 1 ? node : node && node.parentElement;
+          return element && element.closest ? element.closest('.cell[data-language]') : null;
+        }
+
+        function setSelectingLanguage(language) {
+          selectableLanguages.forEach(function (item) { document.body.classList.remove('selecting-' + item); });
+          selectingLanguage = selectableLanguages.indexOf(language) >= 0 ? language : null;
+          if (selectingLanguage) document.body.classList.add('selecting-' + selectingLanguage);
+        }
+
+        function inferLanguage(node) {
+          var cell = closestLanguageCell(node);
+          return cell ? cell.getAttribute('data-language') : null;
+        }
+
+        function onSelectionStart(event) {
+          setSelectingLanguage(inferLanguage(event.target));
+        }
+
+        function normalizeSelectionText(text) {
+          return String(text || '')
+            .replace(/[ \\t\\f\\v]+/g, ' ')
+            .replace(/ *\\n */g, '\\n')
+            .replace(/\\n{3,}/g, '\\n\\n')
+            .trim();
+        }
+
+        function fragmentText(fragment) {
+          var container = document.createElement('div');
+          container.appendChild(fragment);
+          Array.prototype.slice.call(container.querySelectorAll('.verse-number')).forEach(function (numberNode) {
+            var numberText = normalizeSelectionText(numberNode.textContent || '');
+            numberNode.textContent = numberText ? numberText + ' ' : '';
+          });
+          Array.prototype.slice.call(container.querySelectorAll('br')).forEach(function (br) {
+            br.parentNode.replaceChild(document.createTextNode('\\n'), br);
+          });
+          return normalizeSelectionText(container.textContent || '');
+        }
+
+        function rangeIntersectsNode(range, node) {
+          try {
+            return range.intersectsNode(node);
+          } catch (error) {
+            return false;
+          }
+        }
+
+        function clippedTextForNode(range, node) {
+          if (!rangeIntersectsNode(range, node)) return '';
+          var nodeRange = document.createRange();
+          nodeRange.selectNodeContents(node);
+          var clipped = range.cloneRange();
+          if (clipped.compareBoundaryPoints(Range.START_TO_START, nodeRange) < 0) {
+            clipped.setStart(nodeRange.startContainer, nodeRange.startOffset);
+          }
+          if (clipped.compareBoundaryPoints(Range.END_TO_END, nodeRange) > 0) {
+            clipped.setEnd(nodeRange.endContainer, nodeRange.endOffset);
+          }
+          return fragmentText(clipped.cloneContents());
+        }
+
+        function selectedTextForLanguage(selection, language) {
+          if (!selection || !selection.rangeCount || !language) return '';
+          var range = selection.getRangeAt(0);
+          var nodes = Array.prototype.slice.call(document.querySelectorAll('.cell[data-language="' + language + '"]'));
+          return nodes
+            .map(function (node) { return clippedTextForNode(range, node); })
+            .filter(Boolean)
+            .join('\\n');
+        }
+
+        document.addEventListener('pointerdown', onSelectionStart, true);
+        document.addEventListener('mousedown', onSelectionStart, true);
+        document.addEventListener('touchstart', onSelectionStart, true);
+        document.addEventListener('selectionchange', function () {
+          var selection = window.getSelection && window.getSelection();
+          if (!selection || !selection.rangeCount || selection.isCollapsed) {
+            setSelectingLanguage(null);
+            return;
+          }
+          if (!selectingLanguage) {
+            setSelectingLanguage(inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode));
+          }
+        });
+        document.addEventListener('copy', function (event) {
+          var selection = window.getSelection && window.getSelection();
+          var language = selectingLanguage || (selection && (inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode)));
+          var text = selectedTextForLanguage(selection, language);
+          if (!text || !event.clipboardData) return;
+          event.clipboardData.setData('text/plain', text);
+          event.preventDefault();
+        });
 
         function stripIds(node) {
           if (!node || node.nodeType !== 1) return;
@@ -519,6 +640,7 @@ const COPTIC_TO_UPPER: Record<string, string> = { ⲭ: 'Ⲭ', ϭ: 'Ϭ', ϯ: 'Ϯ'
 
 function formatVerseText(text: string, language: BibleLanguageKey, isFirstCopticVerse: boolean): string {
   if (language === 'arabic') return formatArabicDigits(text);
+  if (language === 'greek') return String(text || '');
   if (language === 'coptic') {
     const normalized = lowercaseCopticCharacters(String(text || ''));
     const withCopticNumbers = formatCopticNumbers(normalized);
@@ -540,9 +662,12 @@ function uppercaseFirstCopticCharacter(text: string): string {
   return text.slice(0, index) + upper + text.slice(index + 1);
 }
 
-function formatVerseNumber(verseNumber: number, language: BibleLanguageKey): string {
-  if (language === 'arabic') return formatArabicDigits(String(verseNumber));
-  if (language === 'coptic') return formatCopticNumber(verseNumber);
+function formatVerseNumber(verseNumber: number | string, language: BibleLanguageKey): string {
+  const text = String(verseNumber);
+  const numericValue = /^\d+$/.test(text) ? Number(text) : null;
+  if (language === 'arabic') return formatArabicLetterSuffixes(formatArabicDigits(text));
+  if (language === 'coptic') return numericValue === null ? text : formatCopticNumber(numericValue);
+  if (language === 'greek') return numericValue === null ? text : formatGreekNumber(numericValue);
   return String(verseNumber);
 }
 
@@ -553,6 +678,15 @@ const EASTERN_ARABIC_DIGITS: Record<string, string> = {
 
 function formatArabicDigits(text: string) {
   return String(text || '').replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit);
+}
+
+const ARABIC_LETTER_SUFFIXES = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'];
+
+function formatArabicLetterSuffixes(text: string) {
+  return String(text || '').replace(/[a-z]/gi, (letter) => {
+    const index = letter.toLowerCase().charCodeAt(0) - 97;
+    return ARABIC_LETTER_SUFFIXES[index] || letter;
+  });
 }
 
 const COPTIC_DIGITS: Record<number, string> = { 1: 'ⲁ̅', 2: 'ⲃ̅', 3: 'ⲅ̅', 4: 'ⲇ̅', 5: 'ⲉ̅', 6: 'Ⲋ', 7: 'ⲍ̅', 8: 'ⲏ̅', 9: 'ⲑ̅' };
@@ -569,6 +703,27 @@ function formatCopticNumber(value: number): string {
 
 function formatCopticNumbers(text: string): string {
   return String(text || '').replace(/\d+/g, (value) => formatCopticNumber(Number(value)));
+}
+
+const GREEK_NUMERAL_SIGN = 'ʹ';
+const GREEK_THOUSANDS_SIGN = '͵';
+const GREEK_DIGITS: Record<number, string> = { 1: 'Α', 2: 'Β', 3: 'Γ', 4: 'Δ', 5: 'Ε', 6: 'Ϛ', 7: 'Ζ', 8: 'Η', 9: 'Θ' };
+const GREEK_TENS: Record<number, string> = { 1: 'Ι', 2: 'Κ', 3: 'Λ', 4: 'Μ', 5: 'Ν', 6: 'Ξ', 7: 'Ο', 8: 'Π', 9: 'Ϟ' };
+const GREEK_HUNDREDS: Record<number, string> = { 1: 'Ρ', 2: 'Σ', 3: 'Τ', 4: 'Υ', 5: 'Φ', 6: 'Χ', 7: 'Ψ', 8: 'Ω', 9: 'Ϡ' };
+
+function formatGreekNumber(value: number): string {
+  if (!Number.isInteger(value) || value <= 0 || value > 9999) return String(value);
+  const thousands = Math.floor(value / 1000);
+  const remainder = value % 1000;
+  const numeral = `${thousands ? `${GREEK_THOUSANDS_SIGN}${formatGreekNumberUnderThousand(thousands)}` : ''}${formatGreekNumberUnderThousand(remainder)}`;
+  return numeral ? `${numeral}${GREEK_NUMERAL_SIGN}` : String(value);
+}
+
+function formatGreekNumberUnderThousand(value: number): string {
+  const hundreds = Math.floor(value / 100);
+  const tens = Math.floor((value % 100) / 10);
+  const ones = value % 10;
+  return `${GREEK_HUNDREDS[hundreds] || ''}${GREEK_TENS[tens] || ''}${GREEK_DIGITS[ones] || ''}`;
 }
 
 function getLanguageFontSize(fontSize: number, language: BibleLanguageKey) {

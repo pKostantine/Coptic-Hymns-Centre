@@ -8,7 +8,7 @@ import HymnCard from '@/components/chc/ui/HymnCard';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { getBibleBooks, getBibleChapterKeys, PsalmNumbering } from '@/utils/bibleService';
+import { getBibleBooks, getBibleChapterDisplayLabel, getBibleChapterKeys, getBibleSpecialChapterTitle, isEstherAdditionChapter, PsalmNumbering } from '@/utils/bibleService';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { goBack } from '@/utils/navigation';
 
@@ -28,6 +28,7 @@ export default function BibleNestedList() {
   const showArabic = preferences.appLanguage === 'ar';
   const testament = bookKey === 'OT' || bookKey === 'NT' ? bookKey : null;
   const isPsalms = bookKey === 'psalms';
+  const isEsther = bookKey === 'esther';
   const [books, setBooks] = useState<Awaited<ReturnType<typeof getBibleBooks>> | null>(null);
   const [chapters, setChapters] = useState<number[] | null>(null);
   const [psalmNumbering, setPsalmNumbering] = useState<PsalmNumbering>('septuagint');
@@ -120,26 +121,62 @@ export default function BibleNestedList() {
               })}
             </View>
           ) : null}
+          {isEsther ? (
+            <View style={styles.estherDisclaimer}>
+              {showArabic ? (
+                <Text style={[styles.estherDisclaimerText, styles.estherDisclaimerArabic]}>
+                  الأصحاحات والآيات الملوَّنة باللون الأحمر لا تَرِد إلا في مخطوطات الترجمة السبعينية اليونانية، وتظهر فيها كإضافة إلى سفر أستير.
+                </Text>
+              ) : (
+                <Text style={styles.estherDisclaimerText}>
+                  Chapters and verses coloured red occur only in the Greek Septuagint (LXX) manuscripts and appear there as an addition to the Book of Esther.
+                </Text>
+              )}
+            </View>
+          ) : null}
           <View style={styles.grid}>
-            {chapters.map((chapterNumber) => (
-              <Pressable
-                key={chapterNumber}
-                style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
-                onPress={() =>
-                  router.push({
-                    pathname: '/bible/[bookKey]/[chapter]',
-                    params: {
-                      bookKey: bookKey!,
-                      chapter: String(chapterNumber),
-                      title: title || bookKey || '',
-                      psalmNumbering: isPsalms ? psalmNumbering : undefined,
-                    },
-                  })
-                }
-              >
-                <Text style={styles.chipText}>{chapterNumber}</Text>
-              </Pressable>
-            ))}
+            {chapters.map((chapterNumber) => {
+              const isSpecialChapter = Boolean(getBibleSpecialChapterTitle(bookKey, chapterNumber));
+              const isLxxAdditionChapter = isEstherAdditionChapter(bookKey, chapterNumber);
+              const chapterLabel = getBibleChapterDisplayLabel(bookKey, chapterNumber, preferences.appLanguage);
+
+              return (
+                <Pressable
+                  key={chapterNumber}
+                  accessibilityLabel={chapterLabel}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    isSpecialChapter && styles.namedChip,
+                    isLxxAdditionChapter && styles.lxxAdditionChip,
+                    pressed && styles.chipPressed,
+                  ]}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/bible/[bookKey]/[chapter]',
+                      params: {
+                        bookKey: bookKey!,
+                        chapter: String(chapterNumber),
+                        title: title || bookKey || '',
+                        arabic: arabic || '',
+                        psalmNumbering: isPsalms ? psalmNumbering : undefined,
+                      },
+                    })
+                  }
+                >
+                  <Text
+                    numberOfLines={isSpecialChapter ? 2 : 1}
+                    style={[
+                      styles.chipText,
+                      isSpecialChapter && styles.namedChipText,
+                      isSpecialChapter && showArabic && styles.namedChipArabic,
+                      isLxxAdditionChapter && styles.lxxAdditionChipText,
+                    ]}
+                  >
+                    {chapterLabel}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </ScrollView>
       )}
@@ -167,6 +204,29 @@ const styles = StyleSheet.create({
   },
   psalmNumberingText: { fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', textAlign: 'center' },
   psalmNumberingArabic: { fontFamily: 'Arial', fontSize: 14, fontWeight: '700', textAlign: 'right', writingDirection: 'rtl' },
+  estherDisclaimer: {
+    backgroundColor: 'rgba(214, 69, 69, 0.08)',
+    borderColor: 'rgba(214, 69, 69, 0.42)',
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  estherDisclaimerText: {
+    color: COLORS.priest,
+    fontFamily: TYPOGRAPHY.body,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  estherDisclaimerArabic: {
+    fontFamily: TYPOGRAPHY.arabic,
+    fontSize: 15,
+    lineHeight: 23,
+    writingDirection: 'rtl',
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -182,15 +242,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 8,
+    paddingHorizontal: SPACING.xs,
+  },
+  namedChip: {
+    width: 206,
+    height: CHIP_SIZE,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
   },
   chipPressed: {
     backgroundColor: COLORS.surfaceSoft,
     borderColor: COLORS.goldLine,
+  },
+  lxxAdditionChip: {
+    borderColor: 'rgba(214, 69, 69, 0.72)',
   },
   chipText: {
     fontFamily: TYPOGRAPHY.title,
     fontSize: 20,
     fontWeight: '700',
     color: COLORS.gold,
+    textAlign: 'center',
+  },
+  lxxAdditionChipText: {
+    color: COLORS.priest,
+  },
+  namedChipText: {
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  namedChipArabic: {
+    fontFamily: TYPOGRAPHY.arabic,
+    fontSize: 14,
+    lineHeight: 19,
+    writingDirection: 'rtl',
   },
 });

@@ -29,6 +29,15 @@ interface ContentSelectorDrawerProps {
   appLanguage?: AppLanguage;
 }
 
+function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
+  if (section.title?.english || section.title?.arabic) return section.title;
+  const readingReference = section.verses.find((verse) => verse.type === 'readingReference');
+  return {
+    english: readingReference?.english || '',
+    arabic: readingReference?.arabic || '',
+  };
+}
+
 /** CHC ContentSelectorDrawer — ported 1:1 from HymnDisplayScreen.js's selector Modal/panel. */
 export default function ContentSelectorDrawer({
   visible,
@@ -86,7 +95,8 @@ export default function ContentSelectorDrawer({
     // Subdocument/Antiphonary buttons are a real UI action, not hymn text —
     // they must survive even though they carry no verses.
     if (section.isSubdocumentButton || section.isAntiphonaryButton) return true;
-    return Boolean(section.title?.english || section.title?.arabic);
+    const selectorTitle = getSectionSelectorTitle(section);
+    return Boolean(selectorTitle.english || selectorTitle.arabic);
   });
 
   // The document's currentSectionId can land on a titleless hymn (e.g. an
@@ -151,7 +161,8 @@ export default function ContentSelectorDrawer({
               // the App Language setting — falling back to whichever
               // language actually has text for this specific section if the
               // selected one doesn't.
-              const showArabic = appLanguage === 'ar' ? Boolean(section.title.arabic) : !section.title.english && Boolean(section.title.arabic);
+              const selectorTitle = getSectionSelectorTitle(section);
+              const showArabic = appLanguage === 'ar' ? Boolean(selectorTitle.arabic) : !selectorTitle.english && Boolean(selectorTitle.arabic);
               // A hymn whose own title row declares "Silent Prayer" reads
               // visually distinct in the selector too — dimmer/italic, since
               // none of its content is spoken aloud.
@@ -171,9 +182,9 @@ export default function ContentSelectorDrawer({
                 >
                   <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
                     {showArabic ? (
-                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{section.title.arabic}</Text>
+                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
                     ) : (
-                      <Text style={[styles.selectorTitle, styles.centeredTitle, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{section.title.english || section.title.arabic}</Text>
+                      <Text style={[styles.selectorTitle, styles.centeredTitle, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
                     )}
                   </View>
                 </Pressable>

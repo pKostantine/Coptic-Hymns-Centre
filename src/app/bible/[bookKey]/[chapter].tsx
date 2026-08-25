@@ -14,8 +14,11 @@ import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
   BibleBook,
+  getBibleChapterDisplayLabel,
   getBibleBook,
   getBibleChapterKeys,
+  getBibleSpecialChapterTitle,
+  getBibleVerseDisplayLabel,
   getDisplayedChapterVerses,
   getDisplayedPsalmPreface,
   PsalmNumbering,
@@ -29,12 +32,16 @@ import { goBack } from '@/utils/navigation';
 const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: string }[] = [
   { key: 'english', label: 'English' },
   { key: 'coptic', label: 'Coptic' },
+  { key: 'greek', label: 'Greek' },
   { key: 'arabic', label: 'Arabic' },
 ];
 
 function getAvailableLanguages(verses: BibleDisplayVerse[]): BibleLanguageKey[] {
-  const hasCoptic = verses.some((verse) => verse.coptic);
-  return hasCoptic ? ['english', 'coptic', 'arabic'] : ['english', 'arabic'];
+  const languages: BibleLanguageKey[] = ['english'];
+  if (verses.some((verse) => String(verse.coptic || '').trim())) languages.push('coptic');
+  if (verses.some((verse) => String(verse.greek || '').trim())) languages.push('greek');
+  languages.push('arabic');
+  return languages;
 }
 
 function normalizeInitialLanguages(visibleLanguages: { english: boolean; coptic: boolean; arabic: boolean }) {
@@ -42,22 +49,24 @@ function normalizeInitialLanguages(visibleLanguages: { english: boolean; coptic:
     arabic: Boolean(visibleLanguages.arabic),
     coptic: Boolean(visibleLanguages.coptic),
     english: visibleLanguages.english !== false,
+    greek: true,
   };
 }
 
 export default function BibleChapterDocument() {
   const router = useRouter();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
   // get the same headerless, gesture-nav UI as the native app, same as
   // ServiceDocument.tsx/lectionary/index.tsx.
   const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
   const selectorPanelWidth = isMobileDocument ? Math.round(screenWidth * 0.7) : Math.round(screenWidth * 0.5);
-  const { bookKey, chapter, title, psalmNumbering: psalmNumberingParam } = useLocalSearchParams<{
+  const { bookKey, chapter, title, arabic, psalmNumbering: psalmNumberingParam } = useLocalSearchParams<{
     bookKey: string;
     chapter: string;
     title?: string;
+    arabic?: string;
     psalmNumbering?: PsalmNumbering;
   }>();
   const psalmNumbering: PsalmNumbering = psalmNumberingParam === 'masoretic' ? 'masoretic' : 'septuagint';
@@ -105,9 +114,15 @@ export default function BibleChapterDocument() {
   const visibleLanguageKeys = availableLanguages.filter((language) => enabledLanguages[language]);
   const effectiveLanguageKeys = visibleLanguageKeys.length ? visibleLanguageKeys : [availableLanguages[0] || 'english'];
   const fontSize = fontScaleToPx(preferences.fontScale);
+  const currentChapterNumber = Number(chapter);
+  const specialChapterTitle = getBibleSpecialChapterTitle(bookKey, currentChapterNumber);
+  const chapterTitleEnglish = getBibleChapterDisplayLabel(bookKey, currentChapterNumber, 'en');
+  const bookTitleEnglish = book?.titleEnglish || title || bookKey || '';
+  const headerTitleEnglish = `${bookTitleEnglish} ${chapterTitleEnglish}`.trim();
+  const headerTitleArabic = specialChapterTitle?.arabic || `الإصحاح ${getBibleChapterDisplayLabel(bookKey, currentChapterNumber, 'ar')}`;
   const preface = book?.bookKey === 'psalms' ? getDisplayedPsalmPreface() : null;
 
-  const chapterIndex = chapterKeys ? chapterKeys.indexOf(Number(chapter)) : -1;
+  const chapterIndex = chapterKeys ? chapterKeys.indexOf(currentChapterNumber) : -1;
   const previousChapter = chapterIndex > 0 ? chapterKeys![chapterIndex - 1] : null;
   const nextChapter = chapterIndex >= 0 && chapterKeys && chapterIndex < chapterKeys.length - 1 ? chapterKeys[chapterIndex + 1] : null;
 
@@ -130,14 +145,14 @@ export default function BibleChapterDocument() {
 
   const goToChapter = useCallback(
     (targetChapter: number | null) => {
-      if (!targetChapter) return;
+      if (targetChapter === null) return;
       setIsSelectorOpen(false);
       router.setParams({ chapter: String(targetChapter) });
     },
     [router],
   );
 
-  function selectVerse(verse: number) {
+  function selectVerse(verse: number | string) {
     setIsSelectorOpen(false);
     bibleWebViewRef.current?.selectVerse(verse);
   }
@@ -151,8 +166,8 @@ export default function BibleChapterDocument() {
   }
 
   const goBackALevel = useCallback(() => {
-    goBack(router, bookKey ? { pathname: '/bible/[bookKey]', params: { bookKey, title } } : '/bible');
-  }, [router, bookKey, title]);
+    goBack(router, bookKey ? { pathname: '/bible/[bookKey]', params: { bookKey, title: book?.titleEnglish || title, arabic: book?.titleArabic || arabic } } : '/bible');
+  }, [router, bookKey, title, arabic, book?.titleEnglish, book?.titleArabic]);
 
   const gesturePanResponder = useMemo(() => {
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
@@ -178,13 +193,13 @@ export default function BibleChapterDocument() {
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}>
       <Head>
-        <title>{`CHC ${title || bookKey || 'Bible'} ${chapter}`}</title>
+        <title>{`CHC ${bookTitleEnglish || 'Bible'} ${chapterTitleEnglish}`}</title>
       </Head>
       {/* Unlike every other document screen, the Bible reader's header is
           NEVER hidden -- not even natively -- because it's the only place
           showing the user which book/chapter they're actually reading. */}
       <AppHeader
-        title={{ english: `${title || bookKey || ''} ${chapter}`, arabic: `الإصحاح ${chapter}` }}
+        title={{ english: headerTitleEnglish, arabic: headerTitleArabic }}
         canGoBack
         onBack={goBackALevel}
         rightIcon="list-outline"
@@ -230,8 +245,8 @@ export default function BibleChapterDocument() {
                 </View>
 
                 <View style={styles.chapterNavRow}>
-                  <ChapterNavButton disabled={!previousChapter} icon="chevron-back" label="Previous" onPress={() => goToChapter(previousChapter)} />
-                  <ChapterNavButton disabled={!nextChapter} icon="chevron-forward" label="Next" onPress={() => goToChapter(nextChapter)} />
+                  <ChapterNavButton disabled={previousChapter === null} icon="chevron-back" label="Previous" onPress={() => goToChapter(previousChapter)} />
+                  <ChapterNavButton disabled={nextChapter === null} icon="chevron-forward" label="Next" onPress={() => goToChapter(nextChapter)} />
                 </View>
 
                 <View style={styles.selectorLanguageBar}>
@@ -252,9 +267,11 @@ export default function BibleChapterDocument() {
                 <ScrollView style={styles.selectorList}>
                   {(verses || []).map((verse) => (
                     <Pressable key={`selector-${verse.verseNumber}`} style={styles.selectorItem} onPress={() => selectVerse(verse.verseNumber)}>
-                      <Text style={styles.selectorVerseNumber}>{verse.verseNumber}</Text>
+                      <Text style={[styles.selectorVerseNumber, verse.isLxxAddition && styles.selectorVerseNumberLxx]}>
+                        {getBibleVerseDisplayLabel(verse.verseNumber, preferences.appLanguage)}
+                      </Text>
                       <Text numberOfLines={1} style={styles.selectorVersePreview}>
-                        {verse[(['english', 'coptic', 'arabic'] as BibleLanguageKey[]).find((l) => availableLanguages.includes(l) && enabledLanguages[l]) || availableLanguages[0]]}
+                        {verse[(['english', 'coptic', 'greek', 'arabic'] as BibleLanguageKey[]).find((l) => availableLanguages.includes(l) && enabledLanguages[l]) || availableLanguages[0]]}
                       </Text>
                     </Pressable>
                   ))}
@@ -361,6 +378,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   selectorVerseNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', minWidth: 28 },
+  selectorVerseNumberLxx: { color: COLORS.priest },
   selectorVersePreview: { flex: 1, fontFamily: 'Georgia', fontSize: 13, lineHeight: 18, color: COLORS.white },
   selectorActionRow: {
     alignItems: 'center',

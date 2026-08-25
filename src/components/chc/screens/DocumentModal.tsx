@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
+import EdgeSwipeOverlay from '../ui/EdgeSwipeOverlay';
 import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
@@ -39,13 +40,10 @@ const ANTIPHONARY_GROUPS: { key: 'introduction' | 'adam' | 'vatos'; label: strin
 ];
 
 // COPTIC_PAULINE_EPISTLE/COPTIC_CATHOLIC_EPISTLE/COPTIC_PRAXIS (see
-// SUBDOCUMENT_MAP in hymnLibrary.js) are always exactly 3 sections —
-// introduction, the day's reading itself, conclusion — short enough that
-// the vertical content-list drawer is redundant chrome; the pill row is
-// the only navigation they get. The reading section itself carries no
-// hymn_titles row (its citation, e.g. "Romans 1:1-7", is a readingReference
-// verse *inside* it, not a section title) — the pill row's fallback label
-// below is what actually gives it a pill.
+// SUBDOCUMENT_MAP in hymnLibrary.js) each include one untitled reading
+// section whose citation (e.g. "Romans 1:1-7") lives as a readingReference
+// verse inside it, not as a section title. This lets the pill row use that
+// citation as the visible label.
 const COPTIC_READINGS_SUBDOCUMENT_KEYS = new Set(['COPTIC_PAULINE_EPISTLE', 'COPTIC_CATHOLIC_EPISTLE', 'COPTIC_PRAXIS']);
 
 /** A section's own title, or — for the untitled reading section in a Coptic readings subdocument — its reading-reference citation verse, so the pill row can represent it without ever giving that section a real title (which would render as its own yellow header in the document body). */
@@ -124,6 +122,11 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       if (!nestedModal && !selectorOpen) onClose();
       return;
     }
+
+    if (action.type === 'openSelector') {
+      if (!nestedModal && !selectorOpen) setSelectorOpen(true);
+      return;
+    }
   };
 
   function jumpToSection(id: string) {
@@ -174,7 +177,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     else documentRef.current?.scrollToSection(introSection.id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const safeAreaRef = useRef<any>(null);
 
   // Desktop-web left-edge swipe: attaches to the SafeAreaView's DOM node so
@@ -221,7 +223,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         if (!isHorizontal) return false;
         const isCloseSwipe = gestureState.x0 < 56 && gestureState.dx > 12;
         const isSelectorSwipe =
-          !isCopticReadingsSubdocument &&
           gestureState.x0 > screenWidth - selectorEdgeWidth &&
           gestureState.dx < -12;
         return isCloseSwipe || isSelectorSwipe;
@@ -233,16 +234,12 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           return;
         }
         const selectorEdge = Math.min(240, Math.max(128, screenWidth * 0.18));
-        if (
-          !isCopticReadingsSubdocument &&
-          gestureState.x0 > screenWidth - selectorEdge &&
-          gestureState.dx < -36
-        ) {
+        if (gestureState.x0 > screenWidth - selectorEdge && gestureState.dx < -36) {
           setSelectorOpen(true);
         }
       },
     });
-  }, [onClose, nestedModal, selectorOpen, screenWidth, isCopticReadingsSubdocument]);
+  }, [onClose, nestedModal, selectorOpen, screenWidth]);
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
@@ -255,19 +252,17 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         {/* Web already always shows this header regardless of width (see
             ServiceDocument.tsx's doc comment), but unlike those screens this
             one is never hidden on the NATIVE APP either -- outside Slideshow
-            Mode (see DocumentSurface.tsx: onOpenSelector only reaches
-            SlideshowContainer, never the scroll-mode WebView reader), the
-            list icon here is the ONLY way to open ContentSelectorDrawer, so
-            hiding it natively would strand the user with no way to navigate
-            this modal's sections. isMobileDocument still applies to the
-            swipe-to-close gesture below. */}
+            Mode, the list icon here is still the most discoverable way to
+            open ContentSelectorDrawer; mobile edge swipes are an additional
+            gesture path. isMobileDocument still applies to the swipe
+            gestures below. */}
         <AppHeader
           title={title || ''}
           canGoBack
           onBack={onClose}
-          rightIcon={isCopticReadingsSubdocument ? undefined : 'list-outline'}
+          rightIcon="list-outline"
           rightAccessibilityLabel="Open content list"
-          onRightPress={isCopticReadingsSubdocument ? undefined : () => setSelectorOpen(true)}
+          onRightPress={() => setSelectorOpen(true)}
         />
         {isAntiphonary ? (
           <View style={styles.selectorBar}>
@@ -294,33 +289,38 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           <LoadingScreen />
         ) : (
           <>
-            <DocumentSurface
-              ref={documentRef}
-              sections={sections}
-              preferences={preferences}
-              onAction={handleAction}
-              selectedSectionId={selectedSlideSectionId}
-              onCurrentSectionChange={setCurrentSectionId}
-              onOpenSelector={isCopticReadingsSubdocument ? undefined : () => setSelectorOpen(true)}
-              onCollapseToggle={setSelectedSlideSectionId}
-            />
-            {isCopticReadingsSubdocument ? null : (
-              <ContentSelectorDrawer
-                visible={selectorOpen}
+            <View style={styles.documentFrame}>
+              <DocumentSurface
+                ref={documentRef}
                 sections={sections}
-                currentSectionId={currentSectionId}
-                onClose={() => setSelectorOpen(false)}
-                onSelectSection={jumpToSection}
-                bookmarked={subdocumentBookmarkId ? isBookmarked(subdocumentBookmarkId) : undefined}
-                onToggleBookmark={subdocumentBookmarkId ? () => toggleBookmark(subdocumentBookmarkId) : undefined}
-                onOpenCalendar={() => navigateAway('/calendar')}
-                onOpenSettings={() => navigateAway('/settings')}
-                bishopPresent={preferences.bishopPresent}
-                onToggleBishopPresent={toggleBishopPresent}
-                displaySilentPrayers={preferences.displaySilentPrayers}
-                appLanguage={preferences.appLanguage}
+                preferences={preferences}
+                onAction={handleAction}
+                selectedSectionId={selectedSlideSectionId}
+                onCurrentSectionChange={setCurrentSectionId}
+                onOpenSelector={() => setSelectorOpen(true)}
+                onCollapseToggle={setSelectedSlideSectionId}
               />
-            )}
+              <EdgeSwipeOverlay
+                enabled={isMobileDocument && !nestedModal && !selectorOpen}
+                onSwipeFromLeft={onClose}
+                onSwipeFromRight={() => setSelectorOpen(true)}
+              />
+            </View>
+            <ContentSelectorDrawer
+              visible={selectorOpen}
+              sections={sections}
+              currentSectionId={currentSectionId}
+              onClose={() => setSelectorOpen(false)}
+              onSelectSection={jumpToSection}
+              bookmarked={subdocumentBookmarkId ? isBookmarked(subdocumentBookmarkId) : undefined}
+              onToggleBookmark={subdocumentBookmarkId ? () => toggleBookmark(subdocumentBookmarkId) : undefined}
+              onOpenCalendar={() => navigateAway('/calendar')}
+              onOpenSettings={() => navigateAway('/settings')}
+              bishopPresent={preferences.bishopPresent}
+              onToggleBishopPresent={toggleBishopPresent}
+              displaySilentPrayers={preferences.displaySilentPrayers}
+              appLanguage={preferences.appLanguage}
+            />
           </>
         )}
         <DocumentModal
@@ -362,6 +362,7 @@ export function AntiphonaryModal({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
+  documentFrame: { flex: 1, position: 'relative' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
   loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
   // Ported from the old app's modalSelector/modalSelectorContent/

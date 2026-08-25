@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
+import EdgeSwipeOverlay from '../ui/EdgeSwipeOverlay';
 import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
@@ -364,6 +365,11 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       return;
     }
 
+    if (action.type === 'openSelector') {
+      if (!isCoveredByModal) setSelectorOpen(true);
+      return;
+    }
+
     const triggerSection = sections.find((s) => s.id === action.sectionId);
     if (!triggerSection?.subdocumentSections) return;
 
@@ -456,6 +462,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         <LoadingScreen />
       ) : (
         <>
+          <View style={styles.documentFrame}>
           <DocumentSurface
             ref={documentRef}
             sections={sections}
@@ -479,6 +486,12 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             initialScrollSectionId={currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
             onCollapseToggle={setSelectedSlideSectionId}
           />
+          <EdgeSwipeOverlay
+            enabled={isMobileDocument && !isCoveredByModal}
+            onSwipeFromLeft={() => goBack(router, backHref)}
+            onSwipeFromRight={() => setSelectorOpen(true)}
+          />
+          </View>
           <ContentSelectorDrawer
             visible={selectorOpen}
             sections={sections}
@@ -522,6 +535,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
+  documentFrame: { flex: 1, position: 'relative' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
   loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
   error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17, textAlign: 'center' },

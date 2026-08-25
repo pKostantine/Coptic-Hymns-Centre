@@ -10,7 +10,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { CATEGORIES, DIVINE_LITURGY_SERVICES, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
 import { goBack } from '@/utils/navigation';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { getBibleBooks, type BibleBook } from '@/utils/bibleService';
+import { getBibleChapterDisplayLabel, getBibleBooks, type BibleBook } from '@/utils/bibleService';
 
 interface BookmarkEntry {
   id: string;
@@ -94,10 +94,13 @@ export default function BookmarksScreen() {
           const [, , bookKey, chapter] = id.split(':');
           const book = bibleBooks.find((b) => b.bookKey === bookKey);
           if (!book) return null;
+          const chapterNumber = Number(chapter);
+          const englishChapter = getBibleChapterDisplayLabel(bookKey, chapterNumber, 'en');
+          const arabicChapter = getBibleChapterDisplayLabel(bookKey, chapterNumber, 'ar');
           return {
             id,
-            title: `${book.titleEnglish} ${chapter}`,
-            arabic: `${book.titleArabic} ${chapter}`,
+            title: `${book.titleEnglish} ${englishChapter}`,
+            arabic: `${book.titleArabic} ${arabicChapter}`,
             href: `/bible/${bookKey}/${chapter}`,
           };
         }
