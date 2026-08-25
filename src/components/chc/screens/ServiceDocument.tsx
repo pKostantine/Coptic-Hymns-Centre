@@ -52,7 +52,7 @@ interface SubdocumentModalTarget {
  */
 export default function ServiceDocument({ schema, table, title, arabic, extraContext, backHref }: ServiceDocumentProps) {
   const router = useRouter();
-  const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent } = useReadingPreferences();
+  const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent, toggleCopticGospelRite } = useReadingPreferences();
   const { effectiveDate, vespersEffectiveDate } = useCalendar();
   // Saturday-evening Vespers Praises and Vespers still chant in Saturday's
   // (Vatos) weekday tune even after the liturgical day rolls to Sunday for
@@ -77,9 +77,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
 
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // In-document toggle button (rendered wherever GOSPEL_RITE is spliced in) —
-  // session-only, not a persisted reading preference like Bishop Present.
-  const [copticGospelRite, setCopticGospelRite] = useState(false);
+  // In-document toggle button state, rendered wherever GOSPEL_RITE is spliced in.
+  const copticGospelRite = preferences.copticGospelRite;
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   // Verse-granular position within currentSectionId, reported by the WebView
@@ -145,7 +144,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     // splices specifically (see hydrateWholeTableInlineNested in
     // hymnLibrary.js) — the value passed here is irrelevant since that
     // function always hydrates both states itself, so it's fixed too and
-    // copticGospelRite (session toggle state) isn't a dep below either.
+    // the persisted copticGospelRite preference isn't a dep below either.
     //
     // liturgy_of_the_word is the one document that references the readings
     // schema's Pauline/Catholic Epistle inline splices — those need today's
@@ -331,7 +330,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       if (preferences.slideshowMode && targetSectionId) {
         setSelectedSlideSectionId(targetSectionId);
       }
-      setCopticGospelRite((current) => !current);
+      toggleCopticGospelRite();
       return;
     }
 

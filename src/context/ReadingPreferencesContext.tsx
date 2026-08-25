@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type SetStateAction } from 'react';
 
 import { loadBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
 import {
   AppLanguage,
+  BibleVisibleLanguages,
   DEFAULT_READING_PREFERENCES,
   loadReadingPreferences,
   OrientationMode,
@@ -15,6 +16,7 @@ interface ReadingPreferencesContextValue {
   preferences: ReadingPreferences;
   ready: boolean;
   toggleLanguage: (key: keyof VisibleLanguages) => void;
+  setBibleVisibleLanguages: (updater: SetStateAction<BibleVisibleLanguages>) => void;
   setFontScale: (delta: number) => void;
   setOrientationMode: (mode: OrientationMode) => void;
   toggleSelectText: () => void;
@@ -22,6 +24,7 @@ interface ReadingPreferencesContextValue {
   toggleDisplayComments: () => void;
   toggleDisplaySilentPrayers: () => void;
   toggleBishopPresent: () => void;
+  toggleCopticGospelRite: () => void;
   setAppLanguage: (language: AppLanguage) => void;
   bookmarks: string[];
   isBookmarked: (id: string) => boolean;
@@ -63,6 +66,16 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     }));
   }, []);
 
+  const setBibleVisibleLanguages = useCallback((updater: SetStateAction<BibleVisibleLanguages>) => {
+    setPreferences((prev) => {
+      const next = typeof updater === 'function' ? updater(prev.bibleVisibleLanguages) : updater;
+      return {
+        ...prev,
+        bibleVisibleLanguages: { ...prev.bibleVisibleLanguages, ...next },
+      };
+    });
+  }, []);
+
   const setFontScale = useCallback((delta: number) => {
     setPreferences((prev) => ({ ...prev, fontScale: Math.min(10, Math.max(1, prev.fontScale + delta)) }));
   }, []);
@@ -91,6 +104,10 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     setPreferences((prev) => ({ ...prev, bishopPresent: !prev.bishopPresent }));
   }, []);
 
+  const toggleCopticGospelRite = useCallback(() => {
+    setPreferences((prev) => ({ ...prev, copticGospelRite: !prev.copticGospelRite }));
+  }, []);
+
   const setAppLanguage = useCallback((language: AppLanguage) => {
     setPreferences((prev) => ({ ...prev, appLanguage: language }));
   }, []);
@@ -106,6 +123,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       preferences,
       ready,
       toggleLanguage,
+      setBibleVisibleLanguages,
       setFontScale,
       setOrientationMode,
       toggleSelectText,
@@ -113,6 +131,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleDisplayComments,
       toggleDisplaySilentPrayers,
       toggleBishopPresent,
+      toggleCopticGospelRite,
       setAppLanguage,
       bookmarks,
       isBookmarked,
@@ -122,6 +141,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       preferences,
       ready,
       toggleLanguage,
+      setBibleVisibleLanguages,
       setFontScale,
       setOrientationMode,
       toggleSelectText,
@@ -129,6 +149,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleDisplayComments,
       toggleDisplaySilentPrayers,
       toggleBishopPresent,
+      toggleCopticGospelRite,
       setAppLanguage,
       bookmarks,
       isBookmarked,

@@ -7,12 +7,20 @@ export interface VisibleLanguages {
   arabic: boolean;
 }
 
+export interface BibleVisibleLanguages {
+  english: boolean;
+  coptic: boolean;
+  greek: boolean;
+  arabic: boolean;
+}
+
 export type OrientationMode = 'auto' | 'landscape' | 'reverseLandscape' | 'portrait';
 
 export type AppLanguage = 'en' | 'ar';
 
 export interface ReadingPreferences {
   visibleLanguages: VisibleLanguages;
+  bibleVisibleLanguages: BibleVisibleLanguages;
   fontScale: number; // integer 1-10
   orientationMode: OrientationMode;
   selectText: boolean;
@@ -20,6 +28,7 @@ export interface ReadingPreferences {
   displayComments: boolean;
   displaySilentPrayers: boolean;
   bishopPresent: boolean;
+  copticGospelRite: boolean;
   /** Menu-chrome-only language (main menu + submenus/list screens) — never affects the text rendered inside an actual document, which is governed by visibleLanguages instead. */
   appLanguage: AppLanguage;
 }
@@ -32,6 +41,12 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
     copticRecitedPrayers: true,
     arabic: true,
   },
+  bibleVisibleLanguages: {
+    english: true,
+    coptic: false,
+    greek: false,
+    arabic: true,
+  },
   fontScale: 1,
   orientationMode: 'auto',
   selectText: false,
@@ -39,6 +54,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   displayComments: false,
   displaySilentPrayers: false,
   bishopPresent: false,
+  copticGospelRite: false,
   appLanguage: 'en',
 };
 
@@ -62,6 +78,10 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
     visibleLanguages: {
       ...DEFAULT_READING_PREFERENCES.visibleLanguages,
       ...stored?.visibleLanguages,
+    },
+    bibleVisibleLanguages: {
+      ...DEFAULT_READING_PREFERENCES.bibleVisibleLanguages,
+      ...stored?.bibleVisibleLanguages,
     },
   };
   if (!ORIENTATION_MODES.includes(merged.orientationMode)) {

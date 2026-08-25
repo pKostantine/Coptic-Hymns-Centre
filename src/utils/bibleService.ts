@@ -158,10 +158,18 @@ export function getBibleChapterHeaderTitle(
   appLanguage: 'en' | 'ar' = 'en',
 ): string {
   const chapterLabel = getBibleChapterMenuLabel(bookKey, chapterNumber, appLanguage);
+  const normalizedBookKey = normalizeBookKey(bookKey || '');
+  const englishBookTitle = normalizedBookKey === PSALMS_KEY
+    ? 'Psalm'
+    : book?.titleEnglish || fallbackTitle || bookKey || '';
+  const arabicBookTitle = normalizedBookKey === PSALMS_KEY
+    ? 'مزمور'
+    : book?.titleArabic || fallbackArabic || fallbackTitle || bookKey || '';
+
   if (appLanguage === 'ar') {
-    return `${book?.titleArabic || fallbackArabic || fallbackTitle || bookKey || ''} ${chapterLabel}`.trim();
+    return `${arabicBookTitle} ${chapterLabel}`.trim();
   }
-  return `${book?.titleEnglish || fallbackTitle || bookKey || ''} ${chapterLabel}`.trim();
+  return `${englishBookTitle} ${chapterLabel}`.trim();
 }
 
 // ─── Book metadata (small, cached for the whole session) ──────────────────

@@ -14,7 +14,6 @@ import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
   BibleBook,
-  getBibleChapterDisplayLabel,
   getBibleChapterHeaderTitle,
   getBibleBook,
   getBibleChapterKeys,
@@ -25,16 +24,53 @@ import {
 } from '@/utils/bibleService';
 import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
-import { fontScaleToPx } from '@/utils/preferencesStorage';
+import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { goBack } from '@/utils/navigation';
 
-const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: string }[] = [
-  { key: 'english', label: 'English' },
-  { key: 'coptic', label: 'Coptic' },
-  { key: 'greek', label: 'Greek' },
-  { key: 'arabic', label: 'Arabic' },
+type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
+
+const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: { english: string; arabic: string } }[] = [
+  { key: 'english', label: { english: 'English', arabic: 'الإنجليزية' } },
+  { key: 'coptic', label: { english: 'Coptic', arabic: 'القبطية' } },
+  { key: 'greek', label: { english: 'Greek', arabic: 'اليونانية' } },
+  { key: 'arabic', label: { english: 'Arabic', arabic: 'العربية' } },
 ];
+
+const SELECTOR_TEXT: Record<AppLanguage, {
+  verses: string;
+  previous: string;
+  previousChapter: string;
+  next: string;
+  nextChapter: string;
+  openSelector: string;
+  closeSelector: string;
+  bookmarkChapter: string;
+  openBibleSettings: string;
+}> = {
+  en: {
+    verses: 'Verses',
+    previous: 'Previous',
+    previousChapter: 'Previous chapter',
+    next: 'Next',
+    nextChapter: 'Next chapter',
+    openSelector: 'Open verse selector',
+    closeSelector: 'Close verse selector',
+    bookmarkChapter: 'Bookmark chapter',
+    openBibleSettings: 'Open Bible settings',
+  },
+  ar: {
+    verses: 'الآيات',
+    previous: 'السابق',
+    previousChapter: 'الإصحاح السابق',
+    next: 'التالي',
+    nextChapter: 'الإصحاح التالي',
+    openSelector: 'فتح محدد الآيات',
+    closeSelector: 'إغلاق محدد الآيات',
+    bookmarkChapter: 'حفظ الإصحاح',
+    openBibleSettings: 'فتح إعدادات الكتاب المقدس',
+  },
+};
 
 function getAvailableLanguages(verses: BibleDisplayVerse[]): BibleLanguageKey[] {
   const languages: BibleLanguageKey[] = ['english'];
@@ -44,13 +80,33 @@ function getAvailableLanguages(verses: BibleDisplayVerse[]): BibleLanguageKey[] 
   return languages;
 }
 
-function normalizeInitialLanguages(visibleLanguages: { english: boolean; coptic: boolean; arabic: boolean }) {
-  return {
-    arabic: Boolean(visibleLanguages.arabic),
-    coptic: Boolean(visibleLanguages.coptic),
-    english: visibleLanguages.english !== false,
-    greek: true,
-  };
+function getBibleLanguageLabel(language: BibleLanguageKey, appLanguage: AppLanguage): string {
+  const option = LANGUAGE_OPTIONS.find((item) => item.key === language);
+  return appLanguage === 'ar' ? option?.label.arabic || language : option?.label.english || language;
+}
+
+function getVersePreviewLanguage(
+  verse: BibleDisplayVerse,
+  appLanguage: AppLanguage,
+  availableLanguages: BibleLanguageKey[],
+  enabledLanguages: EnabledBibleLanguages,
+): BibleLanguageKey {
+  const primaryLanguages: BibleLanguageKey[] = appLanguage === 'ar'
+    ? ['arabic', 'english', 'coptic', 'greek']
+    : ['english', 'arabic', 'coptic', 'greek'];
+  const orderedLanguages = [
+    ...primaryLanguages,
+    ...availableLanguages.filter((language) => !primaryLanguages.includes(language)),
+  ];
+  const enabledWithText = orderedLanguages.find((language) =>
+    availableLanguages.includes(language) && enabledLanguages[language] && String(verse[language] || '').trim()
+  );
+  if (enabledWithText) return enabledWithText;
+
+  const enabledFallback = orderedLanguages.find((language) => availableLanguages.includes(language) && enabledLanguages[language]);
+  if (enabledFallback) return enabledFallback;
+
+  return availableLanguages.find((language) => String(verse[language] || '').trim()) || availableLanguages[0] || 'english';
 }
 
 export default function BibleChapterDocument() {
@@ -70,7 +126,7 @@ export default function BibleChapterDocument() {
     psalmNumbering?: PsalmNumbering;
   }>();
   const psalmNumbering: PsalmNumbering = psalmNumberingParam === 'masoretic' ? 'masoretic' : 'septuagint';
-  const { preferences, isBookmarked, toggleBookmark } = useReadingPreferences();
+  const { preferences, isBookmarked, toggleBookmark, setBibleVisibleLanguages } = useReadingPreferences();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const copticFontDataUri = useCopticFontDataUri();
   const bibleWebViewRef = useRef<BibleWebViewHandle>(null);
@@ -81,11 +137,7 @@ export default function BibleChapterDocument() {
   const [error, setError] = useState<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [selectorSlide] = useState(() => new Animated.Value(1));
-  const [enabledLanguages, setEnabledLanguages] = useState(() => normalizeInitialLanguages(preferences.visibleLanguages));
-
-  useEffect(() => {
-    setEnabledLanguages(normalizeInitialLanguages(preferences.visibleLanguages));
-  }, [preferences.visibleLanguages]);
+  const enabledLanguages = preferences.bibleVisibleLanguages;
 
   useEffect(() => {
     Animated.timing(selectorSlide, {
@@ -115,11 +167,10 @@ export default function BibleChapterDocument() {
   const effectiveLanguageKeys = visibleLanguageKeys.length ? visibleLanguageKeys : [availableLanguages[0] || 'english'];
   const fontSize = fontScaleToPx(preferences.fontScale);
   const currentChapterNumber = Number(chapter);
-  const chapterTitleEnglish = getBibleChapterDisplayLabel(bookKey, currentChapterNumber, 'en');
-  const bookTitleEnglish = book?.titleEnglish || title || bookKey || '';
   const headerTitleEnglish = getBibleChapterHeaderTitle(book, title, arabic, bookKey, currentChapterNumber, 'en');
   const headerTitleArabic = getBibleChapterHeaderTitle(book, title, arabic, bookKey, currentChapterNumber, 'ar');
   const preface = book?.bookKey === 'psalms' ? getDisplayedPsalmPreface() : null;
+  const selectorText = SELECTOR_TEXT[preferences.appLanguage];
 
   const chapterIndex = chapterKeys ? chapterKeys.indexOf(currentChapterNumber) : -1;
   const previousChapter = chapterIndex > 0 ? chapterKeys![chapterIndex - 1] : null;
@@ -157,11 +208,9 @@ export default function BibleChapterDocument() {
   }
 
   function toggleLanguage(language: BibleLanguageKey) {
-    setEnabledLanguages((current) => {
-      const next = { ...current, [language]: !current[language] };
-      const activeCount = availableLanguages.filter((item) => next[item]).length;
-      return activeCount ? next : current;
-    });
+    const next = { ...enabledLanguages, [language]: !enabledLanguages[language] };
+    const activeCount = availableLanguages.filter((item) => next[item]).length;
+    if (activeCount) setBibleVisibleLanguages(next);
   }
 
   const goBackALevel = useCallback(() => {
@@ -192,7 +241,7 @@ export default function BibleChapterDocument() {
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}>
       <Head>
-        <title>{`CHC ${bookTitleEnglish || 'Bible'} ${chapterTitleEnglish}`}</title>
+        <title>{`CHC ${headerTitleEnglish || 'Bible'}`}</title>
       </Head>
       {/* Unlike every other document screen, the Bible reader's header is
           NEVER hidden -- not even natively -- because it's the only place
@@ -202,7 +251,7 @@ export default function BibleChapterDocument() {
         canGoBack
         onBack={goBackALevel}
         rightIcon="list-outline"
-        rightAccessibilityLabel="Open verse selector"
+        rightAccessibilityLabel={selectorText.openSelector}
         onRightPress={() => setIsSelectorOpen(true)}
         rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
         onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
@@ -233,55 +282,85 @@ export default function BibleChapterDocument() {
             supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
           >
             <View style={styles.selectorOverlay}>
-              <Pressable accessibilityLabel="Close verse selector" style={styles.selectorBackdrop} onPress={() => setIsSelectorOpen(false)} />
+              <Pressable accessibilityLabel={selectorText.closeSelector} style={styles.selectorBackdrop} onPress={() => setIsSelectorOpen(false)} />
               <Animated.View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top, transform: [{ translateX: selectorSlide.interpolate({ inputRange: [0, 1], outputRange: [0, selectorPanelWidth] }) }] }]}>
                 <View style={styles.selectorHeader}>
                   {preferences.appLanguage === 'ar' ? (
-                    <Text style={[styles.selectorHeaderTitle, styles.selectorHeaderArabic]}>الآيات</Text>
+                    <Text style={[styles.selectorHeaderTitle, styles.selectorHeaderArabic]}>{selectorText.verses}</Text>
                   ) : (
-                    <Text style={styles.selectorHeaderTitle}>Verses</Text>
+                    <Text style={styles.selectorHeaderTitle}>{selectorText.verses}</Text>
                   )}
                 </View>
 
                 <View style={styles.chapterNavRow}>
-                  <ChapterNavButton disabled={previousChapter === null} icon="chevron-back" label="Previous" onPress={() => goToChapter(previousChapter)} />
-                  <ChapterNavButton disabled={nextChapter === null} icon="chevron-forward" label="Next" onPress={() => goToChapter(nextChapter)} />
+                  <ChapterNavButton
+                    accessibilityLabel={selectorText.previousChapter}
+                    appLanguage={preferences.appLanguage}
+                    disabled={previousChapter === null}
+                    icon="chevron-back"
+                    label={selectorText.previous}
+                    onPress={() => goToChapter(previousChapter)}
+                  />
+                  <ChapterNavButton
+                    accessibilityLabel={selectorText.nextChapter}
+                    appLanguage={preferences.appLanguage}
+                    disabled={nextChapter === null}
+                    icon="chevron-forward"
+                    label={selectorText.next}
+                    onPress={() => goToChapter(nextChapter)}
+                  />
                 </View>
 
                 <View style={styles.selectorLanguageBar}>
-                  {LANGUAGE_OPTIONS.filter((option) => availableLanguages.includes(option.key)).map((option) => (
-                    <Pressable
-                      key={option.key}
-                      style={[
-                        styles.languageButton,
-                        { backgroundColor: enabledLanguages[option.key] ? COLORS.gold : COLORS.surface, borderColor: enabledLanguages[option.key] ? COLORS.gold : COLORS.border },
-                      ]}
-                      onPress={() => toggleLanguage(option.key)}
-                    >
-                      <Text style={[styles.languageText, { color: enabledLanguages[option.key] ? COLORS.black : COLORS.white }]}>{option.label}</Text>
-                    </Pressable>
-                  ))}
+                  {LANGUAGE_OPTIONS.filter((option) => availableLanguages.includes(option.key)).map((option) => {
+                    const languageLabel = getBibleLanguageLabel(option.key, preferences.appLanguage);
+                    return (
+                      <Pressable
+                        accessibilityLabel={languageLabel}
+                        key={option.key}
+                        style={[
+                          styles.languageButton,
+                          { backgroundColor: enabledLanguages[option.key] ? COLORS.gold : COLORS.surface, borderColor: enabledLanguages[option.key] ? COLORS.gold : COLORS.border },
+                        ]}
+                        onPress={() => toggleLanguage(option.key)}
+                      >
+                        <Text style={[styles.languageText, preferences.appLanguage === 'ar' && styles.languageTextArabic, { color: enabledLanguages[option.key] ? COLORS.black : COLORS.white }]}>
+                          {languageLabel}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
 
                 <ScrollView style={styles.selectorList}>
-                  {(verses || []).map((verse) => (
-                    <Pressable key={`selector-${verse.verseNumber}`} style={styles.selectorItem} onPress={() => selectVerse(verse.verseNumber)}>
-                      <Text style={[styles.selectorVerseNumber, verse.isLxxAddition && styles.selectorVerseNumberLxx]}>
-                        {getBibleVerseDisplayLabel(verse.verseNumber, preferences.appLanguage)}
-                      </Text>
-                      <Text numberOfLines={1} style={styles.selectorVersePreview}>
-                        {verse[(['english', 'coptic', 'greek', 'arabic'] as BibleLanguageKey[]).find((l) => availableLanguages.includes(l) && enabledLanguages[l]) || availableLanguages[0]]}
-                      </Text>
-                    </Pressable>
-                  ))}
+                  {(verses || []).map((verse) => {
+                    const previewLanguage = getVersePreviewLanguage(verse, preferences.appLanguage, availableLanguages, enabledLanguages);
+                    return (
+                      <Pressable key={`selector-${verse.verseNumber}`} style={styles.selectorItem} onPress={() => selectVerse(verse.verseNumber)}>
+                        <Text style={[styles.selectorVerseNumber, verse.isLxxAddition && styles.selectorVerseNumberLxx]}>
+                          {getBibleVerseDisplayLabel(verse.verseNumber, preferences.appLanguage)}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.selectorVersePreview,
+                            previewLanguage === 'arabic' && styles.selectorVersePreviewArabic,
+                            previewLanguage === 'coptic' && styles.selectorVersePreviewCoptic,
+                          ]}
+                        >
+                          {verse[previewLanguage]}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </ScrollView>
 
                 <View style={styles.selectorActionRow}>
-                  <Pressable accessibilityLabel="Bookmark chapter" style={styles.selectorIconButton} onPress={() => toggleBookmark(bookmarkId)}>
+                  <Pressable accessibilityLabel={selectorText.bookmarkChapter} style={styles.selectorIconButton} onPress={() => toggleBookmark(bookmarkId)}>
                     <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={COLORS.gold} />
                   </Pressable>
                   <Pressable
-                    accessibilityLabel="Open Bible settings"
+                    accessibilityLabel={selectorText.openBibleSettings}
                     style={styles.selectorIconButton}
                     onPress={() => {
                       setIsSelectorOpen(false);
@@ -300,16 +379,30 @@ export default function BibleChapterDocument() {
   );
 }
 
-function ChapterNavButton({ disabled, icon, label, onPress }: { disabled: boolean; icon: 'chevron-back' | 'chevron-forward'; label: string; onPress: () => void }) {
+function ChapterNavButton({
+  accessibilityLabel,
+  appLanguage,
+  disabled,
+  icon,
+  label,
+  onPress,
+}: {
+  accessibilityLabel: string;
+  appLanguage: AppLanguage;
+  disabled: boolean;
+  icon: 'chevron-back' | 'chevron-forward';
+  label: string;
+  onPress: () => void;
+}) {
   return (
     <Pressable
-      accessibilityLabel={`${label} chapter`}
+      accessibilityLabel={accessibilityLabel}
       disabled={disabled}
       style={[styles.chapterNavButton, disabled && styles.chapterNavButtonDisabled]}
       onPress={onPress}
     >
       <Icon name={icon} size={20} color={disabled ? '#6E6E6E' : COLORS.gold} />
-      <Text style={[styles.chapterNavText, { color: disabled ? '#6E6E6E' : COLORS.white }]}>{label}</Text>
+      <Text style={[styles.chapterNavText, appLanguage === 'ar' && styles.chapterNavTextArabic, { color: disabled ? '#6E6E6E' : COLORS.white }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -360,9 +453,11 @@ const styles = StyleSheet.create({
   },
   chapterNavButtonDisabled: { borderColor: 'rgba(110, 110, 110, 0.4)', opacity: 0.72 },
   chapterNavText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '800' },
+  chapterNavTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   selectorLanguageBar: { borderBottomColor: 'rgba(201, 162, 39, 0.18)', borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingVertical: SPACING.sm },
   languageButton: { borderRadius: 8, borderWidth: 1, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
   languageText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
+  languageTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   selectorList: { flex: 1, paddingTop: SPACING.md },
   selectorItem: {
     alignItems: 'center',
@@ -379,6 +474,8 @@ const styles = StyleSheet.create({
   selectorVerseNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', minWidth: 28 },
   selectorVerseNumberLxx: { color: COLORS.priest },
   selectorVersePreview: { flex: 1, fontFamily: 'Georgia', fontSize: 13, lineHeight: 18, color: COLORS.white },
+  selectorVersePreviewArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  selectorVersePreviewCoptic: { fontFamily: TYPOGRAPHY.coptic },
   selectorActionRow: {
     alignItems: 'center',
     backgroundColor: '#101010',
