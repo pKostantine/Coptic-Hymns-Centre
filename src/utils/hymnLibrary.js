@@ -1,6 +1,7 @@
 import { evaluateCondition, getContextFlags } from "./conditionEngine";
 import { toIsoDate as toIsoDateString } from "./dateUtils";
 import { formatVerses } from "./verseFormatting";
+import { resolveBibleReadingReference } from "./readingReferenceResolver";
 import { supabase } from "./supabase";
 
 // ─── Subdocument sentinel → schema.table registry ────────────────────────────
@@ -189,9 +190,15 @@ function getReadingsForDate(isoDate) {
   if (readingsForDateCache?.isoDate === isoDate) return readingsForDateCache.promise;
   const promise = supabase
     .rpc("get_readings_for_date", { p_date: isoDate })
-    .then(({ data, error }) => {
+    .then(async ({ data, error }) => {
       if (error) throw new Error(`Unable to load readings for ${isoDate}: ${error.message}`);
-      return data || [];
+      return Promise.all(
+        (data || []).map(async (row) => {
+          if (!row.reading_reference) return row;
+          const { resolvedSegments } = await resolveBibleReadingReference(row.reading_reference);
+          return { ...row, resolved_verses: resolvedSegments };
+        }),
+      );
     });
   readingsForDateCache = { isoDate, promise };
   return promise;

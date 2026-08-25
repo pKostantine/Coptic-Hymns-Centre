@@ -48,19 +48,21 @@ export default function EdgeSwipeOverlay({
 }: EdgeSwipeOverlayProps) {
   const leftResponder = useEdgeResponder('left', onSwipeFromLeft);
   const rightResponder = useEdgeResponder('right', onSwipeFromRight);
+  const showLeftEdge = Boolean(onSwipeFromLeft) && leftEdgeWidth > 0;
+  const showRightEdge = Boolean(onSwipeFromRight) && rightEdgeWidth > 0;
 
   if (!enabled) return null;
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {onSwipeFromLeft ? (
+      {showLeftEdge ? (
         <View
           pointerEvents="box-only"
           style={[styles.edge, styles.leftEdge, { width: leftEdgeWidth }]}
           {...leftResponder.panHandlers}
         />
       ) : null}
-      {onSwipeFromRight ? (
+      {showRightEdge ? (
         <View
           pointerEvents="box-only"
           style={[styles.edge, styles.rightEdge, { width: rightEdgeWidth }]}

@@ -293,6 +293,11 @@ function parseVerseToken(token: string): VerseToken {
   return { verseNum: Number(match[1]), partLabel: match[2] ?? null };
 }
 
+function parseNumericVerseNumber(value: unknown): number | null {
+  const match = String(value ?? '').trim().match(/^\d+$/);
+  return match ? Number(match[0]) : null;
+}
+
 interface ReadingSegmentVerses {
   kind: 'verses';
   bookNum: number;
@@ -374,40 +379,55 @@ function getBookKeyByCalendarNumber(bookNum: number): Promise<string | null> {
 
 async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse[]> {
   if (segment.kind === 'range') {
-    const { data, error } = await supabase.schema('bible').rpc('get_verses_by_calendar_range', {
-      p_calendar_book_number: segment.bookNum,
-      p_start_chapter: segment.startChapter,
-      p_start_verse: segment.startVerse,
-      p_end_chapter: segment.endChapter,
-      p_end_verse: segment.endVerse,
-    });
+    const bookKey = await getBookKeyByCalendarNumber(segment.bookNum);
+    if (!bookKey) return [];
+
+    const { data, error } = await supabase
+      .schema('bible')
+      .from('verses')
+      .select('chapter_number, verse_number, english, coptic, arabic')
+      .eq('book_key', bookKey)
+      .gte('chapter_number', segment.startChapter)
+      .lte('chapter_number', segment.endChapter);
     if (error) throw new Error(`Unable to load reading verses: ${error.message}`);
-    return ((data || []) as { chapter_number: number; verse_number: number; english: string; coptic: string | null; arabic: string }[])
-      .map((row): ReadingVerse => ({
-        displayChapter: row.chapter_number,
-        displayVerse: row.verse_number,
-        partLabel: null,
-        english: row.english || '',
-        coptic: row.coptic,
-        arabic: row.arabic || '',
-      }));
+    return ((data || []) as { chapter_number: number; verse_number: number | string; english: string; coptic: string | null; arabic: string }[])
+      .map((row): ReadingVerse | null => {
+        const verseNumber = parseNumericVerseNumber(row.verse_number);
+        if (verseNumber === null) return null;
+        return {
+          displayChapter: row.chapter_number,
+          displayVerse: verseNumber,
+          partLabel: null,
+          english: row.english || '',
+          coptic: row.coptic,
+          arabic: row.arabic || '',
+        };
+      })
+      .filter((verse): verse is ReadingVerse => {
+        if (!verse) return false;
+        if (verse.displayChapter < segment.startChapter || verse.displayChapter > segment.endChapter) return false;
+        if (verse.displayChapter === segment.startChapter && verse.displayVerse < segment.startVerse) return false;
+        if (verse.displayChapter === segment.endChapter && verse.displayVerse > segment.endVerse) return false;
+        return true;
+      })
+      .sort((a, b) => a.displayChapter - b.displayChapter || a.displayVerse - b.displayVerse);
   }
 
   const bookKey = await getBookKeyByCalendarNumber(segment.bookNum);
   if (!bookKey) return [];
 
   // A part-labeled token ("11a") names one editorial excerpt of a verse
-  // (bible.verse_parts), not the whole verse — resolved individually via
+  // (bible.verse_parts), not the whole verse â€” resolved individually via
   // get_verse_part_by_calendar, which queries bible.verse_parts directly using
   // the Septuagint chapter/verse from reading_reference (no conversion needed).
   const plainTokens = segment.verses.filter((v) => !v.partLabel);
   const partTokens = segment.verses.filter((v) => v.partLabel);
 
   const targets = plainTokens.map((v) => ({ chapter: segment.chapter, verse: v.verseNum }));
-  const verseNumbersByChapter = new Map<number, number[]>();
+  const verseNumbersByChapter = new Map<number, string[]>();
   for (const t of targets) {
     const list = verseNumbersByChapter.get(t.chapter) || [];
-    list.push(t.verse);
+    list.push(String(t.verse));
     verseNumbersByChapter.set(t.chapter, list);
   }
 
@@ -420,18 +440,22 @@ async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse
           .select('chapter_number, verse_number, english, coptic, arabic')
           .eq('book_key', bookKey)
           .eq('chapter_number', chapter)
-          .in('verse_number', verseNumbers)
-          .order('verse_number');
+          .in('verse_number', verseNumbers);
         if (error) throw new Error(`Unable to load reading verses: ${error.message}`);
         return (data || [])
-          .map((row): ReadingVerse => ({
-            displayChapter: row.chapter_number,
-            displayVerse: row.verse_number,
-            partLabel: null,
-            english: row.english || '',
-            coptic: row.coptic,
-            arabic: row.arabic || '',
-          }));
+          .map((row): ReadingVerse | null => {
+            const verseNumber = parseNumericVerseNumber(row.verse_number);
+            if (verseNumber === null) return null;
+            return {
+              displayChapter: row.chapter_number,
+              displayVerse: verseNumber,
+              partLabel: null,
+              english: row.english || '',
+              coptic: row.coptic,
+              arabic: row.arabic || '',
+            };
+          })
+          .filter((verse): verse is ReadingVerse => Boolean(verse));
       }),
     ),
     Promise.all(
@@ -457,7 +481,7 @@ async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse
     ),
   ]);
   // Re-sort by the reference's own order (plainTokens index), not by verse
-  // number — references like "Psalm 47:6,1" must display 6 before 1.
+  // number â€” references like "Psalm 47:6,1" must display 6 before 1.
   const verseOrder = new Map<number, number>(plainTokens.map((v, i) => [v.verseNum, i]));
   return [...plainResults.flat(), ...partResults.filter((v): v is ReadingVerse => v !== null)].sort((a, b) => {
     const aOrd = verseOrder.get(a.displayVerse) ?? plainTokens.length;

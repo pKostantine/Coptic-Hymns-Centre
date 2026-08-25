@@ -369,6 +369,11 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       return;
     }
 
+    if (action.type === 'swipeBack') {
+      if (!isCoveredByModal) goBack(router, backHref);
+      return;
+    }
+
     const triggerSection = sections.find((s) => s.id === action.sectionId);
     if (!triggerSection?.subdocumentSections) return;
 
@@ -489,6 +494,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             enabled={isMobileDocument && !isCoveredByModal}
             onSwipeFromLeft={() => goBack(router, backHref)}
             onSwipeFromRight={() => setSelectorOpen(true)}
+            rightEdgeWidth={0}
           />
           </View>
           <ContentSelectorDrawer

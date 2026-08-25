@@ -304,6 +304,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 enabled={isMobileDocument && !nestedModal && !selectorOpen}
                 onSwipeFromLeft={onClose}
                 onSwipeFromRight={() => setSelectorOpen(true)}
+                rightEdgeWidth={0}
               />
             </View>
             <ContentSelectorDrawer
