@@ -309,6 +309,10 @@ export function buildDocumentHtml(
       .speaker-label.deacon, .speaker-label.reader { color: ${COLORS.deacon}; }
       .speaker-label.refrain { color: ${COLORS.refrain}; font-style: italic;}
       .bible-verse-number { color: ${COLORS.gold}; font-weight: 700; }
+      .bible-verse-number-gap {
+        display: inline-block;
+        width: 0.25em;
+      }
       .metropolitan { color: ${COLORS.metropolitanBrackets}; }
       .section-title {
         color: ${COLORS.gold};
@@ -915,7 +919,7 @@ function renderVerse(
         <div class="cell" data-language="${escapeAttribute(language.key)}">
           <p class="verse-text ${language.className} ${centered ? 'centered' : ''}" style="${textStyle}">${
             language.speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(language.speakerLabel)}</span><br/>` : ''
-          }${verseNumberText ? `<span class="bible-verse-number" data-copy-text="${escapeAttribute(verseNumberText)}">${escapeHtml(verseNumberText)}</span> ` : ''}${highlightMetropolitanBrackets(language.text)}</p>
+          }${verseNumberText ? `<span class="bible-verse-number" data-copy-text="${escapeAttribute(verseNumberText)}">${escapeHtml(verseNumberText)}</span><span class="bible-verse-number-gap"></span>` : ''}${highlightMetropolitanBrackets(language.text)}</p>
         </div>
       `;
     })

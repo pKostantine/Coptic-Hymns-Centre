@@ -50,6 +50,7 @@ export function buildBibleChapterHtml({
   const effectiveLanguages: BibleLanguageKey[] = languageKeys.length ? languageKeys : ['english'];
   const columnTemplate = `repeat(${Math.max(effectiveLanguages.length, 1)}, minmax(0, 1fr))`;
   const firstCopticVerse = verses.find((verse) => String(verse.coptic || '').trim());
+  const arabicVerseLineHeight = Math.round(fontSize * 1.6);
 
   const rowHtml = verses
     .map((verse) => {
@@ -62,7 +63,7 @@ export function buildBibleChapterHtml({
           }
           return [
             `<div class="cell ${language}" data-language="${language}" dir="${language === 'arabic' ? 'rtl' : 'ltr'}">`,
-            `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span> `,
+            `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span>`,
             `<span class="verse-text">${escapeHtml(formatVerseText(text, language, verse === firstCopticVerse))}</span>`,
             '</div>',
           ].join('');
@@ -184,7 +185,7 @@ export function buildBibleChapterHtml({
       .cell.arabic {
         font-family: Arial, sans-serif;
         font-size: ${getLanguageFontSize(safeFontSize, 'arabic')}px;
-        line-height: ${getLanguageLineHeight(safeFontSize, 'arabic')}px;
+        line-height: ${arabicVerseLineHeight}px;
         text-align: justify;
       }
       .cell.greek {
@@ -193,10 +194,16 @@ export function buildBibleChapterHtml({
         line-height: ${getLanguageLineHeight(safeFontSize, 'greek')}px;
       }
       .verse-number {
+        display: inline-block;
         color: var(--gold);
         font-weight: 700;
         padding-inline-end: 0;
         white-space: nowrap;
+      }
+      .verse-number::after {
+        content: '';
+        display: inline-block;
+        width: 0.5em;
       }
       .verse-number.lxx-addition {
         color: var(--lxx-addition);
