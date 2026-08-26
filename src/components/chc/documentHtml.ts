@@ -223,12 +223,14 @@ export function buildDocumentHtml(
       .title-row {
         align-items: center;
         grid-template-columns: 1fr;
+        position: relative;
       }
       .title-row.has-collapse-button {
-        grid-template-columns: 1fr auto;
+        grid-template-columns: 1fr;
       }
       .title-text-group {
         display: grid;
+        width: 100%;
       }
       .collapse-button {
         align-items: center;
@@ -238,7 +240,11 @@ export function buildDocumentHtml(
         display: flex;
         height: 40px;
         justify-content: center;
+        left: 0;
         padding: 0;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
         width: 40px;
       }
       .collapse-button svg {

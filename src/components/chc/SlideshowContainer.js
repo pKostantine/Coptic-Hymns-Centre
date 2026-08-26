@@ -788,7 +788,7 @@ const SlideItem = memo(function SlideItem({
 
   if (item.type === "title") {
     const hasButton = Boolean(item.collapsible && onToggleCollapse);
-    const titleTableWidth = hasButton ? Math.max(tableWidth - COLLAPSE_BUTTON_SIZE, 1) : tableWidth;
+    const titleTableWidth = tableWidth;
     const titleLanguages = buildTitleLanguages(
       item.title,
       visibleLanguages,
@@ -1081,7 +1081,7 @@ function buildTitleLanguages(title, visibleLanguages, titleHelpers) {
 
   if (showEnglish) {
     languages.push({
-      align: showArabic ? "left" : "center",
+      align: "center",
       key: "english",
       text: formatEnglishDisplayText(titleHelpers.getTitleText(title)),
     });
@@ -1089,7 +1089,7 @@ function buildTitleLanguages(title, visibleLanguages, titleHelpers) {
 
   if (showArabic) {
     languages.push({
-      align: showEnglish ? "right" : "center",
+      align: "center",
       key: "arabic",
       text: formatArabicNumbers(titleParts.arabic || ""),
     });
@@ -1959,22 +1959,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     flexShrink: 0,
+    position: "relative",
   },
   collapseButton: {
     alignItems: "center",
     height: COLLAPSE_BUTTON_SIZE,
     justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    top: "50%",
+    transform: [{ translateY: -COLLAPSE_BUTTON_SIZE / 2 }],
     width: COLLAPSE_BUTTON_SIZE,
     zIndex: 20,
   },
   // Rendered as a sibling AFTER NavigationOverlay (higher in the stack), at
-  // the exact y/height the title row reported via onTitleLayout, right-
-  // aligned to match where the (otherwise untappable) inline button sits.
+  // the exact y/height the title row reported via onTitleLayout, left-aligned
+  // to match where the (otherwise untappable) inline button sits.
   collapseButtonOverlay: {
-    position: "absolute",
-    right: 0,
     alignItems: "center",
     justifyContent: "center",
+    left: 0,
+    position: "absolute",
     width: COLLAPSE_BUTTON_SIZE,
     zIndex: 30,
     elevation: 20,
