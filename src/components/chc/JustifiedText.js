@@ -2,6 +2,13 @@ import { useMemo, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
 
 const IS_WEB = Platform.OS === "web";
+const DISABLED_SELECTION_STYLE = IS_WEB
+  ? {
+      WebkitTouchCallout: "none",
+      WebkitUserSelect: "none",
+      userSelect: "none",
+    }
+  : null;
 
 // The shared verse textStyle carries width:"100%"/flexShrink:1 (meant for
 // the full paragraph block) -- applied to a single word in a justified row,
@@ -253,7 +260,20 @@ function useNativeLines(text, style, fontSize, fontFamily, width) {
  * measured from what actually renders. See SlideshowContainer.js's
  * appendTallVerseSegments.
  */
-export default function JustifiedText({ text, style, fontSize, fontFamily, width, rtl = false, firstWordStyle, onLayout, onLines, forceLines }) {
+export default function JustifiedText({
+  text,
+  style,
+  fontSize,
+  fontFamily,
+  width,
+  rtl = false,
+  firstWordStyle,
+  onLayout,
+  onLines,
+  forceLines,
+  minWordsToJustify = 5,
+  selectable = false,
+}) {
   const words = useMemo(() => splitWords(text), [text]);
   const fallbackAlign = rtl ? "right" : "left";
   const reportedLinesForRef = useRef(null);
@@ -274,8 +294,9 @@ export default function JustifiedText({ text, style, fontSize, fontFamily, width
   );
   const lines = forcedLines ?? (IS_WEB ? webLines : native.lines);
 
-  if (lines && onLines && !forceLines && reportedLinesForRef.current !== text) {
-    reportedLinesForRef.current = text;
+  const reportKey = `${fontFamily}|${fontSize}|${width}|${text}`;
+  if (lines && onLines && !forceLines && reportedLinesForRef.current !== reportKey) {
+    reportedLinesForRef.current = reportKey;
     onLines(lines.map((lineWords) => ({ text: lineWords.join(" ") })));
   }
 
@@ -300,21 +321,23 @@ export default function JustifiedText({ text, style, fontSize, fontFamily, width
   }
 
   const lastIndex = lines.length - 1;
+  const selectionStyle = selectable ? null : DISABLED_SELECTION_STYLE;
 
   return (
-    <View style={{ width }} onLayout={onLayout}>
+    <View style={[{ width }, selectionStyle]} onLayout={onLayout}>
       {lines.map((lineWords, index) => {
         const isFirstLine = index === 0;
         const isLastLine = index === lastIndex;
 
-        if (isLastLine || lineWords.length <= 1) {
+        if (isLastLine || lineWords.length < minWordsToJustify) {
           return (
-            <Text key={index} style={[style, { textAlign: fallbackAlign }]}>
-              {isFirstLine && firstWordStyle && lineWords.length === 1 ? (
-                <Text style={firstWordStyle}>{lineWords[0]}</Text>
-              ) : (
-                lineWords.join(" ")
-              )}
+            <Text key={index} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }]}>
+              {isFirstLine && firstWordStyle && lineWords.length ? (
+                <>
+                  <Text selectable={selectable} style={firstWordStyle}>{lineWords[0]}</Text>
+                  {lineWords.length > 1 ? ` ${lineWords.slice(1).join(" ")}` : ""}
+                </>
+              ) : lineWords.join(" ")}
             </Text>
           );
         }
@@ -331,10 +354,11 @@ export default function JustifiedText({ text, style, fontSize, fontFamily, width
             {lineWords.map((word, wordIndex) => (
               <Text
                 key={wordIndex}
+                selectable={selectable}
                 style={
                   isFirstLine && wordIndex === 0 && firstWordStyle
-                    ? [style, WORD_INTRINSIC_STYLE, firstWordStyle]
-                    : [style, WORD_INTRINSIC_STYLE]
+                    ? [style, WORD_INTRINSIC_STYLE, selectionStyle, firstWordStyle]
+                    : [style, WORD_INTRINSIC_STYLE, selectionStyle]
                 }
               >
                 {word}

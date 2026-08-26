@@ -15,11 +15,12 @@ export interface BibleWebViewAction {
 interface BibleWebViewProps {
   html: string;
   scrollEnabled?: boolean;
+  selectText?: boolean;
   onAction?: (action: BibleWebViewAction) => void;
 }
 
 /** Native (iOS/Android) Bible chapter renderer — see bibleDocumentHtml.ts for the shared HTML builder. BibleWebView.web.tsx is the web counterpart (plain iframe). */
-const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, scrollEnabled = true, onAction }, ref) => {
+const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, scrollEnabled = true, selectText = false, onAction }, ref) => {
   const webviewRef = useRef<WebView>(null);
 
   useImperativeHandle(ref, () => ({
@@ -47,6 +48,7 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
       showsHorizontalScrollIndicator={false}
       showsVerticalScrollIndicator={scrollEnabled}
       javaScriptEnabled
+      textInteractionEnabled={selectText}
       onMessage={handleMessage}
     />
   );

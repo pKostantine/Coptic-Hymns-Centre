@@ -46,6 +46,7 @@ export function buildBibleChapterHtml({
   preface?: BiblePreface | null;
 }) {
   const safeFontSize = Math.max(12, Number(fontSize) || 18);
+  const effectiveSelectText = Boolean(selectText) && !isSlideshow;
   const effectiveLanguages: BibleLanguageKey[] = languageKeys.length ? languageKeys : ['english'];
   const columnTemplate = `repeat(${Math.max(effectiveLanguages.length, 1)}, minmax(0, 1fr))`;
   const firstCopticVerse = verses.find((verse) => String(verse.coptic || '').trim());
@@ -124,7 +125,17 @@ export function buildBibleChapterHtml({
         color: var(--text-color);
         font-family: Georgia, 'Times New Roman', serif;
         -webkit-text-size-adjust: 100%;
-        ${selectText ? '' : '-webkit-user-select: none; user-select: none;'}
+        -webkit-user-select: ${effectiveSelectText ? 'text' : 'none'};
+        user-select: ${effectiveSelectText ? 'text' : 'none'};
+      }
+      ${
+        effectiveSelectText
+          ? ''
+          : `body, body * {
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+      }`
       }
       body {
         overflow-x: hidden;
@@ -264,6 +275,7 @@ export function buildBibleChapterHtml({
         var pageCount = 1;
         var pageWidth = 1;
         var isSlideshow = ${JSON.stringify(Boolean(isSlideshow))};
+        var selectTextEnabled = ${JSON.stringify(effectiveSelectText)};
         var selectableLanguages = ${JSON.stringify(effectiveLanguages)};
         var selectingLanguage = null;
         var startX = 0;
@@ -297,6 +309,23 @@ export function buildBibleChapterHtml({
         function onSelectionStart(event) {
           setSelectingLanguage(inferLanguage(event.target));
         }
+
+        if (!selectTextEnabled) {
+          var clearDisabledSelection = function () {
+            var selection = window.getSelection && window.getSelection();
+            if (selection && selection.rangeCount) selection.removeAllRanges();
+          };
+          document.addEventListener('selectstart', function (event) {
+            event.preventDefault();
+            clearDisabledSelection();
+          }, true);
+          document.addEventListener('selectionchange', clearDisabledSelection, true);
+          document.addEventListener('copy', function (event) {
+            event.preventDefault();
+            if (event.clipboardData) event.clipboardData.setData('text/plain', '');
+            clearDisabledSelection();
+          }, true);
+        } else {
 
         function normalizeSelectionText(text) {
           return String(text || '')
@@ -372,6 +401,7 @@ export function buildBibleChapterHtml({
           event.clipboardData.setData('text/plain', text);
           event.preventDefault();
         });
+        }
 
         function stripIds(node) {
           if (!node || node.nodeType !== 1) return;

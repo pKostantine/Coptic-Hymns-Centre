@@ -85,11 +85,18 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
   }, []);
 
   const toggleSelectText = useCallback(() => {
-    setPreferences((prev) => ({ ...prev, selectText: !prev.selectText }));
+    setPreferences((prev) => (prev.slideshowMode ? prev : { ...prev, selectText: !prev.selectText }));
   }, []);
 
   const toggleSlideshowMode = useCallback(() => {
-    setPreferences((prev) => ({ ...prev, slideshowMode: !prev.slideshowMode }));
+    setPreferences((prev) => {
+      const slideshowMode = !prev.slideshowMode;
+      return {
+        ...prev,
+        slideshowMode,
+        selectText: slideshowMode ? false : prev.selectText,
+      };
+    });
   }, []);
 
   const toggleDisplayComments = useCallback(() => {

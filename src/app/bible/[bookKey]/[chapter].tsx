@@ -171,6 +171,7 @@ export default function BibleChapterDocument() {
   const headerTitleArabic = getBibleChapterHeaderTitle(book, title, arabic, bookKey, currentChapterNumber, 'ar');
   const preface = book?.bookKey === 'psalms' ? getDisplayedPsalmPreface() : null;
   const selectorText = SELECTOR_TEXT[preferences.appLanguage];
+  const effectiveSelectText = preferences.selectText && !preferences.slideshowMode;
 
   const chapterIndex = chapterKeys ? chapterKeys.indexOf(currentChapterNumber) : -1;
   const previousChapter = chapterIndex > 0 ? chapterKeys![chapterIndex - 1] : null;
@@ -183,12 +184,12 @@ export default function BibleChapterDocument() {
       languageKeys: effectiveLanguageKeys,
       fontSize,
       copticFontDataUri,
-      selectText: preferences.selectText,
+      selectText: effectiveSelectText,
       isSlideshow: preferences.slideshowMode,
       preface,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [verses, effectiveLanguageKeys.join(','), fontSize, copticFontDataUri, preferences.selectText, preferences.slideshowMode]);
+  }, [verses, effectiveLanguageKeys.join(','), fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -268,6 +269,7 @@ export default function BibleChapterDocument() {
             ref={bibleWebViewRef}
             html={chapterHtml}
             scrollEnabled={!preferences.slideshowMode}
+            selectText={effectiveSelectText}
             onAction={(action) => {
               if (action.type === 'openSelector') setIsSelectorOpen(true);
               else if (action.type === 'previousLevel') goBackALevel();

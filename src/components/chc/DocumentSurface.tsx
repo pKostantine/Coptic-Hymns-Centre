@@ -117,6 +117,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
   ) => {
     const { width: screenWidth } = useWindowDimensions();
     const fontSize = Math.round(fontScaleToPx(preferences.fontScale) * fontScaleMultiplier);
+    const effectiveSelectText = preferences.selectText && !preferences.slideshowMode;
     // Keyed by section.id, same model as the old app's collapsedContentIds: a
     // missing entry falls back to the section's own defaultCollapsed, an
     // explicit entry (set by tapping the slideshow's collapse button) wins.
@@ -195,7 +196,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           arabic: preferences.visibleLanguages.arabic,
         }}
         appLanguage={preferences.appLanguage}
-        selectText={preferences.selectText}
+        selectText={effectiveSelectText}
         displayComments={preferences.displayComments}
         displaySilentPrayers={preferences.displaySilentPrayers}
         bishopPresent={preferences.bishopPresent}

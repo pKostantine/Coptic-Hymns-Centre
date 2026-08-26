@@ -134,6 +134,7 @@ export function buildDocumentHtml(
   const arabicFontSize = Math.round(fontSize * 1.15);
   const verseLineHeight = Math.round(fontSize * 1.3);
   const arabicVerseLineHeight = Math.round(fontSize * 1.6);
+  const effectiveSelectText = Boolean(selectText);
 
   const visibleSections = sections.filter((section) => {
     if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;
@@ -192,8 +193,17 @@ export function buildDocumentHtml(
         overscroll-behavior-x: none;
         overflow-x: hidden;
         touch-action: pan-y;
-        -webkit-user-select: ${selectText ? 'text' : 'none'};
-        user-select: ${selectText ? 'text' : 'none'};
+        -webkit-user-select: ${effectiveSelectText ? 'text' : 'none'};
+        user-select: ${effectiveSelectText ? 'text' : 'none'};
+      }
+      ${
+        effectiveSelectText
+          ? ''
+          : `body, body * {
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+      }`
       }
       .document {
         box-sizing: border-box;
@@ -414,6 +424,24 @@ export function buildDocumentHtml(
       (function () {
         var languages = ['english', 'coptic', 'arabic'];
         var selectingLanguage = null;
+        var selectTextEnabled = ${JSON.stringify(effectiveSelectText)};
+        if (!selectTextEnabled) {
+          var clearDisabledSelection = function () {
+            var selection = window.getSelection && window.getSelection();
+            if (selection && selection.rangeCount) selection.removeAllRanges();
+          };
+          document.addEventListener('selectstart', function (event) {
+            event.preventDefault();
+            clearDisabledSelection();
+          }, true);
+          document.addEventListener('selectionchange', clearDisabledSelection, true);
+          document.addEventListener('copy', function (event) {
+            event.preventDefault();
+            if (event.clipboardData) event.clipboardData.setData('text/plain', '');
+            clearDisabledSelection();
+          }, true);
+          return;
+        }
         function closestLanguageCell(node) {
           var element = node && node.nodeType === 1 ? node : node && node.parentElement;
           return element && element.closest ? element.closest('.cell[data-language], .title-cell[data-language]') : null;

@@ -161,6 +161,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         scrollEnabled
         showsVerticalScrollIndicator={false}
         javaScriptEnabled
+        textInteractionEnabled={selectText}
         onMessage={handleMessage}
         onLoadEnd={handleLoadEnd}
       />

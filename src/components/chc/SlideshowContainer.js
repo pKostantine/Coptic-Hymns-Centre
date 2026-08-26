@@ -449,14 +449,14 @@ export default function SlideshowContainer({
 
   return (
     <View
-      style={styles.container}
+      style={[styles.container, DISABLED_SELECTION_STYLE]}
       onLayout={(event) => {
         setViewportHeight(event.nativeEvent.layout.height);
         setViewportWidth(event.nativeEvent.layout.width);
       }}
     >
       {!isMeasurementComplete ? (
-        <View pointerEvents="none" style={styles.measurementLayer}>
+        <View pointerEvents="none" style={[styles.measurementLayer, DISABLED_SELECTION_STYLE]}>
           {/* Only items missing a cached height actually need to mount and
               measure here -- most of the time (e.g. minimizing one hymn)
               that's a small handful of items, not the whole document; see
@@ -664,6 +664,15 @@ export function NavigationOverlay({
 
 const COLLAPSE_BUTTON_SIZE = 40;
 const COLLAPSE_BUTTON_CIRCLE = 22;
+const MIN_TALL_VERSE_START_LINES = 4;
+const MIN_SLIDESHOW_LANGUAGE_COLUMN_EMS = 12;
+const DISABLED_SELECTION_STYLE = Platform.OS === "web"
+  ? {
+      WebkitTouchCallout: "none",
+      WebkitUserSelect: "none",
+      userSelect: "none",
+    }
+  : null;
 
 /** Gold outlined circle with a minus bar always, plus a vertical bar (making a plus) only when collapsed — matches the old app's collapse-button-icon ::before/::after CSS bars. */
 function CollapseButton({ collapsed, onPress }) {
@@ -725,6 +734,7 @@ const SlideItem = memo(function SlideItem({
         >
           <View style={[styles.gospelRiteToggleDot, copticGospelRite && styles.gospelRiteToggleDotOn]} />
           <Text
+            selectable={false}
             style={[
               styles.gospelRiteToggleText,
               { fontSize: Math.round(fontSize * 0.65), color: copticGospelRite ? COLORS.black : theme.colors.text },
@@ -755,12 +765,13 @@ const SlideItem = memo(function SlideItem({
           onPress={() => onAction?.({ type: item.buttonAction, sectionId: item.sectionId })}
         >
           {label ? (
-            <Text style={[styles.openButtonText, { color: theme.colors.text, fontSize: Math.round(fontSize * 0.65) }]}>
+            <Text selectable={false} style={[styles.openButtonText, { color: theme.colors.text, fontSize: Math.round(fontSize * 0.65) }]}>
               {label}
             </Text>
           ) : null}
           {arabicLabel ? (
             <Text
+              selectable={false}
               style={[
                 styles.openButtonText,
                 styles.openButtonTextArabic,
@@ -813,6 +824,7 @@ const SlideItem = memo(function SlideItem({
               >
                 {language.text ? (
                   <Text
+                    selectable={false}
                     style={[
                       styles.sectionTitle,
                       language.key === "arabic" && styles.sectionTitleArabic,
@@ -861,6 +873,7 @@ const SlideItem = memo(function SlideItem({
         forceWhiteText={Boolean(item.forceWhiteVerses || item.verse?.forceWhiteText)}
         colorIndex={item.colorIndex}
         suppressSpeakerLabel={Boolean(item.suppressSpeakerLabel)}
+        selectableText={false}
         bishopPresent={item.bishopPresent}
         onLanguageLayout={(language, metric) =>
           onLanguageMeasured?.(language, metric, measurementSignature)
@@ -1227,6 +1240,15 @@ function paginateItems(
       return;
     }
 
+    if (
+      !startedFreshHere &&
+      currentSlide.length &&
+      verseHeight > availableHeight &&
+      shouldStartTallVerseOnFreshSlide(currentHeight, availableHeight, fontSize, verseItem)
+    ) {
+      flushSlide();
+    }
+
     const languageMetric = hasMeasuredVerseLines(languageHeights[verseItem.id])
       ? languageHeights[verseItem.id]
       : createEstimatedVerseMetric(verseItem, fontSize, visibleLanguages, tableWidth);
@@ -1245,6 +1267,7 @@ function paginateItems(
       currentHeight,
       availableHeight,
       fontSize,
+      tableWidth,
     });
     currentSlide = result.currentSlide;
     currentHeight = result.currentHeight;
@@ -1293,8 +1316,9 @@ function appendTallVerseSegments({
   currentHeight,
   availableHeight,
   fontSize,
+  tableWidth,
 }) {
-  const state = createVerseLineState(languageMetric, fontSize, item);
+  const state = createVerseLineState(languageMetric, fontSize, item, tableWidth);
   let segmentIndex = 0;
 
   while (hasRemainingVerseLines(state)) {
@@ -1342,17 +1366,21 @@ function hasMeasuredVerseLines(metric = {}) {
   );
 }
 
-function createVerseLineState(languageMetric = {}, fontSize, item = {}) {
+function createVerseLineState(languageMetric = {}, fontSize, item = {}, tableWidth = 0) {
   const languages = ["english", "coptic", "arabic"]
     .map((language) => ({
       language,
+      chromeHeight: getStackedLanguageChromeHeight(language, item, fontSize),
       lineHeight: getLanguageLineHeight(language, fontSize),
       lines: getMetricLinesForLanguage(languageMetric[language]?.lines || [], language, item),
       offset: 0,
     }))
     .filter((entry) => entry.lines.length);
 
-  return { languages };
+  return {
+    isStacked: shouldStackVerseLanguageColumns(languages.length, tableWidth, fontSize),
+    languages,
+  };
 }
 
 function hasRemainingVerseLines(state) {
@@ -1360,6 +1388,10 @@ function hasRemainingVerseLines(state) {
 }
 
 function getLineCapacitiesForHeight(state, height, fontSize, item) {
+  if (state.isStacked) {
+    return height > 0 ? getStackedLineCapacitiesForHeight(state, height, item) : {};
+  }
+
   const usableHeight = height - getVerseVerticalPadding(item);
 
   if (usableHeight <= 0) {
@@ -1397,11 +1429,59 @@ function getLineCapacitiesForHeight(state, height, fontSize, item) {
   return capacities;
 }
 
+function getStackedLineCapacitiesForHeight(state, usableHeight, item) {
+  const activeEntries = state.languages.filter((entry) => entry.offset < entry.lines.length);
+  const capacities = {};
+  let remainingHeight = usableHeight;
+  const languagePadding = getVerseVerticalPadding(item);
+
+  activeEntries.forEach((entry) => {
+    const remainingLines = entry.lines.length - entry.offset;
+    if (remainingLines <= 0) {
+      return;
+    }
+
+    if (remainingHeight >= entry.lineHeight + entry.chromeHeight + languagePadding) {
+      capacities[entry.language] = 1;
+      remainingHeight -= entry.lineHeight + entry.chromeHeight + languagePadding;
+    } else {
+      capacities[entry.language] = 0;
+    }
+  });
+
+  if (!hasPositiveLineCapacity(capacities)) {
+    return {};
+  }
+
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    activeEntries.forEach((entry) => {
+      const currentCapacity = capacities[entry.language] || 0;
+      const remainingLines = entry.lines.length - entry.offset;
+      if (currentCapacity >= remainingLines || remainingHeight < entry.lineHeight) {
+        return;
+      }
+
+      capacities[entry.language] = currentCapacity + 1;
+      remainingHeight -= entry.lineHeight;
+      progressed = true;
+    });
+  }
+
+  return capacities;
+}
+
 function hasPositiveLineCapacity(lineCapacities = {}) {
   return Object.values(lineCapacities).some((capacity) => capacity > 0);
 }
 
 function getMinimumLineCapacities(state) {
+  if (state.isStacked) {
+    const entry = state.languages.find((item) => item.offset < item.lines.length);
+    return entry ? { [entry.language]: 1 } : {};
+  }
+
   return state.languages
     .filter((entry) => entry.offset < entry.lines.length)
     .reduce((capacities, entry) => {
@@ -1412,13 +1492,13 @@ function getMinimumLineCapacities(state) {
 }
 
 function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
-  const languageKeys = state.languages.map((entry) => entry.language);
+  const originalLanguageKeys = state.languages.map((entry) => entry.language);
   const verse = {
     ...item.verse,
     arabic: "",
     coptic: "",
     english: "",
-    slideshowLanguageKeys: languageKeys,
+    slideshowStackedLanguages: Boolean(state.isStacked),
   };
   const lineCounts = {};
   // The exact pre-measured lines handed to each language's render, keyed the
@@ -1431,26 +1511,38 @@ function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
   // legitimately break at different word boundaries than the original did,
   // which is what produces visibly wrong splits.
   const forcedLines = {};
-  // A language that wraps to fewer total lines than its siblings (Coptic at
-  // a larger font routinely does, since its words/glyphs run wider) can
-  // finish displaying all of its content in an earlier segment while
-  // English/Arabic still have more to show in later ones. That column stays
-  // in the fixed-column layout anyway (rendered blank) for every later
-  // segment — every segment of a split verse must keep the exact same set of
-  // columns at the exact same widths, or the other languages visibly shift
-  // position between segments, which reads far worse than one column
-  // sitting blank for a segment or two.
+  const segmentEntries = [];
+  // A language can finish earlier than its siblings in a split verse. While
+  // the original language set remains, measured lines stay fixed so the
+  // split matches pagination. If a later segment has fewer languages left,
+  // those languages reflow in their wider columns instead of being pinned
+  // to line breaks measured for the old narrower layout.
   state.languages.forEach((entry) => {
     const remainingCount = entry.lines.length - entry.offset;
     const takeCount = Math.min(lineCapacities[entry.language] || 0, remainingCount);
     const lines = entry.lines.slice(entry.offset, entry.offset + takeCount);
 
-    verse[entry.language] = joinRenderedLines(lines);
-    lineCounts[entry.language] = lines.length;
-    forcedLines[entry.language] = lines;
+    if (lines.length) {
+      segmentEntries.push({ entry, lines });
+    }
+
     entry.offset += takeCount;
   });
-  verse.slideshowForcedLines = forcedLines;
+
+  const segmentLanguageKeys = segmentEntries.map(({ entry }) => entry.language);
+  const shouldReflowReducedLanguages =
+    originalLanguageKeys.length > 1 && segmentLanguageKeys.length < originalLanguageKeys.length;
+
+  segmentEntries.forEach(({ entry, lines }) => {
+    verse[entry.language] = shouldReflowReducedLanguages ? joinReflowedLines(lines) : joinRenderedLines(lines);
+    lineCounts[entry.language] = lines.length;
+    if (!shouldReflowReducedLanguages) {
+      forcedLines[entry.language] = lines;
+    }
+  });
+
+  verse.slideshowLanguageKeys = segmentLanguageKeys;
+  verse.slideshowForcedLines = shouldReflowReducedLanguages ? undefined : forcedLines;
 
   return {
     item: {
@@ -1472,17 +1564,45 @@ function joinRenderedLines(lines) {
     .trim();
 }
 
+function joinReflowedLines(lines) {
+  return lines
+    .map((line) => line.text || "")
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function shouldStartTallVerseOnFreshSlide(currentHeight, availableHeight, fontSize, item) {
+  const remainingHeight = availableHeight - currentHeight;
+  if (remainingHeight <= 0) return true;
+  const minimumStartHeight = Math.min(
+    Math.max(getLanguageLineHeight("coptic", fontSize) * MIN_TALL_VERSE_START_LINES + getVerseVerticalPadding(item), availableHeight * 0.25),
+    availableHeight * 0.5,
+  );
+  return remainingHeight < minimumStartHeight;
+}
+
 function getVerseLineSegmentHeight(segment, fontSize) {
   const counts = segment.item.slideshowLineCounts || {};
+  const isStacked = Boolean(segment.item.verse?.slideshowStackedLanguages);
   const languageHeights = Object.entries(counts)
     .filter(([, count]) => count > 0)
     .map(([language, count]) =>
       count * getLanguageLineHeight(language, fontSize) +
-      getLanguageExtraTopPadding(language, segment.item, fontSize) +
-      getVerseVerticalPadding(segment.item),
+      (isStacked
+        ? getStackedLanguageChromeHeight(language, segment.item, fontSize)
+        : getLanguageExtraTopPadding(language, segment.item, fontSize)),
     );
 
-  return languageHeights.length ? Math.max(...languageHeights) : 0;
+  if (!languageHeights.length) {
+    return getVerseVerticalPadding(segment.item);
+  }
+
+  const contentHeight = isStacked
+    ? languageHeights.reduce((sum, height) => sum + height, 0)
+    : Math.max(...languageHeights);
+  const verticalPadding = getVerseVerticalPadding(segment.item) * (isStacked ? languageHeights.length : 1);
+  return contentHeight + verticalPadding;
 }
 
 function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
@@ -1498,7 +1618,7 @@ function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
     return Math.round(fontSize * 0.8) + SPACING.sm * 2 + SPACING.lg;
   }
 
-  const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
+  const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth, fontSize);
   const languageHeights = layout.languages
     .map((language) => {
       const text = item.verse?.[language];
@@ -1515,16 +1635,24 @@ function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
         item,
       ) *
         getLanguageLineHeight(language, fontSize) +
-        getLanguageExtraTopPadding(language, item, fontSize) +
-        getVerseVerticalPadding(item);
+        (layout.isStacked
+          ? getStackedLanguageChromeHeight(language, item, fontSize)
+          : getLanguageExtraTopPadding(language, item, fontSize));
     })
     .filter(Boolean);
 
-  return languageHeights.length ? Math.max(...languageHeights) : getVerseVerticalPadding(item);
+  if (!languageHeights.length) {
+    return getVerseVerticalPadding(item);
+  }
+
+  const contentHeight = layout.isStacked
+    ? languageHeights.reduce((sum, height) => sum + height, 0)
+    : Math.max(...languageHeights);
+  return contentHeight + getVerseVerticalPadding(item) * (layout.isStacked ? languageHeights.length : 1);
 }
 
 function createEstimatedVerseMetric(item, fontSize, visibleLanguages, tableWidth) {
-  const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
+  const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth, fontSize);
 
   return layout.languages.reduce((metric, language) => {
     const text = item.verse?.[language];
@@ -1549,12 +1677,14 @@ function createEstimatedVerseMetric(item, fontSize, visibleLanguages, tableWidth
   }, {});
 }
 
-function getVerseLanguageLayout(item, visibleLanguages = {}, tableWidth = 0) {
+function getVerseLanguageLayout(item, visibleLanguages = {}, tableWidth = 0, fontSize = 1) {
   const languages = getVisibleVerseLanguages(item, visibleLanguages);
+  const isStacked = shouldStackVerseLanguageColumns(languages.length, tableWidth, fontSize);
   const rowColumnWidth =
-    (tableWidth || 0) / Math.max(languages.length, 1);
+    isStacked ? (tableWidth || 0) : (tableWidth || 0) / Math.max(languages.length, 1);
 
   return {
+    isStacked,
     languages,
     rowColumnWidth: Math.max(rowColumnWidth, 1),
   };
@@ -1590,6 +1720,15 @@ function getVisibleVerseLanguages(item, visibleLanguages = {}) {
 
 function getVisibleLanguageCount(visibleLanguages = {}) {
   return ["english", "coptic", "arabic"].filter((language) => visibleLanguages[language]).length || 1;
+}
+
+function shouldStackVerseLanguageColumns(languageCount, tableWidth, fontSize) {
+  if (languageCount < 2) {
+    return false;
+  }
+
+  const columnWidth = (tableWidth || 0) / Math.max(languageCount, 1);
+  return columnWidth < fontSize * MIN_SLIDESHOW_LANGUAGE_COLUMN_EMS;
 }
 
 function createEstimatedTextLines(text, maxLineLength) {
@@ -1717,6 +1856,22 @@ function getLanguageExtraTopPadding(language, item, fontSize) {
   }
 
   return SPACING.sm + getLanguageLineHeight(language, fontSize);
+}
+
+function getStackedLanguageChromeHeight(language, item, fontSize) {
+  if (language === "coptic" && hasSeasonalPrefixLine(item?.verse)) {
+    return getSeasonalPrefixLineHeight(getLanguageFontSize(language, item, fontSize));
+  }
+
+  if (
+    (language === "english" || language === "arabic") &&
+    !item.suppressSpeakerLabel &&
+    getSpeakerRole(item.verse?.personRole || item.verse?.type)
+  ) {
+    return getLanguageLineHeight(language, fontSize);
+  }
+
+  return 0;
 }
 
 function getMetricLinesForLanguage(lines, language, item = {}) {

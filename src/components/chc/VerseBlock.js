@@ -1,14 +1,21 @@
-import { useMemo, useRef } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
 import { resolveRubricKey } from "../../utils/verseRubric";
-import JustifiedText, { measureJustifiedLinesWeb } from "./JustifiedText";
+import JustifiedText from "./JustifiedText";
 
 const REFRAIN_TAN = "#9FFFD0";
 const LIGHT_YELLOW = "#FFFF00";
 const SILENT_PRAYER_GRAY = "#C5CBD2";
+const MIN_SLIDESHOW_LANGUAGE_COLUMN_EMS = 12;
+const DISABLED_SELECTION_STYLE = Platform.OS === "web"
+  ? {
+      WebkitTouchCallout: "none",
+      WebkitUserSelect: "none",
+      userSelect: "none",
+    }
+  : null;
 
 export default function VerseBlock({
   verse,
@@ -87,6 +94,7 @@ export default function VerseBlock({
           : Math.round(fontSize * 1.25),
       styles: [styles.english],
       textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
+      minWordsToJustify: 5,
       forceLines: verse.slideshowForcedLines?.english,
     },
     {
@@ -104,6 +112,7 @@ export default function VerseBlock({
           : Math.round(copticFontSize * 1),
       styles: [styles.coptic],
       textAlign: isRefrainLabel || isReadingReference || copticStandsAlone ? "center" : "justify",
+      minWordsToJustify: 5,
       forceLines: verse.slideshowForcedLines?.coptic,
     },
     {
@@ -123,6 +132,7 @@ export default function VerseBlock({
           : Math.round(fontSize * 1.25),
       styles: [styles.arabic],
       textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
+      minWordsToJustify: 5,
       forceLines: verse.slideshowForcedLines?.arabic,
     },
   ].filter((language) => {
@@ -148,7 +158,12 @@ export default function VerseBlock({
     if (!visibleLanguages[language.key]) return false;
     return Boolean((language.text && language.text.trim()) || language.speakerLabel);
   });
-  const rowColumnWidth = tableWidth / Math.max(rowLanguages.length, 1);
+  const shouldStackLanguages =
+    Boolean(verse.slideshowStackedLanguages) ||
+    shouldStackLanguageColumns(rowLanguages.length, tableWidth, fontSize);
+  const rowColumnWidth = shouldStackLanguages
+    ? tableWidth
+    : tableWidth / Math.max(rowLanguages.length, 1);
   const isCenteredAcrossPage = Boolean(verse.centeredAcrossPage);
   const hasSpeakerLabel = rowLanguages.some((language) => language.speakerLabel);
 
@@ -157,24 +172,17 @@ export default function VerseBlock({
   }
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, shouldStackLanguages && styles.stackedRow]}>
       {rowLanguages.map((language) => {
         const isJustified = language.textAlign === "justify";
-        // On web, react-native-web renders straight to real DOM/CSS, so the
-        // browser's own text-align:justify already does true word-only
-        // justification as long as text-justify:inter-word rides along (see
-        // styles.text below) -- exactly the mechanism scroll mode's WebView
-        // already uses. Only native (iOS/Android) needs the synthetic
-        // per-word-Flexbox reconstruction in JustifiedText, since RN's own
-        // native justify stretches letter tracking too. Routing web through
-        // the plain single-Text path instead keeps it exactly as cheap as
-        // every non-justified verse -- no extra components, no per-word
-        // layout -- which is also why it's the fast path worth preferring
-        // whenever it's actually correct to use.
-        const useCssJustify = isJustified && Platform.OS === "web";
+        const selectionStyle = selectableText ? null : DISABLED_SELECTION_STYLE;
+        const cellWidthStyle = shouldStackLanguages
+          ? { maxWidth: tableWidth, width: "100%" }
+          : { flexBasis: rowColumnWidth, maxWidth: rowColumnWidth };
         const textStyle = [
           styles.text,
           ...language.styles,
+          selectionStyle,
           {
             color: rowTextColor,
             fontFamily: language.fontFamily,
@@ -186,7 +194,7 @@ export default function VerseBlock({
             ...(Platform.OS === "web"
               ? {
                   overflowWrap: "break-word",
-                  wordBreak: "break-word",
+                  wordBreak: "normal",
                 }
               : null),
           },
@@ -199,54 +207,47 @@ export default function VerseBlock({
               styles.cell,
               isSeasonalHoosVerse && styles.seasonalHoosCell,
               isCenteredAcrossPage && styles.centeredCell,
-              language.key === "coptic" && hasSpeakerLabel
+              language.key === "coptic" && hasSpeakerLabel && !shouldStackLanguages
                 ? { paddingTop: SPACING.sm + language.lineHeight }
                 : null,
-              { flexBasis: rowColumnWidth, maxWidth: rowColumnWidth },
+              cellWidthStyle,
             ]}
           >
             {language.speakerLabel ? (
-              <Text style={[textStyle, { textAlign: getSafeTextAlign(language), color: getSpeakerColor(rubricType, bishopPresent) }]}>
+              <Text
+                selectable={selectableText}
+                style={[textStyle, { textAlign: getSafeTextAlign(language), color: getSpeakerColor(rubricType, bishopPresent) }]}
+              >
                 {language.speakerLabel}
               </Text>
             ) : null}
-            {isJustified && !useCssJustify ? (
+            {isJustified ? (
               <JustifiedVerseBody
                 language={language}
                 textStyle={textStyle}
                 selectableText={selectableText}
                 columnWidth={rowColumnWidth - SPACING.xs * 2}
                 forceLines={language.forceLines}
+                minWordsToJustify={language.minWordsToJustify}
                 onMetric={(metric) => reportLanguageMetric(language.key, metric)}
               />
             ) : (
-              <>
-                {useCssJustify ? (
-                  <CssJustifiedLinesReporter
-                    text={getJustifiedBodyText(language)}
-                    fontSize={language.fontSize}
-                    fontFamily={language.fontFamily}
-                    width={rowColumnWidth - SPACING.xs * 2}
-                    onLines={(lines) => reportLanguageMetric(language.key, { lines })}
-                  />
-                ) : null}
-                <Text
-                  selectable={selectableText}
-                  style={[...textStyle, { textAlign: useCssJustify ? "justify" : getSafeTextAlign(language) }]}
-                  onLayout={(event) =>
-                    reportLanguageMetric(language.key, {
-                      height: event.nativeEvent.layout.height,
-                    })
-                  }
-                  onTextLayout={(event) =>
-                    reportLanguageMetric(language.key, {
-                      lines: event.nativeEvent.lines || [],
-                    })
-                  }
-                >
-                  {renderLanguageText(language)}
-                </Text>
-              </>
+              <Text
+                selectable={selectableText}
+                style={[...textStyle, { textAlign: getSafeTextAlign(language) }]}
+                onLayout={(event) =>
+                  reportLanguageMetric(language.key, {
+                    height: event.nativeEvent.layout.height,
+                  })
+                }
+                onTextLayout={(event) =>
+                  reportLanguageMetric(language.key, {
+                    lines: event.nativeEvent.lines || [],
+                  })
+                }
+              >
+                {renderLanguageText(language)}
+              </Text>
             )}
           </View>
         );
@@ -271,7 +272,7 @@ export default function VerseBlock({
  * split for how rarely it fires. It's unaffected everywhere else (scroll
  * mode, and every non-justified slideshow verse type).
  */
-function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, onMetric }) {
+function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, onMetric }) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
@@ -279,10 +280,10 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
   let prefixNode = null;
 
   if (parts) {
-    prefixNode = <Text style={[prefixStyle, { color: REFRAIN_TAN }]}>{parts.prefix}</Text>;
+    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: REFRAIN_TAN }]}>{parts.prefix}</Text>;
   } else if (language.seasonalHoosVersePrefixSpacer) {
     prefixNode = (
-      <Text style={[prefixStyle, { color: "transparent" }]}>{language.seasonalHoosVersePrefixSpacer}</Text>
+      <Text selectable={selectableText} style={[prefixStyle, { color: "transparent" }]}>{language.seasonalHoosVersePrefixSpacer}</Text>
     );
   }
 
@@ -300,6 +301,8 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         rtl={language.key === "arabic"}
         firstWordStyle={bibleVerseNumber ? { color: COLORS.gold } : null}
         forceLines={forceLines}
+        minWordsToJustify={minWordsToJustify}
+        selectable={selectableText}
         onLayout={(event) => onMetric({ height: event.nativeEvent.layout.height })}
         onLines={(lines) => onMetric({ lines })}
       />
@@ -310,42 +313,12 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
 // The exact text a justified paragraph body wraps -- verse number prepended,
 // seasonal Hoos prefix excluded (it renders on its own line, never part of
 // the justified body; see JustifiedVerseBody's prefixNode). Shared between
-// JustifiedVerseBody (native's real render+measurement) and
-// CssJustifiedLinesReporter (web's measurement-only shadow of the same text)
-// so the two platforms measure identically-derived input.
+// JustifiedVerseBody's render and measurement paths.
 function getJustifiedBodyText(language) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const bodyText = parts ? parts.body : language.text;
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
   return bibleVerseNumber ? `${bibleVerseNumber} ${bodyText}` : bodyText;
-}
-
-// Web's justified verse text renders as a single plain CSS
-// text-align:"justify" Text (see useCssJustify above) rather than through
-// JustifiedText, so it never mounts anything that measures real line breaks
-// -- and react-native-web's Text has no onTextLayout equivalent at all, so
-// there is no native fallback either. Without this, SlideshowContainer.js's
-// tall-verse splitter has no real line data to work with on web and always
-// falls back to rough character-count estimation, which is what produces
-// visibly wrong splits (mid-word breaks, misjudged capacity) and wasted
-// slide space. This renders nothing -- it exists purely to compute the same
-// canvas-based line breaks JustifiedText already uses on web and report them
-// up through the same onLanguageLayout/onMetric channel real measurement
-// uses, so pagination gets accurate data without changing what's actually
-// painted on screen.
-function CssJustifiedLinesReporter({ text, fontSize, fontFamily, width, onLines }) {
-  const reportedForRef = useRef(null);
-  const lines = useMemo(
-    () => measureJustifiedLinesWeb(text, fontSize, fontFamily, width),
-    [text, fontSize, fontFamily, width],
-  );
-
-  if (lines && reportedForRef.current !== text) {
-    reportedForRef.current = text;
-    onLines(lines);
-  }
-
-  return null;
 }
 
 function renderLanguageText(language) {
@@ -604,6 +577,15 @@ function isSilentPrayerVerse(verse = {}) {
   return Boolean(verse.isSilentPrayer) || /silent/i.test(String(verse.type || ""));
 }
 
+function shouldStackLanguageColumns(languageCount, tableWidth, fontSize) {
+  if (languageCount < 2) {
+    return false;
+  }
+
+  const columnWidth = (tableWidth || 0) / Math.max(languageCount, 1);
+  return columnWidth < fontSize * MIN_SLIDESHOW_LANGUAGE_COLUMN_EMS;
+}
+
 const EASTERN_ARABIC_DIGITS = {
   0: "٠",
   1: "١",
@@ -641,6 +623,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     overflow: "hidden",
     width: "100%",
+  },
+  stackedRow: {
+    flexDirection: "column",
   },
   seasonalHoosCell: {
     paddingVertical: 2,

@@ -6,6 +6,7 @@ import { BibleWebViewAction, BibleWebViewHandle } from './BibleWebView';
 interface BibleWebViewProps {
   html: string;
   scrollEnabled?: boolean;
+  selectText?: boolean;
   onAction?: (action: BibleWebViewAction) => void;
 }
 
