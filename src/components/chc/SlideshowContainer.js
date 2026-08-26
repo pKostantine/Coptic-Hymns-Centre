@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { COLORS, SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
-import { resolveRubricKey, computeGlobalSuppressSpeakerLabelFlags } from "../../utils/verseRubric";
+import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 
 export default function SlideshowContainer({
