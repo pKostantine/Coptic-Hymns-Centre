@@ -119,6 +119,26 @@ function withWeekdayFlagsFrom(baseFlags, weekdayFlags) {
 // matching the same service->book_key resolution getGospelRiteSections
 // (readingsService.ts) already uses for the "[AUTHOR]" placeholder itself.
 const gospelAuthorsByDateCache = new Map(); // isoDate -> Promise<Record<service, bookKey>>
+const gospelBookKeyCache = new Map(); // calendar book number -> Promise<bookKey>
+
+function getGospelBookKey(readingReference) {
+  const firstSegment = String(readingReference || "").split(/\*@\+|@/).map((part) => part.trim()).find(Boolean);
+  const bookNumber = Number(firstSegment?.split(":")[0]?.split(".")[0]);
+  if (!Number.isFinite(bookNumber)) return Promise.resolve(null);
+
+  let cached = gospelBookKeyCache.get(bookNumber);
+  if (!cached) {
+    cached = supabase
+      .schema("bible")
+      .rpc("get_book_key_by_calendar_number", { p_calendar_number: bookNumber })
+      .then(({ data, error }) => {
+        if (error) throw new Error(`Unable to resolve Gospel book ${bookNumber}: ${error.message}`);
+        return data || null;
+      });
+    gospelBookKeyCache.set(bookNumber, cached);
+  }
+  return cached;
+}
 
 function getGospelAuthorsByService(isoDate) {
   let cached = gospelAuthorsByDateCache.get(isoDate);
@@ -126,12 +146,13 @@ function getGospelAuthorsByService(isoDate) {
     cached = (async () => {
       const { data, error } = await supabase.rpc("get_readings_for_date", { p_date: isoDate });
       if (error) throw new Error(`Unable to load Gospel readings for ${isoDate}: ${error.message}`);
+      const gospelRows = (data || []).filter((row) => row.reading_type === "Gospel");
+      const resolvedBooks = await Promise.all(gospelRows.map((row) => getGospelBookKey(row.reading_reference)));
       const byService = {};
-      for (const row of data || []) {
-        if (row.reading_type !== "Gospel") continue;
-        const bookKey = row.resolved_verses?.[0]?.book_key;
+      gospelRows.forEach((row, index) => {
+        const bookKey = resolvedBooks[index];
         if (bookKey) byService[row.service] = bookKey;
-      }
+      });
       return byService;
     })();
     rememberInCache(gospelAuthorsByDateCache, isoDate, cached);
