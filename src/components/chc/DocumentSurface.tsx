@@ -1,5 +1,5 @@
-import { forwardRef, useMemo, useState } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { Platform, useWindowDimensions } from 'react-native';
 
 import SlideshowContainer from './SlideshowContainer';
 import DocumentWebView, { DocumentAction, DocumentSection, DocumentWebViewHandle } from './DocumentWebView';
@@ -155,6 +155,54 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         ),
       [sections, preferences.displayComments, preferences.displaySilentPrayers, preferences.bishopPresent, copticGospelRite, collapsedSectionIds],
     );
+
+    useEffect(() => {
+      if (Platform.OS !== 'web' || effectiveSelectText || typeof document === 'undefined') return;
+
+      const styleTargets = [document.documentElement, document.body].filter(Boolean);
+      const previousStyles = styleTargets.map((target) => ({
+        target,
+        userSelect: target.style.getPropertyValue('user-select'),
+        webkitUserSelect: target.style.getPropertyValue('-webkit-user-select'),
+        webkitTouchCallout: target.style.getPropertyValue('-webkit-touch-callout'),
+      }));
+      let clearingSelection = false;
+
+      const clearSelection = () => {
+        if (clearingSelection || typeof window === 'undefined') return;
+        const selection = window.getSelection?.();
+        if (!selection?.rangeCount) return;
+        clearingSelection = true;
+        selection.removeAllRanges();
+        clearingSelection = false;
+      };
+
+      const preventSelection = (event: Event) => {
+        event.preventDefault();
+        clearSelection();
+      };
+
+      styleTargets.forEach((target) => {
+        target.style.setProperty('user-select', 'none');
+        target.style.setProperty('-webkit-user-select', 'none');
+        target.style.setProperty('-webkit-touch-callout', 'none');
+      });
+      clearSelection();
+      document.addEventListener('selectstart', preventSelection, true);
+      document.addEventListener('selectionchange', clearSelection, true);
+      document.addEventListener('copy', preventSelection, true);
+
+      return () => {
+        document.removeEventListener('selectstart', preventSelection, true);
+        document.removeEventListener('selectionchange', clearSelection, true);
+        document.removeEventListener('copy', preventSelection, true);
+        previousStyles.forEach(({ target, userSelect, webkitUserSelect, webkitTouchCallout }) => {
+          target.style.setProperty('user-select', userSelect);
+          target.style.setProperty('-webkit-user-select', webkitUserSelect);
+          target.style.setProperty('-webkit-touch-callout', webkitTouchCallout);
+        });
+      };
+    }, [effectiveSelectText]);
 
     if (preferences.slideshowMode) {
       return (

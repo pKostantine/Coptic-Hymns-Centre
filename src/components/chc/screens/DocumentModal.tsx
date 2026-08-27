@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
-import EdgeSwipeOverlay from '../ui/EdgeSwipeOverlay';
 import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
@@ -299,12 +298,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 onCurrentSectionChange={setCurrentSectionId}
                 onOpenSelector={() => setSelectorOpen(true)}
                 onCollapseToggle={setSelectedSlideSectionId}
-              />
-              <EdgeSwipeOverlay
-                enabled={isMobileDocument && !nestedModal && !selectorOpen}
-                onSwipeFromLeft={onClose}
-                onSwipeFromRight={() => setSelectorOpen(true)}
-                rightEdgeWidth={0}
               />
             </View>
             <ContentSelectorDrawer
