@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -13,6 +13,12 @@ import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { goBack } from '@/utils/navigation';
 
 const CHIP_SIZE = 58;
+
+type BibleBookList = Awaited<ReturnType<typeof getBibleBooks>>;
+type BibleListBook = BibleBookList[number];
+type LoadedBibleBooks = { requestKey: string; books: BibleBookList };
+type LoadedBibleChapters = { requestKey: string; chapters: number[] };
+type BibleLoadError = { requestKey: string; message: string };
 
 const PSALM_NUMBERING_OPTIONS: { key: PsalmNumbering; label: string; arabic: string }[] = [
   { key: 'septuagint', label: 'Septuagint', arabic: 'السبعيني' },
@@ -29,31 +35,94 @@ export default function BibleNestedList() {
   const testament = bookKey === 'OT' || bookKey === 'NT' ? bookKey : null;
   const isPsalms = bookKey === 'psalms';
   const isEsther = bookKey === 'esther';
-  const [books, setBooks] = useState<Awaited<ReturnType<typeof getBibleBooks>> | null>(null);
-  const [chapters, setChapters] = useState<number[] | null>(null);
+  const [loadedBooks, setLoadedBooks] = useState<LoadedBibleBooks | null>(null);
+  const [loadedChapters, setLoadedChapters] = useState<LoadedBibleChapters | null>(null);
   const [psalmNumbering, setPsalmNumbering] = useState<PsalmNumbering>('septuagint');
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<BibleLoadError | null>(null);
+
+  const booksRequestKey = testament ? `books:${testament}` : '';
+  const chaptersRequestKey = bookKey && !testament ? `chapters:${bookKey}:${psalmNumbering}` : '';
+  const activeRequestKey = booksRequestKey || chaptersRequestKey;
+  const books = loadedBooks?.requestKey === booksRequestKey ? loadedBooks.books : null;
+  const chapters = loadedChapters?.requestKey === chaptersRequestKey ? loadedChapters.chapters : null;
+  const error = loadError?.requestKey === activeRequestKey ? loadError.message : null;
 
   useEffect(() => {
-    if (!bookKey) return;
-    setBooks(null);
-    setError(null);
+    if (!testament) return;
+    let cancelled = false;
+    const requestKey = `books:${testament}`;
 
-    if (testament) {
-      getBibleBooks()
-        .then((allBooks) => setBooks(allBooks.filter((book) => book.testament === testament).sort((a, b) => a.bookOrder - b.bookOrder)))
-        .catch((err) => setError(err.message));
-    }
-  }, [bookKey, testament]);
+    getBibleBooks()
+      .then((allBooks) => {
+        if (!cancelled) setLoadedBooks({ requestKey, books: allBooks.filter((book) => book.testament === testament).sort((a, b) => a.bookOrder - b.bookOrder) });
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError({ requestKey, message: err.message });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [testament]);
 
   useEffect(() => {
     if (!bookKey || testament) return;
-    setChapters(null);
-    setError(null);
+    let cancelled = false;
+    const requestKey = `chapters:${bookKey}:${psalmNumbering}`;
+
     getBibleChapterKeys(bookKey, psalmNumbering)
-      .then(setChapters)
-      .catch((err) => setError(err.message));
+      .then((nextChapters) => {
+        if (!cancelled) setLoadedChapters({ requestKey, chapters: nextChapters });
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError({ requestKey, message: err.message });
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [bookKey, testament, psalmNumbering]);
+
+  useEffect(() => {
+    if (!bookKey || testament || !chapters || chapters.length !== 1) return;
+    router.replace({
+      pathname: '/bible/[bookKey]/[chapter]',
+      params: {
+        bookKey,
+        chapter: String(chapters[0]),
+        title: title || bookKey,
+        arabic: arabic || '',
+        psalmNumbering: isPsalms ? psalmNumbering : undefined,
+      },
+    });
+  }, [arabic, bookKey, chapters, isPsalms, psalmNumbering, router, testament, title]);
+
+  const openBook = useCallback(
+    async (book: BibleListBook) => {
+      setLoadError(null);
+      try {
+        const bookChapters = await getBibleChapterKeys(book.bookKey);
+        if (bookChapters.length === 1) {
+          router.push({
+            pathname: '/bible/[bookKey]/[chapter]',
+            params: { bookKey: book.bookKey, chapter: String(bookChapters[0]), title: book.titleEnglish, arabic: book.titleArabic },
+          });
+          return;
+        }
+
+        router.push({
+          pathname: '/bible/[bookKey]',
+          params: { bookKey: book.bookKey, title: book.titleEnglish, arabic: book.titleArabic },
+        });
+      } catch (err) {
+        setLoadError({
+          requestKey: testament ? `books:${testament}` : `open:${book.bookKey}`,
+          message: err instanceof Error ? err.message : 'Unable to open Bible book.',
+        });
+      }
+    },
+    [router, testament],
+  );
 
   return (
     <View style={styles.screen}>
@@ -84,17 +153,14 @@ export default function BibleNestedList() {
                 arabic={book.titleArabic}
                 showEnglish={showEnglish}
                 showArabic={showArabic}
-                onPress={() =>
-                  router.push({
-                    pathname: '/bible/[bookKey]',
-                    params: { bookKey: book.bookKey, title: book.titleEnglish, arabic: book.titleArabic },
-                  })
-                }
+                onPress={() => openBook(book)}
               />
             ))}
           </ScrollView>
         )
       ) : !chapters ? (
+        <LoadingScreen />
+      ) : chapters.length === 1 ? (
         <LoadingScreen />
       ) : (
         <ScrollView contentContainerStyle={styles.chapterContent}>

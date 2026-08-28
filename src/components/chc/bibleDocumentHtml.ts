@@ -304,6 +304,13 @@ export function buildBibleChapterHtml({
         var selectTextEnabled = ${JSON.stringify(effectiveSelectText)};
         var selectableLanguages = ${JSON.stringify(effectiveLanguages)};
         var selectingLanguage = null;
+        var richCopyColors = {
+          background: ${JSON.stringify(COLORS.black)},
+          text: ${JSON.stringify(COLORS.white)},
+          gold: ${JSON.stringify(COLORS.gold)},
+          lxxAddition: ${JSON.stringify(COLORS.priest)},
+          psalmIntroduction: ${JSON.stringify(COLORS.refrain)}
+        };
         var startX = 0;
         var startY = 0;
 
@@ -382,7 +389,7 @@ export function buildBibleChapterHtml({
           }
         }
 
-        function clippedTextForNode(range, node) {
+        function clippedRangeForNode(range, node) {
           if (!rangeIntersectsNode(range, node)) return '';
           var nodeRange = document.createRange();
           nodeRange.selectNodeContents(node);
@@ -393,7 +400,76 @@ export function buildBibleChapterHtml({
           if (clipped.compareBoundaryPoints(Range.END_TO_END, nodeRange) > 0) {
             clipped.setEnd(nodeRange.endContainer, nodeRange.endOffset);
           }
-          return fragmentText(clipped.cloneContents());
+          return clipped;
+        }
+
+        function clippedTextForNode(range, node) {
+          var clipped = clippedRangeForNode(range, node);
+          return clipped ? fragmentText(clipped.cloneContents()) : '';
+        }
+
+        function styleString(styles) {
+          return Object.keys(styles)
+            .filter(function (key) { return styles[key] !== null && styles[key] !== undefined && styles[key] !== ''; })
+            .map(function (key) { return key + ':' + styles[key]; })
+            .join(';');
+        }
+
+        function inlineRichCopyStyles(container) {
+          Array.prototype.slice.call(container.querySelectorAll('.verse-number')).forEach(function (numberNode) {
+            var numberText = normalizeSelectionText(numberNode.textContent || '');
+            numberNode.textContent = numberText ? numberText + ' ' : '';
+            numberNode.setAttribute('style', styleString({
+              'background': richCopyColors.background,
+              'background-color': richCopyColors.background,
+              'color': numberNode.classList.contains('lxx-addition') ? richCopyColors.lxxAddition : richCopyColors.gold,
+              'font-weight': '700',
+              'white-space': 'nowrap'
+            }));
+          });
+          Array.prototype.slice.call(container.querySelectorAll('.verse-text')).forEach(function (textNode) {
+            textNode.setAttribute('style', styleString({
+              'background': richCopyColors.background,
+              'background-color': richCopyColors.background,
+              'color': 'inherit',
+              'font-style': 'inherit',
+              'white-space': 'pre-wrap'
+            }));
+          });
+          Array.prototype.slice.call(container.querySelectorAll('*')).forEach(function (element) {
+            element.removeAttribute('class');
+            element.removeAttribute('data-language');
+            element.removeAttribute('data-copy-text');
+          });
+        }
+
+        function fragmentHtml(fragment, sourceNode) {
+          var block = document.createElement('div');
+          var computed = window.getComputedStyle ? window.getComputedStyle(sourceNode) : null;
+          var isIntroduction = sourceNode.classList && sourceNode.classList.contains('psalm-introduction');
+          var direction = sourceNode.getAttribute('dir') || (computed ? computed.direction : 'ltr') || 'ltr';
+          block.setAttribute('style', styleString({
+            'background': richCopyColors.background,
+            'background-color': richCopyColors.background,
+            'color': isIntroduction ? richCopyColors.psalmIntroduction : richCopyColors.text,
+            'font-family': computed ? computed.fontFamily : "Georgia, 'Times New Roman', serif",
+            'font-size': computed ? computed.fontSize : '${safeFontSize}px',
+            'font-style': isIntroduction ? 'italic' : (computed ? computed.fontStyle : 'normal'),
+            'font-weight': computed ? computed.fontWeight : '400',
+            'line-height': computed ? computed.lineHeight : '1.25',
+            'direction': direction,
+            'text-align': direction === 'rtl' ? 'right' : 'left',
+            'margin': '0 0 8px 0',
+            'padding': '0'
+          }));
+          block.appendChild(fragment);
+          inlineRichCopyStyles(block);
+          return block.innerHTML.trim() ? block.outerHTML : '';
+        }
+
+        function clippedHtmlForNode(range, node) {
+          var clipped = clippedRangeForNode(range, node);
+          return clipped ? fragmentHtml(clipped.cloneContents(), node) : '';
         }
 
         function selectedTextForLanguage(selection, language) {
@@ -404,6 +480,29 @@ export function buildBibleChapterHtml({
             .map(function (node) { return clippedTextForNode(range, node); })
             .filter(Boolean)
             .join('\\n');
+        }
+
+        function selectedHtmlForLanguage(selection, language) {
+          if (!selection || !selection.rangeCount || !language) return '';
+          var range = selection.getRangeAt(0);
+          var nodes = Array.prototype.slice.call(document.querySelectorAll('.cell[data-language="' + language + '"]'));
+          var body = nodes
+            .map(function (node) { return clippedHtmlForNode(range, node); })
+            .filter(Boolean)
+            .join('');
+          if (!body) return '';
+          return [
+            '<meta charset="utf-8">',
+            '<div style="' + styleString({
+              'background': richCopyColors.background,
+              'background-color': richCopyColors.background,
+              'color': richCopyColors.text,
+              'padding': '8px',
+              'margin': '0'
+            }) + '">',
+            body,
+            '</div>'
+          ].join('');
         }
 
         document.addEventListener('pointerdown', onSelectionStart, true);
@@ -425,6 +524,8 @@ export function buildBibleChapterHtml({
           var text = selectedTextForLanguage(selection, language);
           if (!text || !event.clipboardData) return;
           event.clipboardData.setData('text/plain', text);
+          var html = selectedHtmlForLanguage(selection, language);
+          if (html) event.clipboardData.setData('text/html', html);
           event.preventDefault();
         });
         }

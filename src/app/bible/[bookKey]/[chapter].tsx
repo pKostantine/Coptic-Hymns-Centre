@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,6 +41,11 @@ const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: { english: string; arabi
 ];
 
 const PSALMS_BOOK_KEY = 'psalms';
+
+const TESTAMENT_ROUTE_LABELS: Record<BibleBook['testament'], { title: string; arabic: string }> = {
+  OT: { title: 'Old Testament', arabic: 'العهد القديم' },
+  NT: { title: 'New Testament', arabic: 'العهد الجديد' },
+};
 
 const SELECTOR_TEXT: Record<AppLanguage, {
   verses: string;
@@ -201,6 +206,8 @@ export default function BibleChapterDocument() {
   const chapterIndex = chapterKeys ? chapterKeys.indexOf(currentChapterNumber) : -1;
   const previousChapter = chapterIndex > 0 ? chapterKeys![chapterIndex - 1] : null;
   const nextChapter = chapterIndex >= 0 && chapterKeys && chapterIndex < chapterKeys.length - 1 ? chapterKeys[chapterIndex + 1] : null;
+  const chapterListLoaded = chapterKeys !== null;
+  const chapterCount = chapterKeys?.length || 0;
 
   const chapterHtml = useMemo(() => {
     if (!verses || !copticFontDataUri) return null;
@@ -239,8 +246,26 @@ export default function BibleChapterDocument() {
   }
 
   const goBackALevel = useCallback(() => {
-    goBack(router, bookKey ? { pathname: '/bible/[bookKey]', params: { bookKey, title: book?.titleEnglish || title, arabic: book?.titleArabic || arabic } } : '/bible');
-  }, [router, bookKey, title, arabic, book?.titleEnglish, book?.titleArabic]);
+    const chapterGridFallback: Href = bookKey
+      ? {
+          pathname: '/bible/[bookKey]',
+          params: { bookKey, title: book?.titleEnglish || title, arabic: book?.titleArabic || arabic },
+        }
+      : '/bible';
+    const testamentFallback: Href = book?.testament
+      ? {
+          pathname: '/bible/[bookKey]',
+          params: {
+            bookKey: book.testament,
+            title: TESTAMENT_ROUTE_LABELS[book.testament].title,
+            arabic: TESTAMENT_ROUTE_LABELS[book.testament].arabic,
+          },
+        }
+      : '/bible';
+
+    const fallbackHref: Href = !chapterListLoaded ? '/bible' : chapterCount === 1 ? testamentFallback : chapterGridFallback;
+    goBack(router, fallbackHref);
+  }, [router, bookKey, title, arabic, book, chapterListLoaded, chapterCount]);
 
   const gesturePanResponder = useMemo(() => {
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
