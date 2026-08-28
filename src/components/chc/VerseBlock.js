@@ -8,7 +8,6 @@ import JustifiedText from "./JustifiedText";
 const REFRAIN_TAN = "#9FFFD0";
 const LIGHT_YELLOW = "#FFFF00";
 const SILENT_PRAYER_GRAY = "#C5CBD2";
-const MIN_SLIDESHOW_LANGUAGE_COLUMN_EMS = 12;
 const DISABLED_SELECTION_STYLE = Platform.OS === "web"
   ? {
       WebkitTouchCallout: "none",
@@ -94,7 +93,7 @@ export default function VerseBlock({
           : Math.round(fontSize * 1.25),
       styles: [styles.english],
       textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
-      minWordsToJustify: 5,
+      minWordsToJustify: 1,
       forceLines: verse.slideshowForcedLines?.english,
     },
     {
@@ -112,7 +111,7 @@ export default function VerseBlock({
           : Math.round(copticFontSize * 1),
       styles: [styles.coptic],
       textAlign: isRefrainLabel || isReadingReference || copticStandsAlone ? "center" : "justify",
-      minWordsToJustify: 5,
+      minWordsToJustify: 1,
       forceLines: verse.slideshowForcedLines?.coptic,
     },
     {
@@ -132,7 +131,7 @@ export default function VerseBlock({
           : Math.round(fontSize * 1.25),
       styles: [styles.arabic],
       textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
-      minWordsToJustify: 5,
+      minWordsToJustify: 1,
       forceLines: verse.slideshowForcedLines?.arabic,
     },
   ].filter((language) => {
@@ -158,12 +157,7 @@ export default function VerseBlock({
     if (!visibleLanguages[language.key]) return false;
     return Boolean((language.text && language.text.trim()) || language.speakerLabel);
   });
-  const shouldStackLanguages =
-    Boolean(verse.slideshowStackedLanguages) ||
-    shouldStackLanguageColumns(rowLanguages.length, tableWidth, fontSize);
-  const rowColumnWidth = shouldStackLanguages
-    ? tableWidth
-    : tableWidth / Math.max(rowLanguages.length, 1);
+  const rowColumnWidth = tableWidth / Math.max(rowLanguages.length, 1);
   const isCenteredAcrossPage = Boolean(verse.centeredAcrossPage);
   const hasSpeakerLabel = rowLanguages.some((language) => language.speakerLabel);
 
@@ -172,13 +166,11 @@ export default function VerseBlock({
   }
 
   return (
-    <View style={[styles.row, shouldStackLanguages && styles.stackedRow]}>
+    <View style={styles.row}>
       {rowLanguages.map((language) => {
         const isJustified = language.textAlign === "justify";
         const selectionStyle = selectableText ? null : DISABLED_SELECTION_STYLE;
-        const cellWidthStyle = shouldStackLanguages
-          ? { maxWidth: tableWidth, width: "100%" }
-          : { flexBasis: rowColumnWidth, maxWidth: rowColumnWidth };
+        const cellWidthStyle = { flexBasis: rowColumnWidth, maxWidth: rowColumnWidth };
         const textStyle = [
           styles.text,
           ...language.styles,
@@ -207,7 +199,7 @@ export default function VerseBlock({
               styles.cell,
               isSeasonalHoosVerse && styles.seasonalHoosCell,
               isCenteredAcrossPage && styles.centeredCell,
-              language.key === "coptic" && hasSpeakerLabel && !shouldStackLanguages
+              language.key === "coptic" && hasSpeakerLabel
                 ? { paddingTop: SPACING.sm + language.lineHeight }
                 : null,
               cellWidthStyle,
@@ -577,15 +569,6 @@ function isSilentPrayerVerse(verse = {}) {
   return Boolean(verse.isSilentPrayer) || /silent/i.test(String(verse.type || ""));
 }
 
-function shouldStackLanguageColumns(languageCount, tableWidth, fontSize) {
-  if (languageCount < 2) {
-    return false;
-  }
-
-  const columnWidth = (tableWidth || 0) / Math.max(languageCount, 1);
-  return columnWidth < fontSize * MIN_SLIDESHOW_LANGUAGE_COLUMN_EMS;
-}
-
 const EASTERN_ARABIC_DIGITS = {
   0: "٠",
   1: "١",
@@ -623,9 +606,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     overflow: "hidden",
     width: "100%",
-  },
-  stackedRow: {
-    flexDirection: "column",
   },
   seasonalHoosCell: {
     paddingVertical: 2,

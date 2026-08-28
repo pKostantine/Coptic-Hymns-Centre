@@ -406,15 +406,18 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonarySections) || selectorOpen;
 
   const gesturePanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          if (isCoveredByModal) return false;
-          const startsInRightEdge = gestureState.x0 >= selectorSwipeStartX;
-          const startsInLeftEdge = gestureState.x0 < 56;
-          const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-          return (startsInRightEdge || startsInLeftEdge) && isHorizontal && Math.abs(gestureState.dx) > 18;
-        },
+    () => {
+      const shouldHandleEdgeSwipe = (gestureState: { x0: number; dx: number; dy: number }) => {
+        if (isCoveredByModal) return false;
+        const startsInRightEdge = gestureState.x0 >= selectorSwipeStartX;
+        const startsInLeftEdge = gestureState.x0 < 56;
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        return (startsInRightEdge || startsInLeftEdge) && isHorizontal && Math.abs(gestureState.dx) > 18;
+      };
+
+      return PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => shouldHandleEdgeSwipe(gestureState),
+        onMoveShouldSetPanResponder: (_, gestureState) => shouldHandleEdgeSwipe(gestureState),
         onPanResponderRelease: (_, gestureState) => {
           if (isCoveredByModal) return;
           if (gestureState.x0 >= selectorSwipeStartX && gestureState.dx <= -36) {
@@ -425,7 +428,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             goBack(router, backHref);
           }
         },
-      }),
+      });
+    },
     [router, selectorSwipeStartX, backHref, isCoveredByModal],
   );
 
