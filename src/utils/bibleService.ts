@@ -18,10 +18,13 @@ export interface BibleChapterMeta {
 export interface BibleVerse {
   verseNumber: BibleVerseNumber;
   english: string;
+  englishFromCoptic: string;
   coptic: string;
   greek: string;
   arabic: string;
+  arabicFromCoptic: string;
   isLxxAddition?: boolean;
+  isPsalmIntroduction?: boolean;
 }
 
 export type PsalmNumbering = 'septuagint' | 'masoretic';
@@ -30,6 +33,8 @@ export type BibleVerseNumber = number | string;
 const PSALMS_KEY = 'psalms';
 const ESTHER_KEY = 'esther';
 const DANIEL_KEY = 'daniel';
+const BIBLE_CHAPTER_VERSE_FIELDS = 'verse_number, english, coptic, greek, arabic';
+const PSALM_CHAPTER_VERSE_FIELDS = 'verse_number, english, english_from_coptic, coptic, greek, arabic, arabic_from_coptic';
 const ESTHER_ADDITION_CHAPTER_LABELS: Record<number, string> = { 0: 'A', 11: 'B', 12: 'C' };
 const ESTHER_ADDITION_CHAPTER_ARABIC_LABELS: Record<number, string> = { 0: 'أ', 11: 'ب', 12: 'ت' };
 const DANIEL_ADDITION_CHAPTERS = new Set([0, 13, 14]);
@@ -84,7 +89,17 @@ export function getBibleVerseDisplayLabel(verseNumber: BibleVerseNumber, appLang
   return formatArabicLetterSuffixes(formatArabicDigits(text));
 }
 
-function compareBibleVerseNumbers(a: BibleVerseNumber, b: BibleVerseNumber): number {
+export function isPsalmIntroductionVerseNumber(verseNumber: BibleVerseNumber): boolean {
+  return String(verseNumber).trim().toLowerCase() === 'i';
+}
+
+function compareBibleVerseNumbers(a: BibleVerseNumber, b: BibleVerseNumber, psalmIntroductionsFirst = false): number {
+  if (psalmIntroductionsFirst) {
+    const aIntroduction = isPsalmIntroductionVerseNumber(a);
+    const bIntroduction = isPsalmIntroductionVerseNumber(b);
+    if (aIntroduction || bIntroduction) return aIntroduction === bIntroduction ? 0 : aIntroduction ? -1 : 1;
+  }
+
   const aText = String(a);
   const bText = String(b);
   const aMatch = aText.match(/^(\d+)([a-z]*)$/i);
@@ -236,24 +251,31 @@ async function assertBibleBookVisible(bookKey: string): Promise<void> {
 const chapterCache = new Map<string, Promise<BibleVerse[]>>();
 
 async function loadChapterVerses(bookKey: string, chapterNumber: number): Promise<BibleVerse[]> {
+  const isPsalms = normalizeBookKey(bookKey) === PSALMS_KEY;
   const { data, error } = await supabase
     .schema('bible')
     .from('verses')
-    .select('verse_number, english, coptic, greek, arabic')
+    .select(isPsalms ? PSALM_CHAPTER_VERSE_FIELDS : BIBLE_CHAPTER_VERSE_FIELDS)
     .eq('book_key', bookKey)
     .eq('chapter_number', chapterNumber)
     .order('verse_number');
   if (error) throw new Error(`Unable to load ${bookKey} ${chapterNumber}: ${error.message}`);
   return ((data || []) as any[])
-    .map((row) => ({
-      verseNumber: normalizeVerseNumber(row.verse_number),
-      english: row.english || '',
-      coptic: row.coptic || '',
-      greek: row.greek || '',
-      arabic: row.arabic || '',
-    }))
+    .map((row) => {
+      const verseNumber = normalizeVerseNumber(row.verse_number);
+      return {
+        verseNumber,
+        english: row.english || '',
+        englishFromCoptic: isPsalms ? row.english_from_coptic || '' : '',
+        coptic: row.coptic || '',
+        greek: row.greek || '',
+        arabic: row.arabic || '',
+        arabicFromCoptic: isPsalms ? row.arabic_from_coptic || '' : '',
+        isPsalmIntroduction: isPsalms && isPsalmIntroductionVerseNumber(verseNumber),
+      };
+    })
     .map((verse) => ({ ...verse, isLxxAddition: isBibleLxxAdditionVerse(bookKey, chapterNumber, verse.verseNumber) }))
-    .sort((a, b) => compareBibleVerseNumbers(a.verseNumber, b.verseNumber));
+    .sort((a, b) => compareBibleVerseNumbers(a.verseNumber, b.verseNumber, isPsalms));
 }
 
 function fetchChapterVerses(bookKey: string, chapterNumber: number): Promise<BibleVerse[]> {

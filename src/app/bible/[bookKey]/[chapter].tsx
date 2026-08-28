@@ -29,13 +29,18 @@ import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { goBack } from '@/utils/navigation';
 
 type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
+type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
 
 const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: { english: string; arabic: string } }[] = [
   { key: 'english', label: { english: 'English', arabic: 'الإنجليزية' } },
+  { key: 'englishFromCoptic', label: { english: 'English (from Coptic)', arabic: 'الإنجليزية (من القبطية)' } },
   { key: 'coptic', label: { english: 'Coptic', arabic: 'القبطية' } },
   { key: 'greek', label: { english: 'Greek', arabic: 'اليونانية' } },
   { key: 'arabic', label: { english: 'Arabic', arabic: 'العربية' } },
+  { key: 'arabicFromCoptic', label: { english: 'Arabic (from Coptic)', arabic: 'العربية (من القبطية)' } },
 ];
+
+const PSALMS_BOOK_KEY = 'psalms';
 
 const SELECTOR_TEXT: Record<AppLanguage, {
   verses: string;
@@ -72,12 +77,19 @@ const SELECTOR_TEXT: Record<AppLanguage, {
   },
 };
 
-function getAvailableLanguages(verses: BibleDisplayVerse[]): BibleLanguageKey[] {
+function getAvailableLanguages(verses: BibleDisplayVerse[], bookKey: string | null | undefined): BibleLanguageKey[] {
+  const isPsalms = bookKey === PSALMS_BOOK_KEY;
   const languages: BibleLanguageKey[] = ['english'];
+  if (isPsalms && verses.some((verse) => String(verse.englishFromCoptic || '').trim())) languages.push('englishFromCoptic');
   if (verses.some((verse) => String(verse.coptic || '').trim())) languages.push('coptic');
   if (verses.some((verse) => String(verse.greek || '').trim())) languages.push('greek');
   languages.push('arabic');
+  if (isPsalms && verses.some((verse) => String(verse.arabicFromCoptic || '').trim())) languages.push('arabicFromCoptic');
   return languages;
+}
+
+function isArabicBibleLanguage(language: BibleLanguageKey): boolean {
+  return language === 'arabic' || language === 'arabicFromCoptic';
 }
 
 function getBibleLanguageLabel(language: BibleLanguageKey, appLanguage: AppLanguage): string {
@@ -92,8 +104,8 @@ function getVersePreviewLanguage(
   enabledLanguages: EnabledBibleLanguages,
 ): BibleLanguageKey {
   const primaryLanguages: BibleLanguageKey[] = appLanguage === 'ar'
-    ? ['arabic', 'english', 'coptic', 'greek']
-    : ['english', 'arabic', 'coptic', 'greek'];
+    ? ['arabic', 'arabicFromCoptic', 'english', 'englishFromCoptic', 'coptic', 'greek']
+    : ['english', 'englishFromCoptic', 'arabic', 'arabicFromCoptic', 'coptic', 'greek'];
   const orderedLanguages = [
     ...primaryLanguages,
     ...availableLanguages.filter((language) => !primaryLanguages.includes(language)),
@@ -132,7 +144,7 @@ export default function BibleChapterDocument() {
   const bibleWebViewRef = useRef<BibleWebViewHandle>(null);
 
   const [book, setBook] = useState<BibleBook | null>(null);
-  const [verses, setVerses] = useState<BibleDisplayVerse[] | null>(null);
+  const [loadedVerses, setLoadedVerses] = useState<LoadedBibleVerses | null>(null);
   const [chapterKeys, setChapterKeys] = useState<number[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -156,15 +168,28 @@ export default function BibleChapterDocument() {
 
   useEffect(() => {
     if (!bookKey || !chapter) return;
-    setVerses(null);
+    let cancelled = false;
+    const requestKey = `${bookKey}:${chapter}:${psalmNumbering}`;
     getDisplayedChapterVerses(bookKey, Number(chapter), psalmNumbering)
-      .then(setVerses)
-      .catch((err) => setError(err.message));
+      .then((nextVerses) => {
+        if (!cancelled) setLoadedVerses({ requestKey, verses: nextVerses });
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [bookKey, chapter, psalmNumbering]);
 
-  const availableLanguages = useMemo(() => getAvailableLanguages(verses || []), [verses]);
-  const visibleLanguageKeys = availableLanguages.filter((language) => enabledLanguages[language]);
-  const effectiveLanguageKeys = visibleLanguageKeys.length ? visibleLanguageKeys : [availableLanguages[0] || 'english'];
+  const verseRequestKey = bookKey && chapter ? `${bookKey}:${chapter}:${psalmNumbering}` : '';
+  const verses = loadedVerses?.requestKey === verseRequestKey ? loadedVerses.verses : null;
+  const availableLanguages = useMemo(() => getAvailableLanguages(verses || [], bookKey), [verses, bookKey]);
+  const visibleLanguageKeys = useMemo(() => availableLanguages.filter((language) => enabledLanguages[language]), [availableLanguages, enabledLanguages]);
+  const effectiveLanguageKeys = useMemo(
+    () => (visibleLanguageKeys.length ? visibleLanguageKeys : [availableLanguages[0] || 'english']),
+    [availableLanguages, visibleLanguageKeys],
+  );
   const fontSize = fontScaleToPx(preferences.fontScale);
   const currentChapterNumber = Number(chapter);
   const headerTitleEnglish = getBibleChapterHeaderTitle(book, title, arabic, bookKey, currentChapterNumber, 'en');
@@ -188,8 +213,7 @@ export default function BibleChapterDocument() {
       isSlideshow: preferences.slideshowMode,
       preface,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [verses, effectiveLanguageKeys.join(','), fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -337,17 +361,25 @@ export default function BibleChapterDocument() {
                 <ScrollView style={styles.selectorList}>
                   {(verses || []).map((verse) => {
                     const previewLanguage = getVersePreviewLanguage(verse, preferences.appLanguage, availableLanguages, enabledLanguages);
+                    const isPsalmIntroduction = Boolean(verse.isPsalmIntroduction);
                     return (
                       <Pressable key={`selector-${verse.verseNumber}`} style={styles.selectorItem} onPress={() => selectVerse(verse.verseNumber)}>
-                        <Text style={[styles.selectorVerseNumber, verse.isLxxAddition && styles.selectorVerseNumberLxx]}>
-                          {getBibleVerseDisplayLabel(verse.verseNumber, preferences.appLanguage)}
+                        <Text
+                          style={[
+                            styles.selectorVerseNumber,
+                            verse.isLxxAddition && styles.selectorVerseNumberLxx,
+                            isPsalmIntroduction && styles.selectorVerseNumberIntro,
+                          ]}
+                        >
+                          {isPsalmIntroduction ? '' : getBibleVerseDisplayLabel(verse.verseNumber, preferences.appLanguage)}
                         </Text>
                         <Text
                           numberOfLines={1}
                           style={[
                             styles.selectorVersePreview,
-                            previewLanguage === 'arabic' && styles.selectorVersePreviewArabic,
+                            isArabicBibleLanguage(previewLanguage) && styles.selectorVersePreviewArabic,
                             previewLanguage === 'coptic' && styles.selectorVersePreviewCoptic,
+                            isPsalmIntroduction && styles.selectorVersePreviewIntro,
                           ]}
                         >
                           {verse[previewLanguage]}
@@ -475,9 +507,11 @@ const styles = StyleSheet.create({
   },
   selectorVerseNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', minWidth: 28 },
   selectorVerseNumberLxx: { color: COLORS.priest },
+  selectorVerseNumberIntro: { color: COLORS.refrain },
   selectorVersePreview: { flex: 1, fontFamily: 'Georgia', fontSize: 13, lineHeight: 18, color: COLORS.white },
   selectorVersePreviewArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   selectorVersePreviewCoptic: { fontFamily: TYPOGRAPHY.coptic },
+  selectorVersePreviewIntro: { color: COLORS.refrain, fontStyle: 'italic' },
   selectorActionRow: {
     alignItems: 'center',
     backgroundColor: '#101010',

@@ -4,20 +4,25 @@ import { formatEnglishDisplayText } from '../../utils/displayText';
 export interface BibleDisplayVerse {
   verseNumber: number | string;
   english: string;
+  englishFromCoptic: string;
   coptic: string;
   greek: string;
   arabic: string;
+  arabicFromCoptic: string;
   isLxxAddition?: boolean;
+  isPsalmIntroduction?: boolean;
 }
 
 export interface BiblePreface {
   english?: string;
+  englishFromCoptic?: string;
   coptic?: string;
   greek?: string;
   arabic?: string;
+  arabicFromCoptic?: string;
 }
 
-export type BibleLanguageKey = 'english' | 'coptic' | 'greek' | 'arabic';
+export type BibleLanguageKey = 'english' | 'englishFromCoptic' | 'coptic' | 'greek' | 'arabic' | 'arabicFromCoptic';
 
 /**
  * Builds the Bible chapter reader HTML — ported from the old app's
@@ -49,27 +54,31 @@ export function buildBibleChapterHtml({
   const effectiveSelectText = Boolean(selectText) && !isSlideshow;
   const effectiveLanguages: BibleLanguageKey[] = languageKeys.length ? languageKeys : ['english'];
   const columnTemplate = `repeat(${Math.max(effectiveLanguages.length, 1)}, minmax(0, 1fr))`;
-  const firstCopticVerse = verses.find((verse) => String(verse.coptic || '').trim());
+  const firstCopticVerse = verses.find((verse) => !verse.isPsalmIntroduction && String(verse.coptic || '').trim());
   const arabicVerseLineHeight = Math.round(fontSize * 1.6);
 
   const rowHtml = verses
     .map((verse) => {
+      const isPsalmIntroduction = Boolean(verse.isPsalmIntroduction);
       const cellHtml = effectiveLanguages
         .map((language) => {
           const text = verse[language];
-          const verseNumberText = formatVerseNumber(verse.verseNumber, language);
+          const verseNumberText = isPsalmIntroduction ? '' : formatVerseNumber(verse.verseNumber, language);
+          const verseNumberHtml = verseNumberText
+            ? `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span>`
+            : '';
           if (!String(text || '').trim()) {
             return `<div class="cell placeholder ${language}" data-language="${language}"></div>`;
           }
           return [
-            `<div class="cell ${language}" data-language="${language}" dir="${language === 'arabic' ? 'rtl' : 'ltr'}">`,
-            `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span>`,
+            `<div class="cell ${language}${isPsalmIntroduction ? ' psalm-introduction' : ''}" data-language="${language}" dir="${isArabicLanguage(language) ? 'rtl' : 'ltr'}">`,
+            verseNumberHtml,
             `<span class="verse-text">${escapeHtml(formatVerseText(text, language, verse === firstCopticVerse))}</span>`,
             '</div>',
           ].join('');
         })
         .join('');
-      return `<section class="verse-row" data-verse="${escapeHtml(String(verse.verseNumber))}">${cellHtml}</section>`;
+      return `<section class="verse-row${isPsalmIntroduction ? ' psalm-introduction-row' : ''}" data-verse="${escapeHtml(String(verse.verseNumber))}">${cellHtml}</section>`;
     })
     .join('');
 
@@ -81,7 +90,7 @@ export function buildBibleChapterHtml({
             return `<div class="cell placeholder ${language}" data-language="${language}"></div>`;
           }
           return [
-            `<div class="cell preface-cell ${language}" data-language="${language}" dir="${language === 'arabic' ? 'rtl' : 'ltr'}">`,
+            `<div class="cell preface-cell ${language}" data-language="${language}" dir="${isArabicLanguage(language) ? 'rtl' : 'ltr'}">`,
             `<span class="verse-text">${escapeHtml(formatVerseText(text || '', language, false))}</span>`,
             '</div>',
           ].join('');
@@ -116,6 +125,7 @@ export function buildBibleChapterHtml({
         --border-color: ${COLORS.border};
         --gold: ${COLORS.gold};
         --lxx-addition: ${COLORS.priest};
+        --psalm-introduction: ${COLORS.refrain};
         --preface-red: #d9534f;
         --font-size: ${safeFontSize}px;
       }
@@ -168,12 +178,16 @@ export function buildBibleChapterHtml({
       }
       body.selecting-english .cell:not([data-language="english"]),
       body.selecting-english .cell:not([data-language="english"]) *,
+      body.selecting-englishFromCoptic .cell:not([data-language="englishFromCoptic"]),
+      body.selecting-englishFromCoptic .cell:not([data-language="englishFromCoptic"]) *,
       body.selecting-coptic .cell:not([data-language="coptic"]),
       body.selecting-coptic .cell:not([data-language="coptic"]) *,
       body.selecting-greek .cell:not([data-language="greek"]),
       body.selecting-greek .cell:not([data-language="greek"]) *,
       body.selecting-arabic .cell:not([data-language="arabic"]),
-      body.selecting-arabic .cell:not([data-language="arabic"]) * {
+      body.selecting-arabic .cell:not([data-language="arabic"]) *,
+      body.selecting-arabicFromCoptic .cell:not([data-language="arabicFromCoptic"]),
+      body.selecting-arabicFromCoptic .cell:not([data-language="arabicFromCoptic"]) * {
         -webkit-user-select: none !important;
         user-select: none !important;
       }
@@ -182,7 +196,8 @@ export function buildBibleChapterHtml({
         font-size: ${getLanguageFontSize(safeFontSize, 'coptic')}px;
         line-height: ${getLanguageLineHeight(safeFontSize, 'coptic')}px;
       }
-      .cell.arabic {
+      .cell.arabic,
+      .cell.arabicFromCoptic {
         font-family: Arial, sans-serif;
         font-size: ${getLanguageFontSize(safeFontSize, 'arabic')}px;
         line-height: ${arabicVerseLineHeight}px;
@@ -210,6 +225,10 @@ export function buildBibleChapterHtml({
       }
       .verse-text {
         white-space: pre-line;
+      }
+      .cell.psalm-introduction {
+        color: var(--psalm-introduction);
+        font-style: italic;
       }
       .preface-cell {
         color: var(--preface-red);
@@ -675,8 +694,12 @@ const COPTIC_CHARACTER_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/gu;
 const COPTIC_TO_LOWER: Record<string, string> = { Ⲭ: 'ⲭ', Ϭ: 'ϭ', Ϯ: 'ϯ' };
 const COPTIC_TO_UPPER: Record<string, string> = { ⲭ: 'Ⲭ', ϭ: 'Ϭ', ϯ: 'Ϯ' };
 
+function isArabicLanguage(language: BibleLanguageKey): boolean {
+  return language === 'arabic' || language === 'arabicFromCoptic';
+}
+
 function formatVerseText(text: string, language: BibleLanguageKey, isFirstCopticVerse: boolean): string {
-  if (language === 'arabic') return formatArabicDigits(text);
+  if (isArabicLanguage(language)) return formatArabicDigits(text);
   if (language === 'greek') return String(text || '');
   if (language === 'coptic') {
     const normalized = lowercaseCopticCharacters(String(text || ''));
@@ -702,7 +725,7 @@ function uppercaseFirstCopticCharacter(text: string): string {
 function formatVerseNumber(verseNumber: number | string, language: BibleLanguageKey): string {
   const text = String(verseNumber);
   const numericValue = /^\d+$/.test(text) ? Number(text) : null;
-  if (language === 'arabic') return formatArabicLetterSuffixes(formatArabicDigits(text));
+  if (isArabicLanguage(language)) return formatArabicLetterSuffixes(formatArabicDigits(text));
   if (language === 'coptic') return numericValue === null ? text : formatCopticNumber(numericValue);
   if (language === 'greek') return numericValue === null ? text : formatGreekNumber(numericValue);
   return String(verseNumber);
@@ -765,7 +788,7 @@ function formatGreekNumberUnderThousand(value: number): string {
 
 function getLanguageFontSize(fontSize: number, language: BibleLanguageKey) {
   if (language === 'coptic') return Math.round(fontSize * 1.25);
-  if (language === 'arabic') return Math.round(fontSize * 1.15);
+  if (isArabicLanguage(language)) return Math.round(fontSize * 1.15);
   return fontSize;
 }
 

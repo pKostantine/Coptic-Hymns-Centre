@@ -9,9 +9,11 @@ export interface VisibleLanguages {
 
 export interface BibleVisibleLanguages {
   english: boolean;
+  englishFromCoptic: boolean;
   coptic: boolean;
   greek: boolean;
   arabic: boolean;
+  arabicFromCoptic: boolean;
 }
 
 export type OrientationMode = 'auto' | 'landscape' | 'reverseLandscape' | 'portrait';
@@ -43,9 +45,11 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   },
   bibleVisibleLanguages: {
     english: true,
+    englishFromCoptic: false,
     coptic: false,
     greek: false,
     arabic: true,
+    arabicFromCoptic: false,
   },
   fontScale: 1,
   orientationMode: 'auto',

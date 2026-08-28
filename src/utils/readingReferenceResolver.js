@@ -1,5 +1,11 @@
 import { supabase } from "./supabase";
 
+const PSALMS_CALENDAR_NUMBER = 19;
+const BIBLE_VERSE_FIELDS = "chapter_number, verse_number, english, coptic, arabic";
+const PSALM_VERSE_FIELDS = "chapter_number, verse_number, english:english_from_coptic, coptic, arabic:arabic_from_coptic";
+const BIBLE_VERSE_PART_FIELDS = "english, coptic, arabic";
+const PSALM_VERSE_PART_FIELDS = "english:english_from_coptic, coptic, arabic:arabic_from_coptic";
+
 const bookKeyByCalendarNumberCache = new Map();
 
 function splitReadingReference(ref) {
@@ -13,8 +19,31 @@ function parseVerseToken(token) {
   return { verseNum: Number(match[1]), partLabel: match[2] || null };
 }
 
+function parseVerseList(versePart) {
+  const tokens = String(versePart || "").split(",").flatMap((token) => {
+    const cleaned = String(token || "").trim().replace(/\*$/, "");
+    const rangeMatch = cleaned.match(/^(\d+)-(\d+)$/);
+    if (!rangeMatch) return [parseVerseToken(cleaned)];
+
+    const start = Number(rangeMatch[1]);
+    const end = Number(rangeMatch[2]);
+    if (end < start) throw new Error(`Malformed verse range "${token}" in reading_reference`);
+    return Array.from({ length: end - start + 1 }, (_, index) => ({ verseNum: start + index, partLabel: null }));
+  });
+  const seen = new Set();
+  return tokens.filter((token) => {
+    const key = `${token.verseNum}${token.partLabel || ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function parseReadingSegment(segment) {
-  const [bookPart, rawVersePart] = String(segment || "").split(":");
+  const rawSegment = String(segment || "");
+  const separatorIndex = rawSegment.indexOf(":");
+  const bookPart = separatorIndex === -1 ? rawSegment : rawSegment.slice(0, separatorIndex);
+  const rawVersePart = separatorIndex === -1 ? "" : rawSegment.slice(separatorIndex + 1);
   const [bookNumStr, startChapterStr] = String(bookPart || "").split(".");
   const bookNum = Number(bookNumStr);
   const startChapter = Number(startChapterStr);
@@ -24,7 +53,7 @@ function parseReadingSegment(segment) {
   }
 
   if (versePart.includes(",")) {
-    return { kind: "verses", bookNum, chapter: startChapter, verses: versePart.split(",").map(parseVerseToken) };
+    return { kind: "verses", bookNum, chapter: startChapter, verses: parseVerseList(versePart) };
   }
 
   if (versePart.includes("-")) {
@@ -53,6 +82,14 @@ function parseReadingSegment(segment) {
 function parseNumericVerseNumber(value) {
   const match = String(value ?? "").trim().match(/^\d+$/);
   return match ? Number(match[0]) : null;
+}
+
+function getBibleVerseSelectFields(bookNum) {
+  return bookNum === PSALMS_CALENDAR_NUMBER ? PSALM_VERSE_FIELDS : BIBLE_VERSE_FIELDS;
+}
+
+function getBibleVersePartSelectFields(bookNum) {
+  return bookNum === PSALMS_CALENDAR_NUMBER ? PSALM_VERSE_PART_FIELDS : BIBLE_VERSE_PART_FIELDS;
 }
 
 function normalizeVerseRow(row, partLabel = null, chapterNumber = null, verseNumber = null) {
@@ -90,6 +127,31 @@ function isRangeVerse(segment, verse) {
   return true;
 }
 
+async function fetchVersePartByCalendar(bookKey, bookNum, chapter, verse, partLabel) {
+  if (bookNum === PSALMS_CALENDAR_NUMBER) {
+    const { data, error } = await supabase
+      .schema("bible")
+      .from("verse_parts")
+      .select(getBibleVersePartSelectFields(bookNum))
+      .eq("book_key", bookKey)
+      .eq("chapter_number", chapter)
+      .eq("verse_number", verse)
+      .eq("part_label", partLabel)
+      .maybeSingle();
+    if (error) throw new Error(`Unable to load verse part ${chapter}:${verse}${partLabel}: ${error.message}`);
+    return data || null;
+  }
+
+  const { data, error } = await supabase.schema("bible").rpc("get_verse_part_by_calendar", {
+    p_calendar_book_number: bookNum,
+    p_chapter: chapter,
+    p_verse: verse,
+    p_part_label: partLabel,
+  });
+  if (error) throw new Error(`Unable to load verse part ${chapter}:${verse}${partLabel}: ${error.message}`);
+  return (data || [])[0] || null;
+}
+
 async function resolveRangeSegment(segment) {
   const bookKey = await getBookKeyByCalendarNumber(segment.bookNum);
   if (!bookKey) return { book_key: null, verses: [] };
@@ -97,7 +159,7 @@ async function resolveRangeSegment(segment) {
   const { data, error } = await supabase
     .schema("bible")
     .from("verses")
-    .select("chapter_number, verse_number, english, coptic, arabic")
+    .select(getBibleVerseSelectFields(segment.bookNum))
     .eq("book_key", bookKey)
     .gte("chapter_number", segment.startChapter)
     .lte("chapter_number", segment.endChapter);
@@ -125,7 +187,7 @@ async function resolveVerseListSegment(segment) {
     const { data, error } = await supabase
       .schema("bible")
       .from("verses")
-      .select("chapter_number, verse_number, english, coptic, arabic")
+      .select(getBibleVerseSelectFields(segment.bookNum))
       .eq("book_key", bookKey)
       .eq("chapter_number", segment.chapter)
       .in("verse_number", plainVerseNumbers);
@@ -139,14 +201,7 @@ async function resolveVerseListSegment(segment) {
   const partRowsByIndex = new Map(
     (await Promise.all(
       partTokens.map(async (token) => {
-        const { data, error } = await supabase.schema("bible").rpc("get_verse_part_by_calendar", {
-          p_calendar_book_number: segment.bookNum,
-          p_chapter: segment.chapter,
-          p_verse: token.verseNum,
-          p_part_label: token.partLabel,
-        });
-        if (error) throw new Error(`Unable to load verse part ${segment.chapter}:${token.verseNum}${token.partLabel}: ${error.message}`);
-        const row = (data || [])[0];
+        const row = await fetchVersePartByCalendar(bookKey, segment.bookNum, segment.chapter, token.verseNum, token.partLabel);
         return [token.index, row ? normalizeVerseRow(row, token.partLabel, segment.chapter, token.verseNum) : null];
       }),
     )).filter(([, verse]) => verse),
