@@ -18,6 +18,8 @@ export interface BibleChapterMeta {
 export interface BibleVerse {
   verseNumber: BibleVerseNumber;
   english: string;
+  /** NKJV rendering — Old Testament protocanon only. Empty for the New Testament, the deuterocanon, and the LXX-only chapters/verses the NKJV has no counterpart for (Susanna, Bel, the Esther additions, Psalm 151, the LXX Jeremiah surplus). */
+  englishNkjv: string;
   englishFromCoptic: string;
   coptic: string;
   greek: string;
@@ -33,8 +35,8 @@ export type BibleVerseNumber = number | string;
 const PSALMS_KEY = 'psalms';
 const ESTHER_KEY = 'esther';
 const DANIEL_KEY = 'daniel';
-const BIBLE_CHAPTER_VERSE_FIELDS = 'verse_number, english, coptic, greek, arabic';
-const PSALM_CHAPTER_VERSE_FIELDS = 'verse_number, english, english_from_coptic, coptic, greek, arabic, arabic_from_coptic';
+const BIBLE_CHAPTER_VERSE_FIELDS = 'verse_number, english, english_nkjv, coptic, greek, arabic';
+const PSALM_CHAPTER_VERSE_FIELDS = 'verse_number, english, english_nkjv, english_from_coptic, coptic, greek, arabic, arabic_from_coptic';
 const ESTHER_ADDITION_CHAPTER_LABELS: Record<number, string> = { 0: 'A', 11: 'B', 12: 'C' };
 const ESTHER_ADDITION_CHAPTER_ARABIC_LABELS: Record<number, string> = { 0: 'أ', 11: 'ب', 12: 'ت' };
 const DANIEL_ADDITION_CHAPTERS = new Set([0, 13, 14]);
@@ -266,6 +268,7 @@ async function loadChapterVerses(bookKey: string, chapterNumber: number): Promis
       return {
         verseNumber,
         english: row.english || '',
+        englishNkjv: row.english_nkjv || '',
         englishFromCoptic: isPsalms ? row.english_from_coptic || '' : '',
         coptic: row.coptic || '',
         greek: row.greek || '',

@@ -33,6 +33,7 @@ type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
 
 const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: { english: string; arabic: string } }[] = [
   { key: 'english', label: { english: 'English', arabic: 'الإنجليزية' } },
+  { key: 'englishNkjv', label: { english: 'English (NKJV)', arabic: 'الإنجليزية (NKJV)' } },
   { key: 'englishFromCoptic', label: { english: 'English (from Coptic)', arabic: 'الإنجليزية (من القبطية)' } },
   { key: 'coptic', label: { english: 'Coptic', arabic: 'القبطية' } },
   { key: 'greek', label: { english: 'Greek', arabic: 'اليونانية' } },
@@ -85,6 +86,10 @@ const SELECTOR_TEXT: Record<AppLanguage, {
 function getAvailableLanguages(verses: BibleDisplayVerse[], bookKey: string | null | undefined): BibleLanguageKey[] {
   const isPsalms = bookKey === PSALMS_BOOK_KEY;
   const languages: BibleLanguageKey[] = ['english'];
+  // The NKJV covers only the Old Testament protocanon — nothing in the New
+  // Testament, the deuterocanon, or the LXX-only chapters — so let the loaded
+  // rows decide whether to offer it rather than gating on testament/book.
+  if (verses.some((verse) => String(verse.englishNkjv || '').trim())) languages.push('englishNkjv');
   if (isPsalms && verses.some((verse) => String(verse.englishFromCoptic || '').trim())) languages.push('englishFromCoptic');
   if (verses.some((verse) => String(verse.coptic || '').trim())) languages.push('coptic');
   if (verses.some((verse) => String(verse.greek || '').trim())) languages.push('greek');
@@ -109,8 +114,8 @@ function getVersePreviewLanguage(
   enabledLanguages: EnabledBibleLanguages,
 ): BibleLanguageKey {
   const primaryLanguages: BibleLanguageKey[] = appLanguage === 'ar'
-    ? ['arabic', 'arabicFromCoptic', 'english', 'englishFromCoptic', 'coptic', 'greek']
-    : ['english', 'englishFromCoptic', 'arabic', 'arabicFromCoptic', 'coptic', 'greek'];
+    ? ['arabic', 'arabicFromCoptic', 'english', 'englishNkjv', 'englishFromCoptic', 'coptic', 'greek']
+    : ['english', 'englishNkjv', 'englishFromCoptic', 'arabic', 'arabicFromCoptic', 'coptic', 'greek'];
   const orderedLanguages = [
     ...primaryLanguages,
     ...availableLanguages.filter((language) => !primaryLanguages.includes(language)),

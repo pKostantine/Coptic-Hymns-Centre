@@ -4,6 +4,7 @@ import { formatEnglishDisplayText } from '../../utils/displayText';
 export interface BibleDisplayVerse {
   verseNumber: number | string;
   english: string;
+  englishNkjv: string;
   englishFromCoptic: string;
   coptic: string;
   greek: string;
@@ -15,6 +16,7 @@ export interface BibleDisplayVerse {
 
 export interface BiblePreface {
   english?: string;
+  englishNkjv?: string;
   englishFromCoptic?: string;
   coptic?: string;
   greek?: string;
@@ -22,7 +24,7 @@ export interface BiblePreface {
   arabicFromCoptic?: string;
 }
 
-export type BibleLanguageKey = 'english' | 'englishFromCoptic' | 'coptic' | 'greek' | 'arabic' | 'arabicFromCoptic';
+export type BibleLanguageKey = 'english' | 'englishNkjv' | 'englishFromCoptic' | 'coptic' | 'greek' | 'arabic' | 'arabicFromCoptic';
 
 /**
  * Builds the Bible chapter reader HTML — ported from the old app's
@@ -178,6 +180,8 @@ export function buildBibleChapterHtml({
       }
       body.selecting-english .cell:not([data-language="english"]),
       body.selecting-english .cell:not([data-language="english"]) *,
+      body.selecting-englishNkjv .cell:not([data-language="englishNkjv"]),
+      body.selecting-englishNkjv .cell:not([data-language="englishNkjv"]) *,
       body.selecting-englishFromCoptic .cell:not([data-language="englishFromCoptic"]),
       body.selecting-englishFromCoptic .cell:not([data-language="englishFromCoptic"]) *,
       body.selecting-coptic .cell:not([data-language="coptic"]),

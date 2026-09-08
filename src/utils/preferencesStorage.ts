@@ -9,6 +9,7 @@ export interface VisibleLanguages {
 
 export interface BibleVisibleLanguages {
   english: boolean;
+  englishNkjv: boolean;
   englishFromCoptic: boolean;
   coptic: boolean;
   greek: boolean;
@@ -45,6 +46,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   },
   bibleVisibleLanguages: {
     english: true,
+    englishNkjv: false,
     englishFromCoptic: false,
     coptic: false,
     greek: false,
