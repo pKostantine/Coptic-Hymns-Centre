@@ -1,12 +1,17 @@
 import { useWindowDimensions } from 'react-native';
 
-/** Below this viewport width, web-only screens/components switch to a
- * mobile-tuned layout (smaller chrome, wrapping instead of truncating,
- * single-column rows) instead of the desktop-oriented layout they're built
- * for by default. Desktop/tablet widths are completely unaffected. */
+/** Compact web layout for narrow windows and phones in either orientation. */
 export const MOBILE_WEB_BREAKPOINT = 700;
 
 export function useIsMobileWeb(): boolean {
-  const { width } = useWindowDimensions();
-  return width < MOBILE_WEB_BREAKPOINT;
+  const { width, height } = useWindowDimensions();
+  // A landscape phone is wide but still needs compact controls. Requiring a
+  // coarse pointer keeps short desktop browser windows in the desktop layout.
+  const isLandscapePhone =
+    height < MOBILE_WEB_BREAKPOINT &&
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
+
+  return width < MOBILE_WEB_BREAKPOINT || isLandscapePhone;
 }

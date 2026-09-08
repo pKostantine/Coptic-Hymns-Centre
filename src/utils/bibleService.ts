@@ -343,7 +343,10 @@ function septuagintChaptersForMasoreticChapter(masoreticChapter: number): number
 
 // ─── Public: chapter list for a book, in the requested numbering ──────────
 
-export async function getBibleChapterKeys(bookKey: string, psalmNumbering: PsalmNumbering = 'septuagint'): Promise<number[]> {
+const chapterKeysPromises = new Map<string, Promise<number[]>>();
+const chapterKeysCache = new Map<string, number[]>();
+
+async function loadBibleChapterKeys(bookKey: string, psalmNumbering: PsalmNumbering): Promise<number[]> {
   await assertBibleBookVisible(bookKey);
 
   if (bookKey === PSALMS_KEY && psalmNumbering === 'masoretic') {
@@ -356,6 +359,28 @@ export async function getBibleChapterKeys(bookKey: string, psalmNumbering: Psalm
   return ((data || []) as BibleChapterMeta[])
     .map((row: any) => row.chapter_number as number)
     .sort((a, b) => compareBibleChapters(bookKey, a, b));
+}
+
+export function getCachedBibleChapterKeys(bookKey: string, psalmNumbering: PsalmNumbering = 'septuagint'): number[] | null {
+  return chapterKeysCache.get(`${bookKey}:${psalmNumbering}`) ?? null;
+}
+
+export function getBibleChapterKeys(bookKey: string, psalmNumbering: PsalmNumbering = 'septuagint'): Promise<number[]> {
+  const cacheKey = `${bookKey}:${psalmNumbering}`;
+  let promise = chapterKeysPromises.get(cacheKey);
+  if (!promise) {
+    promise = loadBibleChapterKeys(bookKey, psalmNumbering)
+      .then((keys) => {
+        chapterKeysCache.set(cacheKey, keys);
+        return keys;
+      })
+      .catch((err) => {
+        chapterKeysPromises.delete(cacheKey);
+        throw err;
+      });
+    chapterKeysPromises.set(cacheKey, promise);
+  }
+  return promise;
 }
 
 // ─── Public: verses for a chapter, in the requested display numbering ─────

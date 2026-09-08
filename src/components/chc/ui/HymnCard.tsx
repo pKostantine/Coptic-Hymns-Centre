@@ -18,19 +18,26 @@ interface HymnCardProps {
   arabic?: string;
   isBookmarked?: boolean;
   onPress?: () => void;
+  onPressIn?: () => void;
+  onHoverIn?: () => void;
   /** Both default true — the main menu's App Language setting passes only one of these, so the card shows a single centered title instead of the normal bilingual pair. */
   showEnglish?: boolean;
   showArabic?: boolean;
 }
 
 /** CHC HymnCard — ported 1:1 from HymnCard.js: submenu/bookmark row, no icon chip, inline bookmark glyph. */
-export default function HymnCard({ title, arabic, isBookmarked, onPress, showEnglish = true, showArabic: showArabicProp = true }: HymnCardProps) {
+export default function HymnCard({ title, arabic, isBookmarked, onPress, onPressIn, onHoverIn, showEnglish = true, showArabic: showArabicProp = true }: HymnCardProps) {
   const showArabic = showArabicProp && Boolean(arabic);
   const showEnglishTitle = showEnglish;
   const visibleTitleCount = (showEnglishTitle ? 1 : 0) + (showArabic ? 1 : 0);
 
   return (
-    <Pressable style={({ pressed }) => [styles.card, SHADOWS.hymnCard, pressed && { opacity: 0.82 }]} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [styles.card, SHADOWS.hymnCard, pressed && { opacity: 0.82 }]}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onHoverIn={onHoverIn}
+    >
       <View style={styles.textGroup}>
         <View style={styles.titleRow}>
           <View style={styles.titleTable}>

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
@@ -12,6 +13,7 @@ interface BottomTabBarProps {
 
 export default function BottomTabBar({ active }: BottomTabBarProps) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
   const labels = isArabic
@@ -20,7 +22,7 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   const labelStyle = [styles.tabLabel, isArabic && styles.tabLabelArabic];
 
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, Platform.OS === 'web' && { paddingBottom: insets.bottom }]}>
       <Pressable accessibilityLabel={labels.books} style={styles.tab} onPress={() => router.replace('/')}>
         {active === 'books' ? <View style={styles.activeIndicator} /> : null}
         <Icon name="library-outline" size={27} color={active === 'books' ? COLORS.gold : COLORS.muted} />

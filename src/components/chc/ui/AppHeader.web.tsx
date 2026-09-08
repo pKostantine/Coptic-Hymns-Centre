@@ -1,4 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
@@ -19,7 +20,7 @@ interface AppHeaderProps {
   visibleLanguages?: { english: boolean; arabic: boolean };
 }
 
-/** CHC Header (web) — ported 1:1 from Header.web.js: no safe-area top inset, CHC_sm_web logo. */
+/** CHC web header, with room for the safe area in edge-to-edge browsers. */
 export default function AppHeader({
   title = 'Coptic Hymns Centre',
   canGoBack = false,
@@ -45,11 +46,18 @@ export default function AppHeader({
   const hasRightLeadingAction = Boolean(rightLeadingIcon && onRightLeadingPress);
   const hasRightAction = Boolean(rightIcon && onRightPress);
   const isMobileWeb = useIsMobileWeb();
+  const insets = useSafeAreaInsets();
   const iconButtonStyle = [styles.iconButton, isMobileWeb && styles.iconButtonMobile];
   const iconSize = isMobileWeb ? 22 : 26;
 
   return (
-    <View style={[styles.container, isMobileWeb && styles.containerMobile]}>
+    <View
+      style={[
+        styles.container,
+        isMobileWeb && styles.containerMobile,
+        { paddingTop: (isMobileWeb ? SPACING.sm : SPACING.lg + 4) + insets.top },
+      ]}
+    >
       <View style={styles.topRow}>
         {canGoBack ? (
           <Pressable accessibilityLabel="Go back" style={iconButtonStyle} onPress={onBack}>

@@ -435,6 +435,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
 
   return (
     <SafeAreaView
+      edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
       style={styles.safeArea}
       {...(isCompactViewport ? gesturePanResponder.panHandlers : {})}
     >
