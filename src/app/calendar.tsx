@@ -17,6 +17,7 @@ import {
   getCopticYearForDate,
   getGregorianMonthGrid,
   getGregorianRangeForCopticYear,
+  getActivePeriodKeys,
   getSeasonRanges,
   getSingleDayEventsForCopticYear,
   SeasonRange,
@@ -62,6 +63,7 @@ export default function CalendarScreen() {
   const [days, setDays] = useState<CalendarDay[] | null>(null);
   const [seasons, setSeasons] = useState<SeasonRange[]>([]);
   const [events, setEvents] = useState<SingleDayEvent[]>([]);
+  const [periodKeys, setPeriodKeys] = useState<string[]>([]);
   const [openPicker, setOpenPicker] = useState<Picker | null>(null);
   const [pickerAnchor, setPickerAnchor] = useState<PickerAnchor | null>(null);
   const monthTriggerRef = useRef<View>(null);
@@ -97,7 +99,7 @@ export default function CalendarScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    getCopticYearForDate(new Date(`${todayIso}T00:00:00Z`))
+    getCopticYearForDate(new Date(`${selectedIso}T00:00:00Z`))
       .then(async (year) => {
         if (year === null) return;
         const { startDate, endDate } = await getGregorianRangeForCopticYear(year);
@@ -112,7 +114,25 @@ export default function CalendarScreen() {
     return () => {
       cancelled = true;
     };
-  }, [todayIso]);
+  }, [selectedIso]);
+
+  // Nayrouz/Nativity/Theophany periods live only in calendar.get_context_flags
+  // — the same RPC that drives hymn selection — so they're fetched per date
+  // rather than derived from season_ranges, which has no rows for them.
+  useEffect(() => {
+    let cancelled = false;
+    getActivePeriodKeys(selectedIso)
+      .then((keys) => {
+        if (!cancelled) setPeriodKeys(keys);
+      })
+      .catch(() => {
+        if (!cancelled) setPeriodKeys([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedIso]);
 
   const loadMonth = useCallback(async () => {
     setDays(null);
@@ -120,20 +140,20 @@ export default function CalendarScreen() {
       const grid = await getGregorianMonthGrid(gregorianYear, gregorianMonth);
       setDays(grid);
       if (grid.length) {
-        const fromDate = grid[0].gregorianDate < todayIso ? grid[0].gregorianDate : todayIso;
-        const toDate = grid[grid.length - 1].gregorianDate > todayIso ? grid[grid.length - 1].gregorianDate : todayIso;
+        const fromDate = [grid[0].gregorianDate, todayIso, selectedIso].sort()[0];
+        const toDate = [grid[grid.length - 1].gregorianDate, todayIso, selectedIso].sort().slice(-1)[0];
         setSeasons(await getSeasonRanges(fromDate, toDate));
       }
     } else if (copticYear !== null && copticMonth !== null) {
       const grid = await getCopticMonthGrid(copticYear, copticMonth);
       setDays(grid);
       if (grid.length) {
-        const fromDate = grid[0].gregorianDate < todayIso ? grid[0].gregorianDate : todayIso;
-        const toDate = grid[grid.length - 1].gregorianDate > todayIso ? grid[grid.length - 1].gregorianDate : todayIso;
+        const fromDate = [grid[0].gregorianDate, todayIso, selectedIso].sort()[0];
+        const toDate = [grid[grid.length - 1].gregorianDate, todayIso, selectedIso].sort().slice(-1)[0];
         setSeasons(await getSeasonRanges(fromDate, toDate));
       }
     }
-  }, [mode, gregorianYear, gregorianMonth, copticYear, copticMonth]);
+  }, [mode, gregorianYear, gregorianMonth, copticYear, copticMonth, selectedIso]);
 
   useEffect(() => {
     loadMonth();
@@ -174,13 +194,22 @@ export default function CalendarScreen() {
 
   const leadingBlanks = days && days.length ? WEEKDAY_INDEX[days[0].weekday] : 0;
 
+  // Keyed on the SELECTED date, not today's. This used to read todayIso
+  // throughout, so the pill reported today's season permanently and picking
+  // any other day left it unchanged — which also made it impossible to see
+  // that a season was resolving at all whenever today happened to be Annual.
   const activeSeasons = useMemo(
-    () => seasons.filter((season) => season.startDate <= todayIso && season.endDate >= todayIso).map((season) => ({ key: season.rangeKey })),
-    [seasons, todayIso],
+    () => [
+      ...seasons
+        .filter((season) => season.startDate <= selectedIso && season.endDate >= selectedIso)
+        .map((season) => ({ key: season.rangeKey })),
+      ...periodKeys.map((key) => ({ key })),
+    ],
+    [seasons, selectedIso, periodKeys],
   );
   const activeEvents = useMemo(
-    () => events.filter((event) => event.date === todayIso).map((event) => ({ key: event.key })),
-    [events, todayIso],
+    () => events.filter((event) => event.date === selectedIso).map((event) => ({ key: event.key })),
+    [events, selectedIso],
   );
   const activeSeasonLabel = getSeasonIndicatorName(activeSeasons, activeEvents);
   const displayedYear = mode === 'gregorian' ? gregorianYear : copticYear;

@@ -157,6 +157,36 @@ export async function getSeasonRanges(fromDate: string, toDate: string): Promise
   }));
 }
 
+/**
+ * The liturgical periods that exist only in `calendar.get_context_flags`, not
+ * in season_ranges — mapped onto the range-key vocabulary the indicator's
+ * priority table already speaks.
+ *
+ * get_context_flags is the same RPC conditionEngine.js uses to decide which
+ * hymns show, and its own comment calls it the single source of truth for
+ * every date-derived flag. Reading the periods from it, rather than adding a
+ * competing set of season_ranges rows, is what stops the pill and the hymn
+ * filtering from becoming two independent definitions of the same season.
+ */
+const PERIOD_FLAG_TO_RANGE_KEY: Record<string, string> = {
+  CopticNewYearPeriod: 'nayrouz-period',
+  NativityPeriod: 'nativity-period',
+  TheophanyPeriod: 'theophany-period',
+};
+
+/** Which period pseudo-seasons are running on the given date. Resolves to [] rather than throwing — a failure here just leaves the pill on whatever season_ranges knows. */
+export async function getActivePeriodKeys(isoDate: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .schema('calendar')
+    .rpc('get_context_flags', { p_date: isoDate, p_extra_context: {} });
+
+  if (error || !data) return [];
+
+  return Object.entries(PERIOD_FLAG_TO_RANGE_KEY)
+    .filter(([flag]) => (data as Record<string, unknown>)[flag] === true)
+    .map(([, rangeKey]) => rangeKey);
+}
+
 // ─── Single-day feast events ────────────────────────────────────────────────
 // The old app's Season Selector sourced these from a static local dataset
 // that's since been stubbed out to empty during its own migration to a

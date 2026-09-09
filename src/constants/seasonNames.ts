@@ -35,6 +35,7 @@ export const SEASON_SHORT_NAMES: Record<string, string> = {
   'st-mary-fast': "St. Mary's Fast",
   'nayrouz-period': 'Nayrouz Period',
   'nativity-period': 'Nativity Period',
+  'theophany-period': 'Theophany Period',
   'second-day-of-theophany': '2nd Day of Theophany',
   annual: 'Annual',
 };
@@ -130,8 +131,13 @@ export const EVENT_SHORT_NAMES: Record<string, string> = {
 // see the note in calendarService.ts about the periods that still have no data
 // source — and are harmless until something actually produces them.
 const SEASON_INDICATOR_PRIORITIES: Record<string, number> = {
-  'nativity-period': 60,
-  'theophany-period': 60,
+  // The three periods rank below the 50 their own feasts use, for the same
+  // reason the fasts do: a period is the least specific thing true on a given
+  // day, so Circumcision and Wedding at Cana should win inside the Nativity and
+  // Theophany periods rather than being flattened into them. Nativity and
+  // Theophany themselves sit at 80 and still outrank their periods.
+  'nativity-period': 40,
+  'theophany-period': 40,
   'holy-50-days': 60,
   'holy-week': 60,
   'nayrouz-period': 40,
