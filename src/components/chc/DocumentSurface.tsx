@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, useWindowDimensions } from 'react-native';
 
 import SlideshowContainer from './SlideshowContainer';
@@ -141,6 +141,17 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       };
     }, [preferences.appLanguage]);
 
+    const handleToggleCollapse = useCallback(
+      (sectionId: string) => {
+        setCollapsedSectionIds((current) => ({
+          ...current,
+          [sectionId]: !(current[sectionId] ?? sections.find((s) => s.id === sectionId)?.defaultCollapsed ?? false),
+        }));
+        onCollapseToggle?.(sectionId);
+      },
+      [sections, onCollapseToggle],
+    );
+
     const slideshowSections = useMemo(
       () =>
         buildSlideshowSections(
@@ -222,13 +233,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           onAction={onAction}
           copticGospelRite={copticGospelRite}
           suppressAllSpeakerLabels={suppressAllSpeakerLabels}
-          onToggleCollapse={(sectionId: string) => {
-            setCollapsedSectionIds((current) => ({
-              ...current,
-              [sectionId]: !(current[sectionId] ?? sections.find((s) => s.id === sectionId)?.defaultCollapsed ?? false),
-            }));
-            onCollapseToggle?.(sectionId);
-          }}
+          onToggleCollapse={handleToggleCollapse}
         />
       );
     }

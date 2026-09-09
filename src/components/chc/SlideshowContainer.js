@@ -186,12 +186,20 @@ export default function SlideshowContainer({
 
           Object.entries(metrics).forEach(([language, metric]) => {
             const currentMetric = currentItem[language] || {};
+            // A reported metric can be partial (a height without a fresh
+            // lineSignature, say), so it layers over whatever is already
+            // known for this language rather than replacing it. This merge
+            // used to happen back in queueMeasuredLanguage, which forced that
+            // callback to close over measuredLanguageHeights and take a new
+            // identity after every flush; doing it here reads the committed
+            // state straight from the updater instead.
+            const mergedMetric = normalizeLanguageMetric({ ...currentMetric, ...metric });
 
             if (
-              currentMetric.height !== metric.height ||
-              currentMetric.lineSignature !== metric.lineSignature
+              currentMetric.height !== mergedMetric.height ||
+              currentMetric.lineSignature !== mergedMetric.lineSignature
             ) {
-              nextItem[language] = metric;
+              nextItem[language] = mergedMetric;
               didChange = true;
             }
           });
@@ -232,21 +240,16 @@ export default function SlideshowContainer({
         return;
       }
 
-      const existingMetric =
-        pendingLanguageHeightsRef.current[itemId]?.[language] ||
-        measuredLanguageHeights[itemId]?.[language] ||
-        {};
-      const normalizedMetric = normalizeLanguageMetric({
-        ...existingMetric,
-        ...metric,
-      });
+      // Accumulates only against what this frame has already queued --
+      // merging against committed state is flushPendingMeasurements' job now.
+      const existingMetric = pendingLanguageHeightsRef.current[itemId]?.[language] || {};
       pendingLanguageHeightsRef.current[itemId] = {
         ...(pendingLanguageHeightsRef.current[itemId] || {}),
-        [language]: normalizedMetric,
+        [language]: { ...existingMetric, ...metric },
       };
       scheduleMeasurementFlush();
     },
-    [measuredLanguageHeights, scheduleMeasurementFlush],
+    [scheduleMeasurementFlush],
   );
 
   const slides = useMemo(() => {
@@ -292,10 +295,32 @@ export default function SlideshowContainer({
     visibleLanguages,
   ]);
   const slidePadding = useMemo(() => getSlidePadding(), []);
+  // The next bounded batch of items still missing a real measured height.
+  // Mounting EVERY unmeasured item in one commit is what made this slow:
+  // anything that changes globalMeasurementKey (font size, a language
+  // toggle, a rotation, or entering Slideshow Mode at all) wipes every
+  // cached height, so the measurement layer would try to mount every verse
+  // in the document at once -- thousands of views in a single synchronous
+  // commit, which is the freeze. Capping each commit lets the batch measure,
+  // land its heights, advance the filter, and mount the next batch on a
+  // later frame, so the UI stays responsive the whole way through.
+  // Pagination keeps falling back to estimateItemHeight for anything not yet
+  // measured, and items are scanned in document order, so slides settle
+  // front-to-back -- where the reader already is.
+  const measurementBatch = useMemo(() => {
+    if (!(viewportHeight || viewportHeightOverride)) return [];
+    const batch = [];
+    for (let i = 0; i < items.length && batch.length < MEASUREMENT_BATCH_SIZE; i += 1) {
+      if (typeof measuredHeights[items[i].id] !== "number") batch.push(items[i]);
+    }
+    return batch;
+  }, [items, measuredHeights, viewportHeight, viewportHeightOverride]);
+  // An empty batch means nothing is left unmeasured, so this stays equivalent
+  // to the old items.every(...) check without rescanning the whole document
+  // on every render.
   const isMeasurementComplete = useMemo(
-    () => Boolean(viewportHeight || viewportHeightOverride) &&
-      items.every((item) => typeof measuredHeights[item.id] === "number"),
-    [items, measuredHeights, viewportHeight, viewportHeightOverride],
+    () => Boolean(viewportHeight || viewportHeightOverride) && measurementBatch.length === 0,
+    [measurementBatch, viewportHeight, viewportHeightOverride],
   );
 
   useEffect(() => {
@@ -457,34 +482,32 @@ export default function SlideshowContainer({
     >
       {!isMeasurementComplete ? (
         <View pointerEvents="none" style={[styles.measurementLayer, DISABLED_SELECTION_STYLE]}>
-          {/* Only items missing a cached height actually need to mount and
-              measure here -- most of the time (e.g. minimizing one hymn)
-              that's a small handful of items, not the whole document; see
-              the reset effect above, which preserves cached heights for
-              every item whose own signature didn't change. */}
-          {items
-            .filter((item) => typeof measuredHeights[item.id] !== "number")
-            .map((item) => (
-              <SlideItem
-                key={item.id}
-                item={item}
-                visibleLanguages={visibleLanguages}
-                fontSize={fontSize}
-                theme={theme}
-                columnWidth={slideColumnWidth}
-                tableWidth={slideTableWidth}
-                titleHelpers={titleHelpers}
-                measurementSignature={measuredKey}
-                onMeasured={(height, signature) =>
-                  queueMeasuredHeight(item.id, height, signature)
-                }
-                onLanguageMeasured={(language, metric, signature) =>
-                  queueMeasuredLanguage(item.id, language, metric, signature)
-                }
-                onToggleCollapse={onToggleCollapse}
-                copticGospelRite={copticGospelRite}
-              />
-            ))}
+          {/* Only items missing a cached height mount here, a bounded batch
+              at a time (see measurementBatch above) -- most of the time
+              (e.g. minimizing one hymn) that's a small handful of items
+              anyway; see the reset effect above, which preserves cached
+              heights for every item whose own signature didn't change.
+              MeasurementItem wraps SlideItem so each item gets a stable pair
+              of measurement callbacks: passing inline arrows here gave every
+              item new props on every render, which defeated SlideItem's memo
+              and re-rendered the whole batch on each flush. */}
+          {measurementBatch.map((item) => (
+            <MeasurementItem
+              key={item.id}
+              item={item}
+              visibleLanguages={visibleLanguages}
+              fontSize={fontSize}
+              theme={theme}
+              columnWidth={slideColumnWidth}
+              tableWidth={slideTableWidth}
+              titleHelpers={titleHelpers}
+              measurementSignature={measuredKey}
+              onQueueHeight={queueMeasuredHeight}
+              onQueueLanguage={queueMeasuredLanguage}
+              onToggleCollapse={onToggleCollapse}
+              copticGospelRite={copticGospelRite}
+            />
+          ))}
         </View>
       ) : null}
 
@@ -662,6 +685,10 @@ export function NavigationOverlay({
   );
 }
 
+// How many unmeasured items may mount in the off-screen measurement layer in
+// a single commit. Large enough that a typical hymn measures in one or two
+// frames, small enough that no commit ever mounts a whole liturgy at once.
+const MEASUREMENT_BATCH_SIZE = 48;
 const COLLAPSE_BUTTON_SIZE = 40;
 const COLLAPSE_BUTTON_CIRCLE = 22;
 const DISABLED_SELECTION_STYLE = Platform.OS === "web"
@@ -878,6 +905,46 @@ const SlideItem = memo(function SlideItem({
         }
       />
     </View>
+  );
+});
+
+/**
+ * Wraps SlideItem for the off-screen measurement layer so each measured item
+ * gets ONE stable pair of callbacks for as long as it stays mounted.
+ *
+ * The measurement layer previously passed inline arrows
+ * (`onMeasured={(h, sig) => queueMeasuredHeight(item.id, h, sig)}`), which
+ * built new function identities on every render and so defeated SlideItem's
+ * memo entirely: every flush of measured heights re-rendered every item in
+ * the layer, not just the ones whose measurements had actually landed.
+ * Binding item.id here instead keeps SlideItem's own props referentially
+ * stable, so a flush only re-renders what genuinely changed.
+ */
+const MeasurementItem = memo(function MeasurementItem({
+  item,
+  onQueueHeight,
+  onQueueLanguage,
+  ...slideItemProps
+}) {
+  const itemId = item.id;
+
+  const handleMeasured = useCallback(
+    (height, signature) => onQueueHeight(itemId, height, signature),
+    [itemId, onQueueHeight],
+  );
+
+  const handleLanguageMeasured = useCallback(
+    (language, metric, signature) => onQueueLanguage(itemId, language, metric, signature),
+    [itemId, onQueueLanguage],
+  );
+
+  return (
+    <SlideItem
+      {...slideItemProps}
+      item={item}
+      onMeasured={handleMeasured}
+      onLanguageMeasured={handleLanguageMeasured}
+    />
   );
 });
 
