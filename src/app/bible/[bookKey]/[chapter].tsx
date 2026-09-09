@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -42,6 +42,10 @@ const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: { english: string; arabi
 ];
 
 const PSALMS_BOOK_KEY = 'psalms';
+const PSALM_118_STANZA_LETTERS = [
+  'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ',
+  'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת',
+] as const;
 
 const TESTAMENT_ROUTE_LABELS: Record<BibleBook['testament'], { title: string; arabic: string }> = {
   OT: { title: 'Old Testament', arabic: 'العهد القديم' },
@@ -100,6 +104,24 @@ function getAvailableLanguages(verses: BibleDisplayVerse[], bookKey: string | nu
 
 function isArabicBibleLanguage(language: BibleLanguageKey): boolean {
   return language === 'arabic' || language === 'arabicFromCoptic';
+}
+
+function getPsalmStanza(
+  bookKey: string | null | undefined,
+  chapterNumber: number,
+  psalmNumbering: PsalmNumbering,
+  verseNumber: number | string,
+): { letter: string; number: number } | null {
+  const isPsalm118 = bookKey === PSALMS_BOOK_KEY
+    && (psalmNumbering === 'septuagint' ? chapterNumber === 118 : chapterNumber === 119);
+  if (!isPsalm118) return null;
+
+  const numericVerse = typeof verseNumber === 'number' ? verseNumber : Number(verseNumber);
+  if (!Number.isInteger(numericVerse) || numericVerse < 1 || (numericVerse - 1) % 8 !== 0) return null;
+
+  const stanzaIndex = (numericVerse - 1) / 8;
+  const letter = PSALM_118_STANZA_LETTERS[stanzaIndex];
+  return letter ? { letter, number: stanzaIndex + 1 } : null;
 }
 
 function getBibleLanguageLabel(language: BibleLanguageKey, appLanguage: AppLanguage): string {
@@ -392,29 +414,44 @@ export default function BibleChapterDocument() {
                   {(verses || []).map((verse) => {
                     const previewLanguage = getVersePreviewLanguage(verse, preferences.appLanguage, availableLanguages, enabledLanguages);
                     const isPsalmIntroduction = Boolean(verse.isPsalmIntroduction);
+                    const stanza = getPsalmStanza(bookKey, currentChapterNumber, psalmNumbering, verse.verseNumber);
                     return (
-                      <Pressable key={`selector-${verse.verseNumber}`} style={styles.selectorItem} onPress={() => selectVerse(verse.verseNumber)}>
-                        <Text
-                          style={[
-                            styles.selectorVerseNumber,
-                            verse.isLxxAddition && styles.selectorVerseNumberLxx,
-                            isPsalmIntroduction && styles.selectorVerseNumberIntro,
-                          ]}
-                        >
-                          {isPsalmIntroduction ? '' : getBibleVerseDisplayLabel(verse.verseNumber, preferences.appLanguage)}
-                        </Text>
-                        <Text
-                          numberOfLines={1}
-                          style={[
-                            styles.selectorVersePreview,
-                            isArabicBibleLanguage(previewLanguage) && styles.selectorVersePreviewArabic,
-                            previewLanguage === 'coptic' && styles.selectorVersePreviewCoptic,
-                            isPsalmIntroduction && styles.selectorVersePreviewIntro,
-                          ]}
-                        >
-                          {verse[previewLanguage]}
-                        </Text>
-                      </Pressable>
+                      <Fragment key={`selector-${verse.verseNumber}`}>
+                        {stanza ? (
+                          <View accessibilityRole="header" style={styles.psalmStanzaDivider}>
+                            <View style={styles.psalmStanzaLine} />
+                            <View style={styles.psalmStanzaLabel}>
+                              <Text style={styles.psalmStanzaLetter}>{stanza.letter}</Text>
+                              <Text style={[styles.psalmStanzaNumber, preferences.appLanguage === 'ar' && styles.psalmStanzaNumberArabic]}>
+                                ({getBibleVerseDisplayLabel(stanza.number, preferences.appLanguage)})
+                              </Text>
+                            </View>
+                            <View style={styles.psalmStanzaLine} />
+                          </View>
+                        ) : null}
+                        <Pressable style={styles.selectorItem} onPress={() => selectVerse(verse.verseNumber)}>
+                          <Text
+                            style={[
+                              styles.selectorVerseNumber,
+                              verse.isLxxAddition && styles.selectorVerseNumberLxx,
+                              isPsalmIntroduction && styles.selectorVerseNumberIntro,
+                            ]}
+                          >
+                            {isPsalmIntroduction ? '' : getBibleVerseDisplayLabel(verse.verseNumber, preferences.appLanguage)}
+                          </Text>
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.selectorVersePreview,
+                              isArabicBibleLanguage(previewLanguage) && styles.selectorVersePreviewArabic,
+                              previewLanguage === 'coptic' && styles.selectorVersePreviewCoptic,
+                              isPsalmIntroduction && styles.selectorVersePreviewIntro,
+                            ]}
+                          >
+                            {verse[previewLanguage]}
+                          </Text>
+                        </Pressable>
+                      </Fragment>
                     );
                   })}
                 </ScrollView>
@@ -523,6 +560,12 @@ const styles = StyleSheet.create({
   languageText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
   languageTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   selectorList: { flex: 1, paddingTop: SPACING.md },
+  psalmStanzaDivider: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
+  psalmStanzaLine: { backgroundColor: 'rgba(201, 162, 39, 0.38)', flex: 1, height: 1 },
+  psalmStanzaLabel: { alignItems: 'center', flexDirection: 'row', gap: SPACING.xs },
+  psalmStanzaLetter: { color: COLORS.gold, fontFamily: 'Arial', fontSize: 21, fontWeight: '700', lineHeight: 28, textAlign: 'center' },
+  psalmStanzaNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700', textAlign: 'left', writingDirection: 'ltr' },
+  psalmStanzaNumberArabic: { fontFamily: TYPOGRAPHY.arabic },
   selectorItem: {
     alignItems: 'center',
     backgroundColor: '#111111',

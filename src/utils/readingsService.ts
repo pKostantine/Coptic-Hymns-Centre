@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { hydrateSupabaseServiceHymn } from './hymnLibrary';
 import { FIXED_FEASTS } from './fixedFeasts';
+import { NESI_MONTH, shouldUseNesiSundayReadings } from './readingCalendarRules';
+import { stripAlleluiaFromPsalmVerse } from './psalmReadingText';
 import { toIsoDate as toIsoDateString } from './dateUtils';
 import { formatVerses } from './verseFormatting';
 import type { DocumentSection } from '../components/chc/documentHtml';
@@ -58,6 +60,7 @@ async function getActiveFlags(isoDate: string): Promise<Set<string>> {
 }
 
 interface CopticDateInfo {
+  copticYear: number;
   copticMonth: number;
   copticMonthName: string;
   copticDay: number;
@@ -69,12 +72,13 @@ async function getCopticDateInfo(isoDate: string): Promise<CopticDateInfo> {
   const { data, error } = await supabase
     .schema('calendar')
     .from('coptic_date_conversions')
-    .select('coptic_month, coptic_month_name, coptic_day, weekday_number, sunday_ordinal_in_coptic_month')
+    .select('coptic_year, coptic_month, coptic_month_name, coptic_day, weekday_number, sunday_ordinal_in_coptic_month')
     .eq('gregorian_date', isoDate)
     .maybeSingle();
   if (error) throw new Error(`Unable to load Coptic date info: ${error.message}`);
   if (!data) throw new Error(`No Coptic date conversion found for ${isoDate}`);
   return {
+    copticYear: data.coptic_year,
     copticMonth: data.coptic_month,
     copticMonthName: data.coptic_month_name,
     copticDay: data.coptic_day,
@@ -179,9 +183,10 @@ function pickHighestPriorityPerServiceType(rules: ReadingRule[]): ReadingRule[] 
  *      through to the normal chain below, exactly as intended (e.g. if day
  *      18 is a Sunday, the Sunday katameros takes priority as usual).
  *   3. Great Lent.
- *   4. An annual Sunday — only actual Sundays have a Sunday-katameros entry;
- *      if today is a Sunday with no matching entry, this falls through to
- *      the Daily book below rather than returning nothing.
+ *   4. An annual Sunday — only actual Sundays have a Sunday-katameros entry.
+ *      In a Coptic year with no Sunday during Nesi, the final Mesore Sunday
+ *      uses Nesi's Sunday readings. If no matching entry exists, this falls
+ *      through to the Daily book below rather than returning nothing.
  *   5. The plain Daily katameros — the fallback everything else lands on.
  */
 async function resolveReadingRules(isoDate: string, activeFlags: Set<string>): Promise<ReadingRule[]> {
@@ -210,10 +215,11 @@ async function resolveReadingRules(isoDate: string, activeFlags: Set<string>): P
   } else {
     rules = [];
     if (copticDate.sundayOrdinalInCopticMonth != null) {
+      const useNesiSundayReadings = await shouldUseNesiSundayReadings(copticDate);
       rules = await queryReadingRules({
         cycle_type: 'AnnualSunday',
-        coptic_month: copticDate.copticMonth,
-        sunday_ordinal: copticDate.sundayOrdinalInCopticMonth,
+        coptic_month: useNesiSundayReadings ? NESI_MONTH : copticDate.copticMonth,
+        sunday_ordinal: useNesiSundayReadings ? 1 : copticDate.sundayOrdinalInCopticMonth,
         day_of_week: copticDate.weekdayNumber,
       });
     }
@@ -717,12 +723,12 @@ async function buildReadingSection(rule: ReadingRule): Promise<{ section: Docume
 
   const psalmVerses = isPsalm && verses.length
     ? applyCopticCaseToReadingVerses([
-        {
+        stripAlleluiaFromPsalmVerse({
           english: verses.map((v) => v.english).filter(Boolean).join(' '),
           coptic: verses.map((v) => v.coptic || '').filter(Boolean).join(' '),
           arabic: verses.map((v) => v.arabic).filter(Boolean).join(' '),
           type: 'text',
-        },
+        }),
       ])
     : null;
 

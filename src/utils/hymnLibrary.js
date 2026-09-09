@@ -1,6 +1,8 @@
 import { evaluateCondition, getContextFlags } from "./conditionEngine";
 import { toIsoDate as toIsoDateString } from "./dateUtils";
 import { formatVerses } from "./verseFormatting";
+import { loadReadingRuleRowsForDate } from "./readingCalendarRules";
+import { stripAlleluiaFromPsalmVerse } from "./psalmReadingText";
 import { resolveBibleReadingReference } from "./readingReferenceResolver";
 import { supabase } from "./supabase";
 
@@ -156,8 +158,8 @@ export const READING_SENTINELS = new Set([
 ]);
 
 // Maps each reading sentinel to the (service, reading_type) pair it needs
-// out of calendar.reading_rules (via the public.get_readings_for_date RPC),
-// and whether Coptic text should be kept. SYNAXARIUM and PSALM_RESPONSES/
+// out of calendar.reading_rules (normally via the public.get_readings_for_date
+// RPC), and whether Coptic text should be kept. SYNAXARIUM and PSALM_RESPONSES/
 // COPTIC_READINGS have no known reading_rules mapping yet (see project
 // memory project_subdocument_registry.md) and are left unmapped — they
 // resolve to nothing rather than guessing wrong.
@@ -188,12 +190,10 @@ let synaxariumCache = null; // { isoDate, promise }
 
 function getReadingsForDate(isoDate) {
   if (readingsForDateCache?.isoDate === isoDate) return readingsForDateCache.promise;
-  const promise = supabase
-    .rpc("get_readings_for_date", { p_date: isoDate })
-    .then(async ({ data, error }) => {
-      if (error) throw new Error(`Unable to load readings for ${isoDate}: ${error.message}`);
+  const promise = loadReadingRuleRowsForDate(isoDate)
+    .then(async (rows) => {
       return Promise.all(
-        (data || []).map(async (row) => {
+        rows.map(async (row) => {
           if (!row.reading_reference) return row;
           const { resolvedSegments } = await resolveBibleReadingReference(row.reading_reference);
           return { ...row, resolved_verses: resolvedSegments };
@@ -205,7 +205,7 @@ function getReadingsForDate(isoDate) {
 }
 
 /**
- * Flattens a get_readings_for_date entry's resolved_verses into plain verse
+ * Flattens a resolved reading-rule entry's resolved_verses into plain verse
  * objects, dropping Coptic text for the "WithoutCoptic" variants. Every
  * reading shows a plain verse-number gold badge (bibleVerseNumber), same as
  * the Bible reader — never a chapter number, even when the reading spans
@@ -225,7 +225,7 @@ function buildReadingVerses(readingRow, withCoptic, isPsalm) {
   // applyCopticCaseToReadingVerses below.
   //
   // Psalm readings also get "Alleluia" (and its Coptic/Arabic equivalents)
-  // stripped out — see stripAlleluiaFromPsalmVerse below. Vespers, Matins,
+  // stripped out by the shared Psalm-text sanitizer. Vespers, Matins,
   // and Liturgy each already have their own dedicated Alleluia response
   // elsewhere in the service; when the day's Psalm reading happens to land
   // on a verse that itself contains "Alleluia" in the source text (bible.verses
@@ -1650,54 +1650,6 @@ function applyCopticCaseToReadingVerses(verses) {
     normalized[firstIndex] = { ...normalized[firstIndex], coptic: uppercaseFirstCopticChar(normalized[firstIndex].coptic) };
   }
   return normalized;
-}
-
-// ─── Alleluia stripping for Psalm readings ─────────────────────────────────
-// Vespers/Matins/Liturgy each already have their own dedicated Alleluia
-// response elsewhere in the service; a Psalm reading whose bible.verses
-// source text happens to already contain "Alleluia" (true of roughly every
-// other Psalm verse) would otherwise duplicate it. Confirmed against the
-// live DB: English always spells it "Alleluia"; Coptic is
-// "Ⲁⲗⲗⲏⲗⲟⲩⲓⲁ̀"/"ⲁⲗⲗⲏⲗⲟⲩⲓⲁ̀" (case follows sentence position, always with a
-// trailing combining grave accent, U+0300); Arabic has three transliterations
-// in live use -- "هلليلويا"/"الليلويا"/"هللويا" -- sometimes with interspersed
-// tashkeel diacritics (e.g. "هَلِّلُويَا"). It can appear either as its own
-// trailing sentence ("...for He is good. Alleluia.") or as a mid-sentence
-// interjection (Psalm 135/136's refrain: "...for He is good, Alleluia His
-// mercy endures forever.") -- both are handled, and since a multi-verse
-// Psalm reading is joined into one paragraph before this runs, an occurrence
-// anywhere in that paragraph (not just the last verse) is removed.
-const ARABIC_DIACRITIC_PATTERN = "[ً-ْٰ]*";
-function arabicWordPattern(word) {
-  return Array.from(word)
-    .map((char) => char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join(ARABIC_DIACRITIC_PATTERN);
-}
-const ARABIC_ALLELUIA_FORMS = ["هلليلويا", "الليلويا", "هللويا"];
-const ARABIC_ALLELUIA_CORE = `(?:${ARABIC_ALLELUIA_FORMS.map(arabicWordPattern).join("|")})${ARABIC_DIACRITIC_PATTERN}`;
-const ENGLISH_ALLELUIA_TRAILING = /\.\s*Alleluia\.?\s*$/i;
-const ENGLISH_ALLELUIA_WORD = /\bAlleluia\b\.?\s*/gi;
-const COPTIC_ALLELUIA_TRAILING = /\.\s*[Ⲁⲁ]ⲗⲗⲏⲗⲟⲩⲓⲁ̀?\.?\s*$/;
-const COPTIC_ALLELUIA_WORD = /[Ⲁⲁ]ⲗⲗⲏⲗⲟⲩⲓⲁ̀?\s*/g;
-const ARABIC_ALLELUIA_TRAILING = new RegExp(`[.,]?\\s*${ARABIC_ALLELUIA_CORE}\\.?\\s*$`);
-const ARABIC_ALLELUIA_WORD = new RegExp(ARABIC_ALLELUIA_CORE, "g");
-
-function stripAlleluia(text, trailingPattern, wordPattern) {
-  if (!text) return text;
-  let result = text;
-  if (trailingPattern.test(text)) {
-    result = result.replace(trailingPattern, ".");
-  }
-  return result.replace(wordPattern, "").replace(/\s{2,}/g, " ").trim();
-}
-
-function stripAlleluiaFromPsalmVerse(verse) {
-  return {
-    ...verse,
-    english: stripAlleluia(verse.english, ENGLISH_ALLELUIA_TRAILING, ENGLISH_ALLELUIA_WORD),
-    coptic: stripAlleluia(verse.coptic, COPTIC_ALLELUIA_TRAILING, COPTIC_ALLELUIA_WORD),
-    arabic: stripAlleluia(verse.arabic, ARABIC_ALLELUIA_TRAILING, ARABIC_ALLELUIA_WORD),
-  };
 }
 
 const INLINE_TEXT_FIELDS =
