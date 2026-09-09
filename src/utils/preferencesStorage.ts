@@ -24,7 +24,7 @@ export type AppLanguage = 'en' | 'ar';
 export interface ReadingPreferences {
   visibleLanguages: VisibleLanguages;
   bibleVisibleLanguages: BibleVisibleLanguages;
-  fontScale: number; // integer 1-10
+  fontScale: number; // integer 0-10, see MIN_FONT_SCALE/MAX_FONT_SCALE
   orientationMode: OrientationMode;
   selectText: boolean;
   slideshowMode: boolean;
@@ -64,14 +64,26 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   appLanguage: 'en',
 };
 
-// Old app's getRenderedFontSize clamps to roughly a 20-41px range on a typical
-// ~390px-wide mobile viewport; we approximate that with a simple linear map.
-const MIN_FONT_SIZE = 25;
-const MAX_FONT_SIZE = 61;
+/** Lowest selectable font scale. */
+export const MIN_FONT_SCALE = 0;
+/** Highest selectable font scale. */
+export const MAX_FONT_SCALE = 10;
 
-/** Maps the old app's 1-10 integer font scale onto a pixel size for the document WebView. */
+// The scale used to be 1-10 over a 25-61px range. It now runs 0-10 over a wider
+// 18-78px range, so the small end is genuinely small and the large end is large
+// enough to read a hymn off a projector. Step size is a round 6px, and the
+// anchor is deliberate: scale 1 still lands on 24px, within a pixel of the 25px
+// it produced before, so an already-stored preference keeps rendering at the
+// size its owner chose. Scale 0 is the new step below that.
+const MIN_FONT_SIZE = 18;
+const MAX_FONT_SIZE = 78;
+
+/** Maps the 0-10 integer font scale onto a pixel size for the document WebView. */
 export function fontScaleToPx(fontScale: number) {
-  return Math.round(MIN_FONT_SIZE + ((fontScale - 1) * (MAX_FONT_SIZE - MIN_FONT_SIZE)) / 9);
+  const clamped = Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, fontScale));
+  return Math.round(
+    MIN_FONT_SIZE + (clamped * (MAX_FONT_SIZE - MIN_FONT_SIZE)) / (MAX_FONT_SCALE - MIN_FONT_SCALE),
+  );
 }
 
 const STORAGE_KEY = 'chc-reading-preferences';
@@ -93,7 +105,10 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   if (!ORIENTATION_MODES.includes(merged.orientationMode)) {
     merged.orientationMode = 'auto';
   }
-  merged.fontScale = Math.min(10, Math.max(1, Math.round(merged.fontScale) || 1));
+  const roundedFontScale = Math.round(merged.fontScale);
+  merged.fontScale = Number.isFinite(roundedFontScale)
+    ? Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, roundedFontScale))
+    : DEFAULT_READING_PREFERENCES.fontScale;
   if (merged.appLanguage !== 'en' && merged.appLanguage !== 'ar') {
     merged.appLanguage = 'en';
   }

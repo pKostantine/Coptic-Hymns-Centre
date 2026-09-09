@@ -1,10 +1,10 @@
-import Icon from '@/components/chc/ui/Icon';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
+import FontScaleControl from '@/components/chc/ui/FontScaleControl';
 import ToggleRow from '@/components/chc/ui/ToggleRow';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -34,24 +34,8 @@ const SETTINGS_LABELS = {
   selectText: { english: 'Select Text', arabic: 'تحديد النص' },
   displayComments: { english: 'Display Comments', arabic: 'عرض التعليقات' },
   displaySilentPrayers: { english: 'Display Silent Prayers', arabic: 'عرض الصلوات السرية' },
+  textSize: { english: 'Text Size', arabic: 'حجم النص' },
 };
-
-const EASTERN_ARABIC_DIGITS: Record<string, string> = {
-  '0': '٠',
-  '1': '١',
-  '2': '٢',
-  '3': '٣',
-  '4': '٤',
-  '5': '٥',
-  '6': '٦',
-  '7': '٧',
-  '8': '٨',
-  '9': '٩',
-};
-
-function toEasternArabicDigits(value: number | string) {
-  return String(value).replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit);
-}
 
 /** Settings screen — ported 1:1 from LanguageToggleBar.js, rendered as its own route instead of a Modal. */
 export default function SettingsScreen() {
@@ -60,6 +44,7 @@ export default function SettingsScreen() {
     preferences,
     toggleLanguage,
     setFontScale,
+    setFontScaleValue,
     setOrientationMode,
     toggleSelectText,
     toggleSlideshowMode,
@@ -120,17 +105,13 @@ export default function SettingsScreen() {
           ) : null}
 
           <Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.display)}</Text>
-          <View style={styles.fontControls}>
-            <Pressable accessibilityLabel="Decrease font size" style={styles.fontButton} onPress={() => setFontScale(-1)}>
-              <Icon name="remove" size={18} color={COLORS.gold} />
-            </Pressable>
-            <Text style={[styles.fontSize, localizedTextStyle]}>
-              {isArabicChrome ? toEasternArabicDigits(preferences.fontScale) : preferences.fontScale}
-            </Text>
-            <Pressable accessibilityLabel="Increase font size" style={styles.fontButton} onPress={() => setFontScale(1)}>
-              <Icon name="add" size={18} color={COLORS.gold} />
-            </Pressable>
-          </View>
+          <FontScaleControl
+            fontScale={preferences.fontScale}
+            isArabic={isArabicChrome}
+            label={labelText(SETTINGS_LABELS.textSize)}
+            onStep={setFontScale}
+            onSetValue={setFontScaleValue}
+          />
           <ToggleRow label={labelText(SETTINGS_LABELS.slideshowMode)} isArabic={isArabicChrome} active={preferences.slideshowMode} onPress={toggleSlideshowMode} />
           <ToggleRow label={labelText(SETTINGS_LABELS.selectText)} isArabic={isArabicChrome} active={preferences.selectText} disabled={preferences.slideshowMode} onPress={toggleSelectText} />
           <ToggleRow label={labelText(SETTINGS_LABELS.displayComments)} isArabic={isArabicChrome} active={preferences.displayComments} onPress={toggleDisplayComments} />
@@ -158,17 +139,6 @@ const styles = StyleSheet.create({
   },
   groupLabel: { fontSize: 15, fontWeight: '800', color: COLORS.white },
   languageList: { gap: SPACING.sm },
-  fontControls: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, justifyContent: 'center' },
-  fontButton: {
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  fontSize: { fontSize: 15, fontWeight: '700', minWidth: 30, textAlign: 'center', color: COLORS.white },
   orientationGroup: { gap: SPACING.sm },
   orientationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   orientationButton: {
