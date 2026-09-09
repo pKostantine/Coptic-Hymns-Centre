@@ -120,6 +120,21 @@ export async function getCopticYearForDate(date: Date): Promise<number | null> {
   return result?.coptic_year ?? null;
 }
 
+// `calendar.season_ranges` currently carries exactly seven range_keys:
+// apostles-fast, great-fast, holy-50-days, holy-week, jonahs-fast,
+// nativity-fast and st-mary-fast. Anything keyed off this table has to use
+// those spellings verbatim — a key that doesn't match simply never resolves,
+// silently, since every lookup here falls back rather than throwing.
+//
+// Three liturgical periods the app knows names for have no data source at all:
+// the Nayrouz period (Thoout 1-17), the Nativity period and the Theophany
+// period. They are not rows in season_ranges, and unlike the old app — which
+// derived the Theophany period client-side from "yesterday was Theophany" —
+// nothing recomputes them here. Days inside them therefore fall through to
+// 'Annual' unless a single-day feast lands on them. Filling that gap needs
+// either new season_ranges rows or a client-side derivation; see
+// SEASON_INDICATOR_PRIORITIES in constants/seasonNames.ts.
+
 /** All liturgical season/fast ranges overlapping [fromDate, toDate] — from `calendar.season_ranges`. */
 export async function getSeasonRanges(fromDate: string, toDate: string): Promise<SeasonRange[]> {
   const { data, error } = await supabase

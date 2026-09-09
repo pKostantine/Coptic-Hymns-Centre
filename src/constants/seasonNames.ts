@@ -16,7 +16,7 @@ export interface FormalName {
 export const SEASON_FORMAL_NAMES: Record<string, FormalName> = {
   'apostles-fast': { english: 'Fast of the Apostles', arabic: 'صوم الرسل' },
   'apostles-feast': { english: 'Feast of the Apostles', arabic: 'عيد الرسل' },
-  'lent': { english: 'Great Lent', arabic: 'الصوم الكبير' },
+  'great-fast': { english: 'Great Lent', arabic: 'الصوم الكبير' },
   'holy-week': { english: 'Holy Week', arabic: 'أسبوع الآلام' },
   'jonahs-fast': { english: "Jonah's Fast", arabic: 'صوم يونان' },
   'nativity-fast': { english: 'Fast of the Nativity (Advent)', arabic: 'صوم الميلاد' },
@@ -27,7 +27,7 @@ export const SEASON_FORMAL_NAMES: Record<string, FormalName> = {
 export const SEASON_SHORT_NAMES: Record<string, string> = {
   'apostles-fast': "Apostles' Fast",
   'apostles-feast': "Apostles' Feast",
-  lent: 'Great Lent',
+  'great-fast': 'Great Lent',
   'holy-week': 'Holy Week',
   'jonahs-fast': "Jonah's Fast",
   'nativity-fast': 'Nativity Fast',
@@ -113,21 +113,39 @@ export const EVENT_SHORT_NAMES: Record<string, string> = {
   'joyful-29': 'Joyful 29th',
 };
 
+// Keyed by `calendar.season_ranges.range_key`. A key absent from here scores 0
+// and is dropped by getSeasonIndicatorName, so the pill falls back to 'Annual' —
+// which is why every key here has to match the database exactly.
+//
+// The two great fasts sit at 20, deliberately below the 30 used by the feast
+// days that fall inside them. A season and an event that tie would resolve to
+// the season (sort is stable and seasons are listed first), which would mask
+// the Lent Sundays, Annunciation and the rest behind a blanket 'Great Lent'.
+// Ranking the span below its own feasts keeps the pill on the more specific of
+// the two.
+//
+// 'nativity-period', 'theophany-period' and 'nayrouz-period' are inert: no
+// season_ranges row carries those keys and nothing computes them client-side,
+// so they can never be scored. They are left here as a record of the intent —
+// see the note in calendarService.ts about the periods that still have no data
+// source — and are harmless until something actually produces them.
 const SEASON_INDICATOR_PRIORITIES: Record<string, number> = {
   'nativity-period': 60,
   'theophany-period': 60,
-  'second-day-of-theophany': 60,
   'holy-50-days': 60,
   'holy-week': 60,
   'nayrouz-period': 40,
   'st-mary-fast': 30,
   'apostles-fast': 30,
   'jonahs-fast': 30,
+  'great-fast': 20,
+  'nativity-fast': 20,
 };
 
 const EVENT_INDICATOR_PRIORITIES: Record<string, number> = {
   nativity: 80,
   theophany: 80,
+  'second-day-of-theophany': 60,
   resurrection: 80,
   'holy-thursday': 80,
   'good-friday': 80,
