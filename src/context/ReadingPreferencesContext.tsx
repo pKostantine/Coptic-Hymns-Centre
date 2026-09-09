@@ -6,6 +6,8 @@ import {
   BibleVisibleLanguages,
   DEFAULT_READING_PREFERENCES,
   loadReadingPreferences,
+  MAX_FONT_SCALE,
+  MIN_FONT_SCALE,
   OrientationMode,
   ReadingPreferences,
   saveReadingPreferences,
@@ -18,6 +20,8 @@ interface ReadingPreferencesContextValue {
   toggleLanguage: (key: keyof VisibleLanguages) => void;
   setBibleVisibleLanguages: (updater: SetStateAction<BibleVisibleLanguages>) => void;
   setFontScale: (delta: number) => void;
+  /** Sets the font scale outright rather than nudging it — what the slider needs. */
+  setFontScaleValue: (value: number) => void;
   setOrientationMode: (mode: OrientationMode) => void;
   toggleSelectText: () => void;
   toggleSlideshowMode: () => void;
@@ -32,6 +36,13 @@ interface ReadingPreferencesContextValue {
 }
 
 const ReadingPreferencesContext = createContext<ReadingPreferencesContextValue | null>(null);
+
+/** Rounds to a whole step and pins it inside the selectable range. */
+function clampFontScale(value: number) {
+  const rounded = Math.round(value);
+  if (!Number.isFinite(rounded)) return DEFAULT_READING_PREFERENCES.fontScale;
+  return Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, rounded));
+}
 
 export function ReadingPreferencesProvider({ children }: { children: React.ReactNode }) {
   const [preferences, setPreferences] = useState<ReadingPreferences>(DEFAULT_READING_PREFERENCES);
@@ -77,7 +88,17 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
   }, []);
 
   const setFontScale = useCallback((delta: number) => {
-    setPreferences((prev) => ({ ...prev, fontScale: Math.min(10, Math.max(1, prev.fontScale + delta)) }));
+    setPreferences((prev) => ({ ...prev, fontScale: clampFontScale(prev.fontScale + delta) }));
+  }, []);
+
+  const setFontScaleValue = useCallback((value: number) => {
+    setPreferences((prev) => {
+      const fontScale = clampFontScale(value);
+      // The slider reports every value it passes through while dragging, and
+      // each accepted change repaginates any open document. Bailing out when
+      // the step hasn't actually changed keeps a drag to one update per step.
+      return prev.fontScale === fontScale ? prev : { ...prev, fontScale };
+    });
   }, []);
 
   const setOrientationMode = useCallback((mode: OrientationMode) => {
@@ -132,6 +153,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleLanguage,
       setBibleVisibleLanguages,
       setFontScale,
+      setFontScaleValue,
       setOrientationMode,
       toggleSelectText,
       toggleSlideshowMode,
@@ -150,6 +172,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleLanguage,
       setBibleVisibleLanguages,
       setFontScale,
+      setFontScaleValue,
       setOrientationMode,
       toggleSelectText,
       toggleSlideshowMode,
