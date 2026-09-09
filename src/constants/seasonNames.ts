@@ -16,7 +16,7 @@ export interface FormalName {
 export const SEASON_FORMAL_NAMES: Record<string, FormalName> = {
   'apostles-fast': { english: 'Fast of the Apostles', arabic: 'صوم الرسل' },
   'apostles-feast': { english: 'Feast of the Apostles', arabic: 'عيد الرسل' },
-  'great-fast': { english: 'Great Lent', arabic: 'الصوم الكبير' },
+  lent: { english: 'Great Lent', arabic: 'الصوم الكبير' },
   'holy-week': { english: 'Holy Week', arabic: 'أسبوع الآلام' },
   'jonahs-fast': { english: "Jonah's Fast", arabic: 'صوم يونان' },
   'nativity-fast': { english: 'Fast of the Nativity (Advent)', arabic: 'صوم الميلاد' },
@@ -27,7 +27,7 @@ export const SEASON_FORMAL_NAMES: Record<string, FormalName> = {
 export const SEASON_SHORT_NAMES: Record<string, string> = {
   'apostles-fast': "Apostles' Fast",
   'apostles-feast': "Apostles' Feast",
-  'great-fast': 'Great Lent',
+  lent: 'Great Lent',
   'holy-week': 'Holy Week',
   'jonahs-fast': "Jonah's Fast",
   'nativity-fast': 'Nativity Fast',
@@ -138,7 +138,7 @@ const SEASON_INDICATOR_PRIORITIES: Record<string, number> = {
   'st-mary-fast': 30,
   'apostles-fast': 30,
   'jonahs-fast': 30,
-  'great-fast': 20,
+  lent: 20,
   'nativity-fast': 20,
 };
 

@@ -121,7 +121,7 @@ export async function getCopticYearForDate(date: Date): Promise<number | null> {
 }
 
 // `calendar.season_ranges` currently carries exactly seven range_keys:
-// apostles-fast, great-fast, holy-50-days, holy-week, jonahs-fast,
+// apostles-fast, lent, holy-50-days, holy-week, jonahs-fast,
 // nativity-fast and st-mary-fast. Anything keyed off this table has to use
 // those spellings verbatim — a key that doesn't match simply never resolves,
 // silently, since every lookup here falls back rather than throwing.

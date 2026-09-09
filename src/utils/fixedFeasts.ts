@@ -93,7 +93,7 @@ export function computeParamounDates(feastIsoDate: string): string[] {
 export function computeMovableFeastDates(ranges: Record<string, DateRange | undefined>): SingleDayFeast[] {
   const holyWeek = ranges['holy-week'];
   const holy50Days = ranges['holy-50-days'];
-  const greatFast = ranges['great-fast'];
+  const lent = ranges['lent'];
   const jonahsFast = ranges['jonahs-fast'];
   const apostlesFast = ranges['apostles-fast'];
   const stMaryFast = ranges['st-mary-fast'];
@@ -108,13 +108,13 @@ export function computeMovableFeastDates(ranges: Record<string, DateRange | unde
     holy50Days && { key: 'thomas-sunday', title: 'Thomas Sunday', date: addDaysIso(holy50Days.startDate, 7) },
     holy50Days && { key: 'ascension', title: 'Ascension', date: addDaysIso(holy50Days.startDate, 39) },
     holy50Days && { key: 'pentecost', title: 'Feast of Pentecost', date: holy50Days.endDate },
-    greatFast && { key: 'lent-sunday-1', title: 'First Sunday of Lent', date: addDaysIso(greatFast.startDate, 6) },
-    greatFast && { key: 'lent-sunday-2', title: 'Second Sunday of Lent', date: addDaysIso(greatFast.startDate, 13) },
-    greatFast && { key: 'lent-sunday-3', title: 'Third Sunday of Lent', date: addDaysIso(greatFast.startDate, 20) },
-    greatFast && { key: 'lent-sunday-4', title: 'Fourth Sunday of Lent', date: addDaysIso(greatFast.startDate, 27) },
-    greatFast && { key: 'lent-sunday-5', title: 'Fifth Sunday of Lent', date: addDaysIso(greatFast.startDate, 34) },
-    greatFast && { key: 'lent-sunday-6', title: 'Sixth Sunday of Lent', date: addDaysIso(greatFast.startDate, 41) },
-    greatFast && { key: 'last-friday-of-lent', title: 'Last Friday of Lent', date: greatFast.endDate },
+    lent && { key: 'lent-sunday-1', title: 'First Sunday of Lent', date: addDaysIso(lent.startDate, 6) },
+    lent && { key: 'lent-sunday-2', title: 'Second Sunday of Lent', date: addDaysIso(lent.startDate, 13) },
+    lent && { key: 'lent-sunday-3', title: 'Third Sunday of Lent', date: addDaysIso(lent.startDate, 20) },
+    lent && { key: 'lent-sunday-4', title: 'Fourth Sunday of Lent', date: addDaysIso(lent.startDate, 27) },
+    lent && { key: 'lent-sunday-5', title: 'Fifth Sunday of Lent', date: addDaysIso(lent.startDate, 34) },
+    lent && { key: 'lent-sunday-6', title: 'Sixth Sunday of Lent', date: addDaysIso(lent.startDate, 41) },
+    lent && { key: 'last-friday-of-lent', title: 'Last Friday of Lent', date: lent.endDate },
     jonahsFast && { key: 'jonahs-feast', title: "Jonah's Feast", date: addDaysIso(jonahsFast.endDate, 1) },
     apostlesFast && { key: 'apostles-feast', title: "Apostles' Feast", date: addDaysIso(apostlesFast.endDate, 1) },
     stMaryFast && { key: 'st-marys-feast', title: "St. Mary's Feast", date: addDaysIso(stMaryFast.endDate, 1) },
