@@ -15,30 +15,43 @@ export interface FormalName {
 
 export const SEASON_FORMAL_NAMES: Record<string, FormalName> = {
   'apostles-fast': { english: 'Fast of the Apostles', arabic: 'صوم الرسل' },
-  'great-fast': { english: 'Great Lent', arabic: 'الصوم الكبير' },
+  'apostles-feast': { english: 'Feast of the Apostles', arabic: 'عيد الرسل' },
+  'lent': { english: 'Great Lent', arabic: 'الصوم الكبير' },
   'holy-week': { english: 'Holy Week', arabic: 'أسبوع الآلام' },
   'jonahs-fast': { english: "Jonah's Fast", arabic: 'صوم يونان' },
   'nativity-fast': { english: 'Fast of the Nativity (Advent)', arabic: 'صوم الميلاد' },
   'holy-50-days': { english: 'Holy 50 Days', arabic: 'الخمسين المقدسة' },
-  'st-mary-fast': { english: "St. Mary's Fast", arabic: 'صوم العذراء مريم' },
+  'st-mary-fast': { english: "Fast of the Virgin Mary", arabic: 'صوم العذراء مريم' },
 };
 
 export const SEASON_SHORT_NAMES: Record<string, string> = {
   'apostles-fast': "Apostles' Fast",
-  'great-fast': 'Great Lent',
+  'apostles-feast': "Apostles' Feast",
+  lent: 'Great Lent',
   'holy-week': 'Holy Week',
   'jonahs-fast': "Jonah's Fast",
   'nativity-fast': 'Nativity Fast',
   'holy-50-days': "Holy 50's",
   'st-mary-fast': "St. Mary's Fast",
+  'nayrouz-period': 'Nayrouz Period',
+  'nativity-period': 'Nativity Period',
+  'second-day-of-theophany': '2nd Day of Theophany',
+  annual: 'Annual',
 };
 
 export const EVENT_FORMAL_NAMES: Record<string, FormalName> = {
   annunciation: { english: 'Feast of the Annunciation', arabic: 'عيد البشارة' },
-  'st-marys-feast': { english: "St. Mary's Feast", arabic: 'عيد العذراء مريم' },
   'palm-sunday': { english: 'Feast of Palm Sunday', arabic: 'عيد أحد الشعانين' },
   resurrection: { english: 'Glorious Feast of the Resurrection', arabic: 'عيد القيامة المجيد' },
   'jonahs-feast': { english: "Jonah's Passover", arabic: 'وفصح يونان' },
+  'first-monday-of-lent': { english: 'First Monday of Lent', arabic: 'اثنين الصوم الكبير الأول' },
+  'lent-sunday-1': { english: 'First Sunday of  Lent', arabic: 'أحد الصوم الكبير الأول' },
+  'lent-sunday-2': { english: 'Second Sunday of Lent', arabic: 'أحد الصوم الكبير الثاني' },
+  'lent-sunday-3': { english: 'Third Sunday of Lent', arabic: 'أحد الصوم الكبير الثالث' },
+  'lent-sunday-4': { english: 'Fourth Sunday of Lent', arabic: 'أحد الصوم الكبير الرابع' },
+  'lent-sunday-5': { english: 'Fifth Sunday of Lent', arabic: 'أحد الصوم الكبير الخامس' },
+  'lent-sunday-6': { english: 'Sixth Sunday of Lent', arabic: 'أحد الصوم الكبير السادس' },
+  'last-friday-of-lent': { english: 'Last Friday of Lent', arabic: 'جمعة ختام الصوم' },
   'lazarus-saturday': { english: 'Lazarus Saturday', arabic: 'سبت لعازر' },
   'apostles-feast': { english: 'Feast of the Apostles', arabic: 'عيد الرسل' },
   'feast-of-the-cross': { english: 'Feast of the Cross', arabic: 'عيد الصليب' },
@@ -55,8 +68,9 @@ export const EVENT_FORMAL_NAMES: Record<string, FormalName> = {
   'holy-thursday': { english: 'Holy Thursday', arabic: 'خميس العهد' },
   'good-friday': { english: 'Good Friday', arabic: 'جمعة العظيمة' },
   'thomas-sunday': { english: 'Thomas Sunday', arabic: 'أحد توما' },
-  'last-friday-of-lent': { english: 'Last Friday of Lent', arabic: 'جمعة ختام الصوم' },
   'bright-saturday': { english: 'Bright Saturday', arabic: 'سبت النور' },
+  'st-marys-feast': { english: "Feast of the Virgin Mary", arabic: 'عيد العذراء مريم' },
+  'joyful-29': { english: 'Joyful 29th of the Coptic Month', arabic: 'التاسع والعشرين من الشهر القبطي' },
   'kiahk-sunday-1': { english: 'First Sunday of Kiahk', arabic: 'أحد كيهك الأول' },
   'kiahk-sunday-2': { english: 'Second Sunday of Kiahk', arabic: 'أحد كيهك الثاني' },
   'kiahk-sunday-3': { english: 'Third Sunday of Kiahk', arabic: 'أحد كيهك الثالث' },
@@ -65,15 +79,16 @@ export const EVENT_FORMAL_NAMES: Record<string, FormalName> = {
 
 export const EVENT_SHORT_NAMES: Record<string, string> = {
   annunciation: 'Annunciation',
-  'st-marys-feast': "St. Mary's Feast",
   'palm-sunday': 'Palm Sunday',
   resurrection: 'Resurrection',
   'jonahs-feast': "Jonah's Feast",
   'lazarus-saturday': 'Lazarus Saturday',
   'apostles-feast': "Apostles' Feast",
   'feast-of-the-cross': 'Cross',
+  'theophany-paramoun': 'Theophany Paramoun',
   theophany: 'Theophany',
   ascension: 'Ascension',
+  'nativity-paramoun': 'Nativity Paramoun',
   nativity: 'Nativity',
   pentecost: 'Pentecost',
   nayrouz: 'Nayrouz',
@@ -85,13 +100,79 @@ export const EVENT_SHORT_NAMES: Record<string, string> = {
   'holy-thursday': 'Holy Thursday',
   'good-friday': 'Good Friday',
   'thomas-sunday': 'Thomas Sunday',
-  'last-friday-of-lent': 'Last Friday',
+  'first-monday-of-lent': 'First Monday Lent',
+  'lent-sunday-1': 'Lent Sunday 1',
+  'lent-sunday-2': 'Lent Sunday 2',
+  'lent-sunday-3': 'Lent Sunday 3',
+  'lent-sunday-4': 'Lent Sunday 4',
+  'lent-sunday-5': 'Lent Sunday 5',
+  'lent-sunday-6': 'Lent Sunday 6',
+  'last-friday-of-lent': 'Last Friday Lent',
   'bright-saturday': 'Bright Saturday',
-  'kiahk-sunday-1': '1st Kiahk',
-  'kiahk-sunday-2': '2nd Kiahk',
-  'kiahk-sunday-3': '3rd Kiahk',
-  'kiahk-sunday-4': '4th Kiahk',
+  'st-marys-feast': "St. Mary's Feast",
+  'joyful-29': 'Joyful 29th',
 };
+
+const SEASON_INDICATOR_PRIORITIES: Record<string, number> = {
+  'nativity-period': 60,
+  'theophany-period': 60,
+  'second-day-of-theophany': 60,
+  'holy-50-days': 60,
+  'holy-week': 60,
+  'nayrouz-period': 40,
+  'st-mary-fast': 30,
+  'apostles-fast': 30,
+  'jonahs-fast': 30,
+};
+
+const EVENT_INDICATOR_PRIORITIES: Record<string, number> = {
+  nativity: 80,
+  theophany: 80,
+  resurrection: 80,
+  'holy-thursday': 80,
+  'good-friday': 80,
+  'bright-saturday': 80,
+  ascension: 70,
+  pentecost: 70,
+  annunciation: 50,
+  'palm-sunday': 50,
+  'feast-of-the-cross': 50,
+  nayrouz: 50,
+  'joyful-29': 50,
+  circumcision: 50,
+  'wedding-at-cana': 50,
+  'entry-into-temple': 50,
+  transfiguration: 50,
+  'entry-into-egypt': 50,
+  'st-marys-feast': 30,
+  'apostles-feast': 30,
+  'jonahs-feast': 30,
+  'first-monday-of-lent': 30,
+  'last-friday-of-lent': 30,
+  'lent-sunday-1': 30,
+  'lent-sunday-2': 30,
+  'lent-sunday-3': 30,
+  'lent-sunday-4': 30,
+  'lent-sunday-5': 30,
+  'lent-sunday-6': 30,
+  'lazarus-saturday': 30,
+};
+
+type SeasonIndicatorItem = { key: string; date?: string };
+
+export function getSeasonIndicatorName(
+  activeSeasons: SeasonIndicatorItem[],
+  activeEvents: SeasonIndicatorItem[],
+): string {
+  const candidates = [
+    ...activeSeasons.map((season) => ({ key: season.key, priority: SEASON_INDICATOR_PRIORITIES[season.key] ?? 0 })),
+    ...activeEvents.map((event) => ({ key: event.key, priority: EVENT_INDICATOR_PRIORITIES[event.key] ?? 0 })),
+  ].filter((candidate) => candidate.priority > 0);
+
+  const selected = candidates.sort((a, b) => b.priority - a.priority)[0];
+  if (!selected) return 'Annual';
+  return EVENT_SHORT_NAMES[selected.key] || SEASON_SHORT_NAMES[selected.key] || 'Annual';
+}
 
 export function getSeasonFormalName(rangeKey: string, fallbackEnglish: string): FormalName {
   return SEASON_FORMAL_NAMES[rangeKey] ?? { english: fallbackEnglish, arabic: '' };

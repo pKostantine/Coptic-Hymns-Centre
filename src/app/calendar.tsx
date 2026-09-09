@@ -1,30 +1,35 @@
 import Icon from '@/components/chc/ui/Icon';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { getSeasonIndicatorName } from '@/constants/seasonNames';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { getSeasonFormalName, getSeasonShortName } from '@/constants/seasonNames';
 import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { todayIsoDate } from '@/utils/dateUtils';
 import {
   CalendarDay,
   getAdjacentCopticMonth,
   getCopticMonthForDate,
   getCopticMonthGrid,
+  getCopticYearForDate,
   getGregorianMonthGrid,
+  getGregorianRangeForCopticYear,
   getSeasonRanges,
+  getSingleDayEventsForCopticYear,
   SeasonRange,
+  SingleDayEvent,
 } from '@/utils/calendarService';
-import { formatCalendarDay, formatCopticMonthName, formatGregorianMonthTitle } from '@/utils/localeFormat';
+import { todayIsoDate } from '@/utils/dateUtils';
+import { formatCalendarDay, formatCopticMonthName, GREGORIAN_MONTHS_AR, GREGORIAN_MONTHS_EN } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAYS_AR = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
 const WEEKDAY_INDEX: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+const COPTIC_MONTHS = ['Thoout', 'Baba', 'Hathor', 'Kiahk', 'Tobe', 'Meshir', 'Paremhotep', 'Parmoute', 'Pashons', 'Paone', 'Epep', 'Mesore', 'Nasie'];
 const CALENDAR_LABELS = {
   calendar: { english: 'Calendar', arabic: 'التقويم' },
   live: { english: 'Live', arabic: 'حاليًا' },
@@ -35,10 +40,13 @@ const CALENDAR_LABELS = {
 };
 
 type Mode = 'gregorian' | 'coptic';
+type Picker = 'year' | 'month';
+type PickerAnchor = { x: number; y: number; width: number; height: number };
 
 /** Calendar screen — ported 1:1 from CalendarDatePicker.js. Its header is custom (not the shared AppHeader), matching the old component exactly. */
 export default function CalendarScreen() {
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
   const safeAreaInsets = useSafeAreaInsets();
   const { rawDate, isLive, selectDate, goLive, liturgicalDayPeriod, setLiturgicalDayPeriod } = useCalendar();
   const { preferences } = useReadingPreferences();
@@ -53,6 +61,12 @@ export default function CalendarScreen() {
   const [copticMonthName, setCopticMonthName] = useState('');
   const [days, setDays] = useState<CalendarDay[] | null>(null);
   const [seasons, setSeasons] = useState<SeasonRange[]>([]);
+  const [events, setEvents] = useState<SingleDayEvent[]>([]);
+  const [openPicker, setOpenPicker] = useState<Picker | null>(null);
+  const [pickerAnchor, setPickerAnchor] = useState<PickerAnchor | null>(null);
+  const monthTriggerRef = useRef<View>(null);
+  const yearTriggerRef = useRef<View>(null);
+  const pickerListRef = useRef<ScrollView>(null);
 
   // The grid highlight always tracks the literal calendar day, even after
   // the liturgical day has rolled forward past 5pm — only the day/night
@@ -80,6 +94,25 @@ export default function CalendarScreen() {
       setCopticMonthName(result.coptic_month_name);
     });
   }, [mode, copticYear, rawDate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCopticYearForDate(new Date(`${todayIso}T00:00:00Z`))
+      .then(async (year) => {
+        if (year === null) return;
+        const { startDate, endDate } = await getGregorianRangeForCopticYear(year);
+        const yearSeasons = await getSeasonRanges(startDate, endDate);
+        const yearEvents = await getSingleDayEventsForCopticYear(year, yearSeasons);
+        if (!cancelled) setEvents(yearEvents);
+      })
+      .catch(() => {
+        if (!cancelled) setEvents([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [todayIso]);
 
   const loadMonth = useCallback(async () => {
     setDays(null);
@@ -141,16 +174,37 @@ export default function CalendarScreen() {
 
   const leadingBlanks = days && days.length ? WEEKDAY_INDEX[days[0].weekday] : 0;
 
-  const activeSeason = useMemo(() => seasons.find((s) => s.startDate <= todayIso && s.endDate >= todayIso), [seasons, todayIso]);
-  const activeSeasonLabel = activeSeason
-    ? isArabic
-      ? getSeasonFormalName(activeSeason.rangeKey, activeSeason.activeSeason).arabic || getSeasonShortName(activeSeason.rangeKey, activeSeason.activeSeason)
-      : getSeasonShortName(activeSeason.rangeKey, activeSeason.activeSeason)
-    : labelText(CALENDAR_LABELS.season);
-  const monthTitle =
-    mode === 'gregorian'
-      ? formatGregorianMonthTitle(gregorianMonth, gregorianYear, isArabic)
-      : `${formatCopticMonthName(copticMonthName, isArabic)} ${copticYear === null ? '' : formatCalendarDay(copticYear, isArabic)}`.trim();
+  const activeSeasons = useMemo(
+    () => seasons.filter((season) => season.startDate <= todayIso && season.endDate >= todayIso).map((season) => ({ key: season.rangeKey })),
+    [seasons, todayIso],
+  );
+  const activeEvents = useMemo(
+    () => events.filter((event) => event.date === todayIso).map((event) => ({ key: event.key })),
+    [events, todayIso],
+  );
+  const activeSeasonLabel = getSeasonIndicatorName(activeSeasons, activeEvents);
+  const displayedYear = mode === 'gregorian' ? gregorianYear : copticYear;
+  const displayedMonth = mode === 'gregorian' ? gregorianMonth : copticMonth;
+  const displayedMonthName = mode === 'gregorian'
+    ? (isArabic ? GREGORIAN_MONTHS_AR[gregorianMonth - 1] : GREGORIAN_MONTHS_EN[gregorianMonth - 1])
+    : copticMonthName ? formatCopticMonthName(copticMonthName, isArabic) : '';
+  const pickerYears = Array.from({ length: 61 }, (_, index) => (displayedYear || new Date().getUTCFullYear()) - 30 + index);
+  const pickerMonths = mode === 'gregorian' ? GREGORIAN_MONTHS_EN.map((_, index) => index + 1) : COPTIC_MONTHS.map((_, index) => index + 1);
+  const pickerWidth = openPicker === 'year' ? 160 : 220;
+  const pickerLeft = pickerAnchor ? Math.max(12, Math.min(pickerAnchor.x, screenWidth - pickerWidth - 12)) : 12;
+
+  useEffect(() => {
+    if (!openPicker) return;
+    const selectedIndex = openPicker === 'year' ? 30 : (displayedMonth || 1) - 1;
+    if (selectedIndex >= 0) pickerListRef.current?.scrollTo({ y: selectedIndex * 44, animated: false });
+  }, [displayedMonth, openPicker]);
+
+  function showPicker(picker: Picker, triggerRef: RefObject<View | null>) {
+    triggerRef.current?.measureInWindow((x, y, width, height) => {
+      setPickerAnchor({ x, y, width, height });
+      setOpenPicker(picker);
+    });
+  }
   const weekdayLabels = isArabic ? WEEKDAYS_AR : WEEKDAYS;
   const goVisualLeftMonth = () => {
     if (isArabic) {
@@ -242,7 +296,22 @@ export default function CalendarScreen() {
           </Pressable>
 
           <View style={styles.monthTitleGroup}>
-            <Text style={[styles.monthTitle, isArabic && styles.arabicText]}>{monthTitle}</Text>
+            <View style={styles.datePickerTriggers}>
+              <View ref={monthTriggerRef} collapsable={false}>
+                <Pressable accessibilityLabel="Choose month" style={styles.datePickerTrigger} onPress={() => showPicker('month', monthTriggerRef)}>
+                  <Text style={[styles.monthTitle, isArabic && styles.arabicText]}>{displayedMonthName}</Text>
+                  <Icon name="chevron-down" size={18} color={COLORS.gold} />
+                </Pressable>
+              </View>
+              <View ref={yearTriggerRef} collapsable={false}>
+                <Pressable accessibilityLabel="Choose year" style={styles.datePickerTrigger} onPress={() => showPicker('year', yearTriggerRef)}>
+                  <Text style={[styles.yearTitle, isArabic && styles.arabicText]}>
+                    {displayedYear === null ? '' : formatCalendarDay(displayedYear, isArabic)}
+                  </Text>
+                  <Icon name="chevron-down" size={18} color={COLORS.gold} />
+                </Pressable>
+              </View>
+            </View>
             <View style={[styles.modeSelector, isArabic && styles.rowReverse]}>
               {(['gregorian', 'coptic'] as Mode[]).map((option) => {
                 const isActive = mode === option;
@@ -302,6 +371,47 @@ export default function CalendarScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal visible={openPicker !== null} transparent animationType="fade" onRequestClose={() => setOpenPicker(null)}>
+        <Pressable style={styles.pickerBackdrop} onPress={() => setOpenPicker(null)}>
+          <Pressable
+            style={[styles.pickerPanel, pickerAnchor && { left: pickerLeft, top: pickerAnchor.y + pickerAnchor.height, width: pickerWidth }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <ScrollView ref={pickerListRef} style={styles.pickerList} showsVerticalScrollIndicator>
+              {(openPicker === 'year' ? pickerYears : pickerMonths).map((value) => {
+                const isSelected = value === displayedYear || value === displayedMonth;
+                const label = openPicker === 'year'
+                  ? formatCalendarDay(value, isArabic)
+                  : mode === 'gregorian'
+                    ? (isArabic ? GREGORIAN_MONTHS_AR[value - 1] : GREGORIAN_MONTHS_EN[value - 1])
+                    : formatCopticMonthName(COPTIC_MONTHS[value - 1], isArabic);
+
+                return (
+                  <Pressable
+                    key={value}
+                    style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                    onPress={() => {
+                      if (openPicker === 'year') {
+                        if (mode === 'gregorian') setGregorianYear(value);
+                        else setCopticYear(value);
+                      } else if (mode === 'gregorian') {
+                        setGregorianMonth(value);
+                      } else {
+                        setCopticMonth(value);
+                        setCopticMonthName(COPTIC_MONTHS[value - 1]);
+                      }
+                      setOpenPicker(null);
+                    }}
+                  >
+                    <Text style={[styles.pickerOptionText, isSelected && styles.pickerOptionTextSelected, isArabic && styles.arabicText]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -364,7 +474,10 @@ const styles = StyleSheet.create({
   monthHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.lg },
   monthButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
   monthTitleGroup: { alignItems: 'center', flex: 1 },
-  monthTitle: { fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700', textAlign: 'center', color: COLORS.white },
+  datePickerTriggers: { alignItems: 'center', flexDirection: 'row', gap: SPACING.xs },
+  datePickerTrigger: { alignItems: 'center', flexDirection: 'row', gap: 5, minHeight: 40, paddingHorizontal: SPACING.sm },
+  monthTitle: { fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700', textAlign: 'center', color: COLORS.white },
+  yearTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   modeSelector: {
     backgroundColor: '#262626',
     borderRadius: 18,
@@ -396,4 +509,11 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.arabic,
     writingDirection: 'rtl',
   },
+  pickerBackdrop: { flex: 1 },
+  pickerPanel: { backgroundColor: '#18212D', borderColor: 'rgba(255, 255, 255, 0.16)', borderRadius: 12, borderWidth: 1, maxHeight: 280, overflow: 'hidden', position: 'absolute', shadowColor: COLORS.black, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 10 },
+  pickerList: { padding: 5 },
+  pickerOption: { alignItems: 'center', borderRadius: 8, minHeight: 44, justifyContent: 'center', paddingHorizontal: SPACING.sm },
+  pickerOptionSelected: { backgroundColor: 'rgba(211, 164, 74, 0.26)' },
+  pickerOptionText: { color: 'rgba(255, 255, 255, 0.86)', fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '600' },
+  pickerOptionTextSelected: { color: COLORS.gold, fontWeight: '800' },
 });

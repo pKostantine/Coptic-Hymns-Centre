@@ -1,32 +1,32 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Head from 'expo-router/head';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import BibleWebView, { BibleWebViewHandle } from '@/components/chc/BibleWebView';
+import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/chc/bibleDocumentHtml';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import Icon from '@/components/chc/ui/Icon';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
-import BibleWebView, { BibleWebViewHandle } from '@/components/chc/BibleWebView';
-import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/chc/bibleDocumentHtml';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
-  BibleBook,
-  getBibleChapterHeaderTitle,
-  getBibleBook,
-  getBibleChapterKeys,
-  getBibleVerseDisplayLabel,
-  getDisplayedChapterVerses,
-  getDisplayedPsalmPreface,
-  PsalmNumbering,
+    BibleBook,
+    getBibleBook,
+    getBibleChapterHeaderTitle,
+    getBibleChapterKeys,
+    getBibleVerseDisplayLabel,
+    getDisplayedChapterVerses,
+    getDisplayedPsalmPreface,
+    PsalmNumbering,
 } from '@/utils/bibleService';
-import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
-import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
-import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { goBack } from '@/utils/navigation';
+import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
+import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
+import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
+import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 
 type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
 type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
@@ -46,11 +46,6 @@ const PSALM_118_STANZA_LETTERS = [
   'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ',
   'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת',
 ] as const;
-
-const TESTAMENT_ROUTE_LABELS: Record<BibleBook['testament'], { title: string; arabic: string }> = {
-  OT: { title: 'Old Testament', arabic: 'العهد القديم' },
-  NT: { title: 'New Testament', arabic: 'العهد الجديد' },
-};
 
 const SELECTOR_TEXT: Record<AppLanguage, {
   verses: string;
@@ -162,14 +157,12 @@ export default function BibleChapterDocument() {
   // ServiceDocument.tsx/lectionary/index.tsx.
   const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
   const selectorPanelWidth = isMobileDocument ? Math.round(screenWidth * 0.7) : Math.round(screenWidth * 0.5);
-  const { bookKey, chapter, title, arabic, psalmNumbering: psalmNumberingParam } = useLocalSearchParams<{
+  const { bookKey, chapter, numbering: numberingParam } = useLocalSearchParams<{
     bookKey: string;
     chapter: string;
-    title?: string;
-    arabic?: string;
-    psalmNumbering?: PsalmNumbering;
+    numbering?: PsalmNumbering;
   }>();
-  const psalmNumbering: PsalmNumbering = psalmNumberingParam === 'masoretic' ? 'masoretic' : 'septuagint';
+  const psalmNumbering: PsalmNumbering = numberingParam === 'masoretic' ? 'masoretic' : 'septuagint';
   const { preferences, isBookmarked, toggleBookmark, setBibleVisibleLanguages } = useReadingPreferences();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const copticFontDataUri = useCopticFontDataUri();
@@ -224,8 +217,8 @@ export default function BibleChapterDocument() {
   );
   const fontSize = fontScaleToPx(preferences.fontScale);
   const currentChapterNumber = Number(chapter);
-  const headerTitleEnglish = getBibleChapterHeaderTitle(book, title, arabic, bookKey, currentChapterNumber, 'en');
-  const headerTitleArabic = getBibleChapterHeaderTitle(book, title, arabic, bookKey, currentChapterNumber, 'ar');
+  const headerTitleEnglish = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'en');
+  const headerTitleArabic = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'ar');
   const preface = book?.bookKey === 'psalms' ? getDisplayedPsalmPreface() : null;
   const selectorText = SELECTOR_TEXT[preferences.appLanguage];
   const effectiveSelectText = preferences.selectText && !preferences.slideshowMode;
@@ -276,23 +269,19 @@ export default function BibleChapterDocument() {
     const chapterGridFallback: Href = bookKey
       ? {
           pathname: '/bible/[bookKey]',
-          params: { bookKey, title: book?.titleEnglish || title, arabic: book?.titleArabic || arabic },
+          params: { bookKey },
         }
       : '/bible';
     const testamentFallback: Href = book?.testament
       ? {
           pathname: '/bible/[bookKey]',
-          params: {
-            bookKey: book.testament,
-            title: TESTAMENT_ROUTE_LABELS[book.testament].title,
-            arabic: TESTAMENT_ROUTE_LABELS[book.testament].arabic,
-          },
+          params: { bookKey: book.testament },
         }
       : '/bible';
 
     const fallbackHref: Href = !chapterListLoaded ? '/bible' : chapterCount === 1 ? testamentFallback : chapterGridFallback;
     goBack(router, fallbackHref);
-  }, [router, bookKey, title, arabic, book, chapterListLoaded, chapterCount]);
+  }, [router, bookKey, book, chapterListLoaded, chapterCount]);
 
   const gesturePanResponder = useMemo(() => {
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));

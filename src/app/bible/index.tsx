@@ -1,14 +1,14 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { goBack } from '@/utils/navigation';
+import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 
 const TESTAMENTS = [
   { key: 'OT', title: 'Old Testament', arabic: 'العهد القديم' },
@@ -46,7 +46,7 @@ export default function BibleTestamentList() {
             onPress={() =>
               router.push({
                 pathname: '/bible/[bookKey]',
-                params: { bookKey: testament.key, title: testament.title, arabic: testament.arabic },
+                  params: { bookKey: testament.key },
               })
             }
           />

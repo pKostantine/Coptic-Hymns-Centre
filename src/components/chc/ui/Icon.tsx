@@ -4,6 +4,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 export type IconName =
   | 'chevron-back'
   | 'chevron-forward'
+  | 'chevron-down'
   | 'bookmark'
   | 'bookmark-outline'
   | 'calendar-outline'
@@ -45,6 +46,12 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="m184 112 144 144-144 144" fill="none" stroke={color} strokeWidth={48} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'chevron-down':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="m112 184 144 144 144-144" fill="none" stroke={color} strokeWidth={48} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     case 'bookmark-outline':
