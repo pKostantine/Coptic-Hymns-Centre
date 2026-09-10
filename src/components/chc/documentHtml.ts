@@ -553,29 +553,48 @@ export function buildDocumentHtml(
             return false;
           }
         }
-        function clippedTextForNode(range, node) {
-          if (!rangeIntersectsNode(range, node)) return '';
+        function fullTextForNode(node) {
           var nodeRange = document.createRange();
           nodeRange.selectNodeContents(node);
-          var clipped = range.cloneRange();
-          if (clipped.compareBoundaryPoints(Range.START_TO_START, nodeRange) < 0) {
-            clipped.setStart(nodeRange.startContainer, nodeRange.startOffset);
-          }
-          if (clipped.compareBoundaryPoints(Range.END_TO_END, nodeRange) > 0) {
-            clipped.setEnd(nodeRange.endContainer, nodeRange.endOffset);
-          }
-          return fragmentText(clipped.cloneContents());
+          return fragmentText(nodeRange.cloneContents());
         }
-        function selectedTextForLanguage(selection, language) {
-          if (!selection || !selection.rangeCount || !language) return '';
+        // Copy is grouped by hymn, then by language within it: every language
+        // of one section, then the next section. It used to collect a single
+        // language across the WHOLE document, so selecting one hymn gave you
+        // its English followed by the next hymn's English, never its own
+        // Coptic and Arabic.
+        //
+        // Rows are the unit, not cells. The layout is row-major (each
+        // .verse-row holds one cell per language side by side), so a drag down
+        // the English column ends inside the last row's English cell — the
+        // Coptic and Arabic cells of that row sit after the range end and
+        // clipping them would silently drop the hymn's last line in every
+        // other language. Taking each touched row's cells in full keeps the
+        // languages the same length as each other.
+        function selectedTextBySection(selection) {
+          if (!selection || !selection.rangeCount) return '';
           var range = selection.getRangeAt(0);
-          var nodes = Array.prototype.slice.call(
-            document.querySelectorAll('.cell[data-language="' + language + '"], .title-cell[data-language="' + language + '"]')
-          );
-          return nodes
-            .map(function (node) { return clippedTextForNode(range, node); })
-            .filter(Boolean)
-            .join('\\n');
+          var blocks = [];
+          Array.prototype.slice.call(document.querySelectorAll('.section')).forEach(function (section) {
+            if (!rangeIntersectsNode(range, section)) return;
+            var rows = Array.prototype.slice
+              .call(section.querySelectorAll('.title-row, .verse-row'))
+              .filter(function (row) { return rangeIntersectsNode(range, row); });
+            if (!rows.length) return;
+            var perLanguage = [];
+            languages.forEach(function (language) {
+              var lines = [];
+              rows.forEach(function (row) {
+                var cell = row.querySelector('.cell[data-language="' + language + '"], .title-cell[data-language="' + language + '"]');
+                if (!cell) return;
+                var text = fullTextForNode(cell);
+                if (text) lines.push(text);
+              });
+              if (lines.length) perLanguage.push(lines.join('\\n'));
+            });
+            if (perLanguage.length) blocks.push(perLanguage.join('\\n\\n'));
+          });
+          return blocks.join('\\n\\n');
         }
         document.addEventListener('pointerdown', onSelectionStart, true);
         document.addEventListener('mousedown', onSelectionStart, true);
@@ -592,8 +611,7 @@ export function buildDocumentHtml(
         });
         document.addEventListener('copy', function (event) {
           var selection = window.getSelection && window.getSelection();
-          var language = selectingLanguage || (selection && (inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode)));
-          var text = selectedTextForLanguage(selection, language);
+          var text = selectedTextBySection(selection);
           if (!text || !event.clipboardData) return;
           event.clipboardData.setData('text/plain', text);
           event.preventDefault();
