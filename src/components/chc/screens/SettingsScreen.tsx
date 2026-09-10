@@ -10,6 +10,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { OrientationMode, VisibleLanguages } from '@/utils/preferencesStorage';
 import { goBack } from '@/utils/navigation';
+import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
 const LANGUAGE_OPTIONS: { key: keyof VisibleLanguages; label: string; arabic: string }[] = [
   { key: 'english', label: 'English', arabic: 'الإنجليزية' },
@@ -64,7 +65,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   const localizedTextStyle = isArabicChrome && styles.arabicText;
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safeArea, DISABLED_TEXT_SELECTION_STYLE]}>
       {/* See CalendarScreen — an overlay over a document isn't its own page. */}
       {isHosted ? null : (
         <Head>
