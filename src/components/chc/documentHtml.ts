@@ -341,6 +341,7 @@ export function buildDocumentHtml(
         border: 1px solid ${COLORS.subdocLine};
         border-radius: 12px;
         color: ${COLORS.subdoc};
+        cursor: pointer;
         display: flex;
         flex-direction: column;
         gap: ${SPACING.sm}px;
@@ -366,6 +367,7 @@ export function buildDocumentHtml(
         border: 1px solid ${COLORS.linkLine};
         border-radius: 12px;
         color: ${COLORS.link};
+        cursor: pointer;
         display: flex;
         font-family: Georgia, serif;
         font-size: ${Math.max(Math.round(sectionTitleFontSize * 1.1), 16)}px;
