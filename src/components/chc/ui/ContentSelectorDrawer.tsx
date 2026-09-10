@@ -7,6 +7,7 @@ import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection } from '../documentHtml';
+import { isDividerSection, mapSectionsToDividers } from '../../../utils/sectionDividers';
 import Icon from './Icon';
 
 interface ContentSelectorDrawerProps {
@@ -67,32 +68,6 @@ function appendReadingReference(title: string, reference?: string) {
   if (!cleanTitle || !cleanReference) return cleanTitle;
   if (cleanTitle.includes(`(${cleanReference})`)) return cleanTitle;
   return `${cleanTitle} (${cleanReference})`;
-}
-
-/**
- * An hour opening that marks where one part of a service gives way to the
- * next: the Midnight Hour's three Watches, and the Agpeya hours prayed inside
- * the Offering of the Lamb ("3rd Hour", "3rd Hour and 6th Hour", "12th Hour
- * and Veil"...).
- *
- * Whether one of these reads as a divider is decided by whether it has a title
- * at all, and that is per-schema: agpeya.hymn_titles leaves the hour openings
- * null, so inside the Agpeya book they stay silent, while liturgy.hymn_titles
- * names them, so inside the Liturgy they announce the hour. An untitled
- * section never reaches this code — `listable` has already dropped it — so the
- * same hymn divides the Offering of the Lamb without touching the Hour it also
- * belongs to.
- *
- * The `(?!Of|To)` is what separates a divider from ordinary content that
- * happens to be named the same way: introductionOfEveryHour is a real prayer
- * (and titled, in agpeya), and introductionToTheCreed, introductionToTheHoosP1
- * and introductionToRaisingOfIncenseP1 are all lead-ins to a hymn rather than
- * headings over a section.
- */
-const SECTION_DIVIDER_KEY = /^introduction(?!Of|To)[A-Za-z]*(?:Hour|Watch|Veil)$/;
-
-function isDividerSection(section: DocumentSection): boolean {
-  return SECTION_DIVIDER_KEY.test(section.hymnKey || '');
 }
 
 function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
@@ -177,37 +152,12 @@ export default function ContentSelectorDrawer({
   });
 
   /**
-   * Everything a divider gathers under it, by section id.
-   *
-   * A nest opens on a divider that actually speaks — one whose hymn key has
-   * the shape AND a title in this document's schema, since the same hour
-   * opening is titled in liturgy.hymn_titles and null in agpeya.hymn_titles.
-   * That matters: an untitled opening never renders a rule, so it must not
-   * silently indent the rest of the Hour behind an invisible heading.
-   *
-   * It closes on the next `introduction…` row of any kind, whether or not that
-   * row is itself visible. In the Offering of the Lamb that is
-   * introductionToTheCreed, which carries no title and so never appears in
-   * this list — but it is still the point where the Agpeya hours end and the
-   * Liturgy resumes, so the Creed and everything after it sit back at the
-   * outer level. The Midnight Hour ends its third Watch on the same row.
-   *
-   * Walked over `sections` rather than `listable` so those invisible
-   * boundaries still count.
+   * Everything a divider gathers under it, by section id — the same grouping
+   * the document itself collapses by, so a heading nests exactly the hymns it
+   * hides (see mapSectionsToDividers). Walked over `sections` rather than
+   * `listable` so the invisible boundaries still count.
    */
-  const nestedSectionIds = useMemo(() => {
-    const nested = new Set<string>();
-    let insideNest = false;
-    for (const section of sections) {
-      if (/^introduction/i.test(section.hymnKey || '')) {
-        const title = getSectionSelectorTitle(section);
-        insideNest = isDividerSection(section) && Boolean(title.english || title.arabic);
-        continue;
-      }
-      if (insideNest) nested.add(section.id);
-    }
-    return nested;
-  }, [sections]);
+  const nestedSectionIds = useMemo(() => new Set(mapSectionsToDividers(sections).keys()), [sections]);
 
   // The document's currentSectionId can land on a titleless hymn (e.g. an
   // inline-spliced continuation) that never made it into `listable` — in

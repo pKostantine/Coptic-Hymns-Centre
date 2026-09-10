@@ -4,6 +4,7 @@ import { ActivityIndicator, Platform, useWindowDimensions, View } from 'react-na
 import SlideshowContainer from './SlideshowContainer';
 import DocumentWebView, { DocumentAction, DocumentSection, DocumentWebViewHandle } from './DocumentWebView';
 import { withRememberedCollapse } from './documentHtml';
+import { mapSectionsToDividers } from '../../utils/sectionDividers';
 import { CHC_SLIDESHOW_THEME, COLORS } from '../../constants/theme';
 import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
 import { fontScaleToPx, ReadingPreferences } from '../../utils/preferencesStorage';
@@ -65,17 +66,35 @@ function buildSlideshowSections(
   }: { displayComments: boolean; displaySilentPrayers: boolean; bishopPresent: boolean; copticGospelRite: boolean },
   collapsedSectionIds: Record<string, boolean>,
 ): DocumentSection[] {
-  return sections
+  const visibleSections = sections
     .filter((section) => displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer')
     .filter((section) => !(section.bishopOnly && !bishopPresent) && !(section.priestOnly && bishopPresent))
     .filter(
       (section) =>
         !(section.copticGospelRiteOnly && !copticGospelRite) && !(section.nonCopticGospelRiteOnly && copticGospelRite),
-    )
+    );
+
+  const isCollapsed = (section: DocumentSection) =>
+    section.collapsible ? (collapsedSectionIds[section.id] ?? Boolean(section.defaultCollapsed)) : false;
+
+  // An hour opening gathers the hymns prayed under it, and collapsing that
+  // heading hides the whole hour or Watch (see mapSectionsToDividers — the
+  // same grouping the scrolling reader and the content list use). Here that
+  // means dropping those sections outright rather than emptying them: a
+  // collapsed hymn still earns its own title slide, but a collapsed hour
+  // leaving thirty title slides to swipe through would defeat the point.
+  const dividerOwners = mapSectionsToDividers(visibleSections);
+  const collapsedDividerIds = new Set(
+    visibleSections.filter((section) => isCollapsed(section)).map((section) => section.id),
+  );
+
+  return visibleSections
+    .filter((section) => {
+      const ownerId = dividerOwners.get(section.id);
+      return !ownerId || !collapsedDividerIds.has(ownerId);
+    })
     .map((section) => {
-      const currentlyCollapsed = section.collapsible
-        ? (collapsedSectionIds[section.id] ?? Boolean(section.defaultCollapsed))
-        : false;
+      const currentlyCollapsed = isCollapsed(section);
 
       const verses = currentlyCollapsed
         ? []

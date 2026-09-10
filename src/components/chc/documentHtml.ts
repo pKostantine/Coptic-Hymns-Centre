@@ -1,5 +1,6 @@
 import { COLORS, SPACING } from '../../constants/theme';
 import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
+import { isSpeakingDivider, mapSectionsToDividers } from '../../utils/sectionDividers';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 
 export interface DocumentVerse {
@@ -177,22 +178,50 @@ export function buildDocumentHtml(
     verses: getDisplayedVerseEntries(section, displayFilterOpts).map(({ verse }) => verse),
   }));
   const suppressMap = computeGlobalSuppressSpeakerLabelFlags(displayedSectionsForSuppress, bishopPresent, suppressAllSpeakerLabels);
-  const htmlSections = visibleSections
-    .map((section) =>
-      renderSection(section, {
-        fontSize,
-        visibleColumns,
-        appLanguage,
-        displayComments,
-        displaySilentPrayers,
-        bishopPresent,
-        copticRecitedPrayers,
-        copticGospelRite,
-        suppressMap,
-        suppressAllSpeakerLabels,
-      }),
-    )
-    .join('');
+  // An hour opening gathers the hymns prayed under it (see
+  // mapSectionsToDividers — the same grouping the content list nests by), and
+  // collapsing that heading has to take all of them with it, not just the
+  // opening prayer's own verses. Each group is wrapped in one element so a
+  // single class on it hides every member; computed over visibleSections, so
+  // a heading hidden by a condition never leaves its hymns gathered under a
+  // divider that isn't there.
+  const dividerOwners = mapSectionsToDividers(visibleSections);
+  const renderOne = (section: DocumentSection) =>
+    renderSection(section, {
+      fontSize,
+      visibleColumns,
+      appLanguage,
+      displayComments,
+      displaySilentPrayers,
+      bishopPresent,
+      copticRecitedPrayers,
+      copticGospelRite,
+      suppressMap,
+      suppressAllSpeakerLabels,
+    });
+
+  let htmlSections = '';
+  let openGroupId: string | null = null;
+  const closeGroup = () => {
+    if (openGroupId === null) return;
+    htmlSections += '</div>';
+    openGroupId = null;
+  };
+
+  for (const section of visibleSections) {
+    const ownerId = dividerOwners.get(section.id);
+    if (ownerId !== openGroupId) closeGroup();
+
+    if (isSpeakingDivider(section) && section.collapsible) {
+      closeGroup();
+      openGroupId = section.id;
+      const groupCollapsed = section.defaultCollapsed ? ' collapsed' : '';
+      htmlSections += `<div class="section-group${groupCollapsed}" data-section-group="${escapeAttribute(section.id)}">`;
+    }
+
+    htmlSections += renderOne(section);
+  }
+  closeGroup();
 
   return `<!doctype html>
 <html>
@@ -282,6 +311,12 @@ export function buildDocumentHtml(
         display: block;
       }
       .section.collapsed .section-content {
+        display: none !important;
+      }
+      /* The heading itself stays; everything it gathered goes. Its own verses
+         are already hidden by the rule above, since it is a collapsed
+         .section in its own right. */
+      .section-group.collapsed > .section ~ .section {
         display: none !important;
       }
       .cell, .title-cell {
@@ -471,6 +506,10 @@ export function buildDocumentHtml(
         var candidates = Array.isArray(sectionId) ? sectionId : [sectionId];
         for (var i = 0; i < candidates.length; i += 1) {
           var element = document.getElementById(candidates[i]);
+          // A section inside a collapsed hour is still in the document but
+          // renders nothing, and its rect would read as the top of the page.
+          // Treat it as absent so the fallback chain walks past it.
+          if (element && element.getClientRects().length === 0) element = null;
           if (element) {
             var top = element.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0);
             window.scrollTo({ top: Math.max(top - 1, 0), behavior: 'auto' });
@@ -500,6 +539,14 @@ export function buildDocumentHtml(
         var collapsed = section.classList.toggle('collapsed');
         button.classList.toggle('is-collapsed', collapsed);
         button.setAttribute('aria-label', collapsed ? 'Expand section' : 'Collapse section');
+        // An hour opening is the heading of a group, and collapsing it hides
+        // every hymn gathered under it, not just its own verses. Only the
+        // group's first section is its heading — a collapsible hymn sitting
+        // inside a group still collapses only itself.
+        var group = section.parentElement;
+        if (group && group.classList.contains('section-group') && group.firstElementChild === section) {
+          group.classList.toggle('collapsed', collapsed);
+        }
         postAction('toggleCollapse', { sectionId: section.getAttribute('data-section-id'), collapsed: collapsed });
       });
       (function () {
