@@ -72,11 +72,12 @@ export function evaluateCondition(condition, flags) {
 // database from being two independent (and driftable) implementations of
 // the same liturgical calendar.
 
-// One network round trip per distinct (date, extraContext) combination —
-// hymnLibrary.js calls getContextFlags once per document, not once per hymn
-// or per line, so in practice this cache mostly serves repeat visits to the
-// same document/date within a session.
+// One cached context resolution per distinct (date, extraContext)
+// combination — hymnLibrary.js calls getContextFlags once per document, not
+// once per hymn or per line. The date-only Lent range lookup has its own
+// cache so documents with different structural flags still share it.
 const contextFlagsCache = new Map(); // cacheKey -> Promise<flags>
+const lentFlagsCache = new Map(); // isoDate -> Promise<flags>
 const MAX_CACHE_ENTRIES = 200;
 
 function cacheKeyFor(isoDate, extraContext) {
@@ -91,16 +92,98 @@ function rememberInCache(cache, key, value) {
   cache.set(key, value);
 }
 
+function utcWeekdayForIsoDate(isoDate) {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function daysBetweenIsoDates(startIsoDate, endIsoDate) {
+  const [startYear, startMonth, startDay] = startIsoDate.split("-").map(Number);
+  const [endYear, endMonth, endDay] = endIsoDate.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(endYear, endMonth - 1, endDay) - Date.UTC(startYear, startMonth - 1, startDay)) /
+      86400000,
+  );
+}
+
+// calendar.get_context_flags currently omits the Great Fast entirely even
+// though calendar.season_ranges contains the correct lent and holy-week
+// ranges. Keep season_ranges as the database source of truth and fill only
+// the missing derived aliases here. This restores the condition vocabulary
+// used throughout the live order tables (especially Offering of the Lamb's
+// THIRD/SIXTH/NINTH/ELEVENTH/TWELFTH_HOUR placements) without hard-coding
+// feast dates in the client.
+function fetchDerivedLentFlags(isoDate) {
+  let cached = lentFlagsCache.get(isoDate);
+  if (!cached) {
+    cached = (async () => {
+      const { data, error } = await supabase
+        .schema("calendar")
+        .from("season_ranges")
+        .select("range_key, start_date, end_date")
+        .in("range_key", ["lent", "holy-week"])
+        .lte("start_date", isoDate)
+        .gte("end_date", isoDate);
+      if (error) {
+        throw new Error("Unable to load Lent range flags for " + isoDate + ": " + error.message);
+      }
+
+      const ranges = data || [];
+      const greatFastRange = ranges.find((range) => range.range_key === "lent");
+      const holyWeekRange = ranges.find((range) => range.range_key === "holy-week");
+      if (!greatFastRange && !holyWeekRange) return {};
+
+      const weekday = utcWeekdayForIsoDate(isoDate);
+      const isWeekend = weekday === 0 || weekday === 6;
+      const flags = {
+        Lent: true,
+        [isWeekend ? "LentWeekends" : "LentWeekdays"]: true,
+      };
+
+      if (greatFastRange) {
+        flags.GreatFast = true;
+        if (weekday === 1 && daysBetweenIsoDates(greatFastRange.start_date, isoDate) < 7) {
+          flags.FirstMondayOfLent = true;
+        }
+        if (weekday === 5 && isoDate === greatFastRange.end_date) {
+          flags.LastFridayOfLent = true;
+        }
+      }
+      if (holyWeekRange) {
+        flags.HolyWeek = true;
+        flags.Pascha = true;
+      }
+      return flags;
+    })();
+    rememberInCache(lentFlagsCache, isoDate, cached);
+  }
+  return cached;
+}
+
 async function fetchContextFlags(isoDate, extraContext) {
   const key = cacheKeyFor(isoDate, extraContext);
   let cached = contextFlagsCache.get(key);
   if (!cached) {
     cached = (async () => {
-      const { data, error } = await supabase
-        .schema("calendar")
-        .rpc("get_context_flags", { p_date: isoDate, p_extra_context: extraContext || {} });
+      const [{ data, error }, derivedLentFlags] = await Promise.all([
+        supabase
+          .schema("calendar")
+          .rpc("get_context_flags", { p_date: isoDate, p_extra_context: extraContext || {} }),
+        fetchDerivedLentFlags(isoDate),
+      ]);
       if (error) throw new Error(`Unable to load context flags for ${isoDate}: ${error.message}`);
-      return data || {};
+      const flags = { ...(data || {}), ...derivedLentFlags };
+      if (derivedLentFlags.Lent) {
+        // The RPC currently emits NormalFastingDays on Lent Wednesdays and
+        // Fridays because it failed to recognize the Lent range first. The
+        // live condition registry explicitly defines that flag as suppressed
+        // during Lent; leaving it set renders both the ordinary-fast and Lent
+        // Agpeya placements (including two Ninth Hours).
+        delete flags.NormalFastingDays;
+        delete flags.Joyful29thOfTheMonth;
+        flags.Fasts = true;
+      }
+      return flags;
     })();
     rememberInCache(contextFlagsCache, key, cached);
   }
@@ -128,9 +211,24 @@ const WEEKDAY_FLAG_KEYS = [
 
 function withWeekdayFlagsFrom(baseFlags, weekdayFlags) {
   const merged = { ...baseFlags };
+  const isLent = Boolean(
+    baseFlags.Lent ||
+      baseFlags.GreatFast ||
+      baseFlags.LentWeekdays ||
+      baseFlags.LentWeekends,
+  );
   for (const key of WEEKDAY_FLAG_KEYS) delete merged[key];
   for (const key of WEEKDAY_FLAG_KEYS) {
     if (weekdayFlags[key]) merged[key] = true;
+  }
+  // LentWeekdays/LentWeekends combine a season flag from the liturgical date
+  // with the weekday family intentionally replaced above (for Vespers).
+  // Recompute them after the swap or Sunday-evening Vespers can retain
+  // Monday's LentWeekdays while its ordinary weekday flags say Weekends.
+  delete merged.LentWeekdays;
+  delete merged.LentWeekends;
+  if (isLent) {
+    merged[merged.Weekends ? "LentWeekends" : "LentWeekdays"] = true;
   }
   return merged;
 }
