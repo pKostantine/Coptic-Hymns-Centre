@@ -516,7 +516,10 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.sm,
     paddingLeft: SPACING.md,
   },
-  nestedSegmentLast: { paddingBottom: 0 },
+  // Keep the group's gold rail ending flush with its final card, then restore
+  // the normal inter-card gap outside the nested wrapper before the next
+  // unnested hymn.
+  nestedSegmentLast: { marginBottom: SPACING.sm, paddingBottom: 0 },
   // The gap moves onto the wrapper's padding so the rule can run through it.
   selectorItemNested: { marginBottom: 0 },
   selectorItemDivider: {
