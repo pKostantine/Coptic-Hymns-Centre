@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -5,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import FontScaleControl from '@/components/chc/ui/FontScaleControl';
+import Icon from '@/components/chc/ui/Icon';
+import SaintHymnPicker from '@/components/chc/ui/SaintHymnPicker';
 import ToggleRow from '@/components/chc/ui/ToggleRow';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -35,6 +38,10 @@ const SETTINGS_LABELS = {
   selectText: { english: 'Select Text', arabic: 'تحديد النص' },
   displayComments: { english: 'Display Comments', arabic: 'عرض التعليقات' },
   displaySilentPrayers: { english: 'Display Silent Prayers', arabic: 'عرض الصلوات السرية' },
+  content: { english: 'Content', arabic: 'المحتوى' },
+  saintHymns: { english: 'Saint Hymns', arabic: 'ألحان القديسين' },
+  saintHymnsNone: { english: 'Follow the calendar', arabic: 'حسب التقويم' },
+  saintHymnsCount: { english: 'chosen', arabic: 'مختار' },
   textSize: { english: 'Text Size', arabic: 'حجم النص' },
 };
 
@@ -58,7 +65,11 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
     toggleSlideshowMode,
     toggleDisplayComments,
     toggleDisplaySilentPrayers,
+    toggleSaintHymn,
+    clearSaintHymns,
   } = useReadingPreferences();
+  const [saintPickerOpen, setSaintPickerOpen] = useState(false);
+  const chosenSaintHymns = preferences.selectedSaintHymns || [];
   const isArabicChrome = preferences.appLanguage === 'ar';
   const labelText = (label: { english?: string; label?: string; arabic: string }) =>
     isArabicChrome ? label.arabic : label.english || label.label || '';
@@ -132,8 +143,37 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
             active={preferences.displaySilentPrayers}
             onPress={toggleDisplaySilentPrayers}
           />
+
+          {/* Saint hymns are chosen by hand here; left alone, the calendar
+              raises the day's saint on its own and every one of his hymns
+              appears without anything being picked. */}
+          <Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.content)}</Text>
+          <Pressable
+            accessibilityLabel="Choose saint hymns"
+            style={styles.contentRow}
+            onPress={() => setSaintPickerOpen(true)}
+          >
+            <View style={styles.contentTextGroup}>
+              <Text style={[styles.contentRowLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.saintHymns)}</Text>
+              <Text style={[styles.contentRowMeta, localizedTextStyle]}>
+                {chosenSaintHymns.length
+                  ? `${chosenSaintHymns.length} ${labelText(SETTINGS_LABELS.saintHymnsCount)}`
+                  : labelText(SETTINGS_LABELS.saintHymnsNone)}
+              </Text>
+            </View>
+            <Icon name="chevron-forward" size={18} color={COLORS.muted} />
+          </Pressable>
         </View>
       </ScrollView>
+
+      <SaintHymnPicker
+        visible={saintPickerOpen}
+        onClose={() => setSaintPickerOpen(false)}
+        isArabic={isArabicChrome}
+        selected={chosenSaintHymns}
+        onToggle={toggleSaintHymn}
+        onClearSaint={clearSaintHymns}
+      />
     </SafeAreaView>
   );
 }
@@ -149,6 +189,20 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
   },
   groupLabel: { fontSize: 15, fontWeight: '800', color: COLORS.white },
+  contentRow: {
+    alignItems: 'center',
+    backgroundColor: '#111111',
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  contentTextGroup: { flex: 1, gap: 2 },
+  contentRowLabel: { color: COLORS.white, fontSize: 15, fontWeight: '700' },
+  contentRowMeta: { color: COLORS.muted, fontSize: 12 },
   languageList: { gap: SPACING.sm },
   orientationGroup: { gap: SPACING.sm },
   orientationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },

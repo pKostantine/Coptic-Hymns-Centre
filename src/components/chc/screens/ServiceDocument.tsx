@@ -93,6 +93,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // point (e.g. Vespers vs. Matins both open raising_of_incense).
   const documentPositionKey = `${bookmarkId}:${JSON.stringify(extraContext || {})}`;
 
+  // Hand-picked saint hymns ride in as ordinary condition flags, each under its
+  // own full child token (`StMark:VOC`). The bare `StMark` is never raised —
+  // that is what keeps one chosen hymn from pulling in the saint's whole set,
+  // while the calendar raising `StMark` on his feast still satisfies all of
+  // them (see isConditionAtomSatisfied in conditionEngine.js).
+  const saintHymnFlags = useMemo(
+    () => Object.fromEntries((preferences.selectedSaintHymns || []).map((token) => [token, true])),
+    [preferences.selectedSaintHymns],
+  );
+
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // In-document toggle button state, rendered wherever GOSPEL_RITE is spliced in.
@@ -200,7 +210,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           schema,
           table,
           effectiveDate,
-          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...extraContext },
+          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...saintHymnFlags, ...extraContext },
           isVespersService ? vespersEffectiveDate : undefined,
         ),
       )
@@ -233,7 +243,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, extraContext]);
+  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, extraContext, saintHymnFlags]);
 
   // The scrolling WebView reader has no equivalent "seed the initial prop"
   // option (scrollToSection is imperative and needs the WebView mounted

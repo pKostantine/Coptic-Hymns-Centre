@@ -34,6 +34,13 @@ export interface ReadingPreferences {
   displaySilentPrayers: boolean;
   bishopPresent: boolean;
   copticGospelRite: boolean;
+  /**
+   * Full saint hymn condition tokens the user has chosen by hand, e.g.
+   * `StMark:VOC`. Each one is raised as its own condition flag; the bare
+   * `StMark` is deliberately never raised, so picking one hymn cannot pull in
+   * the saint's whole set — see isConditionAtomSatisfied in conditionEngine.js.
+   */
+  selectedSaintHymns: string[];
   /** Menu-chrome-only language (main menu + submenus/list screens) — never affects the text rendered inside an actual document, which is governed by visibleLanguages instead. */
   appLanguage: AppLanguage;
 }
@@ -65,6 +72,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   bishopPresent: false,
   copticGospelRite: false,
   appLanguage: 'en',
+  selectedSaintHymns: [],
 };
 
 /** Lowest selectable font scale. */
@@ -123,6 +131,9 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   if (merged.appLanguage !== 'en' && merged.appLanguage !== 'ar') {
     merged.appLanguage = 'en';
   }
+  merged.selectedSaintHymns = Array.isArray(merged.selectedSaintHymns)
+    ? merged.selectedSaintHymns.filter((token): token is string => typeof token === 'string' && token.includes(':'))
+    : [];
   return merged;
 }
 

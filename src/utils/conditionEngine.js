@@ -13,6 +13,30 @@ import { supabase } from "./supabase";
 
 const TOKEN_RE = /[A-Za-z][A-Za-z0-9_.:]*/g;
 
+/**
+ * Whether one required condition atom is satisfied by the active flags.
+ *
+ * Saint hymn conditions are hierarchical: a saint has a base token (StMark)
+ * and child tokens naming individual hymns (StMark:Doxology1, StMark:VOC,
+ * StMark:Veneration, StMark:Feast...). An active parent satisfies every one of
+ * its children, which is what lets the calendar simply raise `StMark` on his
+ * feast and have all of his hymns appear.
+ *
+ * The relationship is deliberately ONE-WAY. An active child never satisfies
+ * the parent, and never satisfies a sibling: picking "Verse of the Cymbals"
+ * from the saint menu sets StMark:VOC alone, and must not drag in his
+ * doxologies, his psalies, or the bare StMark that would.
+ *
+ * Only the first colon separates base from child, so a dotted date token like
+ * Kiahk.5 (no colon) and an ordinary flag are both unaffected.
+ */
+function isConditionAtomSatisfied(token, flags) {
+  if (flags?.[token]) return true;
+  const separator = token.indexOf(":");
+  if (separator <= 0) return false;
+  return Boolean(flags?.[token.slice(0, separator)]);
+}
+
 export function evaluateCondition(condition, flags) {
   const trimmed = String(condition || "").trim();
   if (!trimmed) return true;
@@ -21,9 +45,12 @@ export function evaluateCondition(condition, flags) {
     (a, b) => b.length - a.length,
   );
 
+  // Substituted per atom, leaving &&/||/!/() untouched — the parser still has
+  // to handle "(StMark:Psali1 || Paope.30) && AdamDays" exactly as before, so
+  // the hierarchy is resolved here rather than by rewriting condition strings.
   let expr = trimmed;
   for (const token of tokens) {
-    const value = Boolean(flags?.[token]);
+    const value = isConditionAtomSatisfied(token, flags);
     expr = expr.split(token).join(value ? "true" : "false");
   }
 

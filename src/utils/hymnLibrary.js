@@ -1182,18 +1182,43 @@ function mergeIntoOneInlineSection(callingRow, nestedSections) {
   return applyCopticCaseToSection(merged);
 }
 
+// A saint hymn can be listed on more than one sequence row for calendar
+// reasons — ArchangelMichael's psali sits on both his Hathor 12 and his
+// Paone 12 rows, and the Adam and Vatos variants of one psali are two rows
+// again. With his base condition active every one of those matches, and the
+// same hymn would render two or three times over.
+//
+// Scoped deliberately to rows that actually carry a saint hymn condition:
+// plenty of documents repeat a hymn_key on purpose (the Agpeya prays Our
+// Father twice in an Hour), and those rows have no saint condition, so a
+// blanket dedupe would silently eat them.
+const SAINT_HYMN_CONDITION_RE = /[A-Za-z][A-Za-z0-9_]*:(?:Doxology|VOC|Psali|Veneration)/;
+
+function dropDuplicateSaintHymns(sections) {
+  const seen = new Set();
+  return sections.filter((section) => {
+    if (!SAINT_HYMN_CONDITION_RE.test(section.condition || "")) return true;
+    if (!section.hymn_key) return true;
+    if (seen.has(section.hymn_key)) return false;
+    seen.add(section.hymn_key);
+    return true;
+  });
+}
+
 async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
   const rawRows = await fetchServiceRows(schema, table);
   const sections = assembleServiceSections(rawRows);
 
-  const visibleSections = sections
-    .map((section) => {
-      const visibility = evaluateBishopAwareVisibility(section.condition, flags);
-      return visibility.visible
-        ? { ...section, bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }
-        : null;
-    })
-    .filter(Boolean);
+  const visibleSections = dropDuplicateSaintHymns(
+    sections
+      .map((section) => {
+        const visibility = evaluateBishopAwareVisibility(section.condition, flags);
+        return visibility.visible
+          ? { ...section, bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }
+          : null;
+      })
+      .filter(Boolean),
+  );
 
   const hydrated = [];
   for (const section of visibleSections) {

@@ -30,6 +30,10 @@ interface ReadingPreferencesContextValue {
   toggleBishopPresent: () => void;
   toggleCopticGospelRite: () => void;
   setAppLanguage: (language: AppLanguage) => void;
+  /** Turns one saint hymn choice on or off. The token is the full child condition, e.g. `StMark:VOC`. */
+  toggleSaintHymn: (token: string) => void;
+  /** Clears every saint hymn choice for one saint, given its base token. */
+  clearSaintHymns: (base: string) => void;
   bookmarks: string[];
   isBookmarked: (id: string) => boolean;
   toggleBookmark: (id: string) => void;
@@ -140,6 +144,26 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     setPreferences((prev) => ({ ...prev, appLanguage: language }));
   }, []);
 
+  const toggleSaintHymn = useCallback((token: string) => {
+    setPreferences((prev) => {
+      const current = prev.selectedSaintHymns || [];
+      return {
+        ...prev,
+        selectedSaintHymns: current.includes(token)
+          ? current.filter((entry) => entry !== token)
+          : [...current, token],
+      };
+    });
+  }, []);
+
+  const clearSaintHymns = useCallback((base: string) => {
+    setPreferences((prev) => {
+      const prefix = `${base}:`;
+      const next = (prev.selectedSaintHymns || []).filter((token) => !token.startsWith(prefix));
+      return next.length === (prev.selectedSaintHymns || []).length ? prev : { ...prev, selectedSaintHymns: next };
+    });
+  }, []);
+
   const isBookmarked = useCallback((id: string) => bookmarks.includes(id), [bookmarks]);
 
   const toggleBookmark = useCallback((id: string) => {
@@ -162,6 +186,8 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleBishopPresent,
       toggleCopticGospelRite,
       setAppLanguage,
+      toggleSaintHymn,
+      clearSaintHymns,
       bookmarks,
       isBookmarked,
       toggleBookmark,
@@ -181,6 +207,8 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleBishopPresent,
       toggleCopticGospelRite,
       setAppLanguage,
+      toggleSaintHymn,
+      clearSaintHymns,
       bookmarks,
       isBookmarked,
       toggleBookmark,
