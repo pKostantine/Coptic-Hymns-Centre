@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 import { ActivityIndicator, View } from 'react-native';
 
 import { COLORS } from '../../constants/theme';
+import { sectionRestoreCandidates } from '../../utils/sectionRestore';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns } from './documentHtml';
@@ -114,11 +115,15 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     const handleLoad = () => {
       const win = iframeRef.current?.contentWindow as
-        | (Window & { scrollToSection?: (id: string) => void })
+        | (Window & { scrollToSection?: (id: string | string[]) => void })
         | null
         | undefined;
-      const sectionId = preservedSectionIdRef.current;
-      if (sectionId) win?.scrollToSection?.(sectionId);
+      // The whole chain, not just the remembered section: this load is
+      // usually a settings change rebuilding the document, and that setting
+      // may be what hid the section being restored to. See
+      // sectionRestoreCandidates.
+      const candidates = sectionRestoreCandidates(sections.map((section) => section.id), preservedSectionIdRef.current);
+      if (candidates.length) win?.scrollToSection?.(candidates);
     };
 
     const html = useMemo(

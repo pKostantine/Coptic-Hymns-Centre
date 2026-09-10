@@ -4,6 +4,7 @@ import { COLORS, SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
 import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
+import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 
 export default function SlideshowContainer({
   sections,
@@ -55,6 +56,15 @@ export default function SlideshowContainer({
   // verse, matching scroll mode's own settings-change behavior.
   const preservedSectionIdRef = useRef(null);
   const pendingRestoreSectionIdRef = useRef(null);
+  // Every section id in document order as of the LAST pagination, and the
+  // walk-back chain derived from it when a change invalidates one. A settings
+  // change can remove the very hymn being restored to -- turning Silent
+  // Prayers off while reading one, or the only language it has text in -- and
+  // by then it is already gone from `sections`, so the order it used to sit
+  // in has to have been captured before the change to know what came just
+  // before it.
+  const sectionIdOrderRef = useRef([]);
+  const pendingRestoreCandidatesRef = useRef([]);
   // Tracks what every item's own height was last measured against, so a
   // change that only touches a handful of items (minimizing one hymn, which
   // just removes that section's verse items -- see buildSlideshowSections in
@@ -114,6 +124,11 @@ export default function SlideshowContainer({
       pendingMeasurementFrameRef.current = null;
     }
     pendingRestoreSectionIdRef.current = preservedSectionIdRef.current;
+    pendingRestoreCandidatesRef.current = sectionRestoreCandidates(
+      sectionIdOrderRef.current,
+      preservedSectionIdRef.current,
+    );
+    sectionIdOrderRef.current = getSectionIdOrder(items);
 
     const newSignatures = new Map(items.map((item) => [item.id, getItemSignature(item)]));
     // Nothing that affects every item's height changed -- only the item set
@@ -349,18 +364,35 @@ export default function SlideshowContainer({
     // been reading (pendingRestoreSectionIdRef) — always its title's own
     // slide, never partway through it, matching scroll mode's own
     // settings-change behavior.
-    const targetSectionId = selectedSectionId || pendingRestoreSectionIdRef.current;
+    const requestedSectionId = selectedSectionId || pendingRestoreSectionIdRef.current;
 
-    if (
-      !targetSectionId ||
-      lastAppliedSelectedSectionId.current === targetSectionId
-    ) {
-      return;
+    if (!requestedSectionId) return;
+
+    const findSlideFor = (sectionId) =>
+      slides.findIndex((slide) => slide.some((item) => item.sectionId === sectionId));
+
+    let targetSectionId = requestedSectionId;
+    let nextSlideIndex = findSlideFor(requestedSectionId);
+
+    // The hymn being restored to may be exactly what the change just removed,
+    // in which case there is no slide to land on and the reader would be left
+    // at slide 0 -- the top of the document. Walk back through the hymns that
+    // came before it and take the nearest one that survived. An explicit
+    // content-selector pick never needs this: it can only name something
+    // currently on the list.
+    if (nextSlideIndex < 0 && !selectedSectionId) {
+      const candidates = pendingRestoreCandidatesRef.current;
+      for (let i = 0; i < candidates.length; i += 1) {
+        const candidateSlideIndex = findSlideFor(candidates[i]);
+        if (candidateSlideIndex >= 0) {
+          targetSectionId = candidates[i];
+          nextSlideIndex = candidateSlideIndex;
+          break;
+        }
+      }
     }
 
-    const nextSlideIndex = slides.findIndex((slide) =>
-      slide.some((item) => item.sectionId === targetSectionId),
-    );
+    if (lastAppliedSelectedSectionId.current === targetSectionId) return;
 
     if (nextSlideIndex >= 0) {
       setCurrentSlideIndex(nextSlideIndex);
@@ -374,6 +406,7 @@ export default function SlideshowContainer({
     // with nothing left to compare it against.
     if (!selectedSectionId) {
       pendingRestoreSectionIdRef.current = null;
+      pendingRestoreCandidatesRef.current = [];
     }
   }, [selectedSectionId, slides]);
 
@@ -1120,6 +1153,20 @@ function getSpeakerRole(type, bishopPresent) {
 
 function findSlideSectionId(slide = []) {
   return slide.find((item) => item.sectionId)?.sectionId;
+}
+
+/** Every section id present, in document order and without repeats — the order a walk-back restore searches (see sectionRestoreCandidates). */
+function getSectionIdOrder(items = []) {
+  const order = [];
+  const seen = new Set();
+
+  items.forEach((item) => {
+    if (!item.sectionId || seen.has(item.sectionId)) return;
+    seen.add(item.sectionId);
+    order.push(item.sectionId);
+  });
+
+  return order;
 }
 
 function getItemSignature(item) {

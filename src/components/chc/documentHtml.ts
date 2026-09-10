@@ -443,12 +443,22 @@ export function buildDocumentHtml(
           window.parent.postMessage(message, '*');
         }
       }
+      // Takes either one section id or, for a settings-change restore, an
+      // ordered list of fallbacks (see sectionRestoreCandidates): the
+      // section the reader was on may be exactly the one the changed setting
+      // just hid, so scroll to the first candidate that still rendered and
+      // leave the page at the top only if none of them did.
       window.scrollToSection = function (sectionId) {
-        var element = document.getElementById(sectionId);
-        if (element) {
-          var top = element.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0);
-          window.scrollTo({ top: Math.max(top - 1, 0), behavior: 'auto' });
+        var candidates = Array.isArray(sectionId) ? sectionId : [sectionId];
+        for (var i = 0; i < candidates.length; i += 1) {
+          var element = document.getElementById(candidates[i]);
+          if (element) {
+            var top = element.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0);
+            window.scrollTo({ top: Math.max(top - 1, 0), behavior: 'auto' });
+            return true;
+          }
         }
+        return false;
       };
       window.scrollToVerse = function (verseId) {
         var element = document.querySelector('[data-verse-id="' + verseId + '"]');

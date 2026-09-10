@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 import { COLORS } from '../../constants/theme';
+import { sectionRestoreCandidates } from '../../utils/sectionRestore';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns } from './documentHtml';
@@ -103,10 +104,14 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     };
 
     const handleLoadEnd = () => {
-      const sectionId = preservedSectionIdRef.current;
-      if (sectionId) {
+      // The whole chain, not just the remembered section: this load is
+      // usually a settings change rebuilding the document, and that setting
+      // may be what hid the section being restored to. See
+      // sectionRestoreCandidates.
+      const candidates = sectionRestoreCandidates(sections.map((section) => section.id), preservedSectionIdRef.current);
+      if (candidates.length) {
         webviewRef.current?.injectJavaScript(
-          `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(sectionId)}); } true;`,
+          `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(candidates)}); } true;`,
         );
       }
     };

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
+import CalendarScreen from './CalendarScreen';
+import SeasonSelectorScreen from './SeasonSelectorScreen';
+import SettingsScreen from './SettingsScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
@@ -69,10 +71,17 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
  * through and the depth-3 guard hydrateWithFlags applies while prefetching.
  */
 function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, parentBookmarkId, onClose }: DocumentModalProps) {
-  const router = useRouter();
   const { preferences, toggleBishopPresent, isBookmarked, toggleBookmark } = useReadingPreferences();
   const [nestedModal, setNestedModal] = useState<DocumentModalTarget | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
+  // Calendar/Settings can't be *navigated* to from in here. This whole
+  // document is a Modal, and a Modal renders above the navigator on every
+  // platform — so router.push swapped the screen underneath and the user had
+  // to back out of the subdocument before they could see what they opened.
+  // They're rendered as an overlay of this modal instead, which also means
+  // closing one drops the reader straight back into the subdocument, on the
+  // same hymn, with nothing lost.
+  const [overlayScreen, setOverlayScreen] = useState<'calendar' | 'seasons' | 'settings' | null>(null);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
   const documentRef = useRef<DocumentWebViewHandle>(null);
@@ -82,16 +91,30 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   // ServiceDocument.tsx/lectionary/index.tsx.
   const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
 
+  // Anything stacked over this document: a deeper subdocument, the content
+  // selector, or one of the overlay screens above. While any of them is up,
+  // this document's own gestures and hotkeys must stay inert so a swipe
+  // dismisses only the topmost layer.
+  const isCovered = Boolean(nestedModal) || selectorOpen || overlayScreen !== null;
+
   const isCopticReadingsSubdocument = Boolean(subdocumentKey && COPTIC_READINGS_SUBDOCUMENT_KEYS.has(subdocumentKey));
   const subdocumentBookmarkId =
     parentBookmarkId && subdocumentKey ? `${parentBookmarkId}:sub:${subdocumentKey}` : undefined;
 
-  function navigateAway(path: string) {
-    router.push(path as never);
-  }
-
   const handleAction = (action: DocumentAction) => {
     if (!sections) return;
+
+    if (action.type === 'currentSection') {
+      // Only the scrolling reader reports this; slideshow mode reports the
+      // same thing through onCurrentSectionChange. Either way it is what the
+      // content selector highlights and what a Slideshow Mode flip restores
+      // to, so both renderers have to keep it current. Ignored while
+      // anything covers the document: the layout shift a modal opening
+      // causes is enough to make the reading-line tracker briefly report a
+      // section the reader never actually scrolled to.
+      if (!isCovered && action.sectionId) setCurrentSectionId(action.sectionId);
+      return;
+    }
 
     if (action.type === 'openAntiphonary') {
       const triggerSection = sections.find((s) => s.id === action.sectionId);
@@ -118,12 +141,12 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     }
 
     if (action.type === 'swipeBack') {
-      if (!nestedModal && !selectorOpen) onClose();
+      if (!isCovered) onClose();
       return;
     }
 
     if (action.type === 'openSelector') {
-      if (!nestedModal && !selectorOpen) setSelectorOpen(true);
+      if (!isCovered) setSelectorOpen(true);
       return;
     }
   };
@@ -151,6 +174,24 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         .filter((entry): entry is { section: DocumentSection; label: string } => Boolean(entry.label)),
     [sections, isCopticReadingsSubdocument, preferences.bishopPresent],
   );
+
+  // Flipping Slideshow Mode swaps one renderer for the other (DocumentSurface
+  // renders SlideshowContainer or DocumentWebView, never both), and neither
+  // one's internal "where was the reader" tracking survives that. Both keep
+  // currentSectionId live, so it is the right hymn whichever mode reported it
+  // — hand it to whichever renderer is coming in. Scroll mode picks it up
+  // declaratively via initialScrollSectionId below; slideshow mode needs the
+  // explicit selection. The ref starts equal to the current value, so this
+  // only ever fires on a real flip, never on mount.
+  const previousSlideshowModeRef = useRef(preferences.slideshowMode);
+  useEffect(() => {
+    if (previousSlideshowModeRef.current === preferences.slideshowMode) return;
+    previousSlideshowModeRef.current = preferences.slideshowMode;
+    if (!preferences.slideshowMode || !currentSectionId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedSlideSectionId(currentSectionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferences.slideshowMode]);
 
   function selectAntiphonaryGroup(group: 'introduction' | 'adam' | 'vatos') {
     if (!sections) return;
@@ -188,7 +229,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     if (!el || typeof el.addEventListener !== 'function') return;
     let startX: number | null = null;
     const onDown = (e: PointerEvent) => {
-      if (nestedModal || selectorOpen || e.clientX >= 56) return;
+      if (isCovered || e.clientX >= 56) return;
       startX = e.clientX;
     };
     const onUp = (e: PointerEvent) => {
@@ -203,7 +244,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       el.removeEventListener('pointerdown', onDown);
       document.removeEventListener('pointerup', onUp);
     };
-  }, [visible, isMobileDocument, nestedModal, selectorOpen, onClose]);
+  }, [visible, isMobileDocument, isCovered, onClose]);
 
   // Capture-phase gesture handler for the two screen-edge swipes: left-edge
   // right-swipe closes this modal; right-edge left-swipe opens the content
@@ -217,7 +258,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
     return PanResponder.create({
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        if (nestedModal || selectorOpen) return false;
+        if (isCovered) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal) return false;
         const isCloseSwipe = gestureState.x0 < 56 && gestureState.dx > 12;
@@ -227,7 +268,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         return isCloseSwipe || isSelectorSwipe;
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (nestedModal || selectorOpen) return;
+        if (isCovered) return;
         if (gestureState.x0 < 56 && gestureState.dx > 60) {
           onClose();
           return;
@@ -238,7 +279,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         }
       },
     });
-  }, [onClose, nestedModal, selectorOpen, screenWidth]);
+  }, [onClose, isCovered, screenWidth]);
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
@@ -297,6 +338,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 selectedSectionId={selectedSlideSectionId}
                 onCurrentSectionChange={setCurrentSectionId}
                 onOpenSelector={() => setSelectorOpen(true)}
+                initialScrollSectionId={currentSectionId}
                 onCollapseToggle={setSelectedSlideSectionId}
               />
             </View>
@@ -308,8 +350,8 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
               onSelectSection={jumpToSection}
               bookmarked={subdocumentBookmarkId ? isBookmarked(subdocumentBookmarkId) : undefined}
               onToggleBookmark={subdocumentBookmarkId ? () => toggleBookmark(subdocumentBookmarkId) : undefined}
-              onOpenCalendar={() => navigateAway('/calendar')}
-              onOpenSettings={() => navigateAway('/settings')}
+              onOpenCalendar={() => setOverlayScreen('calendar')}
+              onOpenSettings={() => setOverlayScreen('settings')}
               bishopPresent={preferences.bishopPresent}
               onToggleBishopPresent={toggleBishopPresent}
               displaySilentPrayers={preferences.displaySilentPrayers}
@@ -317,6 +359,24 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             />
           </>
         )}
+        {/* Rendered from inside this document's own Modal, so Calendar and
+            Settings appear OVER the subdocument instead of behind it, and
+            closing one drops straight back into it. */}
+        <Modal
+          animationType="slide"
+          visible={overlayScreen !== null}
+          onRequestClose={() => setOverlayScreen(null)}
+          supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
+        >
+          {overlayScreen === 'calendar' ? (
+            <CalendarScreen
+              onClose={() => setOverlayScreen(null)}
+              onOpenSeasonSelector={() => setOverlayScreen('seasons')}
+            />
+          ) : null}
+          {overlayScreen === 'seasons' ? <SeasonSelectorScreen onClose={() => setOverlayScreen('calendar')} /> : null}
+          {overlayScreen === 'settings' ? <SettingsScreen onClose={() => setOverlayScreen(null)} /> : null}
+        </Modal>
         <DocumentModal
           visible={Boolean(nestedModal)}
           title={nestedModal?.title ?? null}

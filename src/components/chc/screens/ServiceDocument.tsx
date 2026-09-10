@@ -38,6 +38,8 @@ interface SubdocumentModalTarget {
   title: { english: string; arabic: string };
   sections: DocumentSection[];
   subdocumentKey?: string;
+  /** Id of the section holding the open-button this subdocument was reached through — where the reader is put back when it closes. */
+  triggerSectionId?: string;
 }
 
 /**
@@ -90,7 +92,14 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // In-document toggle button state, rendered wherever GOSPEL_RITE is spliced in.
   const copticGospelRite = preferences.copticGospelRite;
   const [selectorOpen, setSelectorOpen] = useState(false);
-  const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
+  // Seeded from the same module-level store selectedSlideSectionId is (see
+  // below): changing a setting can unmount this screen and mount it again,
+  // and starting back at null would leave the content selector with nothing
+  // highlighted and nowhere to scroll to until the reader got around to
+  // reporting its restored position.
+  const [currentSectionId, setCurrentSectionId] = useState<string | null>(
+    () => getLastDocumentPosition(documentPositionKey) ?? null,
+  );
   // Verse-granular position within currentSectionId, reported by the WebView
   // reader's scroll-tracking script — used to re-anchor scroll position
   // after a rotation/window-resize reflows the layout (see the effect below).
@@ -235,6 +244,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         title: triggerSection.title,
         sections: triggerSection.subdocumentSections,
         subdocumentKey: triggerSection.subdocumentKey,
+        triggerSectionId: triggerSection.id,
       });
     }
   }, [sections, initialSubdocumentKey]);
@@ -424,8 +434,39 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         title: triggerSection.title,
         sections: triggerSection.subdocumentSections,
         subdocumentKey: triggerSection.subdocumentKey,
+        triggerSectionId: triggerSection.id,
       });
     }
+  };
+
+  // Opening a subdocument from a bookmark deep link (?sub=...) never scrolled
+  // this document anywhere -- the reader had tapped nothing here, so closing
+  // the subdocument dropped them at the top of a service they never chose to
+  // be at the top of. Land them on the button they came through instead, so
+  // "Vespers - Doxologies" closes back onto the Doxologies button. Opening the
+  // subdocument by tapping that button is the same jump, just already true.
+  const closeSubdocument = () => {
+    const triggerSectionId = subdocumentModal?.triggerSectionId;
+    setSubdocumentModal(null);
+    if (!triggerSectionId) return;
+
+    setCurrentSectionId(triggerSectionId);
+    setLastDocumentPosition(documentPositionKey, triggerSectionId);
+    if (preferences.slideshowMode) {
+      setSelectedSlideSectionId(triggerSectionId);
+      return;
+    }
+    // Guarded the same way every other programmatic jump here is: the reader
+    // reports its own position continuously, and a report still in flight
+    // from before this jump would otherwise overwrite it.
+    pendingScrollRestoreSectionIdRef.current = triggerSectionId;
+    setTimeout(() => {
+      if (pendingScrollRestoreSectionIdRef.current === triggerSectionId) {
+        pendingScrollRestoreSectionIdRef.current = null;
+      }
+    }, 2000);
+    documentRef.current?.setPreservedSection(triggerSectionId);
+    documentRef.current?.scrollToSection(triggerSectionId);
   };
 
   const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
@@ -562,7 +603,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             sections={subdocumentModal?.sections ?? null}
             subdocumentKey={subdocumentModal?.subdocumentKey}
             parentBookmarkId={bookmarkId}
-            onClose={() => setSubdocumentModal(null)}
+            onClose={closeSubdocument}
           />
           <AntiphonaryModal
             visible={Boolean(antiphonarySections)}
