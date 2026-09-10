@@ -40,8 +40,7 @@ const SETTINGS_LABELS = {
   displaySilentPrayers: { english: 'Display Silent Prayers', arabic: 'عرض الصلوات السرية' },
   content: { english: 'Content', arabic: 'المحتوى' },
   saintHymns: { english: 'Saint Hymns', arabic: 'ألحان القديسين' },
-  saintHymnsNone: { english: 'Follow the calendar', arabic: 'حسب التقويم' },
-  saintHymnsCount: { english: 'chosen', arabic: 'مختار' },
+  inMonastery: { english: 'In Monastery', arabic: 'في الدير' },
   textSize: { english: 'Text Size', arabic: 'حجم النص' },
 };
 
@@ -67,6 +66,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
     toggleDisplaySilentPrayers,
     toggleSaintHymn,
     clearSaintHymns,
+    toggleInMonastery,
   } = useReadingPreferences();
   const [saintPickerOpen, setSaintPickerOpen] = useState(false);
   const chosenSaintHymns = preferences.selectedSaintHymns || [];
@@ -153,16 +153,17 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
             style={styles.contentRow}
             onPress={() => setSaintPickerOpen(true)}
           >
-            <View style={styles.contentTextGroup}>
-              <Text style={[styles.contentRowLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.saintHymns)}</Text>
-              <Text style={[styles.contentRowMeta, localizedTextStyle]}>
-                {chosenSaintHymns.length
-                  ? `${chosenSaintHymns.length} ${labelText(SETTINGS_LABELS.saintHymnsCount)}`
-                  : labelText(SETTINGS_LABELS.saintHymnsNone)}
-              </Text>
-            </View>
+            <Text style={[styles.contentRowLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.saintHymns)}</Text>
             <Icon name="chevron-forward" size={18} color={COLORS.muted} />
           </Pressable>
+          {/* The only thing gated on the Monastery condition is the Prayer of
+              the Veil, which monasteries pray and parishes skip. */}
+          <ToggleRow
+            label={labelText(SETTINGS_LABELS.inMonastery)}
+            isArabic={isArabicChrome}
+            active={preferences.inMonastery}
+            onPress={toggleInMonastery}
+          />
         </View>
       </ScrollView>
 
@@ -200,9 +201,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
   },
-  contentTextGroup: { flex: 1, gap: 2 },
-  contentRowLabel: { color: COLORS.white, fontSize: 15, fontWeight: '700' },
-  contentRowMeta: { color: COLORS.muted, fontSize: 12 },
+  contentRowLabel: { color: COLORS.white, flex: 1, fontSize: 15, fontWeight: '700' },
   languageList: { gap: SPACING.sm },
   orientationGroup: { gap: SPACING.sm },
   orientationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },

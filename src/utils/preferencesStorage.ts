@@ -41,6 +41,13 @@ export interface ReadingPreferences {
    * the saint's whole set — see isConditionAtomSatisfied in conditionEngine.js.
    */
   selectedSaintHymns: string[];
+  /**
+   * Raises the `Monastery` condition. Only the Prayer of the Veil is gated on
+   * it — it is prayed in monasteries and skipped in parishes — so this decides
+   * whether that subdocument appears in Offering of the Lamb and Vespers
+   * Praises at all.
+   */
+  inMonastery: boolean;
   /** Menu-chrome-only language (main menu + submenus/list screens) — never affects the text rendered inside an actual document, which is governed by visibleLanguages instead. */
   appLanguage: AppLanguage;
 }
@@ -73,6 +80,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   copticGospelRite: false,
   appLanguage: 'en',
   selectedSaintHymns: [],
+  inMonastery: false,
 };
 
 /** Lowest selectable font scale. */

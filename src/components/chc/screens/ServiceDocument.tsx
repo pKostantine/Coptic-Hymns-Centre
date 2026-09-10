@@ -93,14 +93,20 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // point (e.g. Vespers vs. Matins both open raising_of_incense).
   const documentPositionKey = `${bookmarkId}:${JSON.stringify(extraContext || {})}`;
 
-  // Hand-picked saint hymns ride in as ordinary condition flags, each under its
-  // own full child token (`StMark:VOC`). The bare `StMark` is never raised —
-  // that is what keeps one chosen hymn from pulling in the saint's whole set,
-  // while the calendar raising `StMark` on his feast still satisfies all of
-  // them (see isConditionAtomSatisfied in conditionEngine.js).
-  const saintHymnFlags = useMemo(
-    () => Object.fromEntries((preferences.selectedSaintHymns || []).map((token) => [token, true])),
-    [preferences.selectedSaintHymns],
+  // Settings that are really condition flags, raised alongside the date's own.
+  //
+  // Hand-picked saint hymns ride in under their full child token
+  // (`StMark:VOC`); the bare `StMark` is never raised, which is what keeps one
+  // chosen hymn from pulling in the saint's whole set while the calendar
+  // raising `StMark` on his feast still satisfies all of them (see
+  // isConditionAtomSatisfied in conditionEngine.js). Monastery is the one
+  // gating the Prayer of the Veil.
+  const userConditionFlags = useMemo(
+    () => ({
+      ...Object.fromEntries((preferences.selectedSaintHymns || []).map((token) => [token, true])),
+      Monastery: Boolean(preferences.inMonastery),
+    }),
+    [preferences.selectedSaintHymns, preferences.inMonastery],
   );
 
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
@@ -210,7 +216,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           schema,
           table,
           effectiveDate,
-          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...saintHymnFlags, ...extraContext },
+          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...userConditionFlags, ...extraContext },
           isVespersService ? vespersEffectiveDate : undefined,
         ),
       )
@@ -243,7 +249,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, extraContext, saintHymnFlags]);
+  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, extraContext, userConditionFlags]);
 
   // The scrolling WebView reader has no equivalent "seed the initial prop"
   // option (scrollToSection is imperative and needs the WebView mounted
