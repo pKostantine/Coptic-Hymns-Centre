@@ -34,16 +34,16 @@ export const COLORS = {
   linkSoft: 'rgba(87, 192, 138, 0.13)',
   linkLine: 'rgba(87, 192, 138, 0.45)',
 
-  // Subdocument (open-a-nested-document) accent. Red rather than the app's
-  // gold, because gold is general chrome — the collapse button, section rules,
-  // the header — and a button that opens a document should read as its own kind
-  // of thing, next to the green that means "leave this document". Brighter than
-  // the #D64545 used for Priest/Bishop speaker labels, and deliberately carried
-  // at a heavier fill/border than the other accents so it reads as the most
-  // prominent control on the page.
-  subdoc: '#FF5C5C',
-  subdocSoft: 'rgba(255, 92, 92, 0.16)',
-  subdocLine: 'rgba(255, 92, 92, 0.65)',
+  // Subdocument (open-a-nested-document) accent. Violet is the one hue nothing
+  // else in this palette already means: gold is general chrome, green means
+  // "leave this document", and the speaker colours have spoken for red
+  // (Priest/Bishop), orange (People), yellow (Deacon/Reader) and cyan
+  // (metropolitan brackets). So it cannot be misread as any of them. Carried at
+  // an intensity between the blue this replaced (too quiet against the page)
+  // and the red after it (louder than a secondary control should be).
+  subdoc: '#A78BFA',
+  subdocSoft: 'rgba(167, 139, 250, 0.14)',
+  subdocLine: 'rgba(167, 139, 250, 0.55)',
 
   // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',
