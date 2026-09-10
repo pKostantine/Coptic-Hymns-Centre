@@ -70,18 +70,29 @@ function appendReadingReference(title: string, reference?: string) {
 }
 
 /**
- * The Midnight Hour is prayed in three Watches, and its three watch openings
- * are the only place the Agpeya marks that split. Every hour has an
- * `introduction*` item, but only these three carry a title in
- * agpeya.hymn_titles — introductionFirstHour, introductionToTheCreed and the
- * rest are all title-less, so a title alone can't single them out. Matching
- * `introduction…Watch` does, and keeps working if a watch is ever renumbered
- * or added.
+ * An hour opening that marks where one part of a service gives way to the
+ * next: the Midnight Hour's three Watches, and the Agpeya hours prayed inside
+ * the Offering of the Lamb ("3rd Hour", "3rd Hour and 6th Hour", "12th Hour
+ * and Veil"...).
+ *
+ * Whether one of these reads as a divider is decided by whether it has a title
+ * at all, and that is per-schema: agpeya.hymn_titles leaves the hour openings
+ * null, so inside the Agpeya book they stay silent, while liturgy.hymn_titles
+ * names them, so inside the Liturgy they announce the hour. An untitled
+ * section never reaches this code — `listable` has already dropped it — so the
+ * same hymn divides the Offering of the Lamb without touching the Hour it also
+ * belongs to.
+ *
+ * The `(?!Of|To)` is what separates a divider from ordinary content that
+ * happens to be named the same way: introductionOfEveryHour is a real prayer
+ * (and titled, in agpeya), and introductionToTheCreed, introductionToTheHoosP1
+ * and introductionToRaisingOfIncenseP1 are all lead-ins to a hymn rather than
+ * headings over a section.
  */
-const WATCH_DIVIDER_KEY = /^introduction[A-Za-z]*Watch$/;
+const SECTION_DIVIDER_KEY = /^introduction(?!Of|To)[A-Za-z]*(?:Hour|Watch|Veil)$/;
 
-function isWatchDividerSection(section: DocumentSection): boolean {
-  return WATCH_DIVIDER_KEY.test(section.hymnKey || '');
+function isDividerSection(section: DocumentSection): boolean {
+  return SECTION_DIVIDER_KEY.test(section.hymnKey || '');
 }
 
 function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
@@ -243,13 +254,13 @@ export default function ContentSelectorDrawer({
               // height, since unlike a hyperlink they are content of this
               // service rather than a way out of it.
               const isSubdocument = Boolean(section.isSubdocumentButton || section.isAntiphonaryButton);
-              // The three Midnight Hour watch openings are rendered as rules
-              // across the list rather than as cards: they mark where one
-              // Watch ends and the next begins, so they should read as the
-              // seams of the hour, not as three more hymns sitting in it.
-              // Still tappable — jumping to the top of a Watch is exactly what
-              // someone scanning for one wants.
-              const isWatchDivider = isWatchDividerSection(section);
+              // An hour opening renders as a rule across the list rather than
+              // a card: it marks where one part of the service ends and the
+              // next begins, so it should read as a seam rather than as one
+              // more hymn sitting between them. Still tappable — jumping to
+              // the top of an hour is exactly what someone scanning for one
+              // wants.
+              const isDivider = isDividerSection(section);
               const isActive = section.id === resolvedCurrentSectionId;
               return (
                 <Pressable
@@ -258,8 +269,8 @@ export default function ContentSelectorDrawer({
                     styles.selectorItem,
                     isSubdocument && styles.selectorItemSubdocument,
                     isHyperlink && styles.selectorItemHyperlink,
-                    isWatchDivider && styles.selectorItemWatchDivider,
-                    !isHyperlink && !isWatchDivider && isActive && styles.selectorItemActive,
+                    isDivider && styles.selectorItemDivider,
+                    !isHyperlink && !isDivider && isActive && styles.selectorItemActive,
                   ]}
                   onLayout={(event) => {
                     const y = event.nativeEvent.layout.y;
@@ -278,19 +289,19 @@ export default function ContentSelectorDrawer({
                     onClose();
                   }}
                 >
-                  {isWatchDivider ? (
-                    <View style={styles.watchDividerRow}>
-                      <View style={styles.watchDividerRule} />
+                  {isDivider ? (
+                    <View style={styles.dividerRow}>
+                      <View style={styles.dividerRule} />
                       <Text
                         style={[
-                          styles.watchDividerLabel,
-                          showArabic && styles.watchDividerLabelArabic,
-                          isActive && styles.watchDividerLabelActive,
+                          styles.dividerLabel,
+                          showArabic && styles.dividerLabelArabic,
+                          isActive && styles.dividerLabelActive,
                         ]}
                       >
                         {showArabic ? selectorTitle.arabic : selectorTitle.english || selectorTitle.arabic}
                       </Text>
-                      <View style={styles.watchDividerRule} />
+                      <View style={styles.dividerRule} />
                     </View>
                   ) : (
                     <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
@@ -438,7 +449,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: SPACING.sm,
   },
-  selectorItemWatchDivider: {
+  selectorItemDivider: {
     backgroundColor: 'transparent',
     borderRadius: 0,
     borderWidth: 0,
@@ -448,31 +459,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingVertical: SPACING.xs,
   },
-  watchDividerRow: {
+  dividerRow: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
     gap: SPACING.sm,
   },
-  watchDividerRule: {
+  dividerRule: {
     backgroundColor: COLORS.goldLine,
     flex: 1,
     height: 1,
   },
-  watchDividerLabel: {
+  dividerLabel: {
     color: COLORS.gold,
     fontFamily: TYPOGRAPHY.title,
     fontSize: 13,
     fontWeight: '800',
     textTransform: 'uppercase',
   },
-  watchDividerLabelArabic: {
+  dividerLabelArabic: {
     fontFamily: TYPOGRAPHY.arabic,
     fontSize: 15,
     // Arabic has no upper case for textTransform to reach.
     textTransform: 'none',
   },
-  watchDividerLabelActive: {
+  dividerLabelActive: {
     color: COLORS.goldBright,
   },
   selectorItemActive: {
