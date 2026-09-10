@@ -26,13 +26,15 @@ export const COLORS = {
   goldLine: 'rgba(201, 162, 39, 0.45)',
   goldBright: '#D8C77A',
 
-  // Hyperlink (teleport-to-another-service) accent. Deliberately its own trio
+  // Hyperlink (teleport-to-another-service) accent. Deliberately its own pair
   // rather than reusing `refrain` — that green means "this verse is a refrain",
-  // and a navigation control must not read as content. Same soft/line/base
-  // shape as the gold tints above so the two families behave alike.
+  // and a navigation control must not read as content.
+  //
+  // Fill and text only: both button families take a gold border, so the app's
+  // own yellow is what marks a thing as a control and the hue inside it is what
+  // says which kind. Hence no linkLine — the border is COLORS.gold.
   link: '#57C08A',
   linkSoft: 'rgba(87, 192, 138, 0.13)',
-  linkLine: 'rgba(87, 192, 138, 0.45)',
 
   // Subdocument (open-a-nested-document) accent, alongside the green that means
   // "leave this document" and the gold that is general chrome.
@@ -41,11 +43,11 @@ export const COLORS = {
   // calendar's month chevrons and its evening toggle, so a button wearing it
   // blended into existing furniture rather than reading as its own control —
   // which is what made the first attempt at blue disappear. This is a
-  // saturated azure nothing else uses, at the heavier fill and border the red
-  // attempt proved were needed for a button to hold the page.
+  // saturated azure nothing else uses.
+  //
+  // Fill and text only, like `link` above — the border is COLORS.gold.
   subdoc: '#4DA6FF',
   subdocSoft: 'rgba(77, 166, 255, 0.16)',
-  subdocLine: 'rgba(77, 166, 255, 0.7)',
 
   // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',

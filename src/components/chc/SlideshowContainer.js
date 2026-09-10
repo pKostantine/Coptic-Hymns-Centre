@@ -1912,7 +1912,7 @@ const styles = StyleSheet.create({
   openButton: {
     alignItems: "center",
     backgroundColor: COLORS.subdocSoft,
-    borderColor: COLORS.subdocLine,
+    borderColor: COLORS.gold,
     borderRadius: 8,
     borderWidth: 1,
     gap: SPACING.xs,
@@ -1927,7 +1927,7 @@ const styles = StyleSheet.create({
   // out of this service, not a document to open on top of it.
   hyperlinkButton: {
     backgroundColor: COLORS.linkSoft,
-    borderColor: COLORS.linkLine,
+    borderColor: COLORS.gold,
     minHeight: 72,
   },
   hyperlinkArrow: {
