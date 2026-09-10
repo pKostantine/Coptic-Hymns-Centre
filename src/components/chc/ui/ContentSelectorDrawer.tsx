@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, type LayoutChangeEvent, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -266,7 +266,7 @@ export default function ContentSelectorDrawer({
           </View>
 
           <ScrollView ref={scrollViewRef} style={styles.selectorList}>
-            {listable.map((section) => {
+            {listable.map((section, listIndex) => {
               // A list entry always shows exactly one language, driven by
               // the App Language setting — falling back to whichever
               // language actually has text for this specific section if the
@@ -294,11 +294,18 @@ export default function ContentSelectorDrawer({
               // the top of an hour is exactly what someone scanning for one
               // wants.
               const isDivider = isDividerSection(section);
-              // Sits under the divider above it — indented, with the left edge
-              // picked out so the group reads as belonging to that heading.
+              // Sits under the divider above it. The rule that brackets the
+              // group is drawn by the wrapper below, not by the card.
               const isNested = nestedSectionIds.has(section.id);
+              const isLastNested = isNested && !nestedSectionIds.has(listable[listIndex + 1]?.id ?? '');
               const isActive = section.id === resolvedCurrentSectionId;
-              return (
+
+              const recordLayout = (event: LayoutChangeEvent) => {
+                const y = event.nativeEvent.layout.y;
+                setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
+              };
+
+              const row = (
                 <Pressable
                   key={section.id}
                   style={[
@@ -309,10 +316,10 @@ export default function ContentSelectorDrawer({
                     isDivider && styles.selectorItemDivider,
                     !isHyperlink && !isDivider && isActive && styles.selectorItemActive,
                   ]}
-                  onLayout={(event) => {
-                    const y = event.nativeEvent.layout.y;
-                    setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
-                  }}
+                  // A nested card's own y is measured inside its wrapper, so
+                  // the wrapper reports position instead — itemLayouts feeds
+                  // scrollTo, which needs an offset within the ScrollView.
+                  onLayout={isNested ? undefined : recordLayout}
                   onPress={() => {
                     // Closed first so the panel isn't still sitting over the
                     // destination as it comes in. The jump-within-document
@@ -350,6 +357,24 @@ export default function ContentSelectorDrawer({
                   )}
                   {isHyperlink ? <Text style={styles.selectorHyperlinkArrow}>→</Text> : null}
                 </Pressable>
+              );
+
+              if (!isNested) return row;
+
+              // One segment of the rule bracketing the group. The gap below the
+              // card is this wrapper's padding rather than the card's margin,
+              // so the border runs through it and consecutive segments meet —
+              // one unbroken line down the group instead of a dash beside each
+              // card. The last segment drops that padding so the line stops
+              // with the group rather than trailing past it.
+              return (
+                <View
+                  key={section.id}
+                  style={[styles.nestedSegment, isLastNested && styles.nestedSegmentLast]}
+                  onLayout={recordLayout}
+                >
+                  {row}
+                </View>
               );
             })}
           </ScrollView>
@@ -485,11 +510,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: SPACING.sm,
   },
-  selectorItemNested: {
+  nestedSegment: {
     borderLeftColor: COLORS.goldLine,
-    borderLeftWidth: 2,
-    marginLeft: SPACING.md,
+    borderLeftWidth: 3,
+    paddingBottom: SPACING.sm,
+    paddingLeft: SPACING.md,
   },
+  nestedSegmentLast: { paddingBottom: 0 },
+  // The gap moves onto the wrapper's padding so the rule can run through it.
+  selectorItemNested: { marginBottom: 0 },
   selectorItemDivider: {
     backgroundColor: 'transparent',
     borderRadius: 0,
