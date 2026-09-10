@@ -10,7 +10,7 @@ import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
-import { HYPERLINK_TARGETS } from '../../../constants/manifest';
+import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useCalendar } from '../../../context/CalendarContext';
@@ -28,6 +28,8 @@ interface ServiceDocumentProps {
   arabic: string;
   /** Extra condition flags forced true for this entry point (e.g. Vespers/Matins on the shared raising_of_incense document). */
   extraContext?: Record<string, boolean>;
+  /** Manifest id of the menu entry this document was opened from. Only needed where several entries open the SAME schema/table (Vespers vs Matins), so a bookmark can record which one it was made in — see bookmarkKeyFor. */
+  entryId?: string;
   /** Where "back" should land when there's no navigation history to pop (direct deep link, page reload). */
   backHref: Href;
 }
@@ -50,7 +52,7 @@ interface SubdocumentModalTarget {
  * themselves are still enabled on narrow web (isCompactViewport) since they
  * don't remove anything the header already provides.
  */
-export default function ServiceDocument({ schema, table, title, arabic, extraContext, backHref }: ServiceDocumentProps) {
+export default function ServiceDocument({ schema, table, title, arabic, extraContext, entryId, backHref }: ServiceDocumentProps) {
   const router = useRouter();
   const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent, toggleCopticGospelRite } = useReadingPreferences();
   const { effectiveDate, vespersEffectiveDate } = useCalendar();
@@ -65,7 +67,15 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
   const isCompactViewport = isMobileDocument || screenWidth < MOBILE_WEB_BREAKPOINT;
-  const bookmarkId = `${schema}:${table}`;
+  // Qualified by the entry point only where the document is reachable from
+  // more than one, so bookmarks for every other document keep their existing
+  // ids. Without this, a bookmark made in Vespers and one made in Matins were
+  // the same id, and the bookmarks list labelled both with whichever entry it
+  // had indexed last.
+  // Memoized rather than called bare: bookmarkId feeds memoized values below,
+  // and the React Compiler cannot see through a plain call here, so it bails
+  // out of preserving those memos entirely.
+  const bookmarkId = useMemo(() => bookmarkKeyFor(schema, table, entryId), [schema, table, entryId]);
   // Navigating to Settings and back unmounts this screen (React Navigation
   // doesn't keep off-screen web routes mounted), which would otherwise wipe
   // currentSectionId/selectedSlideSectionId right when "bring me back to

@@ -196,3 +196,49 @@ export const HYPERLINK_TARGETS: Record<string, HyperlinkTarget> = {
   LITURGY_OF_ST_CYRIL: hyperlinkTarget('/liturgy/divine-liturgy/liturgy_of_st_cyril', DIVINE_LITURGY_SERVICES, 'liturgy_of_st_cyril'),
   DISTRIBUTION: hyperlinkTarget('/liturgy/divine-liturgy/distribution', DIVINE_LITURGY_SERVICES, 'distribution'),
 };
+
+/**
+ * Bookmark keys.
+ *
+ * A bookmark is normally identified by the document it points at,
+ * `schema:table` — but that is not unique when two menu entries open the SAME
+ * document with different condition flags. Vespers and Matins are both
+ * liturgy.raising_of_incense, separated only by their extraContext, so a
+ * bookmark made in Vespers was indistinguishable from one made in Matins and
+ * whichever entry was registered last won the label.
+ *
+ * Rather than special-casing that pair, any (schema, table) reachable from more
+ * than one entry point gets its entry id appended. Documents reachable from
+ * exactly one entry keep the bare `schema:table` key, so existing bookmarks for
+ * them are untouched.
+ */
+function collectEntryTables(): string[] {
+  const tables: string[] = [];
+  for (const category of CATEGORIES) {
+    if (category.kind === 'direct' && category.schema && category.table) {
+      tables.push(`${category.schema}:${category.table}`);
+    }
+  }
+  for (const services of Object.values(SERVICES_BY_CATEGORY)) {
+    for (const service of services) tables.push(`${service.schema}:${service.table}`);
+  }
+  for (const option of RAISING_OF_INCENSE_OPTIONS) tables.push(`${option.schema}:${option.table}`);
+  for (const service of DIVINE_LITURGY_SERVICES) tables.push(`${service.schema}:${service.table}`);
+  return tables;
+}
+
+/** `schema:table` pairs that more than one menu entry opens, so a bookmark there must say which entry it was made from. */
+export const SHARED_DOCUMENT_KEYS: ReadonlySet<string> = new Set(
+  collectEntryTables().filter((key, index, all) => all.indexOf(key) !== index),
+);
+
+/**
+ * The bookmark id for a document opened from a given entry point. Falls back to
+ * the bare `schema:table` whenever that is already unambiguous, so only the
+ * genuinely shared documents change shape.
+ */
+export function bookmarkKeyFor(schema: string, table: string, entryId?: string | null): string {
+  const base = `${schema}:${table}`;
+  if (!entryId || !SHARED_DOCUMENT_KEYS.has(base)) return base;
+  return `${base}@${entryId}`;
+}

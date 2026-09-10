@@ -16,6 +16,7 @@ export default function LectionaryDocument() {
       title={service.title}
       arabic={service.arabic}
       extraContext={service.extraContext}
+      entryId={service.id}
       backHref="/lectionary"
     />
   );
