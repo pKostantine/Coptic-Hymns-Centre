@@ -942,6 +942,7 @@ const SlideItem = memo(function SlideItem({
         forceWhiteText={Boolean(item.forceWhiteVerses || item.verse?.forceWhiteText)}
         colorIndex={item.colorIndex}
         suppressSpeakerLabel={Boolean(item.suppressSpeakerLabel)}
+        allSpeakerLabelsSuppressed={Boolean(item.allSpeakerLabelsSuppressed)}
         selectableText={false}
         bishopPresent={item.bishopPresent}
         onLanguageLayout={(language, metric) =>
@@ -1062,6 +1063,10 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         verse,
         colorIndex: getVerseColorIndex(section, verseIndex, bishopPresent),
         suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || Boolean(suppressMap.get(verse)),
+        // Distinct from the line above: that one is also true in ordinary
+        // services whenever a speaker repeats. This is the Agpeya-only
+        // "hide every indicator" state, which is what colours People lines.
+        allSpeakerLabelsSuppressed: Boolean(suppressAllSpeakerLabels),
         bishopPresent,
         // Recited Prayer is a per-verse type (a verse's own effective type
         // after inheritance — see resolveEffectiveVerseType), not a

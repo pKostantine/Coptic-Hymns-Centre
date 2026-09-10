@@ -464,15 +464,12 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.title,
     fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   watchDividerLabelArabic: {
     fontFamily: TYPOGRAPHY.arabic,
     fontSize: 15,
-    // Arabic is cursive — letterSpacing pulls the joined letterforms apart,
-    // and it has no upper case for textTransform to reach.
-    letterSpacing: 0,
+    // Arabic has no upper case for textTransform to reach.
     textTransform: 'none',
   },
   watchDividerLabelActive: {

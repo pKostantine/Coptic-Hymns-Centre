@@ -30,6 +30,9 @@ export default function VerseBlock({
   forceWhiteText = false,
   colorIndex,
   suppressSpeakerLabel = false,
+  // True only in the Agpeya book, where every speaker indicator is hidden —
+  // see resolveVerseColorBase in documentHtml.ts.
+  allSpeakerLabelsSuppressed = false,
   selectableText = false,
   bishopPresent = false,
 }) {
@@ -61,6 +64,14 @@ export default function VerseBlock({
       ? theme.colors.text
       : verse.prayerType === "Blue"
       ? theme.colors.rowBlue
+      : // See resolveVerseColorBase in documentHtml.ts — in the Agpeya book,
+      // where every speaker indicator is hidden, a People line carries the
+      // speaker in the same orange that rubric is drawn in. The two renderers
+      // must never disagree, so this sits at the same point in the chain:
+      // below the authored White/Blue overrides, above the default
+      // alternation, and on the same Agpeya-only flag.
+      allSpeakerLabelsSuppressed && rubricType === "people"
+      ? COLORS.people
       : forceWhiteText || verse.forceWhiteText || isRefrain || isRecitedPrayer || isReading || (colorIndex ?? index) % 2 === 0
       ? theme.colors.text
       : theme.colors.rowBlue;

@@ -171,6 +171,7 @@ export function buildDocumentHtml(
         copticRecitedPrayers,
         copticGospelRite,
         suppressMap,
+        suppressAllSpeakerLabels,
       }),
     )
     .join('');
@@ -770,6 +771,7 @@ function renderSection(
     copticRecitedPrayers: boolean;
     copticGospelRite: boolean;
     suppressMap: Map<DocumentVerse, boolean>;
+    suppressAllSpeakerLabels: boolean;
   },
 ) {
   const { appLanguage, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite, suppressMap } = opts;
@@ -943,9 +945,16 @@ function renderVerse(
     visibleColumns,
     bishopPresent,
     copticRecitedPrayers,
-  }: { fontSize: number; visibleColumns: VisibleColumns; bishopPresent: boolean; copticRecitedPrayers: boolean },
+    suppressAllSpeakerLabels,
+  }: {
+    fontSize: number;
+    visibleColumns: VisibleColumns;
+    bishopPresent: boolean;
+    copticRecitedPrayers: boolean;
+    suppressAllSpeakerLabels: boolean;
+  },
 ) {
-  const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent);
+  const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent, suppressAllSpeakerLabels);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveVerseRubricType(verse, bishopPresent)];
   const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
   // "Invincible Coptic" only means "this Coptic must always render" -- some
@@ -1085,14 +1094,14 @@ function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number, bi
   return count;
 }
 
-function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean) {
-  const resolved = resolveVerseColorBase(verse, index, section, bishopPresent);
+function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean) {
+  const resolved = resolveVerseColorBase(verse, index, section, bishopPresent, allSpeakerLabelsSuppressed);
   // Pre-Refrain lines keep whatever role/color they'd naturally get — this
   // only ever adds italic on top, never changes the color.
   return verse.italic ? { ...resolved, italic: true } : resolved;
 }
 
-function resolveVerseColorBase(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean) {
+function resolveVerseColorBase(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean) {
   if (verse.type === 'comment' || verse.type === 'silentComment') return { color: COLORS.comment, italic: true };
   if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
   if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: true };
@@ -1103,6 +1112,29 @@ function resolveVerseColorBase(verse: DocumentVerse, index: number, section: Doc
   // surrounding verses keep alternating exactly as if it weren't there.
   if (verse.prayerType === 'White' || verse.forceWhiteText) return { color: COLORS.white, italic: false };
   if (verse.prayerType === 'Blue') return { color: COLORS.rowBlue, italic: false };
+  // Agpeya only. Its Hours are prayed by one person, so ServiceDocument hides
+  // every speaker indicator in the book — which left the congregation's own
+  // responses looking identical to the rest of the text. COLORS.people is the
+  // same orange the "People:" rubric is already drawn in, so this reads as
+  // that label moved onto the line rather than as a new colour to learn.
+  //
+  // Keyed on suppressAllSpeakerLabels, NOT on this verse's own suppression
+  // flag. That flag is also set in ordinary services whenever a line repeats
+  // the previous line's speaker, so using it would have tinted People
+  // continuation lines throughout the liturgies. Nothing outside the Agpeya
+  // should change colour because of this.
+  //
+  // Deliberately colour and not italic: two of the three columns are Coptic
+  // and Arabic, and neither has a real italic face here, so italic would be
+  // synthesised by slanting the glyphs — which looks broken in Coptic and
+  // breaks the joined letterforms in Arabic.
+  //
+  // Sits below the explicit "White"/"Blue" prayer_type overrides, which are
+  // authored per line and still win, and above the default alternation, which
+  // is the plain white/blue this replaces.
+  if (allSpeakerLabelsSuppressed && resolveVerseRubricType(verse, bishopPresent) === 'people') {
+    return { color: COLORS.people, italic: false };
+  }
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 
   const effectiveIndex = getEffectiveAlternatingIndex(section.verses, index, bishopPresent);
