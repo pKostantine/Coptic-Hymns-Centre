@@ -176,6 +176,39 @@ export default function ContentSelectorDrawer({
     return Boolean(selectorTitle.english || selectorTitle.arabic);
   });
 
+  /**
+   * Everything a divider gathers under it, by section id.
+   *
+   * A nest opens on a divider that actually speaks — one whose hymn key has
+   * the shape AND a title in this document's schema, since the same hour
+   * opening is titled in liturgy.hymn_titles and null in agpeya.hymn_titles.
+   * That matters: an untitled opening never renders a rule, so it must not
+   * silently indent the rest of the Hour behind an invisible heading.
+   *
+   * It closes on the next `introduction…` row of any kind, whether or not that
+   * row is itself visible. In the Offering of the Lamb that is
+   * introductionToTheCreed, which carries no title and so never appears in
+   * this list — but it is still the point where the Agpeya hours end and the
+   * Liturgy resumes, so the Creed and everything after it sit back at the
+   * outer level. The Midnight Hour ends its third Watch on the same row.
+   *
+   * Walked over `sections` rather than `listable` so those invisible
+   * boundaries still count.
+   */
+  const nestedSectionIds = useMemo(() => {
+    const nested = new Set<string>();
+    let insideNest = false;
+    for (const section of sections) {
+      if (/^introduction/i.test(section.hymnKey || '')) {
+        const title = getSectionSelectorTitle(section);
+        insideNest = isDividerSection(section) && Boolean(title.english || title.arabic);
+        continue;
+      }
+      if (insideNest) nested.add(section.id);
+    }
+    return nested;
+  }, [sections]);
+
   // The document's currentSectionId can land on a titleless hymn (e.g. an
   // inline-spliced continuation) that never made it into `listable` — in
   // that case, highlight/scroll to the nearest surrounding entry that did:
@@ -261,12 +294,16 @@ export default function ContentSelectorDrawer({
               // the top of an hour is exactly what someone scanning for one
               // wants.
               const isDivider = isDividerSection(section);
+              // Sits under the divider above it — indented, with the left edge
+              // picked out so the group reads as belonging to that heading.
+              const isNested = nestedSectionIds.has(section.id);
               const isActive = section.id === resolvedCurrentSectionId;
               return (
                 <Pressable
                   key={section.id}
                   style={[
                     styles.selectorItem,
+                    isNested && styles.selectorItemNested,
                     isSubdocument && styles.selectorItemSubdocument,
                     isHyperlink && styles.selectorItemHyperlink,
                     isDivider && styles.selectorItemDivider,
@@ -296,7 +333,6 @@ export default function ContentSelectorDrawer({
                         style={[
                           styles.dividerLabel,
                           showArabic && styles.dividerLabelArabic,
-                          isActive && styles.dividerLabelActive,
                         ]}
                       >
                         {showArabic ? selectorTitle.arabic : selectorTitle.english || selectorTitle.arabic}
@@ -449,6 +485,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: SPACING.sm,
   },
+  selectorItemNested: {
+    borderLeftColor: COLORS.goldLine,
+    borderLeftWidth: 2,
+    marginLeft: SPACING.md,
+  },
   selectorItemDivider: {
     backgroundColor: 'transparent',
     borderRadius: 0,
@@ -482,9 +523,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     // Arabic has no upper case for textTransform to reach.
     textTransform: 'none',
-  },
-  dividerLabelActive: {
-    color: COLORS.goldBright,
   },
   selectorItemActive: {
     backgroundColor: '#171513',
