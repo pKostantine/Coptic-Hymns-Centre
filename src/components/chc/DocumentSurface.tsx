@@ -1,14 +1,17 @@
-import { forwardRef, useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, useWindowDimensions } from 'react-native';
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Platform, useWindowDimensions, View } from 'react-native';
 
 import SlideshowContainer from './SlideshowContainer';
 import DocumentWebView, { DocumentAction, DocumentSection, DocumentWebViewHandle } from './DocumentWebView';
-import { CHC_SLIDESHOW_THEME } from '../../constants/theme';
+import { CHC_SLIDESHOW_THEME, COLORS } from '../../constants/theme';
+import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
 import { fontScaleToPx, ReadingPreferences } from '../../utils/preferencesStorage';
 
 interface DocumentSurfaceProps {
   sections: DocumentSection[];
   preferences: ReadingPreferences;
+  /** Stable identity of this exact document occurrence; section IDs inside it already encode hymn_key + item_order. */
+  collapseMemoryScope: string;
   onAction?: (action: DocumentAction) => void;
   selectedSectionId?: string | null;
   onCurrentSectionChange?: (id: string) => void;
@@ -23,6 +26,8 @@ interface DocumentSurfaceProps {
   suppressAllSpeakerLabels?: boolean;
   /** Called (in slideshow mode only) immediately after a collapse/expand toggle fires, with the toggled section's own id — lets the parent navigate to that section's title slide. */
   onCollapseToggle?: (sectionId: string) => void;
+  /** Whether this surface may consume desktop arrow-key navigation. Disable it whenever another document or drawer is stacked above this one. */
+  keyboardNavigationEnabled?: boolean;
 }
 
 /** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer/silentComment — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
@@ -103,6 +108,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     {
       sections,
       preferences,
+      collapseMemoryScope,
       onAction,
       selectedSectionId,
       onCurrentSectionChange,
@@ -112,16 +118,42 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       suppressAllSpeakerLabels = false,
       initialScrollSectionId,
       onCollapseToggle,
+      keyboardNavigationEnabled = true,
     },
     ref,
   ) => {
     const { width: screenWidth } = useWindowDimensions();
     const fontSize = Math.round(fontScaleToPx(preferences.fontScale) * fontScaleMultiplier);
     const effectiveSelectText = preferences.selectText && !preferences.slideshowMode;
-    // Keyed by section.id, same model as the old app's collapsedContentIds: a
-    // missing entry falls back to the section's own defaultCollapsed, an
-    // explicit entry (set by tapping the slideshow's collapse button) wins.
+    // section.id already includes hymn_key + item_order. Combining it with
+    // collapseMemoryScope keeps repeated hymns separate both within one
+    // document and across Vespers/Matins/Liturgy or nested subdocuments.
     const [collapsedSectionIds, setCollapsedSectionIds] = useState<Record<string, boolean>>({});
+    const collapsedSectionIdsRef = useRef<Record<string, boolean>>({});
+    const [loadedCollapseScope, setLoadedCollapseScope] = useState<string | null>(null);
+
+    useEffect(() => {
+      let cancelled = false;
+      loadCollapsedSectionStates(collapseMemoryScope).then((storedStates) => {
+        if (cancelled) return;
+        collapsedSectionIdsRef.current = storedStates;
+        setCollapsedSectionIds(storedStates);
+        setLoadedCollapseScope(collapseMemoryScope);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [collapseMemoryScope]);
+
+    const rememberCollapseState = useCallback(
+      (sectionId: string, collapsed: boolean) => {
+        const nextStates = { ...collapsedSectionIdsRef.current, [sectionId]: collapsed };
+        collapsedSectionIdsRef.current = nextStates;
+        setCollapsedSectionIds(nextStates);
+        void saveCollapsedSectionState(collapseMemoryScope, sectionId, collapsed);
+      },
+      [collapseMemoryScope],
+    );
 
     // All titles (section titles, and Subdocument/Antiphonary open-button
     // labels) follow the App Language setting, not the document's own
@@ -143,19 +175,42 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
 
     const handleToggleCollapse = useCallback(
       (sectionId: string) => {
-        setCollapsedSectionIds((current) => ({
-          ...current,
-          [sectionId]: !(current[sectionId] ?? sections.find((s) => s.id === sectionId)?.defaultCollapsed ?? false),
-        }));
+        const currentState =
+          collapsedSectionIdsRef.current[sectionId] ??
+          sections.find((section) => section.id === sectionId)?.defaultCollapsed ??
+          false;
+        rememberCollapseState(sectionId, !currentState);
         onCollapseToggle?.(sectionId);
       },
-      [sections, onCollapseToggle],
+      [sections, rememberCollapseState, onCollapseToggle],
+    );
+
+    const handleDocumentAction = useCallback(
+      (action: DocumentAction) => {
+        if (action.type === 'toggleCollapse' && action.sectionId && typeof action.collapsed === 'boolean') {
+          rememberCollapseState(action.sectionId, action.collapsed);
+          return;
+        }
+        onAction?.(action);
+      },
+      [onAction, rememberCollapseState],
+    );
+
+    const sectionsWithRememberedCollapse = useMemo(
+      () =>
+        sections.map((section) => {
+          const remembered = collapsedSectionIds[section.id];
+          return section.collapsible && remembered !== undefined
+            ? { ...section, defaultCollapsed: remembered }
+            : section;
+        }),
+      [sections, collapsedSectionIds],
     );
 
     const slideshowSections = useMemo(
       () =>
         buildSlideshowSections(
-          sections,
+          sectionsWithRememberedCollapse,
           {
             displayComments: preferences.displayComments,
             displaySilentPrayers: preferences.displaySilentPrayers,
@@ -164,7 +219,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           },
           collapsedSectionIds,
         ),
-      [sections, preferences.displayComments, preferences.displaySilentPrayers, preferences.bishopPresent, copticGospelRite, collapsedSectionIds],
+      [sectionsWithRememberedCollapse, preferences.displayComments, preferences.displaySilentPrayers, preferences.bishopPresent, copticGospelRite, collapsedSectionIds],
     );
 
     useEffect(() => {
@@ -215,6 +270,14 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       };
     }, [effectiveSelectText]);
 
+    if (loadedCollapseScope !== collapseMemoryScope) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.black }}>
+          <ActivityIndicator color={COLORS.gold} />
+        </View>
+      );
+    }
+
     if (preferences.slideshowMode) {
       return (
         <SlideshowContainer
@@ -230,10 +293,11 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           onOpenSelector={onOpenSelector}
           viewportHeightOverride={undefined}
           bishopPresent={preferences.bishopPresent}
-          onAction={onAction}
+          onAction={handleDocumentAction}
           copticGospelRite={copticGospelRite}
           suppressAllSpeakerLabels={suppressAllSpeakerLabels}
           onToggleCollapse={handleToggleCollapse}
+          keyboardNavigationEnabled={keyboardNavigationEnabled}
         />
       );
     }
@@ -241,7 +305,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     return (
       <DocumentWebView
         ref={ref}
-        sections={sections}
+        sections={sectionsWithRememberedCollapse}
         fontSize={fontSize}
         visibleColumns={{
           english: preferences.visibleLanguages.english,
@@ -256,7 +320,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         copticGospelRite={copticGospelRite}
         copticRecitedPrayers={preferences.visibleLanguages.copticRecitedPrayers}
         suppressAllSpeakerLabels={suppressAllSpeakerLabels}
-        onAction={onAction}
+        onAction={handleDocumentAction}
         initialSectionId={initialScrollSectionId}
       />
     );

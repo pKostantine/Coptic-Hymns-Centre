@@ -30,6 +30,11 @@ export default function VerseBlock({
   forceWhiteText = false,
   colorIndex,
   suppressSpeakerLabel = false,
+  // Decided by shouldUsePeopleLineColor in verseRubric.js — the People's own
+  // responses inside the Agpeya's Litanies. Passed in rather than worked out
+  // here because it depends on the section title, which this component never
+  // sees.
+  usePeopleLineColor = false,
   selectableText = false,
   bishopPresent = false,
 }) {
@@ -61,6 +66,12 @@ export default function VerseBlock({
       ? theme.colors.text
       : verse.prayerType === "Blue"
       ? theme.colors.rowBlue
+      : // See resolveVerseColorBase in documentHtml.ts. Same point in the
+      // chain as there — below the authored White/Blue overrides, above the
+      // default alternation — and off the same shared predicate, since the
+      // two renderers must never disagree about this.
+      usePeopleLineColor
+      ? COLORS.peopleLight
       : forceWhiteText || verse.forceWhiteText || isRefrain || isRecitedPrayer || isReading || (colorIndex ?? index) % 2 === 0
       ? theme.colors.text
       : theme.colors.rowBlue;

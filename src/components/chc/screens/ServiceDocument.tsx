@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Href, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -38,8 +38,14 @@ interface SubdocumentModalTarget {
   title: { english: string; arabic: string };
   sections: DocumentSection[];
   subdocumentKey?: string;
+  collapseMemoryScope: string;
   /** Id of the section holding the open-button this subdocument was reached through — where the reader is put back when it closes. */
   triggerSectionId?: string;
+}
+
+interface AntiphonaryModalTarget {
+  sections: DocumentSection[];
+  collapseMemoryScope: string;
 }
 
 /**
@@ -87,6 +93,22 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // point (e.g. Vespers vs. Matins both open raising_of_incense).
   const documentPositionKey = `${bookmarkId}:${JSON.stringify(extraContext || {})}`;
 
+  // Settings that are really condition flags, raised alongside the date's own.
+  //
+  // Hand-picked saint hymns ride in under their full child token
+  // (`StMark:VOC`); the bare `StMark` is never raised, which is what keeps one
+  // chosen hymn from pulling in the saint's whole set while the calendar
+  // raising `StMark` on his feast still satisfies all of them (see
+  // isConditionAtomSatisfied in conditionEngine.js). Monastery is the one
+  // gating the Prayer of the Veil.
+  const userConditionFlags = useMemo(
+    () => ({
+      ...Object.fromEntries((preferences.selectedSaintHymns || []).map((token) => [token, true])),
+      Monastery: Boolean(preferences.inMonastery),
+    }),
+    [preferences.selectedSaintHymns, preferences.inMonastery],
+  );
+
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // In-document toggle button state, rendered wherever GOSPEL_RITE is spliced in.
@@ -116,7 +138,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     getLastDocumentPosition(documentPositionKey),
   );
   const [subdocumentModal, setSubdocumentModal] = useState<SubdocumentModalTarget | null>(null);
-  const [antiphonarySections, setAntiphonarySections] = useState<DocumentSection[] | null>(null);
+  const [antiphonaryModal, setAntiphonaryModal] = useState<AntiphonaryModalTarget | null>(null);
   const documentRef = useRef<DocumentWebViewHandle>(null);
   const hasRestoredScrollPositionRef = useRef(false);
   // A freshly (re)mounted WebView's own scroll-tracking script starts
@@ -143,7 +165,20 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const bookmarked = isBookmarked(bookmarkId);
   // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
   // to a saved subdocument bookmark) — fire once when sections first load.
-  const { sub: initialSubdocumentKey } = useLocalSearchParams<{ sub?: string }>();
+  const { sub: initialSubdocumentKey, viaHyperlink } = useLocalSearchParams<{ sub?: string; viaHyperlink?: string }>();
+  // Set by openHyperlink on the document it jumps TO. A hyperlink replaces the
+  // source document rather than stacking on top of it, so there is no longer a
+  // meaningful entry to pop back to — going back should leave via this
+  // document's own parent (Vespers -> Raising of Incense), not via whatever
+  // happened to precede the document that linked here.
+  const arrivedViaHyperlink = viaHyperlink === '1';
+  const leaveDocument = useCallback(() => {
+    if (arrivedViaHyperlink) {
+      router.replace(backHref);
+      return;
+    }
+    goBack(router, backHref);
+  }, [arrivedViaHyperlink, router, backHref]);
   const initialSubOpenedRef = useRef(false);
 
   useEffect(() => {
@@ -181,7 +216,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           schema,
           table,
           effectiveDate,
-          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...extraContext },
+          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...userConditionFlags, ...extraContext },
           isVespersService ? vespersEffectiveDate : undefined,
         ),
       )
@@ -200,10 +235,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           // (its whole content is the day's commemoration), and it stays open
           // across a re-hydration now like every other modal, so it has to be
           // refreshed the same way rather than left showing the old day.
-          setAntiphonarySections((current) => {
+          setAntiphonaryModal((current) => {
             if (!current) return current;
             const trigger = newSections.find((s) => s.isAntiphonaryButton && s.subdocumentSections);
-            return trigger?.subdocumentSections ?? current;
+            return trigger ? { ...current, sections: trigger.subdocumentSections! } : current;
           });
         }
       })
@@ -214,7 +249,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, extraContext]);
+  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, extraContext, userConditionFlags]);
 
   // The scrolling WebView reader has no equivalent "seed the initial prop"
   // option (scrollToSection is imperative and needs the WebView mounted
@@ -253,10 +288,11 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         title: triggerSection.title,
         sections: triggerSection.subdocumentSections,
         subdocumentKey: triggerSection.subdocumentKey,
+        collapseMemoryScope: `${documentPositionKey}:sub:${triggerSection.id}`,
         triggerSectionId: triggerSection.id,
       });
     }
-  }, [sections, initialSubdocumentKey]);
+  }, [sections, initialSubdocumentKey, documentPositionKey]);
 
   // Rotating the device (or, on web, resizing the window) reflows the
   // WebView's CSS layout at the new width without reloading it — the scroll
@@ -355,10 +391,17 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     // gating it on the same flag made the row permanently dead. From the
     // selector, only a subdocument/Antiphonary modal genuinely blocks.
     const blocked = options?.fromSelector
-      ? Boolean(subdocumentModal) || Boolean(antiphonarySections)
+      ? Boolean(subdocumentModal) || Boolean(antiphonaryModal)
       : isCoveredByModal;
     if (blocked) return;
-    navigateAway(destination.href as Href);
+    // replace, not push: a Hyperlink teleports between services rather than
+    // opening one over another, so the source document should not stay on the
+    // stack holding its hydrated sections in memory.
+    navigatingAwayRef.current = true;
+    setTimeout(() => {
+      navigatingAwayRef.current = false;
+    }, 3000);
+    router.replace({ pathname: destination.href, params: { viaHyperlink: '1' } } as never);
   };
 
   const handleAction = (action: DocumentAction) => {
@@ -419,7 +462,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     }
 
     if (action.type === 'swipeBack') {
-      if (!isCoveredByModal) goBack(router, backHref);
+      if (!isCoveredByModal) leaveDocument();
       return;
     }
 
@@ -434,7 +477,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     if (!triggerSection?.subdocumentSections) return;
 
     if (action.type === 'openAntiphonary') {
-      setAntiphonarySections(triggerSection.subdocumentSections);
+      setAntiphonaryModal({
+        sections: triggerSection.subdocumentSections,
+        collapseMemoryScope: `${documentPositionKey}:sub:${triggerSection.id}`,
+      });
       return;
     }
 
@@ -443,6 +489,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         title: triggerSection.title,
         sections: triggerSection.subdocumentSections,
         subdocumentKey: triggerSection.subdocumentKey,
+        collapseMemoryScope: `${documentPositionKey}:sub:${triggerSection.id}`,
         triggerSectionId: triggerSection.id,
       });
     }
@@ -491,7 +538,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // DocumentModal.tsx's own closeSwipePanResponder already correctly scopes
   // itself to close only the topmost modal; this ensures the document
   // BEHIND it never competes for the same gesture while anything covers it.
-  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonarySections) || selectorOpen;
+  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen;
 
   const gesturePanResponder = useMemo(
     () => {
@@ -513,12 +560,12 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             return;
           }
           if (gestureState.x0 < 56 && gestureState.dx > 60) {
-            goBack(router, backHref);
+            leaveDocument();
           }
         },
       });
     },
-    [router, selectorSwipeStartX, backHref, isCoveredByModal],
+    [selectorSwipeStartX, isCoveredByModal, leaveDocument],
   );
 
   return (
@@ -542,7 +589,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         <AppHeader
           title={{ english: title, arabic }}
           canGoBack
-          onBack={() => goBack(router, backHref)}
+          onBack={() => leaveDocument()}
           rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
           onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
           rightIcon="list-outline"
@@ -563,6 +610,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             ref={documentRef}
             sections={sections}
             preferences={preferences}
+            collapseMemoryScope={documentPositionKey}
             onAction={handleAction}
             selectedSectionId={selectedSlideSectionId}
             onCurrentSectionChange={(id) => {
@@ -581,6 +629,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             suppressAllSpeakerLabels={schema === 'agpeya'}
             initialScrollSectionId={currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
             onCollapseToggle={setSelectedSlideSectionId}
+            keyboardNavigationEnabled={!isCoveredByModal}
           />
           </View>
           <ContentSelectorDrawer
@@ -621,13 +670,15 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         title={subdocumentModal?.title ?? null}
         sections={subdocumentModal?.sections ?? null}
         subdocumentKey={subdocumentModal?.subdocumentKey}
+        collapseMemoryScope={subdocumentModal?.collapseMemoryScope ?? `${documentPositionKey}:sub:unknown`}
         parentBookmarkId={bookmarkId}
         onClose={closeSubdocument}
       />
       <AntiphonaryModal
-        visible={Boolean(antiphonarySections)}
-        sections={antiphonarySections}
-        onClose={() => setAntiphonarySections(null)}
+        visible={Boolean(antiphonaryModal)}
+        sections={antiphonaryModal?.sections ?? null}
+        collapseMemoryScope={antiphonaryModal?.collapseMemoryScope ?? `${documentPositionKey}:sub:antiphonary`}
+        onClose={() => setAntiphonaryModal(null)}
       />
     </SafeAreaView>
   );

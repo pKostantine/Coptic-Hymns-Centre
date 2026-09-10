@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { COLORS, SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
-import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey } from "../../utils/verseRubric";
+import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 
@@ -23,6 +23,7 @@ export default function SlideshowContainer({
   onAction,
   copticGospelRite,
   suppressAllSpeakerLabels,
+  keyboardNavigationEnabled = true,
 }) {
   const [viewportHeight, setViewportHeight] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -477,6 +478,7 @@ export default function SlideshowContainer({
 
   useEffect(() => {
     if (
+      !keyboardNavigationEnabled ||
       typeof window === "undefined" ||
       typeof window.addEventListener !== "function" ||
       typeof window.removeEventListener !== "function"
@@ -503,7 +505,7 @@ export default function SlideshowContainer({
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToNextSlide, goToPreviousSlide]);
+  }, [goToNextSlide, goToPreviousSlide, keyboardNavigationEnabled]);
 
   return (
     <View
@@ -942,6 +944,7 @@ const SlideItem = memo(function SlideItem({
         forceWhiteText={Boolean(item.forceWhiteVerses || item.verse?.forceWhiteText)}
         colorIndex={item.colorIndex}
         suppressSpeakerLabel={Boolean(item.suppressSpeakerLabel)}
+        usePeopleLineColor={Boolean(item.usePeopleLineColor)}
         selectableText={false}
         bishopPresent={item.bishopPresent}
         onLanguageLayout={(language, metric) =>
@@ -1062,6 +1065,11 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         verse,
         colorIndex: getVerseColorIndex(section, verseIndex, bishopPresent),
         suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || Boolean(suppressMap.get(verse)),
+        // Computed here rather than in VerseBlock because the decision needs
+        // the section (its title) as well as the verse — see
+        // shouldUsePeopleLineColor, the one definition the WebView renderer
+        // uses too.
+        usePeopleLineColor: shouldUsePeopleLineColor(section, verse, bishopPresent, suppressAllSpeakerLabels),
         bishopPresent,
         // Recited Prayer is a per-verse type (a verse's own effective type
         // after inheritance — see resolveEffectiveVerseType), not a

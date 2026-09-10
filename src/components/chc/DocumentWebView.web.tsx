@@ -103,6 +103,11 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
           if (action?.type === 'currentSection' && action.sectionId) {
             preservedSectionIdRef.current = action.sectionId;
           }
+          // Remember the title that was actually tapped before the collapse
+          // state rebuilds this HTML, so the reload stays anchored there.
+          if (action?.type === 'toggleCollapse' && action.sectionId) {
+            preservedSectionIdRef.current = action.sectionId;
+          }
           onAction?.(action);
         } catch {
           // Malformed message from the HTML content — ignore.

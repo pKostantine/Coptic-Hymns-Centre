@@ -285,6 +285,7 @@ export function buildBibleChapterHtml({
         margin: 0;
         padding: 0;
         background: transparent;
+        cursor: pointer;
         opacity: 0;
         outline: none;
         appearance: none;

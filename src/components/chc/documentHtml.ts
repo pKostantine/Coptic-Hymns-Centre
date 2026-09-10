@@ -1,6 +1,6 @@
 import { COLORS, SPACING } from '../../constants/theme';
 import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
-import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType } from '../../utils/verseRubric';
+import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 
 export interface DocumentVerse {
   english: string;
@@ -75,6 +75,7 @@ export interface DocumentAction {
   type: string;
   sectionId?: string;
   verseId?: string | null;
+  collapsed?: boolean;
 }
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, coptic: true, arabic: true };
@@ -170,6 +171,7 @@ export function buildDocumentHtml(
         copticRecitedPrayers,
         copticGospelRite,
         suppressMap,
+        suppressAllSpeakerLabels,
       }),
     )
     .join('');
@@ -270,20 +272,15 @@ export function buildDocumentHtml(
         overflow-wrap: break-word;
         padding: ${SPACING.sm}px ${SPACING.xs}px;
       }
-      body.selecting-english .cell:not([data-language="english"]),
-      body.selecting-english .cell:not([data-language="english"]) *,
-      body.selecting-english .title-cell:not([data-language="english"]),
-      body.selecting-english .title-cell:not([data-language="english"]) *,
-      body.selecting-coptic .cell:not([data-language="coptic"]),
-      body.selecting-coptic .cell:not([data-language="coptic"]) *,
-      body.selecting-coptic .title-cell:not([data-language="coptic"]),
-      body.selecting-coptic .title-cell:not([data-language="coptic"]) *,
-      body.selecting-arabic .cell:not([data-language="arabic"]),
-      body.selecting-arabic .cell:not([data-language="arabic"]) *,
-      body.selecting-arabic .title-cell:not([data-language="arabic"]),
-      body.selecting-arabic .title-cell:not([data-language="arabic"]) * {
-        -webkit-user-select: none !important;
-        user-select: none !important;
+      .selection-excluded::selection,
+      .selection-excluded *::selection {
+        background: transparent;
+        color: currentColor;
+      }
+      .selection-excluded::-moz-selection,
+      .selection-excluded *::-moz-selection {
+        background: transparent;
+        color: currentColor;
       }
       .verse-text {
         font-size: ${fontSize}px;
@@ -341,6 +338,7 @@ export function buildDocumentHtml(
         border: 1px solid ${COLORS.subdocLine};
         border-radius: 12px;
         color: ${COLORS.subdoc};
+        cursor: pointer;
         display: flex;
         flex-direction: column;
         gap: ${SPACING.sm}px;
@@ -366,6 +364,7 @@ export function buildDocumentHtml(
         border: 1px solid ${COLORS.linkLine};
         border-radius: 12px;
         color: ${COLORS.link};
+        cursor: pointer;
         display: flex;
         font-family: Georgia, serif;
         font-size: ${Math.max(Math.round(sectionTitleFontSize * 1.1), 16)}px;
@@ -483,10 +482,10 @@ export function buildDocumentHtml(
         var collapsed = section.classList.toggle('collapsed');
         button.classList.toggle('is-collapsed', collapsed);
         button.setAttribute('aria-label', collapsed ? 'Expand section' : 'Collapse section');
+        postAction('toggleCollapse', { sectionId: section.getAttribute('data-section-id'), collapsed: collapsed });
       });
       (function () {
         var languages = ['english', 'coptic', 'arabic'];
-        var selectingLanguage = null;
         var selectTextEnabled = ${JSON.stringify(effectiveSelectText)};
         if (!selectTextEnabled) {
           var clearDisabledSelection = function () {
@@ -509,21 +508,13 @@ export function buildDocumentHtml(
           var element = node && node.nodeType === 1 ? node : node && node.parentElement;
           return element && element.closest ? element.closest('.cell[data-language], .title-cell[data-language]') : null;
         }
-        function setSelectingLanguage(language) {
-          languages.forEach(function (item) { document.body.classList.remove('selecting-' + item); });
-          selectingLanguage = languages.indexOf(language) >= 0 ? language : null;
-          if (selectingLanguage) document.body.classList.add('selecting-' + selectingLanguage);
-        }
         function inferLanguage(node) {
           var cell = closestLanguageCell(node);
           return cell ? cell.getAttribute('data-language') : null;
         }
-        function onSelectionStart(event) {
-          setSelectingLanguage(inferLanguage(event.target));
-        }
-        function hasSelection() {
-          var selection = window.getSelection && window.getSelection();
-          return Boolean(selection && selection.rangeCount && !selection.isCollapsed);
+        function closestSection(node) {
+          var element = node && node.nodeType === 1 ? node : node && node.parentElement;
+          return element && element.closest ? element.closest('.section') : null;
         }
         function normalizeSelectionText(text) {
           return String(text || '')
@@ -551,47 +542,123 @@ export function buildDocumentHtml(
             return false;
           }
         }
-        function clippedTextForNode(range, node) {
+        function selectedTextForNode(range, node) {
           if (!rangeIntersectsNode(range, node)) return '';
-          var nodeRange = document.createRange();
-          nodeRange.selectNodeContents(node);
-          var clipped = range.cloneRange();
-          if (clipped.compareBoundaryPoints(Range.START_TO_START, nodeRange) < 0) {
-            clipped.setStart(nodeRange.startContainer, nodeRange.startOffset);
+          var clippedRange = document.createRange();
+          clippedRange.selectNodeContents(node);
+          if (node.contains(range.startContainer)) {
+            clippedRange.setStart(range.startContainer, range.startOffset);
           }
-          if (clipped.compareBoundaryPoints(Range.END_TO_END, nodeRange) > 0) {
-            clipped.setEnd(nodeRange.endContainer, nodeRange.endOffset);
+          if (node.contains(range.endContainer)) {
+            clippedRange.setEnd(range.endContainer, range.endOffset);
           }
-          return fragmentText(clipped.cloneContents());
+          return fragmentText(clippedRange.cloneContents());
         }
-        function selectedTextForLanguage(selection, language) {
-          if (!selection || !selection.rangeCount || !language) return '';
+        function compareSelectionEndpoints(left, right) {
+          if (left.sectionIndex !== right.sectionIndex) return left.sectionIndex - right.sectionIndex;
+          return left.languageIndex - right.languageIndex;
+        }
+        // The visible document is row-major in the DOM (English, Coptic and
+        // Arabic for one verse, followed by the next verse), but selection
+        // should read section-major and language-major: all English in a
+        // hymn, then all Coptic, then all Arabic. The language containing the
+        // cursor endpoint is the boundary, so languages beyond it are never
+        // silently included.
+        function buildSelectionPlan(selection) {
+          if (!selection || !selection.rangeCount || selection.isCollapsed) return null;
           var range = selection.getRangeAt(0);
-          var nodes = Array.prototype.slice.call(
-            document.querySelectorAll('.cell[data-language="' + language + '"], .title-cell[data-language="' + language + '"]')
-          );
-          return nodes
-            .map(function (node) { return clippedTextForNode(range, node); })
-            .filter(Boolean)
-            .join('\\n');
+          var sections = Array.prototype.slice.call(document.querySelectorAll('.section'));
+          var anchorSection = closestSection(selection.anchorNode) || closestSection(range.startContainer);
+          var focusSection = closestSection(selection.focusNode) || closestSection(range.endContainer);
+          var anchorLanguage = inferLanguage(selection.anchorNode) || inferLanguage(range.startContainer);
+          var focusLanguage = inferLanguage(selection.focusNode) || inferLanguage(range.endContainer);
+          var anchor = {
+            sectionIndex: sections.indexOf(anchorSection),
+            languageIndex: languages.indexOf(anchorLanguage),
+          };
+          var focus = {
+            sectionIndex: sections.indexOf(focusSection),
+            languageIndex: languages.indexOf(focusLanguage),
+          };
+          if (anchor.sectionIndex < 0 || focus.sectionIndex < 0 || anchor.languageIndex < 0 || focus.languageIndex < 0) {
+            return null;
+          }
+          var first = anchor;
+          var last = focus;
+          if (compareSelectionEndpoints(first, last) > 0) {
+            first = focus;
+            last = anchor;
+          }
+          var languageIndexesBySection = {};
+          for (var sectionIndex = first.sectionIndex; sectionIndex <= last.sectionIndex; sectionIndex += 1) {
+            var firstLanguageIndex = sectionIndex === first.sectionIndex ? first.languageIndex : 0;
+            var lastLanguageIndex = sectionIndex === last.sectionIndex ? last.languageIndex : languages.length - 1;
+            languageIndexesBySection[sectionIndex] = [];
+            for (var languageIndex = firstLanguageIndex; languageIndex <= lastLanguageIndex; languageIndex += 1) {
+              languageIndexesBySection[sectionIndex].push(languageIndex);
+            }
+          }
+          return {
+            range: range,
+            sections: sections,
+            languageIndexesBySection: languageIndexesBySection,
+          };
         }
-        document.addEventListener('pointerdown', onSelectionStart, true);
-        document.addEventListener('mousedown', onSelectionStart, true);
-        document.addEventListener('touchstart', onSelectionStart, true);
+        function clearSelectionPreview() {
+          Array.prototype.slice.call(document.querySelectorAll('.selection-excluded')).forEach(function (cell) {
+            cell.classList.remove('selection-excluded');
+          });
+        }
+        function updateSelectionPreview(plan) {
+          clearSelectionPreview();
+          if (!plan) return;
+          plan.sections.forEach(function (section, sectionIndex) {
+            var includedIndexes = plan.languageIndexesBySection[sectionIndex];
+            if (!includedIndexes) return;
+            Array.prototype.slice.call(section.querySelectorAll('.cell[data-language], .title-cell[data-language]')).forEach(function (cell) {
+              var languageIndex = languages.indexOf(cell.getAttribute('data-language'));
+              if (includedIndexes.indexOf(languageIndex) < 0) cell.classList.add('selection-excluded');
+            });
+          });
+        }
+        // Copy is grouped by hymn and then language. Each participating cell
+        // is clipped to the actual Range, preserving partial-word and partial-
+        // verse selections instead of expanding every touched row.
+        function selectedTextBySection(selection) {
+          var plan = buildSelectionPlan(selection);
+          if (!plan) return '';
+          var range = plan.range;
+          var blocks = [];
+          plan.sections.forEach(function (section, sectionIndex) {
+            var includedIndexes = plan.languageIndexesBySection[sectionIndex];
+            if (!includedIndexes || !rangeIntersectsNode(range, section)) return;
+            var rows = Array.prototype.slice
+              .call(section.querySelectorAll('.title-row, .verse-row'))
+              .filter(function (row) { return rangeIntersectsNode(range, row); });
+            if (!rows.length) return;
+            var perLanguage = [];
+            includedIndexes.forEach(function (languageIndex) {
+              var language = languages[languageIndex];
+              var lines = [];
+              rows.forEach(function (row) {
+                var cell = row.querySelector('.cell[data-language="' + language + '"], .title-cell[data-language="' + language + '"]');
+                if (!cell) return;
+                var text = selectedTextForNode(range, cell);
+                if (text) lines.push(text);
+              });
+              if (lines.length) perLanguage.push(lines.join('\\n'));
+            });
+            if (perLanguage.length) blocks.push(perLanguage.join('\\n\\n'));
+          });
+          return blocks.join('\\n\\n');
+        }
         document.addEventListener('selectionchange', function () {
           var selection = window.getSelection && window.getSelection();
-          if (!selection || !selection.rangeCount || selection.isCollapsed) {
-            setSelectingLanguage(null);
-            return;
-          }
-          if (!selectingLanguage) {
-            setSelectingLanguage(inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode));
-          }
+          updateSelectionPreview(buildSelectionPlan(selection));
         });
         document.addEventListener('copy', function (event) {
           var selection = window.getSelection && window.getSelection();
-          var language = selectingLanguage || (selection && (inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode)));
-          var text = selectedTextForLanguage(selection, language);
+          var text = selectedTextBySection(selection);
           if (!text || !event.clipboardData) return;
           event.clipboardData.setData('text/plain', text);
           event.preventDefault();
@@ -748,6 +815,7 @@ function renderSection(
     copticRecitedPrayers: boolean;
     copticGospelRite: boolean;
     suppressMap: Map<DocumentVerse, boolean>;
+    suppressAllSpeakerLabels: boolean;
   },
 ) {
   const { appLanguage, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite, suppressMap } = opts;
@@ -921,9 +989,16 @@ function renderVerse(
     visibleColumns,
     bishopPresent,
     copticRecitedPrayers,
-  }: { fontSize: number; visibleColumns: VisibleColumns; bishopPresent: boolean; copticRecitedPrayers: boolean },
+    suppressAllSpeakerLabels,
+  }: {
+    fontSize: number;
+    visibleColumns: VisibleColumns;
+    bishopPresent: boolean;
+    copticRecitedPrayers: boolean;
+    suppressAllSpeakerLabels: boolean;
+  },
 ) {
-  const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent);
+  const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent, suppressAllSpeakerLabels);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveVerseRubricType(verse, bishopPresent)];
   const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
   // "Invincible Coptic" only means "this Coptic must always render" -- some
@@ -1063,14 +1138,14 @@ function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number, bi
   return count;
 }
 
-function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean) {
-  const resolved = resolveVerseColorBase(verse, index, section, bishopPresent);
+function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean) {
+  const resolved = resolveVerseColorBase(verse, index, section, bishopPresent, allSpeakerLabelsSuppressed);
   // Pre-Refrain lines keep whatever role/color they'd naturally get — this
   // only ever adds italic on top, never changes the color.
   return verse.italic ? { ...resolved, italic: true } : resolved;
 }
 
-function resolveVerseColorBase(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean) {
+function resolveVerseColorBase(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean) {
   if (verse.type === 'comment' || verse.type === 'silentComment') return { color: COLORS.comment, italic: true };
   if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
   if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: true };
@@ -1081,6 +1156,25 @@ function resolveVerseColorBase(verse: DocumentVerse, index: number, section: Doc
   // surrounding verses keep alternating exactly as if it weren't there.
   if (verse.prayerType === 'White' || verse.forceWhiteText) return { color: COLORS.white, italic: false };
   if (verse.prayerType === 'Blue') return { color: COLORS.rowBlue, italic: false };
+  // The People's own responses inside the Agpeya's Litanies — see
+  // shouldUsePeopleLineColor for both gates (the book's hide-every-speaker
+  // state, and the hymn being a Litanies one).
+  //
+  // A lighter orange than COLORS.people, which is what the "People:" rubric
+  // itself is drawn in: that label is two words and carries the saturated
+  // orange fine, but a whole verse in it is punishing to read.
+  //
+  // Colour and not italic, deliberately: two of the three columns are Coptic
+  // and Arabic, and neither has a real italic face here, so italic would be
+  // synthesised by slanting the glyphs — which looks broken in Coptic and
+  // pulls apart the joined letterforms in Arabic.
+  //
+  // Sits below the explicit "White"/"Blue" prayer_type overrides, which are
+  // authored per line and still win, and above the default alternation, which
+  // is the plain white/blue this replaces.
+  if (shouldUsePeopleLineColor(section, verse, bishopPresent, allSpeakerLabelsSuppressed)) {
+    return { color: COLORS.peopleLight, italic: false };
+  }
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 
   const effectiveIndex = getEffectiveAlternatingIndex(section.verses, index, bishopPresent);

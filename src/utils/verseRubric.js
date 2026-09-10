@@ -24,6 +24,30 @@ export function resolveVerseRubricType(verse, bishopPresent) {
   return resolveRubricKey(verse.personRole || verse.type, bishopPresent);
 }
 
+/**
+ * Whether a verse should be drawn in the People colour instead of its normal
+ * body colour — the one definition both renderers use, so documentHtml.ts and
+ * VerseBlock.js cannot drift apart on it.
+ *
+ * Two gates, both required:
+ *
+ *  - `allSpeakerLabelsSuppressed` is the Agpeya book's whole-document "hide
+ *    every speaker indicator" state (its Hours are prayed by one person, so a
+ *    speaker role has no one to address). NOT a verse's own suppression flag,
+ *    which is also set throughout the liturgies whenever a line repeats the
+ *    previous speaker — keying on that would tint People lines in every
+ *    service.
+ *  - The hymn is titled "Litanies". Every People line in the Agpeya today
+ *    already sits in one of the ten Litanies hymns (38 lines, none outside),
+ *    so this changes nothing currently visible — it is here so a People line
+ *    added to some other hymn later doesn't silently start colouring itself.
+ */
+export function shouldUsePeopleLineColor(section, verse, bishopPresent, allSpeakerLabelsSuppressed) {
+  if (!allSpeakerLabelsSuppressed) return false;
+  if (!/^litanies$/i.test(String(section?.title?.english || "").trim())) return false;
+  return resolveVerseRubricType(verse, bishopPresent) === "people";
+}
+
 /** Verse types that get a speaker-rubric label/indicator at all (Refrain included — "Refrain:" is a rubric label like any other speaker). */
 const RUBRIC_TYPES = new Set(["priest", "bishop", "deacon", "reader", "people", "refrain"]);
 

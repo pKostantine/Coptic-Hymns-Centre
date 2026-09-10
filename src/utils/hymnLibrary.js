@@ -567,14 +567,6 @@ const SERVICE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, category, t
 // button, the same way the order table's own `minimization` column works.
 const SERVICE_TEXT_FIELDS =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
-// agpeya.hymn_texts is missing both item_type and inline_hymn_key (every
-// other schema's hymn_texts has them) — omit those columns there so the
-// query doesn't 400, and agpeya lines simply never resolve as
-// Inline/Subdocument/Hyperlink line items (which matches reality: agpeya
-// hymn_texts never uses those).
-const SERVICE_TEXT_FIELDS_NO_ITEM_TYPE =
-  "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition";
-const SCHEMAS_WITHOUT_TEXT_ITEM_TYPE = new Set(["agpeya"]);
 // These schemas only have their own order table + hymn_texts — no native
 // hymn_titles table at all (confirmed against the live schema). Skip just
 // their native title fetch; later schemas in the shared lookup order can
@@ -649,13 +641,12 @@ async function fetchSchemaTitlesByKeys(schema, hymnKeys) {
 
 async function fetchSchemaTextRowsByKeys(schema, hymnKeys) {
   if (!hymnKeys.length) return [];
-  const selectFields = SCHEMAS_WITHOUT_TEXT_ITEM_TYPE.has(schema) ? SERVICE_TEXT_FIELDS_NO_ITEM_TYPE : SERVICE_TEXT_FIELDS;
   const results = await Promise.all(
     chunk(hymnKeys, HYMN_KEY_CHUNK_SIZE).map(async (batch) => {
       const { data, error } = await supabase
         .schema(schema)
         .from("hymn_texts")
-        .select(selectFields)
+        .select(SERVICE_TEXT_FIELDS)
         .in("hymn_key", batch)
         .order("hymn_key", { ascending: true })
         .order("line_order", { ascending: true });
@@ -968,15 +959,18 @@ const STRUCTURAL_FLAGS_BY_TABLE = {
   liturgy_of_st_gregory: { StGregoryLiturgy: true },
   liturgy_of_st_cyril: { StCyrilLiturgy: true },
   liturgy_of_the_word: { PaulineIncense: true },
-  // "Which service am I being read from" flags. An Hour of the Agpeya
-  // nested inside one of these (agpeya.twelfth_hour under
-  // psalmody.vespers_praises, agpeya.first_hour under
-  // psalmody.morning_doxology) drops its own concluding block -- the
-  // Trisagion through the Creed -- because the service around it carries
-  // straight on; prayed on its own, the Hour keeps them. Nested hydration
-  // passes the parent's flags straight down (see safeHydrateNested), which
-  // is exactly how the flag reaches the Hour.
+  // Vespers Praises is the only thing that embeds the Agpeya's 12th Hour, so
+  // a row inside that Hour needs a way to say "only when I am being prayed
+  // here" — exactly the job MorningDoxology does for the 1st Hour below.
+  // Spelled after the service and its table: the database held both
+  // VespersPraises (agpeya.twelfth_hour) and VesperPraises (four
+  // psalmody.midnight_praises rows), and only the latter was ever defined,
+  // so the 12th Hour's conditions silently never fired. Those four rows are
+  // now renamed to this spelling — one concept, one name.
   vespers_praises: { VespersPraises: true },
+  // Morning Doxology is its own service, named on its own. It is the only
+  // thing that embeds the Agpeya's 1st Hour, so a row inside that Hour needs
+  // a way to say "only when I am being prayed here".
   morning_doxology: { MorningDoxology: true },
 };
 const LITURGY_SCHEMA_TABLES = new Set([
@@ -995,7 +989,12 @@ function deriveStructuralFlags(schema, table) {
     flags.Liturgy = true;
   }
   if (schema === "psalmody" && PSALMODY_SCHEMA_TABLES.has(table)) {
-    flags.MidnightPraises = table !== "vespers_praises";
+    // MidnightPraises means the Midnight Praises specifically — the
+    // Antiphonary counts because it is only ever opened as a subdocument of
+    // them. Morning Doxology used to be swept in here too, which made the two
+    // impossible to tell apart in a condition; it now answers only to
+    // MorningDoxology above, and Vespers Praises only to VespersPraises.
+    flags.MidnightPraises = table === "midnight_praises" || table === "antiphonary";
   }
   return flags;
 }
@@ -1191,18 +1190,43 @@ function mergeIntoOneInlineSection(callingRow, nestedSections) {
   return applyCopticCaseToSection(merged);
 }
 
+// A saint hymn can be listed on more than one sequence row for calendar
+// reasons — ArchangelMichael's psali sits on both his Hathor 12 and his
+// Paone 12 rows, and the Adam and Vatos variants of one psali are two rows
+// again. With his base condition active every one of those matches, and the
+// same hymn would render two or three times over.
+//
+// Scoped deliberately to rows that actually carry a saint hymn condition:
+// plenty of documents repeat a hymn_key on purpose (the Agpeya prays Our
+// Father twice in an Hour), and those rows have no saint condition, so a
+// blanket dedupe would silently eat them.
+const SAINT_HYMN_CONDITION_RE = /[A-Za-z][A-Za-z0-9_]*:(?:Doxology|VOC|Psali|Hiten|PraxisResponse|Veneration)/;
+
+function dropDuplicateSaintHymns(sections) {
+  const seen = new Set();
+  return sections.filter((section) => {
+    if (!SAINT_HYMN_CONDITION_RE.test(section.condition || "")) return true;
+    if (!section.hymn_key) return true;
+    if (seen.has(section.hymn_key)) return false;
+    seen.add(section.hymn_key);
+    return true;
+  });
+}
+
 async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
   const rawRows = await fetchServiceRows(schema, table);
   const sections = assembleServiceSections(rawRows);
 
-  const visibleSections = sections
-    .map((section) => {
-      const visibility = evaluateBishopAwareVisibility(section.condition, flags);
-      return visibility.visible
-        ? { ...section, bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }
-        : null;
-    })
-    .filter(Boolean);
+  const visibleSections = dropDuplicateSaintHymns(
+    sections
+      .map((section) => {
+        const visibility = evaluateBishopAwareVisibility(section.condition, flags);
+        return visibility.visible
+          ? { ...section, bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }
+          : null;
+      })
+      .filter(Boolean),
+  );
 
   const hydrated = [];
   for (const section of visibleSections) {
@@ -1688,21 +1712,13 @@ function applyCopticCaseToReadingVerses(verses) {
 
 const INLINE_TEXT_FIELDS =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
-// agpeya.hymn_texts is missing item_type/inline_hymn_key (see
-// SCHEMAS_WITHOUT_TEXT_ITEM_TYPE above) — fetchInlineHymnVerses walks every
-// fallback schema looking for a hymn_key match, and agpeya is one of them,
-// so it needs the same reduced column list or every lookup that falls
-// through to agpeya 400s outright.
-const INLINE_TEXT_FIELDS_NO_ITEM_TYPE =
-  "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition";
 
 async function fetchInlineHymnVerses(schema, hymnKey) {
   for (const lookupSchema of getHymnKeyLookupSchemas(schema)) {
-    const selectFields = SCHEMAS_WITHOUT_TEXT_ITEM_TYPE.has(lookupSchema) ? INLINE_TEXT_FIELDS_NO_ITEM_TYPE : INLINE_TEXT_FIELDS;
     const { data, error } = await supabase
       .schema(lookupSchema)
       .from("hymn_texts")
-      .select(selectFields)
+      .select(INLINE_TEXT_FIELDS)
       .eq("hymn_key", hymnKey)
       .order("line_order", { ascending: true });
     if (error) throw createReadableSupabaseError(error, `${lookupSchema}.hymn_texts`);

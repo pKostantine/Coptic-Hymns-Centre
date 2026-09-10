@@ -18,7 +18,7 @@ export interface FontScaleControlProps {
 
 /**
  * Native font-size control: a real SwiftUI/Jetpack Compose slider, which beats
- * tapping a step button ten times to cross the range on a phone.
+ * tapping a step button twenty times to cross the range on a phone.
  *
  * The Host wrapper is mandatory, not decorative. Slider is not a React Native
  * view — it is a SwiftUI view on iOS and a Jetpack Compose view on Android, and

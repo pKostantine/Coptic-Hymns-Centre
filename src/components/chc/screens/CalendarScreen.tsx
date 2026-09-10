@@ -26,6 +26,7 @@ import {
 import { todayIsoDate } from '@/utils/dateUtils';
 import { formatCalendarDay, formatCopticMonthName, GREGORIAN_MONTHS_AR, GREGORIAN_MONTHS_EN } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
+import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAYS_AR = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
@@ -269,7 +270,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
   };
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.screen, DISABLED_TEXT_SELECTION_STYLE]}>
       {/* Only the real route owns the browser tab title — rendered as a modal
           over a document, this screen is an overlay on that document's page,
           not a page of its own. */}
@@ -420,7 +421,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
       </ScrollView>
 
       <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
-        <Pressable style={styles.pickerBackdrop} onPress={() => setPickerOpen(false)}>
+        <Pressable style={[styles.pickerBackdrop, DISABLED_TEXT_SELECTION_STYLE]} onPress={() => setPickerOpen(false)}>
           <Pressable style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
             <View style={[styles.pickerColumns, isArabic && styles.rowReverse]}>
               <View style={styles.pickerColumn}>

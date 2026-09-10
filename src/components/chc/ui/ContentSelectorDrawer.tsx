@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, type LayoutChangeEvent, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -67,6 +67,32 @@ function appendReadingReference(title: string, reference?: string) {
   if (!cleanTitle || !cleanReference) return cleanTitle;
   if (cleanTitle.includes(`(${cleanReference})`)) return cleanTitle;
   return `${cleanTitle} (${cleanReference})`;
+}
+
+/**
+ * An hour opening that marks where one part of a service gives way to the
+ * next: the Midnight Hour's three Watches, and the Agpeya hours prayed inside
+ * the Offering of the Lamb ("3rd Hour", "3rd Hour and 6th Hour", "12th Hour
+ * and Veil"...).
+ *
+ * Whether one of these reads as a divider is decided by whether it has a title
+ * at all, and that is per-schema: agpeya.hymn_titles leaves the hour openings
+ * null, so inside the Agpeya book they stay silent, while liturgy.hymn_titles
+ * names them, so inside the Liturgy they announce the hour. An untitled
+ * section never reaches this code — `listable` has already dropped it — so the
+ * same hymn divides the Offering of the Lamb without touching the Hour it also
+ * belongs to.
+ *
+ * The `(?!Of|To)` is what separates a divider from ordinary content that
+ * happens to be named the same way: introductionOfEveryHour is a real prayer
+ * (and titled, in agpeya), and introductionToTheCreed, introductionToTheHoosP1
+ * and introductionToRaisingOfIncenseP1 are all lead-ins to a hymn rather than
+ * headings over a section.
+ */
+const SECTION_DIVIDER_KEY = /^introduction(?!Of|To)[A-Za-z]*(?:Hour|Watch|Veil)$/;
+
+function isDividerSection(section: DocumentSection): boolean {
+  return SECTION_DIVIDER_KEY.test(section.hymnKey || '');
 }
 
 function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
@@ -150,6 +176,39 @@ export default function ContentSelectorDrawer({
     return Boolean(selectorTitle.english || selectorTitle.arabic);
   });
 
+  /**
+   * Everything a divider gathers under it, by section id.
+   *
+   * A nest opens on a divider that actually speaks — one whose hymn key has
+   * the shape AND a title in this document's schema, since the same hour
+   * opening is titled in liturgy.hymn_titles and null in agpeya.hymn_titles.
+   * That matters: an untitled opening never renders a rule, so it must not
+   * silently indent the rest of the Hour behind an invisible heading.
+   *
+   * It closes on the next `introduction…` row of any kind, whether or not that
+   * row is itself visible. In the Offering of the Lamb that is
+   * introductionToTheCreed, which carries no title and so never appears in
+   * this list — but it is still the point where the Agpeya hours end and the
+   * Liturgy resumes, so the Creed and everything after it sit back at the
+   * outer level. The Midnight Hour ends its third Watch on the same row.
+   *
+   * Walked over `sections` rather than `listable` so those invisible
+   * boundaries still count.
+   */
+  const nestedSectionIds = useMemo(() => {
+    const nested = new Set<string>();
+    let insideNest = false;
+    for (const section of sections) {
+      if (/^introduction/i.test(section.hymnKey || '')) {
+        const title = getSectionSelectorTitle(section);
+        insideNest = isDividerSection(section) && Boolean(title.english || title.arabic);
+        continue;
+      }
+      if (insideNest) nested.add(section.id);
+    }
+    return nested;
+  }, [sections]);
+
   // The document's currentSectionId can land on a titleless hymn (e.g. an
   // inline-spliced continuation) that never made it into `listable` — in
   // that case, highlight/scroll to the nearest surrounding entry that did:
@@ -207,7 +266,7 @@ export default function ContentSelectorDrawer({
           </View>
 
           <ScrollView ref={scrollViewRef} style={styles.selectorList}>
-            {listable.map((section) => {
+            {listable.map((section, listIndex) => {
               // A list entry always shows exactly one language, driven by
               // the App Language setting — falling back to whichever
               // language actually has text for this specific section if the
@@ -228,19 +287,39 @@ export default function ContentSelectorDrawer({
               // height, since unlike a hyperlink they are content of this
               // service rather than a way out of it.
               const isSubdocument = Boolean(section.isSubdocumentButton || section.isAntiphonaryButton);
-              return (
+              // An hour opening renders as a rule across the list rather than
+              // a card: it marks where one part of the service ends and the
+              // next begins, so it should read as a seam rather than as one
+              // more hymn sitting between them. Still tappable — jumping to
+              // the top of an hour is exactly what someone scanning for one
+              // wants.
+              const isDivider = isDividerSection(section);
+              // Sits under the divider above it. The rule that brackets the
+              // group is drawn by the wrapper below, not by the card.
+              const isNested = nestedSectionIds.has(section.id);
+              const isLastNested = isNested && !nestedSectionIds.has(listable[listIndex + 1]?.id ?? '');
+              const isActive = section.id === resolvedCurrentSectionId;
+
+              const recordLayout = (event: LayoutChangeEvent) => {
+                const y = event.nativeEvent.layout.y;
+                setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
+              };
+
+              const row = (
                 <Pressable
                   key={section.id}
                   style={[
                     styles.selectorItem,
+                    isNested && styles.selectorItemNested,
                     isSubdocument && styles.selectorItemSubdocument,
                     isHyperlink && styles.selectorItemHyperlink,
-                    !isHyperlink && section.id === resolvedCurrentSectionId && styles.selectorItemActive,
+                    isDivider && styles.selectorItemDivider,
+                    !isHyperlink && !isDivider && isActive && styles.selectorItemActive,
                   ]}
-                  onLayout={(event) => {
-                    const y = event.nativeEvent.layout.y;
-                    setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
-                  }}
+                  // A nested card's own y is measured inside its wrapper, so
+                  // the wrapper reports position instead — itemLayouts feeds
+                  // scrollTo, which needs an offset within the ScrollView.
+                  onLayout={isNested ? undefined : recordLayout}
                   onPress={() => {
                     // Closed first so the panel isn't still sitting over the
                     // destination as it comes in. The jump-within-document
@@ -254,15 +333,48 @@ export default function ContentSelectorDrawer({
                     onClose();
                   }}
                 >
-                  <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
-                    {showArabic ? (
-                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
-                    ) : (
-                      <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
-                    )}
-                  </View>
+                  {isDivider ? (
+                    <View style={styles.dividerRow}>
+                      <View style={styles.dividerRule} />
+                      <Text
+                        style={[
+                          styles.dividerLabel,
+                          showArabic && styles.dividerLabelArabic,
+                        ]}
+                      >
+                        {showArabic ? selectorTitle.arabic : selectorTitle.english || selectorTitle.arabic}
+                      </Text>
+                      <View style={styles.dividerRule} />
+                    </View>
+                  ) : (
+                    <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
+                      {showArabic ? (
+                        <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
+                      ) : (
+                        <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
+                      )}
+                    </View>
+                  )}
                   {isHyperlink ? <Text style={styles.selectorHyperlinkArrow}>→</Text> : null}
                 </Pressable>
+              );
+
+              if (!isNested) return row;
+
+              // One segment of the rule bracketing the group. The gap below the
+              // card is this wrapper's padding rather than the card's margin,
+              // so the border runs through it and consecutive segments meet —
+              // one unbroken line down the group instead of a dash beside each
+              // card. The last segment drops that padding so the line stops
+              // with the group rather than trailing past it.
+              return (
+                <View
+                  key={section.id}
+                  style={[styles.nestedSegment, isLastNested && styles.nestedSegmentLast]}
+                  onLayout={recordLayout}
+                >
+                  {row}
+                </View>
               );
             })}
           </ScrollView>
@@ -397,6 +509,52 @@ const styles = StyleSheet.create({
     color: COLORS.link,
     fontSize: 16,
     marginLeft: SPACING.sm,
+  },
+  nestedSegment: {
+    borderLeftColor: COLORS.goldLine,
+    borderLeftWidth: 3,
+    paddingBottom: SPACING.sm,
+    paddingLeft: SPACING.md,
+  },
+  // Keep the group's gold rail ending flush with its final card, then restore
+  // the normal inter-card gap outside the nested wrapper before the next
+  // unnested hymn.
+  nestedSegmentLast: { marginBottom: SPACING.sm, paddingBottom: 0 },
+  // The gap moves onto the wrapper's padding so the rule can run through it.
+  selectorItemNested: { marginBottom: 0 },
+  selectorItemDivider: {
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.md,
+    minHeight: 0,
+    paddingHorizontal: 0,
+    paddingVertical: SPACING.xs,
+  },
+  dividerRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  dividerRule: {
+    backgroundColor: COLORS.goldLine,
+    flex: 1,
+    height: 1,
+  },
+  dividerLabel: {
+    color: COLORS.gold,
+    fontFamily: TYPOGRAPHY.title,
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  dividerLabelArabic: {
+    fontFamily: TYPOGRAPHY.arabic,
+    fontSize: 15,
+    // Arabic has no upper case for textTransform to reach.
+    textTransform: 'none',
   },
   selectorItemActive: {
     backgroundColor: '#171513',

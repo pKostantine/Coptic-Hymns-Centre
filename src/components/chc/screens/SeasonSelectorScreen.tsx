@@ -18,6 +18,7 @@ import {
 import { localDateAtUtcMidnight, todayIsoDate } from '@/utils/dateUtils';
 import { formatCopticYear, formatGregorianDate, formatGregorianDateRange } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
+import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
 const SEASON_SELECTOR_LABELS = {
   title: { english: 'Season Selector', arabic: 'اختيار الفترة' },
@@ -182,7 +183,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.screen, DISABLED_TEXT_SELECTION_STYLE]}>
       {/* See CalendarScreen — an overlay over a document isn't its own page. */}
       {isHosted ? null : (
         <Head>
