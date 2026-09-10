@@ -24,7 +24,9 @@ export type AppLanguage = 'en' | 'ar';
 export interface ReadingPreferences {
   visibleLanguages: VisibleLanguages;
   bibleVisibleLanguages: BibleVisibleLanguages;
-  fontScale: number; // integer 0-10, see MIN_FONT_SCALE/MAX_FONT_SCALE
+  fontScale: number; // integer 0-20, see MIN_FONT_SCALE/MAX_FONT_SCALE
+  /** Persisted range marker used to migrate the former 0-10 scale without changing its rendered size. */
+  fontScaleRangeMax: number;
   orientationMode: OrientationMode;
   selectText: boolean;
   slideshowMode: boolean;
@@ -53,7 +55,8 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
     arabic: true,
     arabicFromCoptic: false,
   },
-  fontScale: 1,
+  fontScale: 2,
+  fontScaleRangeMax: 20,
   orientationMode: 'auto',
   selectText: false,
   slideshowMode: false,
@@ -67,18 +70,16 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
 /** Lowest selectable font scale. */
 export const MIN_FONT_SCALE = 0;
 /** Highest selectable font scale. */
-export const MAX_FONT_SCALE = 10;
+export const MAX_FONT_SCALE = 20;
 
-// The scale used to be 1-10 over a 25-61px range. It now runs 0-10 over a wider
-// 18-78px range, so the small end is genuinely small and the large end is large
-// enough to read a hymn off a projector. Step size is a round 6px, and the
-// anchor is deliberate: scale 1 still lands on 24px, within a pixel of the 25px
-// it produced before, so an already-stored preference keeps rendering at the
-// size its owner chose. Scale 0 is the new step below that.
+// Keep the existing 18-78px bounds while doubling the number of selectable
+// intervals. Each step is now 3px instead of 6px, giving the control finer
+// adjustment without making its smallest or largest text any smaller/larger.
 const MIN_FONT_SIZE = 18;
 const MAX_FONT_SIZE = 78;
+const LEGACY_MAX_FONT_SCALE = 10;
 
-/** Maps the 0-10 integer font scale onto a pixel size for the document WebView. */
+/** Maps the 0-20 integer font scale onto a pixel size for the document WebView. */
 export function fontScaleToPx(fontScale: number) {
   const clamped = Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, fontScale));
   return Math.round(
@@ -105,10 +106,20 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   if (!ORIENTATION_MODES.includes(merged.orientationMode)) {
     merged.orientationMode = 'auto';
   }
-  const roundedFontScale = Math.round(merged.fontScale);
+  // Values saved before the 0-20 range did not have a range marker. Doubling
+  // those 0-10 values preserves the exact rendered size the user selected.
+  const storedFontScale = stored?.fontScale;
+  const migratedFontScale =
+    stored && typeof storedFontScale === 'number' && Number.isFinite(storedFontScale)
+      ? stored.fontScaleRangeMax === MAX_FONT_SCALE
+        ? storedFontScale
+        : (storedFontScale * MAX_FONT_SCALE) / LEGACY_MAX_FONT_SCALE
+      : merged.fontScale;
+  const roundedFontScale = Math.round(migratedFontScale);
   merged.fontScale = Number.isFinite(roundedFontScale)
     ? Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, roundedFontScale))
     : DEFAULT_READING_PREFERENCES.fontScale;
+  merged.fontScaleRangeMax = MAX_FONT_SCALE;
   if (merged.appLanguage !== 'en' && merged.appLanguage !== 'ar') {
     merged.appLanguage = 'en';
   }
