@@ -223,11 +223,17 @@ export default function ContentSelectorDrawer({
               // way out of this service, not a place within it, and it should
               // not compete with the hymn list for height.
               const isHyperlink = Boolean(section.isHyperlinkButton);
+              // Subdocuments and the Antiphonary are destinations too, but they
+              // open ON this document rather than leaving it — blue, and full
+              // height, since unlike a hyperlink they are content of this
+              // service rather than a way out of it.
+              const isSubdocument = Boolean(section.isSubdocumentButton || section.isAntiphonaryButton);
               return (
                 <Pressable
                   key={section.id}
                   style={[
                     styles.selectorItem,
+                    isSubdocument && styles.selectorItemSubdocument,
                     isHyperlink && styles.selectorItemHyperlink,
                     !isHyperlink && section.id === resolvedCurrentSectionId && styles.selectorItemActive,
                   ]}
@@ -236,19 +242,23 @@ export default function ContentSelectorDrawer({
                     setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
                   }}
                   onPress={() => {
+                    // Closed first so the panel isn't still sitting over the
+                    // destination as it comes in. The jump-within-document
+                    // path keeps its original order.
                     if (isHyperlink) {
+                      onClose();
                       onOpenHyperlink?.(section.hyperlinkKey);
-                    } else {
-                      onSelectSection(section.id);
+                      return;
                     }
+                    onSelectSection(section.id);
                     onClose();
                   }}
                 >
                   <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
                     {showArabic ? (
-                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
+                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
                     ) : (
-                      <Text style={[styles.selectorTitle, styles.centeredTitle, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
+                      <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
                     )}
                   </View>
                   {isHyperlink ? <Text style={styles.selectorHyperlinkArrow}>→</Text> : null}
@@ -365,6 +375,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
+  },
+  selectorItemSubdocument: {
+    backgroundColor: COLORS.subdocSoft,
+    borderColor: COLORS.subdocLine,
+  },
+  selectorTitleSubdocument: {
+    color: COLORS.subdoc,
   },
   selectorItemHyperlink: {
     alignItems: 'center',
