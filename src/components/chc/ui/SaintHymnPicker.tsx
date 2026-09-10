@@ -251,7 +251,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     borderTopWidth: 1,
-    maxHeight: '86%',
+    // Fixed, not maxHeight: the sheet keeps one size whatever the search
+    // narrows the list to, instead of collapsing towards the search field as
+    // results drop away and springing back when they return.
+    height: '86%',
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
   },
@@ -279,9 +282,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
   },
   searchInput: { color: COLORS.white, flex: 1, fontSize: 15, paddingVertical: SPACING.sm },
-  list: { marginTop: SPACING.sm },
-  loading: { paddingVertical: SPACING.xl },
-  message: { color: COLORS.muted, fontSize: 14, paddingVertical: SPACING.lg, textAlign: 'center' },
+  list: { flex: 1, marginTop: SPACING.sm },
+  loading: { flex: 1, paddingVertical: SPACING.xl },
+  message: { color: COLORS.muted, flex: 1, fontSize: 14, paddingVertical: SPACING.lg, textAlign: 'center' },
   saintRow: {
     alignItems: 'center',
     backgroundColor: '#111111',
