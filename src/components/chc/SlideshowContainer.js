@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { COLORS, SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
-import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey } from "../../utils/verseRubric";
+import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 
@@ -942,7 +942,7 @@ const SlideItem = memo(function SlideItem({
         forceWhiteText={Boolean(item.forceWhiteVerses || item.verse?.forceWhiteText)}
         colorIndex={item.colorIndex}
         suppressSpeakerLabel={Boolean(item.suppressSpeakerLabel)}
-        allSpeakerLabelsSuppressed={Boolean(item.allSpeakerLabelsSuppressed)}
+        usePeopleLineColor={Boolean(item.usePeopleLineColor)}
         selectableText={false}
         bishopPresent={item.bishopPresent}
         onLanguageLayout={(language, metric) =>
@@ -1063,10 +1063,11 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         verse,
         colorIndex: getVerseColorIndex(section, verseIndex, bishopPresent),
         suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || Boolean(suppressMap.get(verse)),
-        // Distinct from the line above: that one is also true in ordinary
-        // services whenever a speaker repeats. This is the Agpeya-only
-        // "hide every indicator" state, which is what colours People lines.
-        allSpeakerLabelsSuppressed: Boolean(suppressAllSpeakerLabels),
+        // Computed here rather than in VerseBlock because the decision needs
+        // the section (its title) as well as the verse — see
+        // shouldUsePeopleLineColor, the one definition the WebView renderer
+        // uses too.
+        usePeopleLineColor: shouldUsePeopleLineColor(section, verse, bishopPresent, suppressAllSpeakerLabels),
         bishopPresent,
         // Recited Prayer is a per-verse type (a verse's own effective type
         // after inheritance — see resolveEffectiveVerseType), not a

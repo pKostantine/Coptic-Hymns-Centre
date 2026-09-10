@@ -1,6 +1,6 @@
 import { COLORS, SPACING } from '../../constants/theme';
 import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
-import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType } from '../../utils/verseRubric';
+import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 
 export interface DocumentVerse {
   english: string;
@@ -1112,28 +1112,24 @@ function resolveVerseColorBase(verse: DocumentVerse, index: number, section: Doc
   // surrounding verses keep alternating exactly as if it weren't there.
   if (verse.prayerType === 'White' || verse.forceWhiteText) return { color: COLORS.white, italic: false };
   if (verse.prayerType === 'Blue') return { color: COLORS.rowBlue, italic: false };
-  // Agpeya only. Its Hours are prayed by one person, so ServiceDocument hides
-  // every speaker indicator in the book — which left the congregation's own
-  // responses looking identical to the rest of the text. COLORS.people is the
-  // same orange the "People:" rubric is already drawn in, so this reads as
-  // that label moved onto the line rather than as a new colour to learn.
+  // The People's own responses inside the Agpeya's Litanies — see
+  // shouldUsePeopleLineColor for both gates (the book's hide-every-speaker
+  // state, and the hymn being a Litanies one).
   //
-  // Keyed on suppressAllSpeakerLabels, NOT on this verse's own suppression
-  // flag. That flag is also set in ordinary services whenever a line repeats
-  // the previous line's speaker, so using it would have tinted People
-  // continuation lines throughout the liturgies. Nothing outside the Agpeya
-  // should change colour because of this.
+  // A lighter orange than COLORS.people, which is what the "People:" rubric
+  // itself is drawn in: that label is two words and carries the saturated
+  // orange fine, but a whole verse in it is punishing to read.
   //
-  // Deliberately colour and not italic: two of the three columns are Coptic
+  // Colour and not italic, deliberately: two of the three columns are Coptic
   // and Arabic, and neither has a real italic face here, so italic would be
   // synthesised by slanting the glyphs — which looks broken in Coptic and
-  // breaks the joined letterforms in Arabic.
+  // pulls apart the joined letterforms in Arabic.
   //
   // Sits below the explicit "White"/"Blue" prayer_type overrides, which are
   // authored per line and still win, and above the default alternation, which
   // is the plain white/blue this replaces.
-  if (allSpeakerLabelsSuppressed && resolveVerseRubricType(verse, bishopPresent) === 'people') {
-    return { color: COLORS.people, italic: false };
+  if (shouldUsePeopleLineColor(section, verse, bishopPresent, allSpeakerLabelsSuppressed)) {
+    return { color: COLORS.peopleLight, italic: false };
   }
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 

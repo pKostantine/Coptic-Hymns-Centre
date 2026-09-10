@@ -50,6 +50,14 @@ export const COLORS = {
   deacon: '#FFFF00',
   reader: '#FFFF00',
   people: '#E28A2E',
+  // Lighter people orange, for a People LINE's body text rather than its
+  // "People:" label. The label is a two-word flag and carries the saturated
+  // orange fine; a whole verse in it is punishing to read. This sits at
+  // 11.7:1 on black, alongside rowBlue (11.6) and goldBright (12.4), so it
+  // belongs to the same family as the other accent text instead of shouting
+  // over it. Not `peopleSoft` — in this palette a Soft suffix means an rgba
+  // tint used as a background, and this is solid text.
+  peopleLight: '#F0B67E',
   comment: '#47627F',
   silent: '#959ba1',
   silentTitle: '#959ba1',
