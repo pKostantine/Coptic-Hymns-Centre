@@ -16,6 +16,7 @@ export default function RaisingOfIncenseDocument() {
       title={option.title}
       arabic={option.arabic}
       extraContext={option.extraContext}
+      entryId={option.id}
       backHref="/liturgy/raising-of-incense"
     />
   );

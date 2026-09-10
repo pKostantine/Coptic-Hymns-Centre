@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { CATEGORIES, DIVINE_LITURGY_SERVICES, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
+import { bookmarkKeyFor, CATEGORIES, DIVINE_LITURGY_SERVICES, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
 import { goBack } from '@/utils/navigation';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { getBibleChapterDisplayLabel, getBibleBooks, type BibleBook } from '@/utils/bibleService';
@@ -22,44 +22,47 @@ interface BookmarkEntry {
 function buildBookmarkIndex(): Record<string, BookmarkEntry> {
   const index: Record<string, BookmarkEntry> = {};
 
+  // Keyed by bookmarkKeyFor, which appends the entry id only where several
+  // entries open the same schema/table. Vespers and Matins are both
+  // liturgy.raising_of_incense, so before this they wrote the SAME key and
+  // whichever was registered last (Matins) silently claimed every bookmark
+  // made in either — including subdocument ones, which build on the parent id.
+  const register = (
+    schema: string,
+    table: string,
+    entryId: string,
+    title: string,
+    arabic: string,
+    href: string,
+  ) => {
+    const key = bookmarkKeyFor(schema, table, entryId);
+    index[key] = { id: key, title, arabic, href };
+    // Bookmarks saved before the key gained its entry-id suffix are genuinely
+    // ambiguous — nothing recorded which entry they were made from. Rather
+    // than drop them from the list, the bare key stays resolvable, pointing at
+    // the first entry that claims it.
+    const bare = `${schema}:${table}`;
+    if (key !== bare && !index[bare]) index[bare] = { id: bare, title, arabic, href };
+  };
+
   for (const category of CATEGORIES) {
     if (category.kind === 'direct' && category.schema && category.table) {
-      index[`${category.schema}:${category.table}`] = {
-        id: `${category.schema}:${category.table}`,
-        title: category.title,
-        arabic: category.arabic,
-        href: `/${category.id}`,
-      };
+      register(category.schema, category.table, category.id, category.title, category.arabic, `/${category.id}`);
     }
   }
 
   for (const [categoryId, services] of Object.entries(SERVICES_BY_CATEGORY)) {
     for (const service of services) {
-      index[`${service.schema}:${service.table}`] = {
-        id: `${service.schema}:${service.table}`,
-        title: service.title,
-        arabic: service.arabic,
-        href: `/${categoryId}/${service.id}`,
-      };
+      register(service.schema, service.table, service.id, service.title, service.arabic, `/${categoryId}/${service.id}`);
     }
   }
 
   for (const option of RAISING_OF_INCENSE_OPTIONS) {
-    index[`${option.schema}:${option.table}`] = {
-      id: `${option.schema}:${option.table}`,
-      title: option.title,
-      arabic: option.arabic,
-      href: `/liturgy/raising-of-incense/${option.id}`,
-    };
+    register(option.schema, option.table, option.id, option.title, option.arabic, `/liturgy/raising-of-incense/${option.id}`);
   }
 
   for (const service of DIVINE_LITURGY_SERVICES) {
-    index[`${service.schema}:${service.table}`] = {
-      id: `${service.schema}:${service.table}`,
-      title: service.title,
-      arabic: service.arabic,
-      href: `/liturgy/divine-liturgy/${service.id}`,
-    };
+    register(service.schema, service.table, service.id, service.title, service.arabic, `/liturgy/divine-liturgy/${service.id}`);
   }
 
   return index;
