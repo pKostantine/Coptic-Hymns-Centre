@@ -59,6 +59,7 @@ const COPTIC_MONTHS_AR: Record<string, string> = {
   Epep: 'أبيب',
   Mesori: 'مسرى',
   Mesore: 'مسرى',
+  Nesi: 'النسيء',
   Nasie: 'النسيء',
 };
 
