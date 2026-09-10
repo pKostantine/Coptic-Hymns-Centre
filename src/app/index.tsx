@@ -12,6 +12,7 @@ import { CATEGORIES } from '@/constants/manifest';
 import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
+import { useIsCompactLandscape } from '@/utils/useIsCompactLandscape';
 
 /** Main menu — ported 1:1 from HomeScreen.js/HomeScreen.web.js: Header, an action row (web adds a fullscreen toggle), then the category list. Bottom tab bar (Books/App Settings) shown only here. */
 export default function MainMenu() {
@@ -19,6 +20,9 @@ export default function MainMenu() {
   const { isLive, effectiveDate, goLive } = useCalendar();
   const { preferences } = useReadingPreferences();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
+  // Sideways there is width to spare and almost no height, so the menu
+  // pairs its cards up instead of running one tall column off the screen.
+  const columns = useIsCompactLandscape() ? 2 : 1;
   const showEnglish = preferences.appLanguage === 'en';
   const showArabic = preferences.appLanguage === 'ar';
   const appTitle = showArabic ? 'كوبتك هيمنز سنتر' : 'Coptic Hymns Centre';
@@ -60,17 +64,24 @@ export default function MainMenu() {
       ) : null}
 
       <FlatList
+        /* FlatList can't switch column count on an existing instance, so the
+           count doubles as its key and a rotation remounts the list. */
+        key={columns}
+        columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
         contentContainerStyle={styles.listContent}
         data={CATEGORIES}
         keyExtractor={(item) => item.id}
+        numColumns={columns}
         renderItem={({ item }) => (
-          <CategoryCard
-            title={item.title}
-            arabic={item.arabic}
-            showEnglish={showEnglish}
-            showArabic={showArabic}
-            onPress={() => router.push(`/${item.id}`)}
-          />
+          <View style={columns > 1 ? styles.gridCell : undefined}>
+            <CategoryCard
+              title={item.title}
+              arabic={item.arabic}
+              showEnglish={showEnglish}
+              showArabic={showArabic}
+              onPress={() => router.push(`/${item.id}`)}
+            />
+          </View>
         )}
       />
       <BottomTabBar active="books" />
@@ -119,5 +130,13 @@ const styles = StyleSheet.create({
   listContent: {
     padding: SPACING.md,
     paddingBottom: SPACING.xl,
+  },
+  // columnGap only: the cards carry their own marginBottom, so a plain `gap`
+  // would stack on top of it and double the space between rows.
+  gridRow: {
+    columnGap: SPACING.md,
+  },
+  gridCell: {
+    flex: 1,
   },
 });
