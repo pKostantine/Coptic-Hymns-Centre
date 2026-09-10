@@ -41,7 +41,7 @@ export async function getGregorianMonthGrid(year: number, month: number): Promis
   }));
 }
 
-/** Coptic calendar-month grid: every row for the given Coptic year/month (1-13, 13 = the short month Nasie). */
+/** Coptic calendar-month grid: every row for the given Coptic year/month (1-13, 13 = the short month Nesi). */
 export async function getCopticMonthGrid(copticYear: number, copticMonth: number): Promise<CalendarDay[]> {
   const { data, error } = await supabase
     .schema('calendar')
