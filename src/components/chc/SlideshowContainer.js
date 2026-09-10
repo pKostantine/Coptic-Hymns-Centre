@@ -794,7 +794,7 @@ const SlideItem = memo(function SlideItem({
               selectable={false}
               style={[
                 styles.openButtonText,
-                { color: item.isHyperlink ? COLORS.link : theme.colors.text, fontSize: Math.round(fontSize * 0.65) },
+                { color: item.isHyperlink ? COLORS.link : COLORS.subdoc, fontSize: Math.round(fontSize * 0.65) },
               ]}
             >
               {label}
@@ -806,7 +806,7 @@ const SlideItem = memo(function SlideItem({
               style={[
                 styles.openButtonText,
                 styles.openButtonTextArabic,
-                { color: item.isHyperlink ? COLORS.link : theme.colors.text, fontSize: Math.round(fontSize * 0.65) },
+                { color: item.isHyperlink ? COLORS.link : COLORS.subdoc, fontSize: Math.round(fontSize * 0.65) },
               ]}
             >
               {arabicLabel}
@@ -1911,8 +1911,8 @@ const styles = StyleSheet.create({
   },
   openButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderColor: "#C9A227",
+    backgroundColor: COLORS.subdocSoft,
+    borderColor: COLORS.subdocLine,
     borderRadius: 8,
     borderWidth: 1,
     gap: SPACING.xs,

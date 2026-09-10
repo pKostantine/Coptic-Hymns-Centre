@@ -335,10 +335,10 @@ export function buildDocumentHtml(
       }
       .open-button {
         align-items: center;
-        background: ${COLORS.surface};
-        border: 1px solid ${COLORS.gold};
+        background: ${COLORS.subdocSoft};
+        border: 1px solid ${COLORS.subdocLine};
         border-radius: 12px;
-        color: ${COLORS.white};
+        color: ${COLORS.subdoc};
         display: flex;
         flex-direction: column;
         gap: ${SPACING.sm}px;

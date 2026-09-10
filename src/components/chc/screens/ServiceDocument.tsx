@@ -327,9 +327,18 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // this screen mounted behind the destination, which is what navigateAway's
   // guard is for. Reached from both the document button and the content
   // selector's own hyperlink row.
-  const openHyperlink = (hyperlinkKey?: string | null) => {
+  const openHyperlink = (hyperlinkKey?: string | null, options?: { fromSelector?: boolean }) => {
     const destination = hyperlinkKey ? HYPERLINK_TARGETS[hyperlinkKey] : undefined;
-    if (!destination || isCoveredByModal) return;
+    if (!destination) return;
+    // isCoveredByModal counts the content selector as covering this screen,
+    // which is right for anything the DOCUMENT initiates while it sits behind
+    // something -- but the selector's own hyperlink row IS that something, so
+    // gating it on the same flag made the row permanently dead. From the
+    // selector, only a subdocument/Antiphonary modal genuinely blocks.
+    const blocked = options?.fromSelector
+      ? Boolean(subdocumentModal) || Boolean(antiphonarySections)
+      : isCoveredByModal;
+    if (blocked) return;
     navigateAway(destination.href as Href);
   };
 
@@ -536,7 +545,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
                 documentRef.current?.scrollToSection(id);
               }
             }}
-            onOpenHyperlink={openHyperlink}
+            onOpenHyperlink={(hyperlinkKey) => openHyperlink(hyperlinkKey, { fromSelector: true })}
             bookmarked={bookmarked}
             onToggleBookmark={() => toggleBookmark(bookmarkId)}
             onOpenCalendar={() => navigateAway('/calendar')}

@@ -34,6 +34,16 @@ export const COLORS = {
   linkSoft: 'rgba(87, 192, 138, 0.13)',
   linkLine: 'rgba(87, 192, 138, 0.45)',
 
+  // Subdocument (open-a-nested-document) accent. Same hue as rowBlue, which is
+  // already proven against this background, but given its own trio so the two
+  // can move independently. Blue rather than the app's gold because gold is
+  // general chrome — the collapse button, section rules, the header — and a
+  // button that opens a document should read as its own kind of thing, next to
+  // the green that means "leave this document".
+  subdoc: '#8EC5FF',
+  subdocSoft: 'rgba(142, 197, 255, 0.13)',
+  subdocLine: 'rgba(142, 197, 255, 0.45)',
+
   // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',
   bishop: '#D64545',
