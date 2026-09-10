@@ -34,16 +34,18 @@ export const COLORS = {
   linkSoft: 'rgba(87, 192, 138, 0.13)',
   linkLine: 'rgba(87, 192, 138, 0.45)',
 
-  // Subdocument (open-a-nested-document) accent. Violet is the one hue nothing
-  // else in this palette already means: gold is general chrome, green means
-  // "leave this document", and the speaker colours have spoken for red
-  // (Priest/Bishop), orange (People), yellow (Deacon/Reader) and cyan
-  // (metropolitan brackets). So it cannot be misread as any of them. Carried at
-  // an intensity between the blue this replaced (too quiet against the page)
-  // and the red after it (louder than a secondary control should be).
-  subdoc: '#A78BFA',
-  subdocSoft: 'rgba(167, 139, 250, 0.14)',
-  subdocLine: 'rgba(167, 139, 250, 0.55)',
+  // Subdocument (open-a-nested-document) accent, alongside the green that means
+  // "leave this document" and the gold that is general chrome.
+  //
+  // Deliberately NOT rowBlue (#8EC5FF): that pale blue already carries the
+  // calendar's month chevrons and its evening toggle, so a button wearing it
+  // blended into existing furniture rather than reading as its own control —
+  // which is what made the first attempt at blue disappear. This is a
+  // saturated azure nothing else uses, at the heavier fill and border the red
+  // attempt proved were needed for a button to hold the page.
+  subdoc: '#4DA6FF',
+  subdocSoft: 'rgba(77, 166, 255, 0.16)',
+  subdocLine: 'rgba(77, 166, 255, 0.7)',
 
   // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',
