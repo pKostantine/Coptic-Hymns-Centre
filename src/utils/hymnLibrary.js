@@ -1192,7 +1192,7 @@ function mergeIntoOneInlineSection(callingRow, nestedSections) {
 // plenty of documents repeat a hymn_key on purpose (the Agpeya prays Our
 // Father twice in an Hour), and those rows have no saint condition, so a
 // blanket dedupe would silently eat them.
-const SAINT_HYMN_CONDITION_RE = /[A-Za-z][A-Za-z0-9_]*:(?:Doxology|VOC|Psali|Veneration)/;
+const SAINT_HYMN_CONDITION_RE = /[A-Za-z][A-Za-z0-9_]*:(?:Doxology|VOC|Psali|Hiten|PraxisResponse|Veneration)/;
 
 function dropDuplicateSaintHymns(sections) {
   const seen = new Set();

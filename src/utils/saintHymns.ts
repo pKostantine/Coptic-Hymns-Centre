@@ -5,7 +5,7 @@ import { supabase } from './supabase';
  * (`StMark`) and child tokens name his individual hymns (`StMark:Doxology1`,
  * `StMark:VOC`, `StMark:Veneration`). This module builds the index the saint
  * picker needs — base -> the distinct child hymn tokens that actually exist —
- * by reading the four tables those children live in exactly once per session.
+ * by reading the six tables those children live in exactly once per session.
  *
  * Deliberately generic. Nothing here knows any particular saint; a new saint,
  * an extra doxology or a future veneration melody appears in the menu as soon
@@ -13,21 +13,30 @@ import { supabase } from './supabase';
  */
 
 /** Only these child namespaces are hymn choices. `:Feast` and any other child still works as a condition, it just isn't something to pick from a menu. */
-const HYMN_CATEGORIES = ['Doxology', 'VOC', 'Psali', 'Veneration'] as const;
+const HYMN_CATEGORIES = ['Doxology', 'VOC', 'Psali', 'Hiten', 'PraxisResponse', 'Veneration'] as const;
 export type SaintHymnCategory = (typeof HYMN_CATEGORIES)[number];
 
-/** Order the categories appear within one saint's menu. */
+/**
+ * Order the categories appear within one saint's menu: the Praises hymns
+ * first, then the two from the Liturgy, then the Axios that closes it.
+ */
 const CATEGORY_ORDER: Record<SaintHymnCategory, number> = {
   Doxology: 0,
   VOC: 1,
   Psali: 2,
-  Veneration: 3,
+  Hiten: 3,
+  PraxisResponse: 4,
+  Veneration: 5,
 };
 
 const CATEGORY_LABEL: Record<SaintHymnCategory, string> = {
   Doxology: 'Doxology',
   VOC: 'Verse of the Cymbals',
   Psali: 'Psali',
+  // Left as the name it is actually called by, the same way Psali is — this is
+  // the hymn of the intercessions, from hymn_of_the_intercessions.
+  Hiten: 'Hiten',
+  PraxisResponse: 'Praxis Response',
   Veneration: 'Veneration',
 };
 
@@ -137,7 +146,8 @@ export function getSaintHymnIndex(): Promise<SaintEntry[]> {
 }
 
 async function buildIndex(): Promise<SaintEntry[]> {
-  const [venerationRows, doxologyRows, vocConditions, psaliConditions, flagRows] = await Promise.all([
+  const [venerationRows, doxologyRows, vocConditions, psaliConditions, hitenConditions, praxisConditions, flagRows] =
+    await Promise.all([
     (async () => {
       const { data, error } = await supabase
         .schema('veneration')
@@ -157,6 +167,8 @@ async function buildIndex(): Promise<SaintEntry[]> {
     })(),
     fetchConditions('verses_of_the_cymbals', 'verses_of_the_cymbals'),
     fetchConditions('psalmody', 'midnight_praises'),
+    fetchConditions('hymn_of_the_intercessions', 'hymn_of_the_intercessions'),
+    fetchConditions('praxis_response', 'praxis_response'),
     (async () => {
       const { data, error } = await supabase
         .schema('calendar')
@@ -172,6 +184,8 @@ async function buildIndex(): Promise<SaintEntry[]> {
   collectTokens(doxologyRows.map((row) => row.condition), childrenByBase);
   collectTokens(vocConditions, childrenByBase);
   collectTokens(psaliConditions, childrenByBase);
+  collectTokens(hitenConditions, childrenByBase);
+  collectTokens(praxisConditions, childrenByBase);
 
   // Traditional position: Axios line order first, then doxology order for the
   // handful of saints with no Axios line, offset so they always follow.
