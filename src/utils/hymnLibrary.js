@@ -968,7 +968,16 @@ const STRUCTURAL_FLAGS_BY_TABLE = {
   liturgy_of_st_gregory: { StGregoryLiturgy: true },
   liturgy_of_st_cyril: { StCyrilLiturgy: true },
   liturgy_of_the_word: { PaulineIncense: true },
-  vespers_praises: { VesperPraises: true },
+  // "Which service am I being read from" flags. An Hour of the Agpeya
+  // nested inside one of these (agpeya.twelfth_hour under
+  // psalmody.vespers_praises, agpeya.first_hour under
+  // psalmody.morning_doxology) drops its own concluding block -- the
+  // Trisagion through the Creed -- because the service around it carries
+  // straight on; prayed on its own, the Hour keeps them. Nested hydration
+  // passes the parent's flags straight down (see safeHydrateNested), which
+  // is exactly how the flag reaches the Hour.
+  vespers_praises: { VespersPraises: true },
+  morning_doxology: { MorningDoxology: true },
 };
 const LITURGY_SCHEMA_TABLES = new Set([
   "offering_of_the_lamb",
