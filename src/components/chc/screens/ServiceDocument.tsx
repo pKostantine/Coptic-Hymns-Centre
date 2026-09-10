@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Href, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -143,7 +143,20 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const bookmarked = isBookmarked(bookmarkId);
   // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
   // to a saved subdocument bookmark) — fire once when sections first load.
-  const { sub: initialSubdocumentKey } = useLocalSearchParams<{ sub?: string }>();
+  const { sub: initialSubdocumentKey, viaHyperlink } = useLocalSearchParams<{ sub?: string; viaHyperlink?: string }>();
+  // Set by openHyperlink on the document it jumps TO. A hyperlink replaces the
+  // source document rather than stacking on top of it, so there is no longer a
+  // meaningful entry to pop back to — going back should leave via this
+  // document's own parent (Vespers -> Raising of Incense), not via whatever
+  // happened to precede the document that linked here.
+  const arrivedViaHyperlink = viaHyperlink === '1';
+  const leaveDocument = useCallback(() => {
+    if (arrivedViaHyperlink) {
+      router.replace(backHref);
+      return;
+    }
+    goBack(router, backHref);
+  }, [arrivedViaHyperlink, router, backHref]);
   const initialSubOpenedRef = useRef(false);
 
   useEffect(() => {
@@ -358,7 +371,14 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       ? Boolean(subdocumentModal) || Boolean(antiphonarySections)
       : isCoveredByModal;
     if (blocked) return;
-    navigateAway(destination.href as Href);
+    // replace, not push: a Hyperlink teleports between services rather than
+    // opening one over another, so the source document should not stay on the
+    // stack holding its hydrated sections in memory.
+    navigatingAwayRef.current = true;
+    setTimeout(() => {
+      navigatingAwayRef.current = false;
+    }, 3000);
+    router.replace({ pathname: destination.href, params: { viaHyperlink: '1' } } as never);
   };
 
   const handleAction = (action: DocumentAction) => {
@@ -419,7 +439,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     }
 
     if (action.type === 'swipeBack') {
-      if (!isCoveredByModal) goBack(router, backHref);
+      if (!isCoveredByModal) leaveDocument();
       return;
     }
 
@@ -513,12 +533,12 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             return;
           }
           if (gestureState.x0 < 56 && gestureState.dx > 60) {
-            goBack(router, backHref);
+            leaveDocument();
           }
         },
       });
     },
-    [router, selectorSwipeStartX, backHref, isCoveredByModal],
+    [selectorSwipeStartX, isCoveredByModal, leaveDocument],
   );
 
   return (
@@ -542,7 +562,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         <AppHeader
           title={{ english: title, arabic }}
           canGoBack
-          onBack={() => goBack(router, backHref)}
+          onBack={() => leaveDocument()}
           rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
           onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
           rightIcon="list-outline"
