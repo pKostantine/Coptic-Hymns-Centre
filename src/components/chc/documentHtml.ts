@@ -925,12 +925,12 @@ function renderVerse(
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveVerseRubricType(verse, bishopPresent)];
   const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
   // "Invincible Coptic" only means "this Coptic must always render" -- some
-  // rows tagged this way still carry a real English/Arabic translation, so
-  // Coptic only centers when there's truly no translation text to justify
-  // against; when there is, it (and any speaker label on the row) renders in
-  // its normal per-language spot like any other verse, same as everywhere
-  // else -- never centered just because the row happens to be Invincible
-  // Coptic.
+  // rows tagged this way still carry a real English/Arabic translation. Those
+  // lay out in the normal columns, Coptic above Coptic, with any speaker
+  // label in its normal per-language spot, same as everywhere else -- never
+  // centered just because the row happens to be Invincible Coptic. Only when
+  // there is no translation to justify against does the Coptic center, and
+  // then it takes the whole row rather than a column (copticStandsAlone).
   const hasTranslationText = Boolean((verse.english || '').trim()) || Boolean((verse.arabic || '').trim());
   const isCopticCentered = isCentered || (verse.prayerType === 'Invincible Coptic' && !hasTranslationText);
   // "Coptic Recited Prayers" hides just this verse's Coptic text when the
@@ -982,28 +982,48 @@ function renderVerse(
     return visibleColumns[language.key] && (Boolean(language.text.trim()) || Boolean(language.speakerLabel));
   });
 
-  const gridTemplateColumns = `repeat(${Math.max(languages.length, 1)}, minmax(0, 1fr))`;
+  // An Invincible Coptic line carrying no translation of its own isn't a
+  // Coptic *column* — there is nothing in the other columns for it to sit
+  // beside and be read against. Giving it one anyway wedged it into a third
+  // (or a half) of the row and wrapped it in there, reading as text pushed
+  // off to one side rather than a line of its own. It spans the whole row
+  // instead, centered on the row rather than on a cell. The speaker labels
+  // are genuinely per-language, so they keep the grid row above it — which
+  // is where this line already sat, just narrower.
+  const copticStandsAlone =
+    verse.prayerType === 'Invincible Coptic' && !hasTranslationText && languages.some((language) => language.key === 'coptic');
+  const columnLanguages = copticStandsAlone ? languages.filter((language) => language.key !== 'coptic') : languages;
+  const gridTemplateColumns = `repeat(${Math.max(columnLanguages.length, 1)}, minmax(0, 1fr))`;
   const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;
 
-  const cells = languages
-    .map((language) => {
-      const verseNumberText = verse.bibleVerseNumber
-        ? language.key === 'arabic'
-          ? formatArabicDigits(verse.bibleVerseNumber)
-          : language.key === 'coptic'
-            ? formatCopticNumbers(verse.bibleVerseNumber)
-            : verse.bibleVerseNumber
-        : '';
-      const centered = language.key === 'coptic' ? isCopticCentered : isCentered;
-      return `
-        <div class="cell" data-language="${escapeAttribute(language.key)}">
+  const renderCell = (language: (typeof languages)[number], spansRow: boolean) => {
+    const verseNumberText = verse.bibleVerseNumber
+      ? language.key === 'arabic'
+        ? formatArabicDigits(verse.bibleVerseNumber)
+        : language.key === 'coptic'
+          ? formatCopticNumbers(verse.bibleVerseNumber)
+          : verse.bibleVerseNumber
+      : '';
+    const centered = language.key === 'coptic' ? isCopticCentered : isCentered;
+    // A Coptic speaker label is always BLANK_COPTIC_LABEL — pure spacing, so
+    // the Coptic starts on the same line as the text beside it. Spanning the
+    // row it has already been placed below that line, so the filler would
+    // only open a blank gap above it.
+    const speakerLabel = spansRow ? '' : language.speakerLabel;
+    return `
+        <div class="cell" data-language="${escapeAttribute(language.key)}"${spansRow ? ' style="grid-column: 1 / -1;"' : ''}>
           <p class="verse-text ${language.className} ${centered ? 'centered' : ''}" style="${textStyle}">${
-            language.speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(language.speakerLabel)}</span><br/>` : ''
+            speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(speakerLabel)}</span><br/>` : ''
           }${verseNumberText ? `<span class="bible-verse-number" data-copy-text="${escapeAttribute(verseNumberText)}">${escapeHtml(verseNumberText)}</span><span class="bible-verse-number-gap"></span>` : ''}${highlightMetropolitanBrackets(language.text)}</p>
         </div>
       `;
-    })
-    .join('');
+  };
+
+  // The spanning cell has to come last in source order, or grid auto-placement
+  // pushes whatever follows it onto a row of its own.
+  const cells =
+    columnLanguages.map((language) => renderCell(language, false)).join('') +
+    (copticStandsAlone ? renderCell(languages.find((language) => language.key === 'coptic')!, true) : '');
 
   const tuneAttribute = verse.tune ? ` data-tune="${escapeAttribute(verse.tune)}"` : '';
   const verseId = `${section.id}::v${index}`;

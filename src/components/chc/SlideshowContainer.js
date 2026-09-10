@@ -1664,7 +1664,16 @@ function getVerseLanguageLayout(item, visibleLanguages = {}, tableWidth = 0) {
 function getVisibleVerseLanguages(item, visibleLanguages = {}) {
   const verse = item.verse || {};
 
-  if (verse.invincibleCoptic) {
+  // Only when the Coptic really is the whole line does it get the whole
+  // width -- an Invincible Coptic row that carries its own translation lays
+  // out in the normal columns, and estimating it as a single full-width
+  // Coptic column made every height derived from it wrong. Same rule
+  // VerseBlock renders by (copticStandsAlone).
+  const hasTranslationText = Boolean(
+    (verse.english && verse.english.trim()) || (verse.arabic && verse.arabic.trim()),
+  );
+
+  if (verse.invincibleCoptic && !hasTranslationText) {
     return String(verse.coptic || "").trim() ? ["coptic"] : [];
   }
 

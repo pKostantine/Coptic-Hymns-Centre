@@ -71,11 +71,11 @@ export default function VerseBlock({
   // "Invincible Coptic" only means "this Coptic must always render, even if
   // the language toggle or a translation is missing" -- it does NOT mean the
   // line structurally has no English/Arabic (some DB rows tagged this way do
-  // carry a translation). So the row is always built with the normal
-  // three-language shape below; Coptic is centered in its own column only
-  // when there's truly no accompanying translation text to justify against,
-  // and the speaker label (if any) renders in its normal per-language spot
-  // like any other verse, never specially centered.
+  // carry a translation). A row that has one lays out in the normal columns
+  // below, Coptic above Coptic, and its speaker label renders in its normal
+  // per-language spot like any other verse. Only when the Coptic really is
+  // the whole line does it stop being a column and span the row (see
+  // spanningLanguage).
   const hasTranslationText = Boolean((verse.english && verse.english.trim()) || (verse.arabic && verse.arabic.trim()));
   const copticStandsAlone = verse.invincibleCoptic && !hasTranslationText;
   const rowLanguages = [
@@ -157,7 +157,18 @@ export default function VerseBlock({
     if (!visibleLanguages[language.key]) return false;
     return Boolean((language.text && language.text.trim()) || language.speakerLabel);
   });
-  const rowColumnWidth = tableWidth / Math.max(rowLanguages.length, 1);
+  // A Coptic line with no translation of its own has nothing in the other
+  // columns to be read against, so it is not a column -- it is the whole
+  // line. Giving it a column anyway wedged it into a third (or a half) of
+  // the row and wrapped it in there, reading as text shoved to one side.
+  // It spans the full row instead, centered on the row rather than on a
+  // cell, sitting below the speaker labels (which ARE per-language, and so
+  // keep their own row) -- which is where it already appeared, just narrow.
+  const spanningLanguage = copticStandsAlone ? rowLanguages.find((language) => language.key === "coptic") : null;
+  const columnLanguages = spanningLanguage
+    ? rowLanguages.filter((language) => language.key !== "coptic")
+    : rowLanguages;
+  const rowColumnWidth = tableWidth / Math.max(columnLanguages.length, 1);
   const isCenteredAcrossPage = Boolean(verse.centeredAcrossPage);
   const hasSpeakerLabel = rowLanguages.some((language) => language.speakerLabel);
 
@@ -165,87 +176,101 @@ export default function VerseBlock({
     onLanguageLayout?.(language, metric);
   }
 
-  return (
-    <View style={styles.row}>
-      {rowLanguages.map((language) => {
-        const isJustified = language.textAlign === "justify";
-        const selectionStyle = selectableText ? null : DISABLED_SELECTION_STYLE;
-        const cellWidthStyle = { flexBasis: rowColumnWidth, maxWidth: rowColumnWidth };
-        const textStyle = [
-          styles.text,
-          ...language.styles,
-          selectionStyle,
-          {
-            color: rowTextColor,
-            fontFamily: language.fontFamily,
-            fontSize: language.fontSize,
-            fontStyle: isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal",
-            fontWeight: isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400",
-            letterSpacing: 0,
-            lineHeight: language.lineHeight,
-            ...(Platform.OS === "web"
-              ? {
-                  overflowWrap: "break-word",
-                  wordBreak: "normal",
-                }
-              : null),
-          },
-        ];
+  function renderLanguageCell(language, spansRow = false) {
+    const isJustified = language.textAlign === "justify";
+    const selectionStyle = selectableText ? null : DISABLED_SELECTION_STYLE;
+    const cellWidth = spansRow ? tableWidth : rowColumnWidth;
+    const cellWidthStyle = { flexBasis: cellWidth, maxWidth: cellWidth };
+    const textStyle = [
+      styles.text,
+      ...language.styles,
+      selectionStyle,
+      {
+        color: rowTextColor,
+        fontFamily: language.fontFamily,
+        fontSize: language.fontSize,
+        fontStyle: isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal",
+        fontWeight: isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400",
+        letterSpacing: 0,
+        lineHeight: language.lineHeight,
+        ...(Platform.OS === "web"
+          ? {
+              overflowWrap: "break-word",
+              wordBreak: "normal",
+            }
+          : null),
+      },
+    ];
 
-        return (
-          <View
-            key={language.key}
-            style={[
-              styles.cell,
-              isSeasonalHoosVerse && styles.seasonalHoosCell,
-              isCenteredAcrossPage && styles.centeredCell,
-              language.key === "coptic" && hasSpeakerLabel
-                ? { paddingTop: SPACING.sm + language.lineHeight }
-                : null,
-              cellWidthStyle,
-            ]}
+    return (
+      <View
+        key={language.key}
+        style={[
+          styles.cell,
+          isSeasonalHoosVerse && styles.seasonalHoosCell,
+          isCenteredAcrossPage && styles.centeredCell,
+          // Reserves the line the speaker label occupies in the columns
+          // beside it, so Coptic starts level with their text. A spanning
+          // line is already below that row, so the gap would just be
+          // blank space above it.
+          language.key === "coptic" && hasSpeakerLabel && !spansRow
+            ? { paddingTop: SPACING.sm + language.lineHeight }
+            : null,
+          cellWidthStyle,
+        ]}
+      >
+        {language.speakerLabel ? (
+          <Text
+            selectable={selectableText}
+            style={[textStyle, { textAlign: getSafeTextAlign(language), color: getSpeakerColor(rubricType, bishopPresent) }]}
           >
-            {language.speakerLabel ? (
-              <Text
-                selectable={selectableText}
-                style={[textStyle, { textAlign: getSafeTextAlign(language), color: getSpeakerColor(rubricType, bishopPresent) }]}
-              >
-                {language.speakerLabel}
-              </Text>
-            ) : null}
-            {isJustified ? (
-              <JustifiedVerseBody
-                language={language}
-                textStyle={textStyle}
-                selectableText={selectableText}
-                columnWidth={rowColumnWidth - SPACING.xs * 2}
-                forceLines={language.forceLines}
-                minWordsToJustify={language.minWordsToJustify}
-                onMetric={(metric) => reportLanguageMetric(language.key, metric)}
-              />
-            ) : (
-              <Text
-                selectable={selectableText}
-                style={[...textStyle, { textAlign: getSafeTextAlign(language) }]}
-                onLayout={(event) =>
-                  reportLanguageMetric(language.key, {
-                    height: event.nativeEvent.layout.height,
-                  })
-                }
-                onTextLayout={(event) =>
-                  reportLanguageMetric(language.key, {
-                    lines: event.nativeEvent.lines || [],
-                  })
-                }
-              >
-                {renderLanguageText(language)}
-              </Text>
-            )}
-          </View>
-        );
-      })}
-    </View>
-  );
+            {language.speakerLabel}
+          </Text>
+        ) : null}
+        {isJustified ? (
+          <JustifiedVerseBody
+            language={language}
+            textStyle={textStyle}
+            selectableText={selectableText}
+            columnWidth={cellWidth - SPACING.xs * 2}
+            forceLines={language.forceLines}
+            minWordsToJustify={language.minWordsToJustify}
+            onMetric={(metric) => reportLanguageMetric(language.key, metric)}
+          />
+        ) : (
+          <Text
+            selectable={selectableText}
+            style={[...textStyle, { textAlign: getSafeTextAlign(language) }]}
+            onLayout={(event) =>
+              reportLanguageMetric(language.key, {
+                height: event.nativeEvent.layout.height,
+              })
+            }
+            onTextLayout={(event) =>
+              reportLanguageMetric(language.key, {
+                lines: event.nativeEvent.lines || [],
+              })
+            }
+          >
+            {renderLanguageText(language)}
+          </Text>
+        )}
+      </View>
+    );
+  }
+
+  if (spanningLanguage) {
+    return (
+      <View style={styles.spanningRowGroup}>
+        {columnLanguages.length ? (
+          <View style={styles.row}>{columnLanguages.map((language) => renderLanguageCell(language))}</View>
+        ) : null}
+        <View style={styles.row}>{renderLanguageCell(spanningLanguage, true)}</View>
+      </View>
+    );
+  }
+
+  return <View style={styles.row}>{rowLanguages.map((language) => renderLanguageCell(language))}</View>;
 }
 
 /**
@@ -609,6 +634,11 @@ const styles = StyleSheet.create({
   },
   seasonalHoosCell: {
     paddingVertical: 2,
+  },
+  // Stacks the per-language speaker-label row above a line that spans the
+  // whole width instead of taking a column (see spanningLanguage).
+  spanningRowGroup: {
+    width: "100%",
   },
   text: {
     flexShrink: 1,
