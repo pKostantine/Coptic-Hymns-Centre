@@ -1197,6 +1197,31 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
 
   const hydrated = [];
   for (const section of visibleSections) {
+    // A Hyperlink placeholder leaves this document altogether for another
+    // service, so — unlike a Subdocument, whose content is prefetched here and
+    // stashed for its modal — there is nothing to hydrate: the destination
+    // builds itself when its own screen mounts. The section carries just the
+    // all-caps key; which route that resolves to is a presentation concern
+    // (HYPERLINK_TARGETS in constants/manifest.ts), kept out of here so this
+    // module stays free of routing.
+    if (section.isHyperlink) {
+      hydrated.push({
+        id: section.id,
+        title: {
+          english: section.title.english || humanizeSentinelKey(section.hymn_key),
+          arabic: section.title.arabic,
+        },
+        verses: [],
+        isHyperlinkButton: true,
+        hyperlinkKey: section.hymn_key,
+        alternateEvery: null,
+        forceWhiteVerses: true,
+        bishopOnly: section.bishopOnly,
+        priestOnly: section.priestOnly,
+      });
+      continue;
+    }
+
     if (section.isSubdocumentPlaceholder) {
       const target = SUBDOCUMENT_MAP[section.hymn_key];
       if (!target) {

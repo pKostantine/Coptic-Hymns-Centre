@@ -47,6 +47,9 @@ export interface DocumentSection {
   subdocumentTarget?: { schema: string; table: string };
   /** The Antiphonary subdocument gets its own special button/modal (Adam/Vatos tune navigation) rather than the generic subdocument flow. */
   isAntiphonaryButton?: boolean;
+  /** A Hyperlink placeholder: unlike a Subdocument (a modal over this document) it LEAVES this document for another service entirely, so it carries no prefetched content — only the key naming its destination. */
+  isHyperlinkButton?: boolean;
+  hyperlinkKey?: string;
   /** Prefetched during the parent document's own hydration, so opening the button's modal is a local render, never a fresh fetch. */
   subdocumentSections?: DocumentSection[];
   /** Set on the first section spliced in from a GOSPEL_RITE inline import — renders the "Coptic Gospel Rite" toggle button immediately before it. */
@@ -354,6 +357,44 @@ export function buildDocumentHtml(
         font-family: "Arial", sans-serif;
         font-size: ${openButtonFontSize}px;
         line-height: ${openButtonLineHeight}px;
+      }
+      .hyperlink-button {
+        align-items: center;
+        background: ${COLORS.linkSoft};
+        border: 1px solid ${COLORS.linkLine};
+        border-radius: 12px;
+        color: ${COLORS.link};
+        display: flex;
+        font-family: Georgia, serif;
+        font-size: ${Math.max(Math.round(sectionTitleFontSize * 1.1), 16)}px;
+        font-weight: 800;
+        gap: ${SPACING.md}px;
+        justify-content: center;
+        margin: ${SPACING.md}px auto;
+        max-width: 420px;
+        min-height: 72px;
+        padding: ${SPACING.md}px ${SPACING.lg}px;
+        width: 84%;
+      }
+      .hyperlink-button .hyperlink-label {
+        text-align: center;
+      }
+      .hyperlink-button .hyperlink-label.arabic {
+        direction: rtl;
+        font-family: "Arial", sans-serif;
+      }
+      .hyperlink-button .hyperlink-arrow {
+        align-items: center;
+        border: 1.5px solid ${COLORS.link};
+        border-radius: 999px;
+        display: inline-flex;
+        flex-shrink: 0;
+        font-family: -apple-system, "Segoe UI", sans-serif;
+        font-size: 16px;
+        height: 28px;
+        justify-content: center;
+        line-height: 1;
+        width: 28px;
       }
       .gospel-rite-toggle-row {
         align-items: center;
@@ -700,6 +741,10 @@ function renderSection(
   const { appLanguage, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite, suppressMap } = opts;
   const toggleHtml = section.startsGospelRiteToggle ? renderGospelRiteToggle(copticGospelRite, section.id) : '';
 
+  if (section.isHyperlinkButton) {
+    return toggleHtml + renderHyperlinkButtonSection(section, appLanguage);
+  }
+
   if (section.isSubdocumentButton || section.isAntiphonaryButton) {
     return toggleHtml + renderDocumentButtonSection(section, appLanguage);
   }
@@ -774,6 +819,31 @@ function renderDocumentButtonSection(section: DocumentSection, appLanguage: AppT
       <button class="open-button" onclick="${escapeAttribute(onclick)}">
         ${!showArabic ? `<span>${escapeHtml(titleEn || titleAr)}</span>` : ''}
         ${showArabic ? `<span class="arabic">${escapeHtml(titleAr)}</span>` : ''}
+      </button>
+    </section>
+  `;
+}
+
+/**
+ * A Hyperlink placeholder renders as a green bar with an arrow badge —
+ * deliberately unlike the tall gold Subdocument card, because it does
+ * something different: tapping it leaves this document for another service
+ * rather than opening a modal over it. Green is reserved for that "you are
+ * about to go somewhere else" meaning, and the shorter bar keeps it reading as
+ * a transition at the end of a service rather than as content of its own.
+ */
+function renderHyperlinkButtonSection(section: DocumentSection, appLanguage: AppTitleLanguage) {
+  const titleEn = section.title?.english || section.hyperlinkKey || 'Continue';
+  const titleAr = section.title?.arabic || '';
+  const showArabic = appLanguage === 'ar' ? Boolean(titleAr) : !titleEn && Boolean(titleAr);
+  const label = showArabic ? titleAr : titleEn || titleAr;
+  const onclick = `postAction('openHyperlink', { sectionId: ${JSON.stringify(section.id)} })`;
+
+  return `
+    <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
+      <button class="hyperlink-button" onclick="${escapeAttribute(onclick)}">
+        <span class="hyperlink-label${showArabic ? ' arabic' : ''}">${escapeHtml(label)}</span>
+        <span class="hyperlink-arrow" aria-hidden="true">&#8594;</span>
       </button>
     </section>
   `;

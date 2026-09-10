@@ -10,6 +10,7 @@ import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
+import { HYPERLINK_TARGETS } from '../../../constants/manifest';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useCalendar } from '../../../context/CalendarContext';
@@ -311,6 +312,17 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     router.push(href);
   };
 
+  // A Hyperlink teleports to another service rather than opening anything over
+  // this one, so it navigates away exactly like Settings/Calendar do -- leaving
+  // this screen mounted behind the destination, which is what navigateAway's
+  // guard is for. Reached from both the document button and the content
+  // selector's own hyperlink row.
+  const openHyperlink = (hyperlinkKey?: string | null) => {
+    const destination = hyperlinkKey ? HYPERLINK_TARGETS[hyperlinkKey] : undefined;
+    if (!destination || isCoveredByModal) return;
+    navigateAway(destination.href as Href);
+  };
+
   const handleAction = (action: DocumentAction) => {
     if (action.type === 'toggleCopticGospelRite') {
       // The toggle button lives inside the first Gospel Rite section. Pre-set
@@ -370,6 +382,13 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
 
     if (action.type === 'swipeBack') {
       if (!isCoveredByModal) goBack(router, backHref);
+      return;
+    }
+
+    // Checked before the subdocumentSections guard below: a Hyperlink section
+    // deliberately carries no prefetched content, so that guard would drop it.
+    if (action.type === 'openHyperlink') {
+      openHyperlink(sections.find((s) => s.id === action.sectionId)?.hyperlinkKey);
       return;
     }
 
@@ -507,6 +526,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
                 documentRef.current?.scrollToSection(id);
               }
             }}
+            onOpenHyperlink={openHyperlink}
             bookmarked={bookmarked}
             onToggleBookmark={() => toggleBookmark(bookmarkId)}
             onOpenCalendar={() => navigateAway('/calendar')}
