@@ -272,20 +272,15 @@ export function buildDocumentHtml(
         overflow-wrap: break-word;
         padding: ${SPACING.sm}px ${SPACING.xs}px;
       }
-      body.selecting-english .cell:not([data-language="english"]),
-      body.selecting-english .cell:not([data-language="english"]) *,
-      body.selecting-english .title-cell:not([data-language="english"]),
-      body.selecting-english .title-cell:not([data-language="english"]) *,
-      body.selecting-coptic .cell:not([data-language="coptic"]),
-      body.selecting-coptic .cell:not([data-language="coptic"]) *,
-      body.selecting-coptic .title-cell:not([data-language="coptic"]),
-      body.selecting-coptic .title-cell:not([data-language="coptic"]) *,
-      body.selecting-arabic .cell:not([data-language="arabic"]),
-      body.selecting-arabic .cell:not([data-language="arabic"]) *,
-      body.selecting-arabic .title-cell:not([data-language="arabic"]),
-      body.selecting-arabic .title-cell:not([data-language="arabic"]) * {
-        -webkit-user-select: none !important;
-        user-select: none !important;
+      .selection-excluded::selection,
+      .selection-excluded *::selection {
+        background: transparent;
+        color: currentColor;
+      }
+      .selection-excluded::-moz-selection,
+      .selection-excluded *::-moz-selection {
+        background: transparent;
+        color: currentColor;
       }
       .verse-text {
         font-size: ${fontSize}px;
@@ -491,7 +486,6 @@ export function buildDocumentHtml(
       });
       (function () {
         var languages = ['english', 'coptic', 'arabic'];
-        var selectingLanguage = null;
         var selectTextEnabled = ${JSON.stringify(effectiveSelectText)};
         if (!selectTextEnabled) {
           var clearDisabledSelection = function () {
@@ -514,21 +508,13 @@ export function buildDocumentHtml(
           var element = node && node.nodeType === 1 ? node : node && node.parentElement;
           return element && element.closest ? element.closest('.cell[data-language], .title-cell[data-language]') : null;
         }
-        function setSelectingLanguage(language) {
-          languages.forEach(function (item) { document.body.classList.remove('selecting-' + item); });
-          selectingLanguage = languages.indexOf(language) >= 0 ? language : null;
-          if (selectingLanguage) document.body.classList.add('selecting-' + selectingLanguage);
-        }
         function inferLanguage(node) {
           var cell = closestLanguageCell(node);
           return cell ? cell.getAttribute('data-language') : null;
         }
-        function onSelectionStart(event) {
-          setSelectingLanguage(inferLanguage(event.target));
-        }
-        function hasSelection() {
-          var selection = window.getSelection && window.getSelection();
-          return Boolean(selection && selection.rangeCount && !selection.isCollapsed);
+        function closestSection(node) {
+          var element = node && node.nodeType === 1 ? node : node && node.parentElement;
+          return element && element.closest ? element.closest('.section') : null;
         }
         function normalizeSelectionText(text) {
           return String(text || '')
@@ -556,41 +542,108 @@ export function buildDocumentHtml(
             return false;
           }
         }
-        function fullTextForNode(node) {
-          var nodeRange = document.createRange();
-          nodeRange.selectNodeContents(node);
-          return fragmentText(nodeRange.cloneContents());
+        function selectedTextForNode(range, node) {
+          if (!rangeIntersectsNode(range, node)) return '';
+          var clippedRange = document.createRange();
+          clippedRange.selectNodeContents(node);
+          if (node.contains(range.startContainer)) {
+            clippedRange.setStart(range.startContainer, range.startOffset);
+          }
+          if (node.contains(range.endContainer)) {
+            clippedRange.setEnd(range.endContainer, range.endOffset);
+          }
+          return fragmentText(clippedRange.cloneContents());
         }
-        // Copy is grouped by hymn, then by language within it: every language
-        // of one section, then the next section. It used to collect a single
-        // language across the WHOLE document, so selecting one hymn gave you
-        // its English followed by the next hymn's English, never its own
-        // Coptic and Arabic.
-        //
-        // Rows are the unit, not cells. The layout is row-major (each
-        // .verse-row holds one cell per language side by side), so a drag down
-        // the English column ends inside the last row's English cell — the
-        // Coptic and Arabic cells of that row sit after the range end and
-        // clipping them would silently drop the hymn's last line in every
-        // other language. Taking each touched row's cells in full keeps the
-        // languages the same length as each other.
-        function selectedTextBySection(selection) {
-          if (!selection || !selection.rangeCount) return '';
+        function compareSelectionEndpoints(left, right) {
+          if (left.sectionIndex !== right.sectionIndex) return left.sectionIndex - right.sectionIndex;
+          return left.languageIndex - right.languageIndex;
+        }
+        // The visible document is row-major in the DOM (English, Coptic and
+        // Arabic for one verse, followed by the next verse), but selection
+        // should read section-major and language-major: all English in a
+        // hymn, then all Coptic, then all Arabic. The language containing the
+        // cursor endpoint is the boundary, so languages beyond it are never
+        // silently included.
+        function buildSelectionPlan(selection) {
+          if (!selection || !selection.rangeCount || selection.isCollapsed) return null;
           var range = selection.getRangeAt(0);
+          var sections = Array.prototype.slice.call(document.querySelectorAll('.section'));
+          var anchorSection = closestSection(selection.anchorNode) || closestSection(range.startContainer);
+          var focusSection = closestSection(selection.focusNode) || closestSection(range.endContainer);
+          var anchorLanguage = inferLanguage(selection.anchorNode) || inferLanguage(range.startContainer);
+          var focusLanguage = inferLanguage(selection.focusNode) || inferLanguage(range.endContainer);
+          var anchor = {
+            sectionIndex: sections.indexOf(anchorSection),
+            languageIndex: languages.indexOf(anchorLanguage),
+          };
+          var focus = {
+            sectionIndex: sections.indexOf(focusSection),
+            languageIndex: languages.indexOf(focusLanguage),
+          };
+          if (anchor.sectionIndex < 0 || focus.sectionIndex < 0 || anchor.languageIndex < 0 || focus.languageIndex < 0) {
+            return null;
+          }
+          var first = anchor;
+          var last = focus;
+          if (compareSelectionEndpoints(first, last) > 0) {
+            first = focus;
+            last = anchor;
+          }
+          var languageIndexesBySection = {};
+          for (var sectionIndex = first.sectionIndex; sectionIndex <= last.sectionIndex; sectionIndex += 1) {
+            var firstLanguageIndex = sectionIndex === first.sectionIndex ? first.languageIndex : 0;
+            var lastLanguageIndex = sectionIndex === last.sectionIndex ? last.languageIndex : languages.length - 1;
+            languageIndexesBySection[sectionIndex] = [];
+            for (var languageIndex = firstLanguageIndex; languageIndex <= lastLanguageIndex; languageIndex += 1) {
+              languageIndexesBySection[sectionIndex].push(languageIndex);
+            }
+          }
+          return {
+            range: range,
+            sections: sections,
+            languageIndexesBySection: languageIndexesBySection,
+          };
+        }
+        function clearSelectionPreview() {
+          Array.prototype.slice.call(document.querySelectorAll('.selection-excluded')).forEach(function (cell) {
+            cell.classList.remove('selection-excluded');
+          });
+        }
+        function updateSelectionPreview(plan) {
+          clearSelectionPreview();
+          if (!plan) return;
+          plan.sections.forEach(function (section, sectionIndex) {
+            var includedIndexes = plan.languageIndexesBySection[sectionIndex];
+            if (!includedIndexes) return;
+            Array.prototype.slice.call(section.querySelectorAll('.cell[data-language], .title-cell[data-language]')).forEach(function (cell) {
+              var languageIndex = languages.indexOf(cell.getAttribute('data-language'));
+              if (includedIndexes.indexOf(languageIndex) < 0) cell.classList.add('selection-excluded');
+            });
+          });
+        }
+        // Copy is grouped by hymn and then language. Each participating cell
+        // is clipped to the actual Range, preserving partial-word and partial-
+        // verse selections instead of expanding every touched row.
+        function selectedTextBySection(selection) {
+          var plan = buildSelectionPlan(selection);
+          if (!plan) return '';
+          var range = plan.range;
           var blocks = [];
-          Array.prototype.slice.call(document.querySelectorAll('.section')).forEach(function (section) {
-            if (!rangeIntersectsNode(range, section)) return;
+          plan.sections.forEach(function (section, sectionIndex) {
+            var includedIndexes = plan.languageIndexesBySection[sectionIndex];
+            if (!includedIndexes || !rangeIntersectsNode(range, section)) return;
             var rows = Array.prototype.slice
               .call(section.querySelectorAll('.title-row, .verse-row'))
               .filter(function (row) { return rangeIntersectsNode(range, row); });
             if (!rows.length) return;
             var perLanguage = [];
-            languages.forEach(function (language) {
+            includedIndexes.forEach(function (languageIndex) {
+              var language = languages[languageIndex];
               var lines = [];
               rows.forEach(function (row) {
                 var cell = row.querySelector('.cell[data-language="' + language + '"], .title-cell[data-language="' + language + '"]');
                 if (!cell) return;
-                var text = fullTextForNode(cell);
+                var text = selectedTextForNode(range, cell);
                 if (text) lines.push(text);
               });
               if (lines.length) perLanguage.push(lines.join('\\n'));
@@ -599,18 +652,9 @@ export function buildDocumentHtml(
           });
           return blocks.join('\\n\\n');
         }
-        document.addEventListener('pointerdown', onSelectionStart, true);
-        document.addEventListener('mousedown', onSelectionStart, true);
-        document.addEventListener('touchstart', onSelectionStart, true);
         document.addEventListener('selectionchange', function () {
           var selection = window.getSelection && window.getSelection();
-          if (!selection || !selection.rangeCount || selection.isCollapsed) {
-            setSelectingLanguage(null);
-            return;
-          }
-          if (!selectingLanguage) {
-            setSelectingLanguage(inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode));
-          }
+          updateSelectionPreview(buildSelectionPlan(selection));
         });
         document.addEventListener('copy', function (event) {
           var selection = window.getSelection && window.getSelection();
