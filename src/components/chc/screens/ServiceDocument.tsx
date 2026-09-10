@@ -38,8 +38,14 @@ interface SubdocumentModalTarget {
   title: { english: string; arabic: string };
   sections: DocumentSection[];
   subdocumentKey?: string;
+  collapseMemoryScope: string;
   /** Id of the section holding the open-button this subdocument was reached through — where the reader is put back when it closes. */
   triggerSectionId?: string;
+}
+
+interface AntiphonaryModalTarget {
+  sections: DocumentSection[];
+  collapseMemoryScope: string;
 }
 
 /**
@@ -116,7 +122,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     getLastDocumentPosition(documentPositionKey),
   );
   const [subdocumentModal, setSubdocumentModal] = useState<SubdocumentModalTarget | null>(null);
-  const [antiphonarySections, setAntiphonarySections] = useState<DocumentSection[] | null>(null);
+  const [antiphonaryModal, setAntiphonaryModal] = useState<AntiphonaryModalTarget | null>(null);
   const documentRef = useRef<DocumentWebViewHandle>(null);
   const hasRestoredScrollPositionRef = useRef(false);
   // A freshly (re)mounted WebView's own scroll-tracking script starts
@@ -213,10 +219,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           // (its whole content is the day's commemoration), and it stays open
           // across a re-hydration now like every other modal, so it has to be
           // refreshed the same way rather than left showing the old day.
-          setAntiphonarySections((current) => {
+          setAntiphonaryModal((current) => {
             if (!current) return current;
             const trigger = newSections.find((s) => s.isAntiphonaryButton && s.subdocumentSections);
-            return trigger?.subdocumentSections ?? current;
+            return trigger ? { ...current, sections: trigger.subdocumentSections! } : current;
           });
         }
       })
@@ -266,10 +272,11 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         title: triggerSection.title,
         sections: triggerSection.subdocumentSections,
         subdocumentKey: triggerSection.subdocumentKey,
+        collapseMemoryScope: `${documentPositionKey}:sub:${triggerSection.id}`,
         triggerSectionId: triggerSection.id,
       });
     }
-  }, [sections, initialSubdocumentKey]);
+  }, [sections, initialSubdocumentKey, documentPositionKey]);
 
   // Rotating the device (or, on web, resizing the window) reflows the
   // WebView's CSS layout at the new width without reloading it — the scroll
@@ -368,7 +375,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     // gating it on the same flag made the row permanently dead. From the
     // selector, only a subdocument/Antiphonary modal genuinely blocks.
     const blocked = options?.fromSelector
-      ? Boolean(subdocumentModal) || Boolean(antiphonarySections)
+      ? Boolean(subdocumentModal) || Boolean(antiphonaryModal)
       : isCoveredByModal;
     if (blocked) return;
     // replace, not push: a Hyperlink teleports between services rather than
@@ -454,7 +461,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     if (!triggerSection?.subdocumentSections) return;
 
     if (action.type === 'openAntiphonary') {
-      setAntiphonarySections(triggerSection.subdocumentSections);
+      setAntiphonaryModal({
+        sections: triggerSection.subdocumentSections,
+        collapseMemoryScope: `${documentPositionKey}:sub:${triggerSection.id}`,
+      });
       return;
     }
 
@@ -463,6 +473,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         title: triggerSection.title,
         sections: triggerSection.subdocumentSections,
         subdocumentKey: triggerSection.subdocumentKey,
+        collapseMemoryScope: `${documentPositionKey}:sub:${triggerSection.id}`,
         triggerSectionId: triggerSection.id,
       });
     }
@@ -511,7 +522,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // DocumentModal.tsx's own closeSwipePanResponder already correctly scopes
   // itself to close only the topmost modal; this ensures the document
   // BEHIND it never competes for the same gesture while anything covers it.
-  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonarySections) || selectorOpen;
+  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen;
 
   const gesturePanResponder = useMemo(
     () => {
@@ -583,6 +594,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             ref={documentRef}
             sections={sections}
             preferences={preferences}
+            collapseMemoryScope={documentPositionKey}
             onAction={handleAction}
             selectedSectionId={selectedSlideSectionId}
             onCurrentSectionChange={(id) => {
@@ -641,13 +653,15 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         title={subdocumentModal?.title ?? null}
         sections={subdocumentModal?.sections ?? null}
         subdocumentKey={subdocumentModal?.subdocumentKey}
+        collapseMemoryScope={subdocumentModal?.collapseMemoryScope ?? `${documentPositionKey}:sub:unknown`}
         parentBookmarkId={bookmarkId}
         onClose={closeSubdocument}
       />
       <AntiphonaryModal
-        visible={Boolean(antiphonarySections)}
-        sections={antiphonarySections}
-        onClose={() => setAntiphonarySections(null)}
+        visible={Boolean(antiphonaryModal)}
+        sections={antiphonaryModal?.sections ?? null}
+        collapseMemoryScope={antiphonaryModal?.collapseMemoryScope ?? `${documentPositionKey}:sub:antiphonary`}
+        onClose={() => setAntiphonaryModal(null)}
       />
     </SafeAreaView>
   );

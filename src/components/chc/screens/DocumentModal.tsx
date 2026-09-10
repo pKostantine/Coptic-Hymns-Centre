@@ -21,6 +21,7 @@ interface DocumentModalTarget {
   sections: DocumentSection[];
   isAntiphonary?: boolean;
   subdocumentKey?: string;
+  collapseMemoryScope: string;
 }
 
 interface DocumentModalProps {
@@ -29,6 +30,8 @@ interface DocumentModalProps {
   sections: DocumentSection[] | null;
   isAntiphonary?: boolean;
   subdocumentKey?: string;
+  /** Parent-document path plus the exact section occurrence that opened this modal. */
+  collapseMemoryScope: string;
   /** Parent document's bookmark ID (e.g. "liturgy:vespers") — when provided alongside subdocumentKey, the content selector shows a bookmark button that saves "${parentBookmarkId}:sub:${subdocumentKey}". */
   parentBookmarkId?: string;
   onClose: () => void;
@@ -70,7 +73,7 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
  * no fixed nesting cap, it's bounded only by how many buttons a user taps
  * through and the depth-3 guard hydrateWithFlags applies while prefetching.
  */
-function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, parentBookmarkId, onClose }: DocumentModalProps) {
+function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, collapseMemoryScope, parentBookmarkId, onClose }: DocumentModalProps) {
   const { preferences, toggleBishopPresent, isBookmarked, toggleBookmark } = useReadingPreferences();
   const [nestedModal, setNestedModal] = useState<DocumentModalTarget | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -123,6 +126,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           title: { english: 'Antiphonary', arabic: 'الدفنار' },
           sections: triggerSection.subdocumentSections,
           isAntiphonary: true,
+          collapseMemoryScope: `${collapseMemoryScope}:sub:${triggerSection.id}`,
         });
       }
       return;
@@ -135,6 +139,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           title: triggerSection.title,
           sections: triggerSection.subdocumentSections,
           subdocumentKey: triggerSection.subdocumentKey,
+          collapseMemoryScope: `${collapseMemoryScope}:sub:${triggerSection.id}`,
         });
       }
       return;
@@ -334,6 +339,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 ref={documentRef}
                 sections={sections}
                 preferences={preferences}
+                collapseMemoryScope={collapseMemoryScope}
                 onAction={handleAction}
                 selectedSectionId={selectedSlideSectionId}
                 onCurrentSectionChange={setCurrentSectionId}
@@ -383,6 +389,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           sections={nestedModal?.sections ?? null}
           isAntiphonary={nestedModal?.isAntiphonary}
           subdocumentKey={nestedModal?.subdocumentKey}
+          collapseMemoryScope={nestedModal?.collapseMemoryScope ?? `${collapseMemoryScope}:sub:unknown`}
           onClose={() => setNestedModal(null)}
         />
       </SafeAreaView>
@@ -397,10 +404,12 @@ export function SubdocumentModal(props: Omit<DocumentModalProps, 'isAntiphonary'
 export function AntiphonaryModal({
   visible,
   sections,
+  collapseMemoryScope,
   onClose,
 }: {
   visible: boolean;
   sections: DocumentSection[] | null;
+  collapseMemoryScope: string;
   onClose: () => void;
 }) {
   return (
@@ -409,6 +418,7 @@ export function AntiphonaryModal({
       title={{ english: 'Antiphonary', arabic: 'الدفنار' }}
       sections={sections}
       isAntiphonary
+      collapseMemoryScope={collapseMemoryScope}
       onClose={onClose}
     />
   );

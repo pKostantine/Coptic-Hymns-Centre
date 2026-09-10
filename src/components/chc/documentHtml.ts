@@ -75,6 +75,7 @@ export interface DocumentAction {
   type: string;
   sectionId?: string;
   verseId?: string | null;
+  collapsed?: boolean;
 }
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, coptic: true, arabic: true };
@@ -485,6 +486,7 @@ export function buildDocumentHtml(
         var collapsed = section.classList.toggle('collapsed');
         button.classList.toggle('is-collapsed', collapsed);
         button.setAttribute('aria-label', collapsed ? 'Expand section' : 'Collapse section');
+        postAction('toggleCollapse', { sectionId: section.getAttribute('data-section-id'), collapsed: collapsed });
       });
       (function () {
         var languages = ['english', 'coptic', 'arabic'];
