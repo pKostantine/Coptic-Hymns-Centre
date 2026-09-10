@@ -48,7 +48,7 @@ export default function AppHeader({
   const isMobileWeb = useIsMobileWeb();
   const insets = useSafeAreaInsets();
   const iconButtonStyle = [styles.iconButton, isMobileWeb && styles.iconButtonMobile];
-  const iconSize = isMobileWeb ? 22 : 26;
+  const iconSize = isMobileWeb ? 23 : 26;
 
   return (
     <View
@@ -147,10 +147,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
+  // Matched to AppHeader.tsx: 40 button, 44 logo, 22 title. Phone-width web
+  // was rendering a header noticeably smaller than the app's.
   iconButtonMobile: {
-    borderRadius: 16,
-    height: 36,
-    width: 36,
+    borderRadius: 18,
+    height: 40,
+    width: 40,
   },
   logo: {
     height: 48,
@@ -158,16 +160,16 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   logoMobile: {
-    height: 32,
-    width: 32,
+    height: 44,
+    width: 44,
   },
   iconSpacer: {
     height: 48,
     width: 48,
   },
   iconSpacerMobile: {
-    height: 36,
-    width: 36,
+    height: 40,
+    width: 40,
   },
   rightActions: {
     flexDirection: 'row',
@@ -187,7 +189,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
   },
   titleMobile: {
-    fontSize: 18,
+    fontSize: 22,
   },
   arabicTitle: {
     fontFamily: TYPOGRAPHY.arabic,

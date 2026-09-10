@@ -40,7 +40,7 @@ export default function CategoryCard({ title, arabic, onPress, showEnglish = tru
       onPress={onPress}
     >
       <View style={[styles.iconWrap, isMobileWeb && styles.iconWrapMobile]}>
-        <Icon name="book" size={isMobileWeb ? 20 : 26} color={COLORS.gold} />
+        <Icon name="book" size={isMobileWeb ? 24 : 26} color={COLORS.gold} />
       </View>
       <View style={[styles.titleGroup, isMobileWeb && styles.titleGroupMobile]}>
         {showEnglish ? (
@@ -60,7 +60,7 @@ export default function CategoryCard({ title, arabic, onPress, showEnglish = tru
           </Text>
         ) : null}
       </View>
-      <Icon name="chevron-forward" size={isMobileWeb ? 20 : 24} color={COLORS.gold} style={styles.chevron} />
+      <Icon name="chevron-forward" size={isMobileWeb ? 22 : 24} color={COLORS.gold} style={styles.chevron} />
     </Pressable>
   );
 }
@@ -77,10 +77,16 @@ const styles = StyleSheet.create({
     minHeight: 80,
     paddingHorizontal: SPACING.lg,
   },
+  // Phone-width web matches CategoryCard.tsx's own card exactly — 16 all
+  // round, a 48 icon tile, an 18 radius — rather than shrinking the desktop
+  // row further. The desktop row is wide and shallow because a desktop window
+  // is; a phone browser is a phone, and was ending up with a card two thirds
+  // the size of the one in the app.
   rowMobile: {
-    minHeight: 64,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.sm,
+    borderRadius: 18,
+    minHeight: 80,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
   },
   rowPressed: {
     backgroundColor: COLORS.surfaceSoft,
@@ -96,9 +102,9 @@ const styles = StyleSheet.create({
     width: 52,
   },
   iconWrapMobile: {
-    height: 40,
-    marginRight: SPACING.sm,
-    width: 40,
+    height: 48,
+    marginRight: SPACING.md,
+    width: 48,
   },
   titleGroup: {
     alignItems: 'center',
@@ -121,7 +127,7 @@ const styles = StyleSheet.create({
   },
   titleMobile: {
     flex: 0,
-    fontSize: 17,
+    fontSize: 21,
     width: '100%',
   },
   arabicTitle: {
@@ -136,7 +142,7 @@ const styles = StyleSheet.create({
   },
   arabicTitleMobile: {
     flex: 0,
-    fontSize: 16,
+    fontSize: 21,
     marginRight: 0,
     width: '100%',
   },

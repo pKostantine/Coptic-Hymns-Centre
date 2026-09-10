@@ -238,8 +238,10 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     paddingBottom: SPACING.xl,
   },
+  // Same inset as index.tsx's own listContent, so the cards sit at the same
+  // distance from the screen edge as they do in the app.
   listContentMobile: {
-    padding: SPACING.sm,
+    padding: SPACING.md,
     paddingBottom: SPACING.xl,
   },
 });
