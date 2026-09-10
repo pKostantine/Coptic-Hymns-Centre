@@ -41,26 +41,27 @@ export const GREGORIAN_MONTHS_AR = [
   'ديسمبر',
 ];
 
+// One canonical spelling per Coptic month, matching what every month-name
+// column in the database now stores (calendar.coptic_date_conversions,
+// calendar.fixed_coptic_day_flags, calendar.calendar_event_instances,
+// synaxarium.coptic_days) and what the hymn conditions' MonthName.Day tokens
+// are matched against. The alternate spellings this map used to also accept
+// (Tout, Baba, Toba, Paremoude, Mesori, Nasie) no longer occur in any data, so
+// carrying them would only invite a variant back in.
 const COPTIC_MONTHS_AR: Record<string, string> = {
-  Tout: 'توت',
   Thoout: 'توت',
-  Baba: 'بابه',
   Paope: 'بابه',
   Hathor: 'هاتور',
   Kiahk: 'كيهك',
-  Toba: 'طوبه',
   Tobe: 'طوبه',
   Meshir: 'أمشير',
   Paremhotep: 'برمهات',
   Parmoute: 'برموده',
-  Paremoude: 'برموده',
   Pashons: 'بشنس',
   Paone: 'بؤونه',
   Epep: 'أبيب',
-  Mesori: 'مسرى',
   Mesore: 'مسرى',
   Nesi: 'النسيء',
-  Nasie: 'النسيء',
 };
 
 export function toEasternArabicDigits(value: number | string) {
