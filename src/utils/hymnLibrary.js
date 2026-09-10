@@ -960,6 +960,10 @@ const STRUCTURAL_FLAGS_BY_TABLE = {
   liturgy_of_st_cyril: { StCyrilLiturgy: true },
   liturgy_of_the_word: { PaulineIncense: true },
   vespers_praises: { VesperPraises: true },
+  // Morning Doxology is its own service, named on its own. It is the only
+  // thing that embeds the Agpeya's 1st Hour, so a row inside that Hour needs
+  // a way to say "only when I am being prayed here".
+  morning_doxology: { MorningDoxology: true },
 };
 const LITURGY_SCHEMA_TABLES = new Set([
   "offering_of_the_lamb",
@@ -977,7 +981,12 @@ function deriveStructuralFlags(schema, table) {
     flags.Liturgy = true;
   }
   if (schema === "psalmody" && PSALMODY_SCHEMA_TABLES.has(table)) {
-    flags.MidnightPraises = table !== "vespers_praises";
+    // MidnightPraises means the Midnight Praises specifically — the
+    // Antiphonary counts because it is only ever opened as a subdocument of
+    // them. Morning Doxology used to be swept in here too, which made the two
+    // impossible to tell apart in a condition; it now answers only to
+    // MorningDoxology above, and Vespers Praises only to VesperPraises.
+    flags.MidnightPraises = table === "midnight_praises" || table === "antiphonary";
   }
   return flags;
 }
