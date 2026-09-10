@@ -346,6 +346,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 onOpenSelector={() => setSelectorOpen(true)}
                 initialScrollSectionId={currentSectionId}
                 onCollapseToggle={setSelectedSlideSectionId}
+                keyboardNavigationEnabled={visible && !isCovered}
               />
             </View>
             <ContentSelectorDrawer

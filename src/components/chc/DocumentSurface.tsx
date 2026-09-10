@@ -26,6 +26,8 @@ interface DocumentSurfaceProps {
   suppressAllSpeakerLabels?: boolean;
   /** Called (in slideshow mode only) immediately after a collapse/expand toggle fires, with the toggled section's own id — lets the parent navigate to that section's title slide. */
   onCollapseToggle?: (sectionId: string) => void;
+  /** Whether this surface may consume desktop arrow-key navigation. Disable it whenever another document or drawer is stacked above this one. */
+  keyboardNavigationEnabled?: boolean;
 }
 
 /** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer/silentComment — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
@@ -116,6 +118,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       suppressAllSpeakerLabels = false,
       initialScrollSectionId,
       onCollapseToggle,
+      keyboardNavigationEnabled = true,
     },
     ref,
   ) => {
@@ -294,6 +297,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           copticGospelRite={copticGospelRite}
           suppressAllSpeakerLabels={suppressAllSpeakerLabels}
           onToggleCollapse={handleToggleCollapse}
+          keyboardNavigationEnabled={keyboardNavigationEnabled}
         />
       );
     }

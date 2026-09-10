@@ -23,6 +23,7 @@ export default function SlideshowContainer({
   onAction,
   copticGospelRite,
   suppressAllSpeakerLabels,
+  keyboardNavigationEnabled = true,
 }) {
   const [viewportHeight, setViewportHeight] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -477,6 +478,7 @@ export default function SlideshowContainer({
 
   useEffect(() => {
     if (
+      !keyboardNavigationEnabled ||
       typeof window === "undefined" ||
       typeof window.addEventListener !== "function" ||
       typeof window.removeEventListener !== "function"
@@ -503,7 +505,7 @@ export default function SlideshowContainer({
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToNextSlide, goToPreviousSlide]);
+  }, [goToNextSlide, goToPreviousSlide, keyboardNavigationEnabled]);
 
   return (
     <View

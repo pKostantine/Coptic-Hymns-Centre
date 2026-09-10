@@ -623,6 +623,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             suppressAllSpeakerLabels={schema === 'agpeya'}
             initialScrollSectionId={currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
             onCollapseToggle={setSelectedSlideSectionId}
+            keyboardNavigationEnabled={!isCoveredByModal}
           />
           </View>
           <ContentSelectorDrawer
