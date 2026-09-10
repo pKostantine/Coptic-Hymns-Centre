@@ -65,6 +65,10 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<SingleDayEvent[]>([]);
   const [periodKeys, setPeriodKeys] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The year column's window is frozen at whatever year was showing when the
+  // panel opened. Deriving it from the live selection meant picking a year
+  // re-centred the range and slid all 61 rows out from under the finger.
+  const [pickerYearAnchor, setPickerYearAnchor] = useState<number | null>(null);
   const monthListRef = useRef<ScrollView>(null);
   const yearListRef = useRef<ScrollView>(null);
 
@@ -215,16 +219,29 @@ export default function CalendarScreen() {
   const displayedMonthName = mode === 'gregorian'
     ? (isArabic ? GREGORIAN_MONTHS_AR[gregorianMonth - 1] : GREGORIAN_MONTHS_EN[gregorianMonth - 1])
     : copticMonthName ? formatCopticMonthName(copticMonthName, isArabic) : '';
-  const pickerYears = Array.from({ length: 61 }, (_, index) => (displayedYear || new Date().getUTCFullYear()) - 30 + index);
+  const yearWindowAnchor = pickerYearAnchor ?? displayedYear ?? new Date().getUTCFullYear();
+  const pickerYears = useMemo(
+    () => Array.from({ length: 61 }, (_, index) => yearWindowAnchor - 30 + index),
+    [yearWindowAnchor],
+  );
   const pickerMonths = mode === 'gregorian' ? GREGORIAN_MONTHS_EN.map((_, index) => index + 1) : COPTIC_MONTHS.map((_, index) => index + 1);
-  // Both columns are on screen at once now, so both are brought to their
-  // current value when the panel opens. pickerYears is always built centred on
-  // the displayed year, so the selected year sits at index 30 by construction.
+  // Positions both columns once, as the panel opens, and never again while it
+  // is open. Keying this on the current month as well meant every month you
+  // picked snapped the list straight back — the jump that made selecting feel
+  // so abrupt. Selection now only moves the highlight; the list stays where
+  // your finger left it.
   useEffect(() => {
     if (!pickerOpen) return;
     monthListRef.current?.scrollTo({ y: Math.max((displayedMonth || 1) - 1, 0) * PICKER_ROW_HEIGHT, animated: false });
-    yearListRef.current?.scrollTo({ y: 30 * PICKER_ROW_HEIGHT, animated: false });
-  }, [displayedMonth, pickerOpen]);
+    yearListRef.current?.scrollTo({ y: Math.max(pickerYears.indexOf(displayedYear ?? yearWindowAnchor), 0) * PICKER_ROW_HEIGHT, animated: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- positions on open only; re-running on selection is the bug this replaced
+  }, [pickerOpen]);
+
+  const openDatePicker = () => {
+    setPickerYearAnchor(displayedYear ?? new Date().getUTCFullYear());
+    setPickerOpen(true);
+  };
+
   const weekdayLabels = isArabic ? WEEKDAYS_AR : WEEKDAYS;
   const goVisualLeftMonth = () => {
     if (isArabic) {
@@ -319,7 +336,7 @@ export default function CalendarScreen() {
             <Pressable
               accessibilityLabel="Choose month and year"
               style={styles.datePickerTrigger}
-              onPress={() => setPickerOpen(true)}
+              onPress={openDatePicker}
             >
               <Text style={[styles.monthTitle, isArabic && styles.arabicText]}>
                 {displayedMonthName}
@@ -395,7 +412,13 @@ export default function CalendarScreen() {
                 <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>
                   {isArabic ? 'الشهر' : 'Month'}
                 </Text>
-                <ScrollView ref={monthListRef} style={styles.pickerList} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                  ref={monthListRef}
+                  style={styles.pickerList}
+                  showsVerticalScrollIndicator={false}
+                  snapToInterval={PICKER_ROW_HEIGHT}
+                  decelerationRate="fast"
+                >
                   {pickerMonths.map((value) => {
                     const isSelected = value === displayedMonth;
                     const label = mode === 'gregorian'
@@ -432,7 +455,13 @@ export default function CalendarScreen() {
                 <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>
                   {isArabic ? 'السنة' : 'Year'}
                 </Text>
-                <ScrollView ref={yearListRef} style={styles.pickerList} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                  ref={yearListRef}
+                  style={styles.pickerList}
+                  showsVerticalScrollIndicator={false}
+                  snapToInterval={PICKER_ROW_HEIGHT}
+                  decelerationRate="fast"
+                >
                   {pickerYears.map((value) => {
                     const isSelected = value === displayedYear;
                     return (
