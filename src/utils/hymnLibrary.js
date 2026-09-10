@@ -567,14 +567,6 @@ const SERVICE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, category, t
 // button, the same way the order table's own `minimization` column works.
 const SERVICE_TEXT_FIELDS =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
-// agpeya.hymn_texts is missing both item_type and inline_hymn_key (every
-// other schema's hymn_texts has them) — omit those columns there so the
-// query doesn't 400, and agpeya lines simply never resolve as
-// Inline/Subdocument/Hyperlink line items (which matches reality: agpeya
-// hymn_texts never uses those).
-const SERVICE_TEXT_FIELDS_NO_ITEM_TYPE =
-  "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition";
-const SCHEMAS_WITHOUT_TEXT_ITEM_TYPE = new Set(["agpeya"]);
 // These schemas only have their own order table + hymn_texts — no native
 // hymn_titles table at all (confirmed against the live schema). Skip just
 // their native title fetch; later schemas in the shared lookup order can
@@ -649,13 +641,12 @@ async function fetchSchemaTitlesByKeys(schema, hymnKeys) {
 
 async function fetchSchemaTextRowsByKeys(schema, hymnKeys) {
   if (!hymnKeys.length) return [];
-  const selectFields = SCHEMAS_WITHOUT_TEXT_ITEM_TYPE.has(schema) ? SERVICE_TEXT_FIELDS_NO_ITEM_TYPE : SERVICE_TEXT_FIELDS;
   const results = await Promise.all(
     chunk(hymnKeys, HYMN_KEY_CHUNK_SIZE).map(async (batch) => {
       const { data, error } = await supabase
         .schema(schema)
         .from("hymn_texts")
-        .select(selectFields)
+        .select(SERVICE_TEXT_FIELDS)
         .in("hymn_key", batch)
         .order("hymn_key", { ascending: true })
         .order("line_order", { ascending: true });
@@ -1679,21 +1670,13 @@ function applyCopticCaseToReadingVerses(verses) {
 
 const INLINE_TEXT_FIELDS =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
-// agpeya.hymn_texts is missing item_type/inline_hymn_key (see
-// SCHEMAS_WITHOUT_TEXT_ITEM_TYPE above) — fetchInlineHymnVerses walks every
-// fallback schema looking for a hymn_key match, and agpeya is one of them,
-// so it needs the same reduced column list or every lookup that falls
-// through to agpeya 400s outright.
-const INLINE_TEXT_FIELDS_NO_ITEM_TYPE =
-  "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition";
 
 async function fetchInlineHymnVerses(schema, hymnKey) {
   for (const lookupSchema of getHymnKeyLookupSchemas(schema)) {
-    const selectFields = SCHEMAS_WITHOUT_TEXT_ITEM_TYPE.has(lookupSchema) ? INLINE_TEXT_FIELDS_NO_ITEM_TYPE : INLINE_TEXT_FIELDS;
     const { data, error } = await supabase
       .schema(lookupSchema)
       .from("hymn_texts")
-      .select(selectFields)
+      .select(INLINE_TEXT_FIELDS)
       .eq("hymn_key", hymnKey)
       .order("line_order", { ascending: true });
     if (error) throw createReadableSupabaseError(error, `${lookupSchema}.hymn_texts`);
