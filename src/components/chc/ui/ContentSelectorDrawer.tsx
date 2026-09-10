@@ -69,6 +69,21 @@ function appendReadingReference(title: string, reference?: string) {
   return `${cleanTitle} (${cleanReference})`;
 }
 
+/**
+ * The Midnight Hour is prayed in three Watches, and its three watch openings
+ * are the only place the Agpeya marks that split. Every hour has an
+ * `introduction*` item, but only these three carry a title in
+ * agpeya.hymn_titles — introductionFirstHour, introductionToTheCreed and the
+ * rest are all title-less, so a title alone can't single them out. Matching
+ * `introduction…Watch` does, and keeps working if a watch is ever renumbered
+ * or added.
+ */
+const WATCH_DIVIDER_KEY = /^introduction[A-Za-z]*Watch$/;
+
+function isWatchDividerSection(section: DocumentSection): boolean {
+  return WATCH_DIVIDER_KEY.test(section.hymnKey || '');
+}
+
 function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
   const readingReference = section.verses.find((verse) => verse.type === 'readingReference');
   const baseTitle = getReadingReferenceSelectorBaseTitle(section);
@@ -228,6 +243,14 @@ export default function ContentSelectorDrawer({
               // height, since unlike a hyperlink they are content of this
               // service rather than a way out of it.
               const isSubdocument = Boolean(section.isSubdocumentButton || section.isAntiphonaryButton);
+              // The three Midnight Hour watch openings are rendered as rules
+              // across the list rather than as cards: they mark where one
+              // Watch ends and the next begins, so they should read as the
+              // seams of the hour, not as three more hymns sitting in it.
+              // Still tappable — jumping to the top of a Watch is exactly what
+              // someone scanning for one wants.
+              const isWatchDivider = isWatchDividerSection(section);
+              const isActive = section.id === resolvedCurrentSectionId;
               return (
                 <Pressable
                   key={section.id}
@@ -235,7 +258,8 @@ export default function ContentSelectorDrawer({
                     styles.selectorItem,
                     isSubdocument && styles.selectorItemSubdocument,
                     isHyperlink && styles.selectorItemHyperlink,
-                    !isHyperlink && section.id === resolvedCurrentSectionId && styles.selectorItemActive,
+                    isWatchDivider && styles.selectorItemWatchDivider,
+                    !isHyperlink && !isWatchDivider && isActive && styles.selectorItemActive,
                   ]}
                   onLayout={(event) => {
                     const y = event.nativeEvent.layout.y;
@@ -254,13 +278,29 @@ export default function ContentSelectorDrawer({
                     onClose();
                   }}
                 >
-                  <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
-                    {showArabic ? (
-                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
-                    ) : (
-                      <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
-                    )}
-                  </View>
+                  {isWatchDivider ? (
+                    <View style={styles.watchDividerRow}>
+                      <View style={styles.watchDividerRule} />
+                      <Text
+                        style={[
+                          styles.watchDividerLabel,
+                          showArabic && styles.watchDividerLabelArabic,
+                          isActive && styles.watchDividerLabelActive,
+                        ]}
+                      >
+                        {showArabic ? selectorTitle.arabic : selectorTitle.english || selectorTitle.arabic}
+                      </Text>
+                      <View style={styles.watchDividerRule} />
+                    </View>
+                  ) : (
+                    <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
+                      {showArabic ? (
+                        <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
+                      ) : (
+                        <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
+                      )}
+                    </View>
+                  )}
                   {isHyperlink ? <Text style={styles.selectorHyperlinkArrow}>→</Text> : null}
                 </Pressable>
               );
@@ -397,6 +437,46 @@ const styles = StyleSheet.create({
     color: COLORS.link,
     fontSize: 16,
     marginLeft: SPACING.sm,
+  },
+  selectorItemWatchDivider: {
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.md,
+    minHeight: 0,
+    paddingHorizontal: 0,
+    paddingVertical: SPACING.xs,
+  },
+  watchDividerRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  watchDividerRule: {
+    backgroundColor: COLORS.goldLine,
+    flex: 1,
+    height: 1,
+  },
+  watchDividerLabel: {
+    color: COLORS.gold,
+    fontFamily: TYPOGRAPHY.title,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  watchDividerLabelArabic: {
+    fontFamily: TYPOGRAPHY.arabic,
+    fontSize: 15,
+    // Arabic is cursive — letterSpacing pulls the joined letterforms apart,
+    // and it has no upper case for textTransform to reach.
+    letterSpacing: 0,
+    textTransform: 'none',
+  },
+  watchDividerLabelActive: {
+    color: COLORS.goldBright,
   },
   selectorItemActive: {
     backgroundColor: '#171513',
