@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   },
   selectorItemSubdocument: {
     backgroundColor: COLORS.subdocSoft,
-    borderColor: COLORS.subdocLine,
+    borderColor: COLORS.gold,
   },
   selectorTitleSubdocument: {
     color: COLORS.subdoc,
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   selectorItemHyperlink: {
     alignItems: 'center',
     backgroundColor: COLORS.linkSoft,
-    borderColor: COLORS.linkLine,
+    borderColor: COLORS.gold,
     minHeight: 48,
     paddingVertical: SPACING.sm,
   },
