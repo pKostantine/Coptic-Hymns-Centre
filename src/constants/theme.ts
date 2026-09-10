@@ -30,11 +30,12 @@ export const COLORS = {
   // rather than reusing `refrain` — that green means "this verse is a refrain",
   // and a navigation control must not read as content.
   //
-  // Fill and text only: both button families take a gold border, so the app's
-  // own yellow is what marks a thing as a control and the hue inside it is what
-  // says which kind. Hence no linkLine — the border is COLORS.gold.
+  // One colour, no tints. Both button families share the app's card surface and
+  // a gold border — the gold marks a thing as a control, and this colour, in the
+  // label and its icon, says which kind. Washing the card in the accent instead
+  // turned a tall button into a block of colour, and tinting a row in a list
+  // made it read as selected.
   link: '#57C08A',
-  linkSoft: 'rgba(87, 192, 138, 0.13)',
 
   // Subdocument (open-a-nested-document) accent, alongside the green that means
   // "leave this document" and the gold that is general chrome.
@@ -45,9 +46,8 @@ export const COLORS = {
   // which is what made the first attempt at blue disappear. This is a
   // saturated azure nothing else uses.
   //
-  // Fill and text only, like `link` above — the border is COLORS.gold.
+  // One colour, like `link` above.
   subdoc: '#4DA6FF',
-  subdocSoft: 'rgba(77, 166, 255, 0.16)',
 
   // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',
