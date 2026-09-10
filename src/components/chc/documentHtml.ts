@@ -24,6 +24,8 @@ export interface DocumentVerse {
   italic?: boolean;
   /** Forces this verse to render white and excludes it from the alternating parity count in both renderers — used for hymns like vocKyrieEleison that sit outside the enclosing section's alternating cadence. */
   forceWhiteText?: boolean;
+  /** prayer_type "Invincible Coptic" (hymnLibrary sets this alongside prayerType): this Coptic renders whatever the Coptic language toggles say, and — when the verse carries no translation of its own — spans the row instead of taking a column. */
+  invincibleCoptic?: boolean;
 }
 
 export interface DocumentSection {
@@ -932,16 +934,23 @@ function renderVerse(
   // there is no translation to justify against does the Coptic center, and
   // then it takes the whole row rather than a column (copticStandsAlone).
   const hasTranslationText = Boolean((verse.english || '').trim()) || Boolean((verse.arabic || '').trim());
-  const isCopticCentered = isCentered || (verse.prayerType === 'Invincible Coptic' && !hasTranslationText);
+  const isInvincibleCoptic = verse.prayerType === 'Invincible Coptic' || Boolean(verse.invincibleCoptic);
+  const isCopticCentered = isCentered || (isInvincibleCoptic && !hasTranslationText);
   // "Coptic Recited Prayers" hides just this verse's Coptic text when the
   // verse is a Recited Prayer or Silent Prayer (spoken/prayed silently, both
   // conventionally read from Coptic-transliterated-into-English/Arabic
   // rather than the Coptic script itself) — combined with the verse-by-verse
   // column collapse below, that verse's Coptic column disappears for that
   // row only, filling the freed width into whatever columns remain.
+  // Invincible means invincible: this Coptic survives BOTH Coptic toggles —
+  // the language column and Coptic Recited Prayers. That is the whole point
+  // of the flag and what the slideshow renderer has always done (forceCoptic
+  // in VerseBlock); the reader instead dropped these lines outright with
+  // Coptic switched off, which is the one state they exist to survive.
   const copticHiddenByToggle =
     (verse.type === 'recitedPrayer' || verse.type === 'silentPrayer' || verse.type === 'silentComment') &&
-    !copticRecitedPrayers;
+    !copticRecitedPrayers &&
+    !isInvincibleCoptic;
   const copticText = copticHiddenByToggle ? '' : formatCopticNumbers(verse.coptic || '');
 
   const languages: { className: string; key: keyof VisibleColumns; text: string; speakerLabel?: string; speakerClass?: string }[] = [
@@ -977,7 +986,7 @@ function renderVerse(
   ].filter((language) => {
     if (language.key === 'coptic') {
       if (copticHiddenByToggle) return false;
-      return visibleColumns.coptic && Boolean(language.text.trim());
+      return (visibleColumns.coptic || isInvincibleCoptic) && Boolean(language.text.trim());
     }
     return visibleColumns[language.key] && (Boolean(language.text.trim()) || Boolean(language.speakerLabel));
   });
@@ -991,7 +1000,7 @@ function renderVerse(
   // are genuinely per-language, so they keep the grid row above it — which
   // is where this line already sat, just narrower.
   const copticStandsAlone =
-    verse.prayerType === 'Invincible Coptic' && !hasTranslationText && languages.some((language) => language.key === 'coptic');
+    isInvincibleCoptic && !hasTranslationText && languages.some((language) => language.key === 'coptic');
   const columnLanguages = copticStandsAlone ? languages.filter((language) => language.key !== 'coptic') : languages;
   const gridTemplateColumns = `repeat(${Math.max(columnLanguages.length, 1)}, minmax(0, 1fr))`;
   const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;

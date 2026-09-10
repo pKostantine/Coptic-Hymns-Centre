@@ -1686,15 +1686,15 @@ function getVisibleVerseLanguages(item, visibleLanguages = {}) {
       return Boolean(visibleLanguages[language]);
     }
 
-    return (
-      visibleLanguages.coptic ||
-      verse.forceCopticVisible
-    ) &&
-      (
-        !item.isRecitedPrayer ||
-        visibleLanguages.copticRecitedPrayers ||
-        verse.forceCopticVisible
-      );
+    // Same force-visible rule VerseBlock renders by: Invincible Coptic
+    // survives both Coptic toggles. Reached only by an Invincible Coptic row
+    // that carries its own translation (one without a translation returns
+    // above), which is exactly the case that would otherwise be estimated as
+    // having no Coptic at all with the Coptic column switched off.
+    const forceCoptic = verse.forceCopticVisible || verse.invincibleCoptic;
+
+    return (visibleLanguages.coptic || forceCoptic) &&
+      (!item.isRecitedPrayer || visibleLanguages.copticRecitedPrayers || forceCoptic);
   });
 }
 

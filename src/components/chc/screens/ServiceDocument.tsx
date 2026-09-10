@@ -196,6 +196,15 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             const trigger = newSections.find((s) => s.subdocumentKey === current.subdocumentKey && s.subdocumentSections);
             return trigger ? { ...current, sections: trigger.subdocumentSections! } : current;
           });
+          // The Antiphonary is the most date-dependent subdocument there is
+          // (its whole content is the day's commemoration), and it stays open
+          // across a re-hydration now like every other modal, so it has to be
+          // refreshed the same way rather than left showing the old day.
+          setAntiphonarySections((current) => {
+            if (!current) return current;
+            const trigger = newSections.find((s) => s.isAntiphonaryButton && s.subdocumentSections);
+            return trigger?.subdocumentSections ?? current;
+          });
         }
       })
       .catch((err) => {
@@ -597,21 +606,29 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             copticGospelRite={copticGospelRite}
             appLanguage={preferences.appLanguage}
           />
-          <SubdocumentModal
-            visible={Boolean(subdocumentModal)}
-            title={subdocumentModal?.title ?? null}
-            sections={subdocumentModal?.sections ?? null}
-            subdocumentKey={subdocumentModal?.subdocumentKey}
-            parentBookmarkId={bookmarkId}
-            onClose={closeSubdocument}
-          />
-          <AntiphonaryModal
-            visible={Boolean(antiphonarySections)}
-            sections={antiphonarySections}
-            onClose={() => setAntiphonarySections(null)}
-          />
         </>
       )}
+      {/* Deliberately outside the branch above. Changing the date clears
+          `sections` while this document re-hydrates, and these modals used to
+          go with it -- taking their own state along, including which overlay
+          screen was open. So picking a date in the calendar destroyed the
+          calendar and dropped the reader back into the subdocument. They hold
+          their own prefetched sections and never needed the parent's, so they
+          now ride out the reload (still showing content, not a spinner) and
+          are refreshed in place by the hydration effect above. */}
+      <SubdocumentModal
+        visible={Boolean(subdocumentModal)}
+        title={subdocumentModal?.title ?? null}
+        sections={subdocumentModal?.sections ?? null}
+        subdocumentKey={subdocumentModal?.subdocumentKey}
+        parentBookmarkId={bookmarkId}
+        onClose={closeSubdocument}
+      />
+      <AntiphonaryModal
+        visible={Boolean(antiphonarySections)}
+        sections={antiphonarySections}
+        onClose={() => setAntiphonarySections(null)}
+      />
     </SafeAreaView>
   );
 }
