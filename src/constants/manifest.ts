@@ -160,3 +160,39 @@ export const DIVINE_LITURGY_SERVICES: ServiceDef[] = [
   { id: 'liturgy_of_st_cyril', schema: 'liturgy', table: 'liturgy_of_st_cyril', title: 'Liturgy of St. Cyril', arabic: 'قداس القديس كيرلس' },
   { id: 'distribution', schema: 'liturgy', table: 'distribution', title: 'Distribution', arabic: 'التوزيع' },
 ];
+
+/**
+ * Hyperlink targets — where an order row with `item_type = "Hyperlink"` sends
+ * you. Unlike a Subdocument (a modal over the current document) or an Inline
+ * (content spliced into it), a Hyperlink *leaves* the current document for
+ * another service entirely, so it resolves to a route rather than to a
+ * schema/table pair.
+ *
+ * The all-caps key is the order row's own `hymn_key`. Titles are read back out
+ * of the service definitions above rather than restated here, so a service
+ * renamed in one place can't end up labelled two different ways.
+ */
+export interface HyperlinkTarget {
+  href: string;
+  title: string;
+  arabic: string;
+}
+
+function hyperlinkTarget(href: string, services: ServiceDef[], serviceId: string): HyperlinkTarget {
+  const service = services.find((entry) => entry.id === serviceId);
+  return { href, title: service?.title || serviceId, arabic: service?.arabic || '' };
+}
+
+export const HYPERLINK_TARGETS: Record<string, HyperlinkTarget> = {
+  MIDNIGHT_PRAISES: hyperlinkTarget('/psalmody/midnight_praises', SERVICES_BY_CATEGORY.psalmody, 'midnight_praises'),
+  MORNING_DOXOLOGY: hyperlinkTarget('/psalmody/morning_doxology', SERVICES_BY_CATEGORY.psalmody, 'morning_doxology'),
+  VESPERS_PRAISES: hyperlinkTarget('/psalmody/vespers_praises', SERVICES_BY_CATEGORY.psalmody, 'vespers_praises'),
+  VESPERS: hyperlinkTarget('/liturgy/raising-of-incense/vespers', RAISING_OF_INCENSE_OPTIONS, 'vespers'),
+  MATINS: hyperlinkTarget('/liturgy/raising-of-incense/matins', RAISING_OF_INCENSE_OPTIONS, 'matins'),
+  OFFERING_OF_THE_LAMB: hyperlinkTarget('/liturgy/divine-liturgy/offering_of_the_lamb', DIVINE_LITURGY_SERVICES, 'offering_of_the_lamb'),
+  LITURGY_OF_THE_WORD: hyperlinkTarget('/liturgy/divine-liturgy/liturgy_of_the_word', DIVINE_LITURGY_SERVICES, 'liturgy_of_the_word'),
+  LITURGY_OF_ST_BASIL: hyperlinkTarget('/liturgy/divine-liturgy/liturgy_of_st_basil', DIVINE_LITURGY_SERVICES, 'liturgy_of_st_basil'),
+  LITURGY_OF_ST_GREGORY: hyperlinkTarget('/liturgy/divine-liturgy/liturgy_of_st_gregory', DIVINE_LITURGY_SERVICES, 'liturgy_of_st_gregory'),
+  LITURGY_OF_ST_CYRIL: hyperlinkTarget('/liturgy/divine-liturgy/liturgy_of_st_cyril', DIVINE_LITURGY_SERVICES, 'liturgy_of_st_cyril'),
+  DISTRIBUTION: hyperlinkTarget('/liturgy/divine-liturgy/distribution', DIVINE_LITURGY_SERVICES, 'distribution'),
+};

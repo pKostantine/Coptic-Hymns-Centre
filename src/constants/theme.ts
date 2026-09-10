@@ -26,6 +26,14 @@ export const COLORS = {
   goldLine: 'rgba(201, 162, 39, 0.45)',
   goldBright: '#D8C77A',
 
+  // Hyperlink (teleport-to-another-service) accent. Deliberately its own trio
+  // rather than reusing `refrain` — that green means "this verse is a refrain",
+  // and a navigation control must not read as content. Same soft/line/base
+  // shape as the gold tints above so the two families behave alike.
+  link: '#57C08A',
+  linkSoft: 'rgba(87, 192, 138, 0.13)',
+  linkLine: 'rgba(87, 192, 138, 0.45)',
+
   // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',
   bishop: '#D64545',

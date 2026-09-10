@@ -786,11 +786,17 @@ const SlideItem = memo(function SlideItem({
         }}
       >
         <Pressable
-          style={styles.openButton}
+          style={[styles.openButton, item.isHyperlink && styles.hyperlinkButton]}
           onPress={() => onAction?.({ type: item.buttonAction, sectionId: item.sectionId })}
         >
           {label ? (
-            <Text selectable={false} style={[styles.openButtonText, { color: theme.colors.text, fontSize: Math.round(fontSize * 0.65) }]}>
+            <Text
+              selectable={false}
+              style={[
+                styles.openButtonText,
+                { color: item.isHyperlink ? COLORS.link : theme.colors.text, fontSize: Math.round(fontSize * 0.65) },
+              ]}
+            >
               {label}
             </Text>
           ) : null}
@@ -800,11 +806,16 @@ const SlideItem = memo(function SlideItem({
               style={[
                 styles.openButtonText,
                 styles.openButtonTextArabic,
-                { color: theme.colors.text, fontSize: Math.round(fontSize * 0.65) },
+                { color: item.isHyperlink ? COLORS.link : theme.colors.text, fontSize: Math.round(fontSize * 0.65) },
               ]}
             >
               {arabicLabel}
             </Text>
+          ) : null}
+          {item.isHyperlink ? (
+            <View style={styles.hyperlinkArrow}>
+              <Text selectable={false} style={styles.hyperlinkArrowGlyph}>→</Text>
+            </View>
           ) : null}
         </Pressable>
       </View>
@@ -958,14 +969,23 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
   const suppressMap = computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent, suppressAllSpeakerLabels);
 
   return sections.flatMap((section, sectionIndex) => {
-    if (section.isSubdocumentButton || section.isAntiphonaryButton) {
+    if (section.isSubdocumentButton || section.isAntiphonaryButton || section.isHyperlinkButton) {
       return [
         {
           id: `${section.id}-button`,
           sectionId: section.id,
           type: "button",
           title: section.title,
-          buttonAction: section.isAntiphonaryButton ? "openAntiphonary" : "openSubdocument",
+          // A Hyperlink leaves the document entirely rather than opening a
+          // modal over it, so it gets its own action and its own (green)
+          // treatment in SlideItem. The tap itself still rides the same
+          // button overlay as the other two -- see NavigationOverlay.
+          isHyperlink: Boolean(section.isHyperlinkButton),
+          buttonAction: section.isHyperlinkButton
+            ? "openHyperlink"
+            : section.isAntiphonaryButton
+              ? "openAntiphonary"
+              : "openSubdocument",
         },
       ];
     }
@@ -1902,6 +1922,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     width: "72%",
+  },
+  // Shorter and green rather than tall and gold: a Hyperlink is a transition
+  // out of this service, not a document to open on top of it.
+  hyperlinkButton: {
+    backgroundColor: COLORS.linkSoft,
+    borderColor: COLORS.linkLine,
+    minHeight: 72,
+  },
+  hyperlinkArrow: {
+    alignItems: "center",
+    borderColor: COLORS.link,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    height: 28,
+    justifyContent: "center",
+    marginTop: SPACING.xs,
+    width: 28,
+  },
+  hyperlinkArrowGlyph: {
+    color: COLORS.link,
+    fontSize: 16,
+    lineHeight: 18,
   },
   openButtonText: {
     fontFamily: "Georgia",

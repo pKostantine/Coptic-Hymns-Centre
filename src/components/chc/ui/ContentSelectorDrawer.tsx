@@ -15,6 +15,8 @@ interface ContentSelectorDrawerProps {
   currentSectionId?: string | null;
   onClose: () => void;
   onSelectSection: (id: string) => void;
+  /** Called instead of onSelectSection for a Hyperlink row — it leaves this document for another service rather than jumping within it. */
+  onOpenHyperlink?: (hyperlinkKey?: string | null) => void;
   bookmarked?: boolean;
   onToggleBookmark?: () => void;
   onOpenCalendar?: () => void;
@@ -90,6 +92,7 @@ export default function ContentSelectorDrawer({
   currentSectionId,
   onClose,
   onSelectSection,
+  onOpenHyperlink,
   bookmarked,
   onToggleBookmark,
   onOpenCalendar,
@@ -140,6 +143,9 @@ export default function ContentSelectorDrawer({
     // Subdocument/Antiphonary buttons are a real UI action, not hymn text —
     // they must survive even though they carry no verses.
     if (section.isSubdocumentButton || section.isAntiphonaryButton) return true;
+    // Same for a Hyperlink: it carries no verses either, and it is the one way
+    // to reach the next service from here without backing all the way out.
+    if (section.isHyperlinkButton) return true;
     const selectorTitle = getSectionSelectorTitle(section);
     return Boolean(selectorTitle.english || selectorTitle.arabic);
   });
@@ -212,26 +218,40 @@ export default function ContentSelectorDrawer({
               // visually distinct in the selector too — dimmer/italic, since
               // none of its content is spoken aloud.
               const isSilentPrayerHymn = section.titlePrayerType === 'Silent Prayer';
+              // A Hyperlink row is deliberately shorter than a hymn row and
+              // carries the same green as its button in the document: it is a
+              // way out of this service, not a place within it, and it should
+              // not compete with the hymn list for height.
+              const isHyperlink = Boolean(section.isHyperlinkButton);
               return (
                 <Pressable
                   key={section.id}
-                  style={[styles.selectorItem, section.id === resolvedCurrentSectionId && styles.selectorItemActive]}
+                  style={[
+                    styles.selectorItem,
+                    isHyperlink && styles.selectorItemHyperlink,
+                    !isHyperlink && section.id === resolvedCurrentSectionId && styles.selectorItemActive,
+                  ]}
                   onLayout={(event) => {
                     const y = event.nativeEvent.layout.y;
                     setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
                   }}
                   onPress={() => {
-                    onSelectSection(section.id);
+                    if (isHyperlink) {
+                      onOpenHyperlink?.(section.hyperlinkKey);
+                    } else {
+                      onSelectSection(section.id);
+                    }
                     onClose();
                   }}
                 >
                   <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
                     {showArabic ? (
-                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
+                      <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
                     ) : (
-                      <Text style={[styles.selectorTitle, styles.centeredTitle, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
+                      <Text style={[styles.selectorTitle, styles.centeredTitle, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
                     )}
                   </View>
+                  {isHyperlink ? <Text style={styles.selectorHyperlinkArrow}>→</Text> : null}
                 </Pressable>
               );
             })}
@@ -345,6 +365,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
+  },
+  selectorItemHyperlink: {
+    alignItems: 'center',
+    backgroundColor: COLORS.linkSoft,
+    borderColor: COLORS.linkLine,
+    minHeight: 48,
+    paddingVertical: SPACING.sm,
+  },
+  selectorTitleHyperlink: {
+    color: COLORS.link,
+  },
+  selectorHyperlinkArrow: {
+    color: COLORS.link,
+    fontSize: 16,
+    marginLeft: SPACING.sm,
   },
   selectorItemActive: {
     backgroundColor: '#171513',
