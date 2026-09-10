@@ -1911,8 +1911,8 @@ const styles = StyleSheet.create({
   },
   openButton: {
     alignItems: "center",
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.gold,
+    backgroundColor: COLORS.subdocSoft,
+    borderColor: COLORS.subdocLine,
     borderRadius: 8,
     borderWidth: 1,
     gap: SPACING.xs,
@@ -1926,8 +1926,8 @@ const styles = StyleSheet.create({
   // Shorter and green rather than tall and gold: a Hyperlink is a transition
   // out of this service, not a document to open on top of it.
   hyperlinkButton: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.gold,
+    backgroundColor: COLORS.linkSoft,
+    borderColor: COLORS.linkLine,
     minHeight: 72,
   },
   hyperlinkArrow: {

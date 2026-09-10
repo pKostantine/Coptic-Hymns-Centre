@@ -26,28 +26,23 @@ export const COLORS = {
   goldLine: 'rgba(201, 162, 39, 0.45)',
   goldBright: '#D8C77A',
 
-  // Hyperlink (teleport-to-another-service) accent. Deliberately its own pair
+  // Hyperlink (teleport-to-another-service) accent. Deliberately its own trio
   // rather than reusing `refrain` — that green means "this verse is a refrain",
-  // and a navigation control must not read as content.
-  //
-  // One colour, no tints. Both button families share the app's card surface and
-  // a gold border — the gold marks a thing as a control, and this colour, in the
-  // label and its icon, says which kind. Washing the card in the accent instead
-  // turned a tall button into a block of colour, and tinting a row in a list
-  // made it read as selected.
+  // and a navigation control must not read as content. Same soft/line/base
+  // shape as the gold tints above so the two families behave alike.
   link: '#57C08A',
+  linkSoft: 'rgba(87, 192, 138, 0.13)',
+  linkLine: 'rgba(87, 192, 138, 0.45)',
 
-  // Subdocument (open-a-nested-document) accent, alongside the green that means
-  // "leave this document" and the gold that is general chrome.
-  //
-  // Deliberately NOT rowBlue (#8EC5FF): that pale blue already carries the
-  // calendar's month chevrons and its evening toggle, so a button wearing it
-  // blended into existing furniture rather than reading as its own control —
-  // which is what made the first attempt at blue disappear. This is a
-  // saturated azure nothing else uses.
-  //
-  // One colour, like `link` above.
-  subdoc: '#4DA6FF',
+  // Subdocument (open-a-nested-document) accent. Same hue as rowBlue, which is
+  // already proven against this background, but given its own trio so the two
+  // can move independently. Blue rather than the app's gold because gold is
+  // general chrome — the collapse button, section rules, the header — and a
+  // button that opens a document should read as its own kind of thing, next to
+  // the green that means "leave this document".
+  subdoc: '#8EC5FF',
+  subdocSoft: 'rgba(142, 197, 255, 0.13)',
+  subdocLine: 'rgba(142, 197, 255, 0.45)',
 
   // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',

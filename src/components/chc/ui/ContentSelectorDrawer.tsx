@@ -233,6 +233,7 @@ export default function ContentSelectorDrawer({
                   key={section.id}
                   style={[
                     styles.selectorItem,
+                    isSubdocument && styles.selectorItemSubdocument,
                     isHyperlink && styles.selectorItemHyperlink,
                     !isHyperlink && section.id === resolvedCurrentSectionId && styles.selectorItemActive,
                   ]}
@@ -253,13 +254,6 @@ export default function ContentSelectorDrawer({
                     onClose();
                   }}
                 >
-                  {isSubdocument || isHyperlink ? (
-                    <Icon
-                      name={isSubdocument ? 'library-outline' : 'chevron-forward'}
-                      size={17}
-                      color={isSubdocument ? COLORS.subdoc : COLORS.link}
-                    />
-                  ) : null}
                   <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
                     {showArabic ? (
                       <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
@@ -267,7 +261,7 @@ export default function ContentSelectorDrawer({
                       <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
                     )}
                   </View>
-                  {isHyperlink ? <Icon name="chevron-forward" size={16} color={COLORS.link} /> : null}
+                  {isHyperlink ? <Text style={styles.selectorHyperlinkArrow}>→</Text> : null}
                 </Pressable>
               );
             })}
@@ -382,23 +376,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
   },
-  // Subdocument and Hyperlink rows keep the SAME card as every other row —
-  // same fill, same border, same radius. They were previously tinted and given
-  // a gold outline, which collided head-on with selectorItemActive (also a gold
-  // outline): three different meanings wearing one treatment, so a highlighted
-  // row no longer read as "you are here". The accent now lives in the icon and
-  // the title colour, which distinguishes them without shouting over the list.
+  selectorItemSubdocument: {
+    backgroundColor: COLORS.subdocSoft,
+    borderColor: COLORS.subdocLine,
+  },
   selectorTitleSubdocument: {
     color: COLORS.subdoc,
   },
-  // Shorter than a hymn row: it is a way out of this service, not a place in it.
   selectorItemHyperlink: {
     alignItems: 'center',
-    minHeight: 52,
+    backgroundColor: COLORS.linkSoft,
+    borderColor: COLORS.linkLine,
+    minHeight: 48,
     paddingVertical: SPACING.sm,
   },
   selectorTitleHyperlink: {
     color: COLORS.link,
+  },
+  selectorHyperlinkArrow: {
+    color: COLORS.link,
+    fontSize: 16,
+    marginLeft: SPACING.sm,
   },
   selectorItemActive: {
     backgroundColor: '#171513',

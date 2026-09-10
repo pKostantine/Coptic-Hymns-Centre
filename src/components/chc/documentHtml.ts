@@ -335,8 +335,8 @@ export function buildDocumentHtml(
       }
       .open-button {
         align-items: center;
-        background: ${COLORS.surface};
-        border: 1px solid ${COLORS.gold};
+        background: ${COLORS.subdocSoft};
+        border: 1px solid ${COLORS.subdocLine};
         border-radius: 12px;
         color: ${COLORS.subdoc};
         display: flex;
@@ -360,8 +360,8 @@ export function buildDocumentHtml(
       }
       .hyperlink-button {
         align-items: center;
-        background: ${COLORS.surface};
-        border: 1px solid ${COLORS.gold};
+        background: ${COLORS.linkSoft};
+        border: 1px solid ${COLORS.linkLine};
         border-radius: 12px;
         color: ${COLORS.link};
         display: flex;
