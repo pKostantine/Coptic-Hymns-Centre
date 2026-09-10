@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, useWindowDimensions, View } from 'react-na
 
 import SlideshowContainer from './SlideshowContainer';
 import DocumentWebView, { DocumentAction, DocumentSection, DocumentWebViewHandle } from './DocumentWebView';
+import { withRememberedCollapse } from './documentHtml';
 import { CHC_SLIDESHOW_THEME, COLORS } from '../../constants/theme';
 import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
 import { fontScaleToPx, ReadingPreferences } from '../../utils/preferencesStorage';
@@ -196,14 +197,13 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       [onAction, rememberCollapseState],
     );
 
+    // Slideshow mode only. The scrolling reader gets the raw sections plus the
+    // collapse map as its own prop, so that a toggle there never changes what
+    // its document is built from — see the ref in DocumentWebView. Slideshow
+    // has no equivalent local toggle: collapsing changes which verses exist on
+    // a slide, so repagination has to see it, and that IS the re-render.
     const sectionsWithRememberedCollapse = useMemo(
-      () =>
-        sections.map((section) => {
-          const remembered = collapsedSectionIds[section.id];
-          return section.collapsible && remembered !== undefined
-            ? { ...section, defaultCollapsed: remembered }
-            : section;
-        }),
+      () => withRememberedCollapse(sections, collapsedSectionIds),
       [sections, collapsedSectionIds],
     );
 
@@ -305,7 +305,8 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     return (
       <DocumentWebView
         ref={ref}
-        sections={sectionsWithRememberedCollapse}
+        sections={sections}
+        collapsedSectionIds={collapsedSectionIds}
         fontSize={fontSize}
         visibleColumns={{
           english: preferences.visibleLanguages.english,

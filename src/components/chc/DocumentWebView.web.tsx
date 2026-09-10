@@ -5,7 +5,7 @@ import { COLORS } from '../../constants/theme';
 import { sectionRestoreCandidates } from '../../utils/sectionRestore';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
-import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns } from './documentHtml';
+import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
 
 export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
 
@@ -31,6 +31,8 @@ interface DocumentWebViewProps {
   /** Forces every verse's person-type indicator hidden — see documentHtml.ts's buildDocumentHtml. */
   suppressAllSpeakerLabels?: boolean;
   onAction?: (action: DocumentAction) => void;
+  /** The reader's remembered open/closed choice per section, overriding each one's database default. Deliberately not a dependency of the HTML build below — see the ref there. */
+  collapsedSectionIds?: Record<string, boolean>;
   /** Section to scroll to the moment this WebView finishes its first load — e.g. wherever the user was reading in slideshow mode just before switching, or the last remembered position for a brand-new mount. Only consulted once, at mount; changing it on a later render has no effect (use the imperative scrollToSection handle for that). */
   initialSectionId?: string | null;
 }
@@ -58,6 +60,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       suppressAllSpeakerLabels = false,
       onAction,
       initialSectionId,
+      collapsedSectionIds,
     },
     ref,
   ) => {
@@ -131,10 +134,24 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       if (candidates.length) win?.scrollToSection?.(candidates);
     };
 
+    // Collapse state is deliberately NOT a dependency of this build, and is
+    // read from a ref rather than captured by it. The reader opens and closes
+    // a section in its own DOM the instant the button is tapped (see the
+    // collapse-button handler in documentHtml) and reports it up only so the
+    // choice is remembered -- rebuilding the HTML for that would reload this
+    // whole document and throw the reader's place away, for a change that has
+    // already visibly happened. Reading the ref at build time still gets every
+    // choice made since whenever something real does force a rebuild (a font
+    // size, a language, a new date), so nothing is silently lost either.
+    const collapsedSectionIdsRef = useRef(collapsedSectionIds);
+    useEffect(() => {
+      collapsedSectionIdsRef.current = collapsedSectionIds;
+    }, [collapsedSectionIds]);
+
     const html = useMemo(
       () =>
         copticFontDataUri
-          ? buildDocumentHtml(sections, {
+          ? buildDocumentHtml(withRememberedCollapse(sections, collapsedSectionIdsRef.current ?? {}), {
               copticFontDataUri,
               fontSize,
               visibleColumns,

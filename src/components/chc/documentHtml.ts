@@ -96,6 +96,24 @@ const RUBRIC: Record<string, { color: string; english: string; arabic: string; c
 };
 
 /**
+ * Applies the reader's remembered open/closed choices over each section's own
+ * database default. Sections that aren't collapsible, or that the reader has
+ * never touched, are passed through untouched (same object), so a document
+ * nobody has collapsed anything in keeps its original array entries.
+ */
+export function withRememberedCollapse(
+  sections: DocumentSection[],
+  collapsedSectionIds: Record<string, boolean>,
+): DocumentSection[] {
+  return sections.map((section) => {
+    const remembered = collapsedSectionIds[section.id];
+    return section.collapsible && remembered !== undefined
+      ? { ...section, defaultCollapsed: remembered }
+      : section;
+  });
+}
+
+/**
  * Builds the trilingual liturgical document HTML shared by the native
  * (react-native-webview) and web (iframe) renderers. Ported 1:1 from the
  * predecessor app's `buildHymnDocumentHtml`/`buildHtmlSectionTitle`/
