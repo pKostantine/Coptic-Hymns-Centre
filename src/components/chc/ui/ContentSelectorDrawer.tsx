@@ -7,7 +7,6 @@ import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection } from '../documentHtml';
-import { isDividerSection, mapSectionsToDividers } from '../../../utils/sectionDividers';
 import Icon from './Icon';
 
 interface ContentSelectorDrawerProps {
@@ -68,6 +67,32 @@ function appendReadingReference(title: string, reference?: string) {
   if (!cleanTitle || !cleanReference) return cleanTitle;
   if (cleanTitle.includes(`(${cleanReference})`)) return cleanTitle;
   return `${cleanTitle} (${cleanReference})`;
+}
+
+/**
+ * An hour opening that marks where one part of a service gives way to the
+ * next: the Midnight Hour's three Watches, and the Agpeya hours prayed inside
+ * the Offering of the Lamb ("3rd Hour", "3rd Hour and 6th Hour", "12th Hour
+ * and Veil"...).
+ *
+ * Whether one of these reads as a divider is decided by whether it has a title
+ * at all, and that is per-schema: agpeya.hymn_titles leaves the hour openings
+ * null, so inside the Agpeya book they stay silent, while liturgy.hymn_titles
+ * names them, so inside the Liturgy they announce the hour. An untitled
+ * section never reaches this code — `listable` has already dropped it — so the
+ * same hymn divides the Offering of the Lamb without touching the Hour it also
+ * belongs to.
+ *
+ * The `(?!Of|To)` is what separates a divider from ordinary content that
+ * happens to be named the same way: introductionOfEveryHour is a real prayer
+ * (and titled, in agpeya), and introductionToTheCreed, introductionToTheHoosP1
+ * and introductionToRaisingOfIncenseP1 are all lead-ins to a hymn rather than
+ * headings over a section.
+ */
+const SECTION_DIVIDER_KEY = /^introduction(?!Of|To)[A-Za-z]*(?:Hour|Watch|Veil)$/;
+
+function isDividerSection(section: DocumentSection): boolean {
+  return SECTION_DIVIDER_KEY.test(section.hymnKey || '');
 }
 
 function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
@@ -152,12 +177,71 @@ export default function ContentSelectorDrawer({
   });
 
   /**
-   * Everything a divider gathers under it, by section id — the same grouping
-   * the document itself collapses by, so a heading nests exactly the hymns it
-   * hides (see mapSectionsToDividers). Walked over `sections` rather than
-   * `listable` so the invisible boundaries still count.
+   * Everything a divider gathers under it, by section id.
+   *
+   * A nest opens on a divider that actually speaks — one whose hymn key has
+   * the shape AND a title in this document's schema, since the same hour
+   * opening is titled in liturgy.hymn_titles and null in agpeya.hymn_titles.
+   * That matters: an untitled opening never renders a rule, so it must not
+   * silently indent the rest of the Hour behind an invisible heading.
+   *
+   * It closes on the next `introduction…` row of any kind, whether or not that
+   * row is itself visible. In the Offering of the Lamb that is
+   * introductionToTheCreed, which carries no title and so never appears in
+   * this list — but it is still the point where the Agpeya hours end and the
+   * Liturgy resumes, so the Creed and everything after it sit back at the
+   * outer level. The Midnight Hour ends its third Watch on the same row.
+   *
+   * Walked over `sections` rather than `listable` so those invisible
+   * boundaries still count.
    */
-  const nestedSectionIds = useMemo(() => new Set(mapSectionsToDividers(sections).keys()), [sections]);
+  const dividerOwners = useMemo(() => {
+    const owners = new Map<string, string>();
+    let openDividerId: string | null = null;
+    for (const section of sections) {
+      if (/^introduction/i.test(section.hymnKey || '')) {
+        const title = getSectionSelectorTitle(section);
+        const speaks = isDividerSection(section) && Boolean(title.english || title.arabic);
+        openDividerId = speaks ? section.id : null;
+        continue;
+      }
+      if (openDividerId) owners.set(section.id, openDividerId);
+    }
+    return owners;
+  }, [sections]);
+
+  /**
+   * Which hour headings are folded shut. Purely a way of decluttering this
+   * list — folding one hides its hymns from the list and nothing else. The
+   * document and slideshow mode are untouched: every hymn is still there, in
+   * order, exactly as it was.
+   *
+   * Deliberately not persisted and not the document's own minimization: it is
+   * a view of this list, held for as long as the document is open, not a
+   * property of the service.
+   */
+  const [foldedDividerIds, setFoldedDividerIds] = useState<Record<string, boolean>>({});
+  const toggleDividerFold = (dividerId: string) =>
+    setFoldedDividerIds((current) => ({ ...current, [dividerId]: !current[dividerId] }));
+
+  // Headings worth a fold control: one that gathers nothing listable has
+  // nothing to hide, which is what the last heading in a document can come to
+  // once conditions have had their say. Computed over `listable`, not the
+  // folded view, or a heading would lose its control the moment it was used.
+  const foldableDividerIds = useMemo(() => {
+    const foldable = new Set<string>();
+    for (const section of listable) {
+      const ownerId = dividerOwners.get(section.id);
+      if (ownerId) foldable.add(ownerId);
+    }
+    return foldable;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- listable is rebuilt from props on every render
+  }, [sections, dividerOwners, displaySilentPrayers, bishopPresent, copticGospelRite]);
+
+  const visibleListable = useMemo(
+    () => listable.filter((section) => !foldedDividerIds[dividerOwners.get(section.id) ?? '']),
+    [listable, dividerOwners, foldedDividerIds],
+  );
 
   // The document's currentSectionId can land on a titleless hymn (e.g. an
   // inline-spliced continuation) that never made it into `listable` — in
@@ -178,6 +262,15 @@ export default function ContentSelectorDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSectionId, sections]);
 
+  // Whatever the list should scroll to and mark as "you are here". When the
+  // hymn the reader is on has been folded away, its hour heading stands in for
+  // it — the row is gone from the list, but where they are has not changed.
+  const highlightedSectionId = useMemo(() => {
+    if (!resolvedCurrentSectionId) return null;
+    const ownerId = dividerOwners.get(resolvedCurrentSectionId);
+    return ownerId && foldedDividerIds[ownerId] ? ownerId : resolvedCurrentSectionId;
+  }, [resolvedCurrentSectionId, dividerOwners, foldedDividerIds]);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const [itemLayouts, setItemLayouts] = useState<Record<string, number>>({});
 
@@ -185,11 +278,11 @@ export default function ContentSelectorDrawer({
   // document — on open, and any time that position changes while the panel
   // is already open (e.g. it was left open while swiping through slides).
   useEffect(() => {
-    if (!visible || !resolvedCurrentSectionId) return;
-    const y = itemLayouts[resolvedCurrentSectionId];
+    if (!visible || !highlightedSectionId) return;
+    const y = itemLayouts[highlightedSectionId];
     if (y === undefined) return;
     scrollViewRef.current?.scrollTo({ y: Math.max(y - SPACING.md, 0), animated: false });
-  }, [visible, resolvedCurrentSectionId, itemLayouts]);
+  }, [visible, highlightedSectionId, itemLayouts]);
 
   return (
     <Modal
@@ -216,7 +309,7 @@ export default function ContentSelectorDrawer({
           </View>
 
           <ScrollView ref={scrollViewRef} style={styles.selectorList}>
-            {listable.map((section, listIndex) => {
+            {visibleListable.map((section, listIndex) => {
               // A list entry always shows exactly one language, driven by
               // the App Language setting — falling back to whichever
               // language actually has text for this specific section if the
@@ -246,9 +339,11 @@ export default function ContentSelectorDrawer({
               const isDivider = isDividerSection(section);
               // Sits under the divider above it. The rule that brackets the
               // group is drawn by the wrapper below, not by the card.
-              const isNested = nestedSectionIds.has(section.id);
-              const isLastNested = isNested && !nestedSectionIds.has(listable[listIndex + 1]?.id ?? '');
-              const isActive = section.id === resolvedCurrentSectionId;
+              const isNested = dividerOwners.has(section.id);
+              const isLastNested = isNested && !dividerOwners.has(visibleListable[listIndex + 1]?.id ?? '');
+              const isActive = section.id === highlightedSectionId;
+              const foldableDividerId = isDivider && foldableDividerIds.has(section.id) ? section.id : null;
+              const isFolded = Boolean(foldableDividerId && foldedDividerIds[foldableDividerId]);
 
               const recordLayout = (event: LayoutChangeEvent) => {
                 const y = event.nativeEvent.layout.y;
@@ -270,7 +365,21 @@ export default function ContentSelectorDrawer({
                   // the wrapper reports position instead — itemLayouts feeds
                   // scrollTo, which needs an offset within the ScrollView.
                   onLayout={isNested ? undefined : recordLayout}
+                  accessibilityLabel={
+                    foldableDividerId
+                      ? `${isFolded ? 'Show' : 'Hide'} the hymns under ${selectorTitle.english || selectorTitle.arabic}`
+                      : undefined
+                  }
                   onPress={() => {
+                    // A heading with hymns under it folds the list instead of
+                    // jumping. The panel stays open -- folding is something
+                    // you do TO this list, so closing it would hide the result.
+                    // The first row under a heading is the start of that hour
+                    // anyway, one row away.
+                    if (foldableDividerId) {
+                      toggleDividerFold(foldableDividerId);
+                      return;
+                    }
                     // Closed first so the panel isn't still sitting over the
                     // destination as it comes in. The jump-within-document
                     // path keeps its original order.
@@ -286,14 +395,19 @@ export default function ContentSelectorDrawer({
                   {isDivider ? (
                     <View style={styles.dividerRow}>
                       <View style={styles.dividerRule} />
-                      <Text
-                        style={[
-                          styles.dividerLabel,
-                          showArabic && styles.dividerLabelArabic,
-                        ]}
-                      >
-                        {showArabic ? selectorTitle.arabic : selectorTitle.english || selectorTitle.arabic}
-                      </Text>
+                      <View style={styles.dividerLabelGroup}>
+                        <Text
+                          style={[
+                            styles.dividerLabel,
+                            showArabic && styles.dividerLabelArabic,
+                          ]}
+                        >
+                          {showArabic ? selectorTitle.arabic : selectorTitle.english || selectorTitle.arabic}
+                        </Text>
+                        {foldableDividerId ? (
+                          <Icon name={isFolded ? 'chevron-forward' : 'chevron-down'} size={14} color={COLORS.gold} />
+                        ) : null}
+                      </View>
                       <View style={styles.dividerRule} />
                     </View>
                   ) : (
@@ -492,6 +606,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.goldLine,
     flex: 1,
     height: 1,
+  },
+  dividerLabelGroup: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.xs,
   },
   dividerLabel: {
     color: COLORS.gold,

@@ -1,5 +1,4 @@
 import { evaluateCondition, getContextFlags } from "./conditionEngine";
-import { isSpeakingDivider } from "./sectionDividers";
 import { toIsoDate as toIsoDateString } from "./dateUtils";
 import { formatVerses } from "./verseFormatting";
 import { loadReadingRuleRowsForDate } from "./readingCalendarRules";
@@ -756,26 +755,17 @@ export function assembleServiceSections(rawRows) {
     const minimization = normalizeText(row.minimization);
 
     if (!sectionMap.has(key)) {
-      const title = { english: row.title_english || "", arabic: row.title_arabic || "" };
-      // An hour opening that renders a heading is collapsible on its own
-      // account, without needing a minimization column, because collapsing it
-      // hides the whole hour or Watch gathered under it rather than just its
-      // own verses (see mapSectionsToDividers). Derived from the same rule the
-      // content list nests by, so a heading always hides exactly what it
-      // nests. It still starts open unless the row says otherwise.
-      const isHourHeading = isSpeakingDivider({ id: "", hymnKey: row.hymn_key, title });
-
       sectionMap.set(key, {
         id: `${row.hymn_key}-${row.item_order}`,
         hymn_key: row.hymn_key,
         condition: normalizeText(row.placement_condition),
         minimization: minimization || null,
-        collapsible: minimization === "Minimizable" || minimization === "Minimized" || isHourHeading,
+        collapsible: minimization === "Minimizable" || minimization === "Minimized",
         defaultCollapsed: minimization === "Minimized",
         isSubdocumentPlaceholder: isSubdoc,
         isInlinePlacement,
         isHyperlink,
-        title,
+        title: { english: row.title_english || "", arabic: row.title_arabic || "" },
         titlePrayerType: row.title_prayer_type || null,
         verses: [],
       });
