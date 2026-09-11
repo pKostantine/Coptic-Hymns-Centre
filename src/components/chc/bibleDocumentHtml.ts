@@ -43,6 +43,7 @@ export function buildBibleChapterHtml({
   selectText = false,
   isSlideshow = false,
   preface = null,
+  initialVerse = null,
 }: {
   verses: BibleDisplayVerse[];
   languageKeys: BibleLanguageKey[];
@@ -51,6 +52,8 @@ export function buildBibleChapterHtml({
   selectText?: boolean;
   isSlideshow?: boolean;
   preface?: BiblePreface | null;
+  /** Verse to land on when the chapter opens (a search hit or a deep link), instead of the top. */
+  initialVerse?: string | number | null;
 }) {
   const safeFontSize = Math.max(12, Number(fontSize) || 18);
   const effectiveSelectText = Boolean(selectText) && !isSlideshow;
@@ -166,6 +169,16 @@ export function buildBibleChapterHtml({
         gap: 16px;
         border-bottom: 1px solid var(--border-color);
         padding: 15px 0;
+      }
+      .verse-row.verse-target {
+        background: rgba(212, 175, 55, 0.16);
+        border-radius: 8px;
+        box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.45);
+        transition: background-color 700ms ease, box-shadow 700ms ease;
+      }
+      .verse-row.verse-target.verse-target-fading {
+        background: transparent;
+        box-shadow: 0 0 0 1px transparent;
       }
       .cell {
         box-sizing: border-box;
@@ -307,6 +320,7 @@ export function buildBibleChapterHtml({
         var pageWidth = 1;
         var isSlideshow = ${JSON.stringify(Boolean(isSlideshow))};
         var selectTextEnabled = ${JSON.stringify(effectiveSelectText)};
+        var initialVerse = ${JSON.stringify(initialVerse === null || initialVerse === undefined ? '' : String(initialVerse))};
         var selectableLanguages = ${JSON.stringify(effectiveLanguages)};
         var selectingLanguage = null;
         var richCopyColors = {
@@ -781,13 +795,40 @@ export function buildBibleChapterHtml({
           if (dx < 0) { nextPage(); } else { previousPage(); }
         }, { passive: true });
 
+        // A verse arrived at from a search hit or a deep link is marked so the
+        // reader can see which one of the chapter they were sent to; the mark
+        // fades on its own rather than lingering over the reading.
+        function highlightVerse(verse) {
+          var rows = document.querySelectorAll('[data-verse="' + String(verse).replace(/"/g, '\\\\22 ') + '"]');
+          if (!rows.length) return;
+          Array.prototype.forEach.call(rows, function (row) { row.classList.add('verse-target'); });
+          setTimeout(function () {
+            Array.prototype.forEach.call(rows, function (row) { row.classList.add('verse-target-fading'); });
+            setTimeout(function () {
+              Array.prototype.forEach.call(rows, function (row) {
+                row.classList.remove('verse-target');
+                row.classList.remove('verse-target-fading');
+              });
+            }, 800);
+          }, 2200);
+        }
+
         if (isSlideshow) {
           requestAnimationFrame(function () {
-            paginate('');
+            paginate(initialVerse);
             setTimeout(function () { paginate(getCurrentVerse()); }, 80);
-            setTimeout(function () { paginate(getCurrentVerse()); }, 240);
+            setTimeout(function () {
+              paginate(getCurrentVerse());
+              if (initialVerse) highlightVerse(initialVerse);
+            }, 240);
           });
           window.addEventListener('resize', function () { paginate(getCurrentVerse()); });
+        } else if (initialVerse) {
+          requestAnimationFrame(function () {
+            var target = document.querySelector('[data-verse="' + String(initialVerse).replace(/"/g, '\\\\22 ') + '"]');
+            if (target) target.scrollIntoView({ block: 'start' });
+            highlightVerse(initialVerse);
+          });
         }
       })();
     </script>

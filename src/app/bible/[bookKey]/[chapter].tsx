@@ -157,10 +157,11 @@ export default function BibleChapterDocument() {
   // ServiceDocument.tsx/lectionary/index.tsx.
   const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
   const selectorPanelWidth = isMobileDocument ? Math.round(screenWidth * 0.7) : Math.round(screenWidth * 0.5);
-  const { bookKey, chapter, numbering: numberingParam } = useLocalSearchParams<{
+  const { bookKey, chapter, numbering: numberingParam, verse: verseParam } = useLocalSearchParams<{
     bookKey: string;
     chapter: string;
     numbering?: PsalmNumbering;
+    verse?: string;
   }>();
   const psalmNumbering: PsalmNumbering = numberingParam === 'masoretic' ? 'masoretic' : 'septuagint';
   const { preferences, isBookmarked, toggleBookmark, setBibleVisibleLanguages } = useReadingPreferences();
@@ -173,6 +174,10 @@ export default function BibleChapterDocument() {
   const [chapterKeys, setChapterKeys] = useState<number[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  // A verse arrived at from a search hit or a shared link. Held in state as
+  // well as in the URL so that leaving this chapter drops it -- otherwise the
+  // next chapter would jump to whatever verse number the link happened to name.
+  const [targetVerse, setTargetVerse] = useState<string | null>(verseParam || null);
   const [selectorSlide] = useState(() => new Animated.Value(1));
   const enabledLanguages = preferences.bibleVisibleLanguages;
 
@@ -239,8 +244,9 @@ export default function BibleChapterDocument() {
       selectText: effectiveSelectText,
       isSlideshow: preferences.slideshowMode,
       preface,
+      initialVerse: targetVerse,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -249,7 +255,8 @@ export default function BibleChapterDocument() {
     (targetChapter: number | null) => {
       if (targetChapter === null) return;
       setIsSelectorOpen(false);
-      router.setParams({ chapter: String(targetChapter) });
+      setTargetVerse(null);
+      router.setParams({ chapter: String(targetChapter), verse: '' });
     },
     [router],
   );

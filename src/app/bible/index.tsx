@@ -34,6 +34,9 @@ export default function BibleTestamentList() {
         visibleLanguages={{ english: showEnglish, arabic: showArabic }}
         rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
         onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
+        rightIcon="search-outline"
+        onRightPress={() => router.push('/bible/search')}
+        rightAccessibilityLabel="Search the Bible"
       />
       <ScrollView contentContainerStyle={styles.list}>
         {TESTAMENTS.map((testament) => (
