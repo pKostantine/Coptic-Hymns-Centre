@@ -39,6 +39,7 @@ const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: { english: string; arabi
   { key: 'greek', label: { english: 'Greek', arabic: 'اليونانية' } },
   { key: 'arabic', label: { english: 'Arabic', arabic: 'العربية' } },
   { key: 'arabicFromCoptic', label: { english: 'Arabic (from Coptic)', arabic: 'العربية (من القبطية)' } },
+  { key: 'french', label: { english: 'French', arabic: 'الفرنسية' } },
 ];
 
 const PSALMS_BOOK_KEY = 'psalms';
@@ -94,6 +95,7 @@ function getAvailableLanguages(verses: BibleDisplayVerse[], bookKey: string | nu
   if (verses.some((verse) => String(verse.greek || '').trim())) languages.push('greek');
   languages.push('arabic');
   if (isPsalms && verses.some((verse) => String(verse.arabicFromCoptic || '').trim())) languages.push('arabicFromCoptic');
+  if (verses.some((verse) => String(verse.french || '').trim())) languages.push('french');
   return languages;
 }
 

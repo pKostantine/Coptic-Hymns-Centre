@@ -25,6 +25,8 @@ export interface BibleVerse {
   greek: string;
   arabic: string;
   arabicFromCoptic: string;
+  /** French rendering — present for nearly every verse of every book, but not quite all of them. */
+  french: string;
   isLxxAddition?: boolean;
   isPsalmIntroduction?: boolean;
 }
@@ -35,8 +37,8 @@ export type BibleVerseNumber = number | string;
 const PSALMS_KEY = 'psalms';
 const ESTHER_KEY = 'esther';
 const DANIEL_KEY = 'daniel';
-const BIBLE_CHAPTER_VERSE_FIELDS = 'verse_number, english, english_nkjv, coptic, greek, arabic';
-const PSALM_CHAPTER_VERSE_FIELDS = 'verse_number, english, english_nkjv, english_from_coptic, coptic, greek, arabic, arabic_from_coptic';
+const BIBLE_CHAPTER_VERSE_FIELDS = 'verse_number, english, english_nkjv, coptic, greek, arabic, french';
+const PSALM_CHAPTER_VERSE_FIELDS = 'verse_number, english, english_nkjv, english_from_coptic, coptic, greek, arabic, arabic_from_coptic, french';
 const ESTHER_ADDITION_CHAPTER_LABELS: Record<number, string> = { 0: 'A', 11: 'B', 12: 'C' };
 const ESTHER_ADDITION_CHAPTER_ARABIC_LABELS: Record<number, string> = { 0: 'أ', 11: 'ب', 12: 'ت' };
 const DANIEL_ADDITION_CHAPTERS = new Set([0, 13, 14]);
@@ -274,6 +276,7 @@ async function loadChapterVerses(bookKey: string, chapterNumber: number): Promis
         greek: row.greek || '',
         arabic: row.arabic || '',
         arabicFromCoptic: isPsalms ? row.arabic_from_coptic || '' : '',
+        french: row.french || '',
         isPsalmIntroduction: isPsalms && isPsalmIntroductionVerseNumber(verseNumber),
       };
     })

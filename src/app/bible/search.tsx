@@ -95,6 +95,7 @@ const LANGUAGE_PREFERENCE_KEYS: Record<BibleSearchLanguage, keyof BibleVisibleLa
   greek: 'greek',
   arabic: 'arabic',
   arabic_from_coptic: 'arabicFromCoptic',
+  french: 'french',
 };
 
 export default function BibleSearchScreen() {

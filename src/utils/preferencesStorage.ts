@@ -15,6 +15,7 @@ export interface BibleVisibleLanguages {
   greek: boolean;
   arabic: boolean;
   arabicFromCoptic: boolean;
+  french: boolean;
 }
 
 export type OrientationMode = 'auto' | 'landscape' | 'reverseLandscape' | 'portrait';
@@ -68,6 +69,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
     greek: false,
     arabic: true,
     arabicFromCoptic: false,
+    french: false,
   },
   fontScale: 2,
   fontScaleRangeMax: 20,

@@ -10,6 +10,7 @@ export interface BibleDisplayVerse {
   greek: string;
   arabic: string;
   arabicFromCoptic: string;
+  french: string;
   isLxxAddition?: boolean;
   isPsalmIntroduction?: boolean;
 }
@@ -22,9 +23,10 @@ export interface BiblePreface {
   greek?: string;
   arabic?: string;
   arabicFromCoptic?: string;
+  french?: string;
 }
 
-export type BibleLanguageKey = 'english' | 'englishNkjv' | 'englishFromCoptic' | 'coptic' | 'greek' | 'arabic' | 'arabicFromCoptic';
+export type BibleLanguageKey = 'english' | 'englishNkjv' | 'englishFromCoptic' | 'coptic' | 'greek' | 'arabic' | 'arabicFromCoptic' | 'french';
 
 /**
  * Builds the Bible chapter reader HTML — ported from the old app's
@@ -204,7 +206,9 @@ export function buildBibleChapterHtml({
       body.selecting-arabic .cell:not([data-language="arabic"]),
       body.selecting-arabic .cell:not([data-language="arabic"]) *,
       body.selecting-arabicFromCoptic .cell:not([data-language="arabicFromCoptic"]),
-      body.selecting-arabicFromCoptic .cell:not([data-language="arabicFromCoptic"]) * {
+      body.selecting-arabicFromCoptic .cell:not([data-language="arabicFromCoptic"]) *,
+      body.selecting-french .cell:not([data-language="french"]),
+      body.selecting-french .cell:not([data-language="french"]) * {
         -webkit-user-select: none !important;
         user-select: none !important;
       }

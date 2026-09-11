@@ -18,7 +18,8 @@ export type BibleSearchLanguage =
   | 'coptic'
   | 'greek'
   | 'arabic'
-  | 'arabic_from_coptic';
+  | 'arabic_from_coptic'
+  | 'french';
 
 export const BIBLE_SEARCH_LANGUAGES: BibleSearchLanguage[] = [
   'english',
@@ -28,6 +29,7 @@ export const BIBLE_SEARCH_LANGUAGES: BibleSearchLanguage[] = [
   'greek',
   'arabic',
   'arabic_from_coptic',
+  'french',
 ];
 
 export const BIBLE_SEARCH_LANGUAGE_LABELS: Record<BibleSearchLanguage, { english: string; arabic: string }> = {
@@ -38,6 +40,7 @@ export const BIBLE_SEARCH_LANGUAGE_LABELS: Record<BibleSearchLanguage, { english
   greek: { english: 'Greek', arabic: 'اليونانية' },
   arabic: { english: 'Arabic', arabic: 'العربية' },
   arabic_from_coptic: { english: 'Arabic from Coptic', arabic: 'العربية عن القبطية' },
+  french: { english: 'French', arabic: 'الفرنسية' },
 };
 
 /**
