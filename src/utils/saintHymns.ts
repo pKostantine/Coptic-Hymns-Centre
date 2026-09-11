@@ -335,10 +335,64 @@ const TEXT_COLUMNS = 'hymn_key, line_order, english, coptic, arabic, person_type
 
 const byLineOrder = (a: TextRow, b: TextRow) => (Number(a.line_order) || 0) - (Number(b.line_order) || 0);
 
+/**
+ * A jinkim/overline. A Coptic letter carrying one is a numeral rather than a
+ * word — `(ⲓ̅Ⲋ̅/ⲉ̅)` is "16/5" — and those are written in whichever case the
+ * numeral takes (soo is Ⲋ̅, whose lowercase form is a different glyph
+ * altogether), so they are left exactly as entered.
+ */
+const COPTIC_OVERLINE = /[\u0304\u0305]/;
+
+/**
+ * Coptic as the preview presents it: one capital opening the line and
+ * everything after it lowercase, whatever case it happens to be stored in.
+ * The database has been typed by many hands over a long time, so the same
+ * hymn can arrive all-caps, all-lowercase or somewhere in between; a preview
+ * exists to be read at a glance and reads better level.
+ *
+ * Only the preview does this. The document itself still shows every hymn
+ * exactly as it is written.
+ */
+export function previewCopticCase(text: string): string {
+  const chars = Array.from(String(text || ''));
+  const out: string[] = [];
+  let capitalized = false;
+
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
+
+    let marks = '';
+    let next = index + 1;
+    while (next < chars.length && COPTIC_OVERLINE.test(chars[next])) {
+      marks += chars[next];
+      next += 1;
+    }
+    if (marks) {
+      out.push(char + marks);
+      index = next - 1;
+      continue;
+    }
+
+    const lowered = char.toLowerCase();
+    // Anything with a case of its own — which skips spaces, brackets, and the
+    // Arabic that some Coptic lines carry alongside.
+    const hasCase = lowered !== char.toUpperCase();
+    if (hasCase && !capitalized) {
+      out.push(char.toUpperCase());
+      capitalized = true;
+      continue;
+    }
+    out.push(lowered);
+  }
+
+  return out.join('');
+}
+
 function toVerses(rows: TextRow[], titlePrayerType: string | null): DocumentVerse[] {
   return rows
     .sort(byLineOrder)
     .map((row) => buildVerseFromTextRow(row, titlePrayerType) as DocumentVerse)
+    .map((verse) => ({ ...verse, coptic: previewCopticCase(verse.coptic) }))
     .filter(hasText);
 }
 
