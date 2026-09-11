@@ -212,12 +212,13 @@ export default function SaintHymnPicker({
   const countFor = (entry: SaintEntry) => entry.options.filter((option) => selectedSet.has(option.token)).length;
 
   // Sits inside the row it belongs to, so it has to claim the touch before the
-  // row's own handler runs — hitSlop rather than a bigger box, so it stays a
-  // small mark beside the name without stealing width from it.
+  // row's own handler runs. A full 44pt box rather than an icon with slop
+  // around it: the target is then where it looks like it is, which matters
+  // most for the row where the tap that misses it picks the saint instead.
   const previewButton = (target: PreviewTarget) => (
     <Pressable
       accessibilityLabel={`Preview ${target.label} for ${target.saintName}`}
-      hitSlop={12}
+      hitSlop={6}
       style={styles.previewButton}
       onPress={(event) => {
         // On the web the row around this one would otherwise see the same
@@ -228,7 +229,7 @@ export default function SaintHymnPicker({
         openPreview(target);
       }}
     >
-      <Icon name="eye-outline" size={17} color={COLORS.muted} />
+      <Icon name="eye-outline" size={21} color={COLORS.muted} />
     </Pressable>
   );
 
@@ -253,7 +254,7 @@ export default function SaintHymnPicker({
           </View>
 
           <View style={styles.searchRow}>
-            <Icon name="search-outline" size={18} color={COLORS.muted} />
+            <Icon name="search-outline" size={20} color={COLORS.muted} />
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -307,7 +308,7 @@ export default function SaintHymnPicker({
                         <Text style={styles.badgeText}>{count}</Text>
                       </View>
                     ) : null}
-                    {single ? null : <Icon name="chevron-forward" size={18} color={COLORS.muted} />}
+                    {single ? null : <Icon name="chevron-forward" size={22} color={COLORS.muted} />}
                   </Pressable>
                 );
               }}
@@ -350,7 +351,7 @@ export default function SaintHymnPicker({
                       label: option.label,
                       saintName: expanded?.name ?? '',
                     })}
-                    {active ? <Icon name="checkmark" size={18} color={COLORS.gold} /> : null}
+                    {active ? <Icon name="checkmark" size={22} color={COLORS.gold} /> : null}
                   </View>
                 </Pressable>
               );
@@ -451,8 +452,8 @@ const styles = StyleSheet.create({
   },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '800' },
-  doneButton: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs },
-  doneText: { color: COLORS.gold, fontSize: 15, fontWeight: '700' },
+  doneButton: { justifyContent: 'center', minHeight: 44, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs },
+  doneText: { color: COLORS.gold, fontSize: 16, fontWeight: '700' },
   searchRow: {
     alignItems: 'center',
     backgroundColor: '#111111',
@@ -462,9 +463,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     marginTop: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
+    minHeight: 48,
+    paddingHorizontal: SPACING.md,
   },
-  searchInput: { color: COLORS.white, flex: 1, fontSize: 15, paddingVertical: SPACING.sm },
+  searchInput: { color: COLORS.white, flex: 1, fontSize: 16, paddingVertical: SPACING.sm + 2 },
   list: { flex: 1, marginTop: SPACING.sm },
   loading: { flex: 1, paddingVertical: SPACING.xl },
   message: { color: COLORS.muted, flex: 1, fontSize: 14, paddingVertical: SPACING.lg, textAlign: 'center' },
@@ -477,13 +479,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
+    // Comfortably past the 44pt a fingertip actually covers, with two lines of
+    // text inside it.
+    minHeight: 62,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
   },
   saintRowActive: { backgroundColor: '#171513', borderColor: COLORS.goldLine },
   saintTextGroup: { flex: 1, gap: 2 },
-  saintName: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700' },
-  saintMeta: { color: COLORS.muted, fontSize: 12 },
+  saintName: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '700' },
+  saintMeta: { color: COLORS.muted, fontSize: 13, lineHeight: 18 },
   badge: {
     alignItems: 'center',
     backgroundColor: COLORS.goldSoft,
@@ -491,18 +496,18 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     justifyContent: 'center',
-    minWidth: 22,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    minWidth: 26,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
-  badgeText: { color: COLORS.gold, fontSize: 12, fontWeight: '800' },
+  badgeText: { color: COLORS.gold, fontSize: 13, fontWeight: '800' },
   popoverOverlay: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: SPACING.lg },
   popover: {
     backgroundColor: COLORS.black,
     borderColor: COLORS.border,
     borderRadius: 16,
     borderWidth: 1,
-    gap: SPACING.xs,
+    gap: SPACING.sm,
     maxWidth: 420,
     padding: SPACING.md,
     width: '100%',
@@ -520,15 +525,23 @@ const styles = StyleSheet.create({
     borderRadius: RADII.sm,
     borderWidth: 1,
     flexDirection: 'row',
+    gap: SPACING.sm,
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    // These are the rows a choice is actually made on, and they were a third
+    // shorter than a fingertip. The preview button inside one is its own 44pt
+    // box on top of this.
+    minHeight: 54,
+    paddingLeft: SPACING.md,
+    paddingRight: SPACING.sm,
+    // Small, so the 44pt button inside sets the height rather than adding to
+    // it; minHeight above is what the row actually comes out at.
+    paddingVertical: SPACING.xs,
   },
   optionRowActive: { backgroundColor: '#171513', borderColor: COLORS.goldLine },
-  optionLabel: { color: COLORS.white, fontSize: 15, fontWeight: '600' },
+  optionLabel: { color: COLORS.white, flexShrink: 1, fontSize: 16, fontWeight: '600' },
   optionLabelActive: { color: COLORS.gold, fontWeight: '800' },
   optionActions: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm },
-  previewButton: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  previewButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
   previewCard: {
     backgroundColor: COLORS.black,
     borderColor: COLORS.border,
@@ -538,7 +551,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     width: '100%',
   },
-  previewSubtitle: { color: COLORS.gold, fontSize: 13, fontWeight: '700', marginBottom: SPACING.sm },
+  previewSubtitle: { color: COLORS.gold, fontSize: 14, fontWeight: '700', marginBottom: SPACING.sm },
   previewLoading: { paddingVertical: SPACING.xl },
   // The document renderer fills whatever it is given, so the height set on
   // this is what decides the window's size — see previewBodyHeight.
@@ -549,7 +562,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   popoverActions: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end', marginTop: SPACING.xs },
-  popoverAction: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs },
-  popoverActionText: { color: COLORS.gold, fontSize: 14, fontWeight: '700' },
+  popoverAction: { justifyContent: 'center', minHeight: 44, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs },
+  popoverActionText: { color: COLORS.gold, fontSize: 15, fontWeight: '700' },
   arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });
