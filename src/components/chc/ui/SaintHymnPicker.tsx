@@ -4,6 +4,7 @@ import {
   FlatList,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,7 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@/components/chc/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
-import { getSaintHymnIndex, SaintEntry } from '@/utils/saintHymns';
+import {
+  getSaintHymnIndex,
+  getSaintHymnPreview,
+  SaintEntry,
+  SaintHymnCategory,
+  SaintHymnPreviewHymn,
+} from '@/utils/saintHymns';
 import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
 interface SaintHymnPickerProps {
@@ -32,7 +39,17 @@ const LABELS = {
   empty: { english: 'No saints match that search.', arabic: 'لا يوجد قديس مطابق.' },
   clear: { english: 'Clear', arabic: 'مسح' },
   done: { english: 'Done', arabic: 'تم' },
+  close: { english: 'Close', arabic: 'إغلاق' },
+  noPreview: { english: 'This hymn has no text yet.', arabic: 'لا يوجد نص لهذا اللحن بعد.' },
 };
+
+interface PreviewTarget {
+  token: string;
+  category: SaintHymnCategory;
+  /** The hymn's own name in the menu, e.g. "Doxology 2". */
+  label: string;
+  saintName: string;
+}
 
 /** Normalized for search so "st mark" and "stmark" both find StMark. */
 function searchKey(value: string) {
@@ -53,6 +70,12 @@ export default function SaintHymnPicker({
   // The saint whose own hymn menu is open on top of the list. Only saints with
   // more than one choice get one — see the comment on openSaint below.
   const [expandedBase, setExpandedBase] = useState<string | null>(null);
+  // The hymn whose text is being read, over whichever of those two it was
+  // opened from. Choosing a saint hymn otherwise means recognising it by name;
+  // this is how you choose it by reading it.
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const [previewHymns, setPreviewHymns] = useState<SaintHymnPreviewHymn[] | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const label = (entry: { english: string; arabic: string }) => (isArabic ? entry.arabic : entry.english);
   const localized = isArabic && styles.arabicText;
@@ -75,11 +98,36 @@ export default function SaintHymnPicker({
     };
   }, [visible]);
 
+  useEffect(() => {
+    if (!preview) return;
+    let cancelled = false;
+    getSaintHymnPreview(preview.token, preview.category)
+      .then((hymns) => {
+        if (!cancelled) setPreviewHymns(hymns);
+      })
+      .catch((err) => {
+        if (!cancelled) setPreviewError(err?.message || 'Unable to load this hymn.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preview]);
+
+  // Cleared here rather than in the effect above, so opening a second preview
+  // never shows the previous hymn's text while the new one loads — and so the
+  // effect only ever sets state from its own async result.
+  const openPreview = (target: PreviewTarget) => {
+    setPreviewHymns(null);
+    setPreviewError(null);
+    setPreview(target);
+  };
+
   // Closing clears this sheet's own transient state, so it never reopens with
   // a stale search or a saint's menu still hanging open behind it. Done on the
   // close path rather than in an effect watching `visible` — every close goes
   // through here, and the effect was setting state mid-reconciliation.
   const closePicker = () => {
+    setPreview(null);
     setExpandedBase(null);
     setQuery('');
     onClose();
@@ -117,6 +165,27 @@ export default function SaintHymnPicker({
   };
 
   const countFor = (entry: SaintEntry) => entry.options.filter((option) => selectedSet.has(option.token)).length;
+
+  // Sits inside the row it belongs to, so it has to claim the touch before the
+  // row's own handler runs — hitSlop rather than a bigger box, so it stays a
+  // small mark beside the name without stealing width from it.
+  const previewButton = (target: PreviewTarget) => (
+    <Pressable
+      accessibilityLabel={`Preview ${target.label} for ${target.saintName}`}
+      hitSlop={12}
+      style={styles.previewButton}
+      onPress={(event) => {
+        // On the web the row around this one would otherwise see the same
+        // click and toggle the saint, so reading a hymn would also pick it.
+        // Native hands the touch to this responder alone; this makes both
+        // behave the same way.
+        event?.stopPropagation?.();
+        openPreview(target);
+      }}
+    >
+      <Icon name="eye-outline" size={17} color={COLORS.muted} />
+    </Pressable>
+  );
 
   return (
     <Modal
@@ -180,6 +249,14 @@ export default function SaintHymnPicker({
                         {single ? item.options[0].label : item.options.map((option) => option.label).join(' · ')}
                       </Text>
                     </View>
+                    {single
+                      ? previewButton({
+                          token: item.options[0].token,
+                          category: item.options[0].category,
+                          label: item.options[0].label,
+                          saintName: item.name,
+                        })
+                      : null}
                     {count > 0 ? (
                       <View style={styles.badge}>
                         <Text style={styles.badgeText}>{count}</Text>
@@ -221,7 +298,15 @@ export default function SaintHymnPicker({
                   <Text style={[styles.optionLabel, active && styles.optionLabelActive, localized]}>
                     {option.label}
                   </Text>
-                  {active ? <Icon name="checkmark" size={18} color={COLORS.gold} /> : null}
+                  <View style={styles.optionActions}>
+                    {previewButton({
+                      token: option.token,
+                      category: option.category,
+                      label: option.label,
+                      saintName: expanded?.name ?? '',
+                    })}
+                    {active ? <Icon name="checkmark" size={18} color={COLORS.gold} /> : null}
+                  </View>
                 </Pressable>
               );
             })}
@@ -233,6 +318,62 @@ export default function SaintHymnPicker({
               ) : null}
               <Pressable style={styles.popoverAction} onPress={() => setExpandedBase(null)}>
                 <Text style={[styles.popoverActionText, localized]}>{label(LABELS.done)}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* The hymn itself, over whichever layer asked for it. Declared last so
+          it presents above the saint's own menu when opened from there. */}
+      <Modal
+        visible={Boolean(preview)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreview(null)}
+        supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
+      >
+        <View style={styles.popoverOverlay}>
+          <Pressable accessibilityLabel="Close preview" style={styles.backdrop} onPress={() => setPreview(null)} />
+          <View style={[styles.previewCard, DISABLED_TEXT_SELECTION_STYLE]}>
+            <Text style={[styles.popoverTitle, localized]} numberOfLines={2}>
+              {preview?.saintName}
+            </Text>
+            <Text style={[styles.previewSubtitle, localized]}>{preview?.label}</Text>
+
+            {previewError ? (
+              <Text style={[styles.message, localized]}>{previewError}</Text>
+            ) : !previewHymns ? (
+              <ActivityIndicator color={COLORS.gold} style={styles.previewLoading} />
+            ) : previewHymns.length === 0 ? (
+              <Text style={[styles.message, localized]}>{label(LABELS.noPreview)}</Text>
+            ) : (
+              <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewContent}>
+                {previewHymns.map((hymn) => (
+                  <View key={hymn.hymnKey} style={styles.previewHymn}>
+                    {/* Named only when the choice brings in more than one hymn
+                        — an Adam and a Vatos Psali, say — since otherwise the
+                        header above already says what this is. */}
+                    {previewHymns.length > 1 && (hymn.title.english || hymn.title.arabic) ? (
+                      <Text style={[styles.previewHymnTitle, localized]}>
+                        {isArabic ? hymn.title.arabic || hymn.title.english : hymn.title.english || hymn.title.arabic}
+                      </Text>
+                    ) : null}
+                    {hymn.verses.map((verse, index) => (
+                      <View key={index} style={styles.previewVerse}>
+                        {verse.coptic.trim() ? <Text style={styles.previewCoptic}>{verse.coptic}</Text> : null}
+                        {verse.english.trim() ? <Text style={styles.previewEnglish}>{verse.english}</Text> : null}
+                        {verse.arabic.trim() ? <Text style={styles.previewArabic}>{verse.arabic}</Text> : null}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={styles.popoverActions}>
+              <Pressable style={styles.popoverAction} onPress={() => setPreview(null)}>
+                <Text style={[styles.popoverActionText, localized]}>{label(LABELS.close)}</Text>
               </Pressable>
             </View>
           </View>
@@ -344,6 +485,37 @@ const styles = StyleSheet.create({
   optionRowActive: { backgroundColor: '#171513', borderColor: COLORS.goldLine },
   optionLabel: { color: COLORS.white, fontSize: 15, fontWeight: '600' },
   optionLabelActive: { color: COLORS.gold, fontWeight: '800' },
+  optionActions: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm },
+  previewButton: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  previewCard: {
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    // Tall enough to read a doxology in without becoming a second document
+    // screen — a preview is for recognising the hymn, not praying it.
+    maxHeight: '78%',
+    maxWidth: 460,
+    padding: SPACING.md,
+    width: '100%',
+  },
+  previewSubtitle: { color: COLORS.gold, fontSize: 13, fontWeight: '700', marginBottom: SPACING.sm },
+  previewLoading: { paddingVertical: SPACING.xl },
+  previewScroll: { flexGrow: 0 },
+  previewContent: { gap: SPACING.md, paddingBottom: SPACING.xs },
+  previewHymn: { gap: SPACING.sm },
+  previewHymnTitle: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 14, fontWeight: '800' },
+  previewVerse: { gap: 2 },
+  previewCoptic: { color: COLORS.white, fontFamily: TYPOGRAPHY.coptic, fontSize: 17, lineHeight: 24 },
+  previewEnglish: { color: COLORS.white, fontSize: 14, lineHeight: 20 },
+  previewArabic: {
+    color: COLORS.white,
+    fontFamily: TYPOGRAPHY.arabic,
+    fontSize: 15,
+    lineHeight: 24,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
   popoverActions: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end', marginTop: SPACING.xs },
   popoverAction: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs },
   popoverActionText: { color: COLORS.gold, fontSize: 14, fontWeight: '700' },

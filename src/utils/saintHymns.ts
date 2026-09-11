@@ -268,3 +268,186 @@ async function buildIndex(): Promise<SaintEntry[]> {
   entries.sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
   return entries;
 }
+
+
+/**
+ * Where a category's condition lives, and where the text it brings in comes
+ * from. Every one of these schemas has the same shape — an order table of
+ * `item_order, hymn_key, condition` pointing at lines in its own hymn_texts,
+ * titled by its own hymn_titles.
+ */
+const CATEGORY_SOURCE: Record<SaintHymnCategory, { schema: string; orderTable: string | null }> = {
+  Doxology: { schema: 'doxologies', orderTable: 'doxologies' },
+  VOC: { schema: 'verses_of_the_cymbals', orderTable: 'verses_of_the_cymbals' },
+  Psali: { schema: 'psalmody', orderTable: 'midnight_praises' },
+  Hiten: { schema: 'hymn_of_the_intercessions', orderTable: 'hymn_of_the_intercessions' },
+  PraxisResponse: { schema: 'praxis_response', orderTable: 'praxis_response' },
+  // The Axios is one hymn carrying a line per saint, so the condition sits on
+  // the line itself and there is no order row to go through.
+  Veneration: { schema: 'veneration', orderTable: null },
+};
+
+const VENERATION_HYMN_KEY = 'axios';
+
+export interface SaintHymnPreviewVerse {
+  english: string;
+  coptic: string;
+  arabic: string;
+}
+
+export interface SaintHymnPreviewHymn {
+  hymnKey: string;
+  title: { english: string; arabic: string };
+  verses: SaintHymnPreviewVerse[];
+}
+
+function escapeForRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Whether a stored condition really names this token, rather than merely
+ * containing its letters. `StMark:Psali1` must not match `StMark:Psali10`,
+ * and the database is queried with a LIKE that cannot tell them apart (an
+ * underscore in a saint's token is a LIKE wildcard, too) — so the query casts
+ * a wide net and this decides.
+ */
+function referencesToken(condition: string | null | undefined, token: string): boolean {
+  if (!condition) return false;
+  return new RegExp(`${escapeForRegExp(token)}(?![A-Za-z0-9_])`).test(condition);
+}
+
+function hasText(verse: SaintHymnPreviewVerse) {
+  return Boolean(verse.english.trim() || verse.coptic.trim() || verse.arabic.trim());
+}
+
+interface TextRow {
+  hymn_key: string;
+  line_order: string | number | null;
+  english: string | null;
+  coptic: string | null;
+  arabic: string | null;
+}
+
+function toVerse(row: TextRow): SaintHymnPreviewVerse {
+  return { english: row.english || '', coptic: row.coptic || '', arabic: row.arabic || '' };
+}
+
+const byLineOrder = (a: TextRow, b: TextRow) => (Number(a.line_order) || 0) - (Number(b.line_order) || 0);
+
+async function loadTitles(schema: string, hymnKeys: string[]) {
+  const titles = new Map<string, { english: string; arabic: string }>();
+  if (!hymnKeys.length) return titles;
+
+  const { data } = await supabase
+    .schema(schema)
+    .from('hymn_titles')
+    .select('hymn_key, title_english, title_arabic')
+    .in('hymn_key', hymnKeys);
+
+  // Only real titles go in the map, so a row that exists with nothing in it
+  // falls through to the caller's fallback rather than registering as a title
+  // and rendering blank. Two of these six schemas have no hymn_titles table at
+  // all, which arrives here as no data and is handled by the same fallback --
+  // the error is deliberately not raised, since a missing name is no reason to
+  // refuse to show the hymn.
+  for (const row of (data || []) as { hymn_key: string; title_english: string | null; title_arabic: string | null }[]) {
+    const english = row.title_english || '';
+    const arabic = row.title_arabic || '';
+    if (english || arabic) titles.set(row.hymn_key, { english, arabic });
+  }
+  return titles;
+}
+
+async function loadPreview(token: string, category: SaintHymnCategory): Promise<SaintHymnPreviewHymn[]> {
+  const source = CATEGORY_SOURCE[category];
+
+  if (!source.orderTable) {
+    const { data, error } = await supabase
+      .schema(source.schema)
+      .from('hymn_texts')
+      .select('hymn_key, line_order, english, coptic, arabic, condition')
+      .eq('hymn_key', VENERATION_HYMN_KEY)
+      .ilike('condition', `%${token}%`);
+    if (error) throw new Error(`Unable to load this hymn: ${error.message}`);
+
+    const rows = ((data || []) as (TextRow & { condition: string | null })[])
+      .filter((row) => referencesToken(row.condition, token))
+      .sort(byLineOrder);
+    const verses = rows.map(toVerse).filter(hasText);
+    if (!verses.length) return [];
+
+    const titles = await loadTitles(source.schema, [VENERATION_HYMN_KEY]);
+    return [{
+      hymnKey: VENERATION_HYMN_KEY,
+      title: titles.get(VENERATION_HYMN_KEY) || { english: CATEGORY_LABEL[category], arabic: '' },
+      verses,
+    }];
+  }
+
+  const { data: orderData, error: orderError } = await supabase
+    .schema(source.schema)
+    .from(source.orderTable)
+    .select('item_order, hymn_key, condition')
+    .ilike('condition', `%${token}%`);
+  if (orderError) throw new Error(`Unable to load this hymn: ${orderError.message}`);
+
+  const orderRows = ((orderData || []) as { item_order: string | number | null; hymn_key: string; condition: string | null }[])
+    .filter((row) => referencesToken(row.condition, token))
+    .sort((a, b) => (Number(a.item_order) || 0) - (Number(b.item_order) || 0));
+
+  // One token can bring in more than one hymn — an Adam and a Vatos Psali for
+  // the same saint, say. Kept in the order they are prayed in, de-duplicated
+  // where the same hymn is placed twice.
+  const hymnKeys: string[] = [];
+  for (const row of orderRows) {
+    if (row.hymn_key && !hymnKeys.includes(row.hymn_key)) hymnKeys.push(row.hymn_key);
+  }
+  if (!hymnKeys.length) return [];
+
+  const [{ data: textData, error: textError }, titles] = await Promise.all([
+    supabase
+      .schema(source.schema)
+      .from('hymn_texts')
+      .select('hymn_key, line_order, english, coptic, arabic')
+      .in('hymn_key', hymnKeys),
+    loadTitles(source.schema, hymnKeys),
+  ]);
+  if (textError) throw new Error(`Unable to load this hymn: ${textError.message}`);
+
+  const linesByHymn = new Map<string, TextRow[]>();
+  for (const row of (textData || []) as TextRow[]) {
+    if (!linesByHymn.has(row.hymn_key)) linesByHymn.set(row.hymn_key, []);
+    linesByHymn.get(row.hymn_key)!.push(row);
+  }
+
+  return hymnKeys
+    .map((hymnKey) => ({
+      hymnKey,
+      title: titles.get(hymnKey) || { english: humanizeSaintBase(hymnKey), arabic: '' },
+      verses: (linesByHymn.get(hymnKey) || []).sort(byLineOrder).map(toVerse).filter(hasText),
+    }))
+    .filter((hymn) => hymn.verses.length > 0);
+}
+
+const previewCache = new Map<string, Promise<SaintHymnPreviewHymn[]>>();
+
+/**
+ * The actual text a saint hymn choice brings into the service — what the
+ * picker shows behind its preview button, so a choice can be made by reading
+ * the hymn rather than by recognising its key.
+ *
+ * Cached per token for the session, and a failure is not cached, so a
+ * transient network error does not leave one hymn permanently unpreviewable.
+ */
+export function getSaintHymnPreview(token: string, category: SaintHymnCategory): Promise<SaintHymnPreviewHymn[]> {
+  const cached = previewCache.get(token);
+  if (cached) return cached;
+
+  const pending = loadPreview(token, category).catch((error) => {
+    previewCache.delete(token);
+    throw error;
+  });
+  previewCache.set(token, pending);
+  return pending;
+}

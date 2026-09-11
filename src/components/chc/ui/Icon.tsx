@@ -20,6 +20,7 @@ export type IconName =
   | 'close-fullscreen'
   | 'open-in-full'
   | 'search-outline'
+  | 'eye-outline'
   | 'checkmark';
 
 interface IconProps {
@@ -48,6 +49,20 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="m184 112 144 144-144 144" fill="none" stroke={color} strokeWidth={48} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'eye-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M255.66 112c-77.94 0-157.89 45.11-220.83 135.33a16 16 0 0 0-.27 17.77C82.92 340.8 161.8 400 255.66 400c92.84 0 173.34-59.38 221.79-135.25a16.14 16.14 0 0 0 0-17.47C429.18 172.28 348.68 112 255.66 112Z"
+            fill="none"
+            stroke={color}
+            strokeWidth={32}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Circle cx="256" cy="256" r="80" fill="none" stroke={color} strokeWidth={32} strokeMiterlimit={10} />
         </Svg>
       );
     case 'search-outline':
