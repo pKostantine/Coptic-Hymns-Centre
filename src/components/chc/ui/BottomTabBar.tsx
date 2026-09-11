@@ -16,9 +16,8 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { preferences } = useReadingPreferences();
-  // Sideways, height is the scarce axis: sitting the label beside the icon
-  // instead of under it, on tighter padding, roughly halves the bar so it
-  // stops eating the little vertical room the content has left.
+  // On sideways phones, sitting the label beside the icon on tighter padding
+  // roughly halves the bar. Tablets retain the standard navigation size.
   const isCompactLandscape = useIsCompactLandscape();
   const isArabic = preferences.appLanguage === 'ar';
   const labels = isArabic

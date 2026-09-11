@@ -17,7 +17,7 @@ import {
   getCopticYearForDate,
   getGregorianMonthGrid,
   getGregorianRangeForCopticYear,
-  getActivePeriodKeys,
+  getContextIndicatorKeys,
   getSeasonRanges,
   getSingleDayEventsForCopticYear,
   SeasonRange,
@@ -60,7 +60,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
   const closeScreen = () => (onClose ? onClose() : goBack(router, '/'));
   const openSeasonSelector = () => (onOpenSeasonSelector ? onOpenSeasonSelector() : router.push('/season-selector'));
   const safeAreaInsets = useSafeAreaInsets();
-  const { rawDate, isLive, selectDate, goLive, liturgicalDayPeriod, setLiturgicalDayPeriod } = useCalendar();
+  const { rawDate, effectiveDate, isLive, selectDate, goLive, liturgicalDayPeriod, setLiturgicalDayPeriod } = useCalendar();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
   const labelText = (label: { english: string; arabic: string }) => (isArabic ? label.arabic : label.english);
@@ -74,7 +74,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
   const [days, setDays] = useState<CalendarDay[] | null>(null);
   const [seasons, setSeasons] = useState<SeasonRange[]>([]);
   const [events, setEvents] = useState<SingleDayEvent[]>([]);
-  const [periodKeys, setPeriodKeys] = useState<string[]>([]);
+  const [contextIndicatorKeys, setContextIndicatorKeys] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   // The year column's window is frozen at whatever year was showing when the
   // panel opened. Deriving it from the live selection meant picking a year
@@ -87,6 +87,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
   // the liturgical day has rolled forward past 5pm — only the day/night
   // toggle communicates that content is now for the evening.
   const selectedIso = rawDate.toISOString().slice(0, 10);
+  const indicatorIso = effectiveDate.toISOString().slice(0, 10);
   const todayIso = todayIsoDate();
 
   // Keeps the visible month grid following `rawDate` when it changes from
@@ -112,7 +113,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
 
   useEffect(() => {
     let cancelled = false;
-    getCopticYearForDate(new Date(`${selectedIso}T00:00:00Z`))
+    getCopticYearForDate(new Date(`${indicatorIso}T00:00:00Z`))
       .then(async (year) => {
         if (year === null) return;
         const { startDate, endDate } = await getGregorianRangeForCopticYear(year);
@@ -127,25 +128,25 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
     return () => {
       cancelled = true;
     };
-  }, [selectedIso]);
+  }, [indicatorIso]);
 
-  // Nayrouz/Nativity/Theophany periods live only in calendar.get_context_flags
-  // — the same RPC that drives hymn selection — so they're fetched per date
-  // rather than derived from season_ranges, which has no rows for them.
+  // Multi-day periods and feast observances live in calendar.get_context_flags, the
+  // same source that drives hymn selection. Query the rolled liturgical date
+  // so the indicator changes at the evening boundary with the document.
   useEffect(() => {
     let cancelled = false;
-    getActivePeriodKeys(selectedIso)
+    getContextIndicatorKeys(indicatorIso)
       .then((keys) => {
-        if (!cancelled) setPeriodKeys(keys);
+        if (!cancelled) setContextIndicatorKeys(keys);
       })
       .catch(() => {
-        if (!cancelled) setPeriodKeys([]);
+        if (!cancelled) setContextIndicatorKeys([]);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [selectedIso]);
+  }, [indicatorIso]);
 
   const loadMonth = useCallback(async () => {
     setDays(null);
@@ -153,20 +154,20 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
       const grid = await getGregorianMonthGrid(gregorianYear, gregorianMonth);
       setDays(grid);
       if (grid.length) {
-        const fromDate = [grid[0].gregorianDate, todayIso, selectedIso].sort()[0];
-        const toDate = [grid[grid.length - 1].gregorianDate, todayIso, selectedIso].sort().slice(-1)[0];
+        const fromDate = [grid[0].gregorianDate, todayIso, selectedIso, indicatorIso].sort()[0];
+        const toDate = [grid[grid.length - 1].gregorianDate, todayIso, selectedIso, indicatorIso].sort().slice(-1)[0];
         setSeasons(await getSeasonRanges(fromDate, toDate));
       }
     } else if (copticYear !== null && copticMonth !== null) {
       const grid = await getCopticMonthGrid(copticYear, copticMonth);
       setDays(grid);
       if (grid.length) {
-        const fromDate = [grid[0].gregorianDate, todayIso, selectedIso].sort()[0];
-        const toDate = [grid[grid.length - 1].gregorianDate, todayIso, selectedIso].sort().slice(-1)[0];
+        const fromDate = [grid[0].gregorianDate, todayIso, selectedIso, indicatorIso].sort()[0];
+        const toDate = [grid[grid.length - 1].gregorianDate, todayIso, selectedIso, indicatorIso].sort().slice(-1)[0];
         setSeasons(await getSeasonRanges(fromDate, toDate));
       }
     }
-  }, [mode, gregorianYear, gregorianMonth, copticYear, copticMonth, selectedIso]);
+  }, [mode, gregorianYear, gregorianMonth, copticYear, copticMonth, selectedIso, indicatorIso, todayIso]);
 
   useEffect(() => {
     loadMonth();
@@ -207,22 +208,23 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
 
   const leadingBlanks = days && days.length ? WEEKDAY_INDEX[days[0].weekday] : 0;
 
-  // Keyed on the SELECTED date, not today's. This used to read todayIso
-  // throughout, so the pill reported today's season permanently and picking
-  // any other day left it unchanged — which also made it impossible to see
-  // that a season was resolving at all whenever today happened to be Annual.
+  // The indicator follows the rolled liturgical date while the calendar grid
+  // continues highlighting the literal selected Gregorian date.
   const activeSeasons = useMemo(
     () => [
       ...seasons
-        .filter((season) => season.startDate <= selectedIso && season.endDate >= selectedIso)
+        .filter((season) => season.startDate <= indicatorIso && season.endDate >= indicatorIso)
         .map((season) => ({ key: season.rangeKey })),
-      ...periodKeys.map((key) => ({ key })),
+      ...contextIndicatorKeys.filter((key) => key.endsWith('-period')).map((key) => ({ key })),
     ],
-    [seasons, selectedIso, periodKeys],
+    [seasons, indicatorIso, contextIndicatorKeys],
   );
   const activeEvents = useMemo(
-    () => events.filter((event) => event.date === selectedIso).map((event) => ({ key: event.key })),
-    [events, selectedIso],
+    () => [
+      ...events.filter((event) => event.date === indicatorIso).map((event) => ({ key: event.key })),
+      ...contextIndicatorKeys.filter((key) => !key.endsWith('-period')).map((key) => ({ key })),
+    ],
+    [events, indicatorIso, contextIndicatorKeys],
   );
   const activeSeasonLabel = getSeasonIndicatorName(activeSeasons, activeEvents);
   const displayedYear = mode === 'gregorian' ? gregorianYear : copticYear;
@@ -358,7 +360,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
                 {displayedMonthName}
                 {displayedYear === null ? '' : ` ${formatCalendarDay(displayedYear, isArabic)}`}
               </Text>
-              <Icon name="chevron-down" size={18} color={COLORS.gold} />
+              <Icon name="chevron-down" size={16} color={COLORS.gold} />
             </Pressable>
             <View style={[styles.modeSelector, isArabic && styles.rowReverse]}>
               {(['gregorian', 'coptic'] as Mode[]).map((option) => {
@@ -370,7 +372,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
                     style={[styles.modeOption, isActive && styles.modeOptionActive]}
                     onPress={() => setMode(option)}
                   >
-                    <Text style={[styles.modeText, isArabic && styles.arabicText, { color: isActive ? COLORS.white : COLORS.muted }]}>
+                    <Text style={[styles.modeText, isArabic && styles.arabicText, { color: isActive ? COLORS.navyDark : COLORS.muted }]} numberOfLines={1}>
                       {labelText(option === 'gregorian' ? CALENDAR_LABELS.gregorian : CALENDAR_LABELS.coptic)}
                     </Text>
                   </Pressable>
@@ -574,24 +576,30 @@ const styles = StyleSheet.create({
   monthButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
   monthTitleGroup: { alignItems: 'center', flex: 1 },
   // Month and year read as one date on one control, rather than two adjacent
-  // dropdowns each with its own chevron competing for the same glance.
+  // dropdowns each with its own chevron competing for the same glance. No
+  // filled chrome: this is the screen's headline, and a gold-tinted box here
+  // fought the solid-gold selected-day circle for the same glance. The
+  // chevron alone carries the "opens a picker" affordance.
   datePickerTrigger: {
     alignItems: 'center',
-    backgroundColor: COLORS.goldSoft,
-    borderColor: COLORS.goldLine,
     borderRadius: 999,
-    borderWidth: 1,
     flexDirection: 'row',
-    gap: SPACING.sm,
-    minHeight: 44,
-    paddingHorizontal: SPACING.lg,
+    gap: SPACING.xs,
+    minHeight: 40,
+    paddingHorizontal: SPACING.sm,
   },
-  monthTitle: { fontFamily: TYPOGRAPHY.title, fontSize: 20, fontWeight: '700', textAlign: 'center', color: COLORS.white },
-  // Was a grey (#262626 / #4A4A4A) that belonged to no palette; navy-on-surface
-  // puts the segmented control in the app's own colours.
+  monthTitle: { fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700', letterSpacing: 0.2, textAlign: 'center', color: COLORS.white },
+  // Colours only — the shape is the original segmented control. Two things were
+  // wrong with the old palette: the ring was #262626, a dead grey belonging to
+  // no palette, and the active pill was `navy` on a `surface` track, which is a
+  // 1.4:1 contrast ratio — the selected side could never look raised, whatever
+  // the geometry. Solid gold clears 7:1 on the same track and is already this
+  // screen's "selected" colour on the day circle. Never a translucent tint
+  // here: the Soft tokens are mixed against black, so over a dark navy track
+  // the warm gold goes muddy.
   modeSelector: {
     backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
+    borderColor: COLORS.surfaceSoft,
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: 'row',
@@ -607,7 +615,7 @@ const styles = StyleSheet.create({
     minHeight: 34,
     paddingHorizontal: SPACING.sm,
   },
-  modeOptionActive: { backgroundColor: COLORS.navy },
+  modeOptionActive: { backgroundColor: COLORS.gold },
   modeText: { fontSize: 15, fontWeight: '700' },
   weekdayGrid: { flexDirection: 'row', marginBottom: SPACING.sm },
   weekday: { fontSize: 18, textAlign: 'center', width: `${100 / 7}%`, color: COLORS.muted },

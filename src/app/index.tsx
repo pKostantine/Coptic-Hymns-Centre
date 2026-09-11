@@ -20,8 +20,8 @@ export default function MainMenu() {
   const { isLive, effectiveDate, goLive } = useCalendar();
   const { preferences } = useReadingPreferences();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
-  // Sideways there is width to spare and almost no height, so the menu
-  // pairs its cards up instead of running one tall column off the screen.
+  // A sideways phone has width to spare and almost no height, so the menu
+  // pairs its cards up. Tablets retain the standard single-column layout.
   const columns = useIsCompactLandscape() ? 2 : 1;
   const showEnglish = preferences.appLanguage === 'en';
   const showArabic = preferences.appLanguage === 'ar';

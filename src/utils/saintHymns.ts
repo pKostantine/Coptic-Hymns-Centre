@@ -31,7 +31,9 @@ const CATEGORY_ORDER: Record<SaintHymnCategory, number> = {
 
 const CATEGORY_LABEL: Record<SaintHymnCategory, string> = {
   Doxology: 'Doxology',
-  VOC: 'Verse of the Cymbals',
+  // Always plural, even where a saint has only one — "Verses of the Cymbals"
+  // is the name of the hymn, not a count of what's in it.
+  VOC: 'Verses of the Cymbals',
   Psali: 'Psali',
   // Left as the name it is actually called by, the same way Psali is — this is
   // the hymn of the intercessions, from hymn_of_the_intercessions.
@@ -146,7 +148,7 @@ export function getSaintHymnIndex(): Promise<SaintEntry[]> {
 }
 
 async function buildIndex(): Promise<SaintEntry[]> {
-  const [venerationRows, doxologyRows, vocConditions, psaliConditions, hitenConditions, praxisConditions, flagRows] =
+  const [venerationRows, doxologyRows, vocConditions, psaliConditions, hitenConditions, praxisConditions, flagRows, orderRows] =
     await Promise.all([
     (async () => {
       const { data, error } = await supabase
@@ -177,6 +179,13 @@ async function buildIndex(): Promise<SaintEntry[]> {
       if (error) return [] as { flag_key: string; title_english: string | null }[];
       return (data || []) as { flag_key: string; title_english: string | null }[];
     })(),
+    (async () => {
+      const { data, error } = await supabase.from('saint_order').select('flag_key, sort_order');
+      // Soft-fail: an unreachable order table should degrade to the inferred
+      // order below, never leave the picker empty.
+      if (error) return [] as { flag_key: string; sort_order: number | string | null }[];
+      return (data || []) as { flag_key: string; sort_order: number | string | null }[];
+    })(),
   ]);
 
   const childrenByBase = new Map<string, Set<string>>();
@@ -190,6 +199,9 @@ async function buildIndex(): Promise<SaintEntry[]> {
   // Traditional position: Axios line order first, then doxology order for the
   // handful of saints with no Axios line, offset so they always follow.
   const DOXOLOGY_OFFSET = 100000;
+  // Anything absent from public.saint_order sorts after everything present in
+  // it, however large its curated sort_order grows.
+  const UNLISTED_OFFSET = Number.MAX_SAFE_INTEGER / 4;
   const sortByBase = new Map<string, number>();
   const noteSort = (condition: string | null, value: number, offset: number) => {
     if (!condition) return;
@@ -208,6 +220,18 @@ async function buildIndex(): Promise<SaintEntry[]> {
     if (row.title_english) nameByFlag.set(row.flag_key, row.title_english);
   }
 
+  // public.saint_order is the formal, hand-maintained order and wins outright
+  // where a saint is listed. The Axios/doxology derivation above stays as the
+  // fallback for anything not in the table yet — a saint added to the hymn
+  // tables still appears in a sensible place before anyone curates his row.
+  // Listed saints always precede unlisted ones, so a partially filled table
+  // never scatters curated entries through the inferred tail.
+  const explicitOrder = new Map<string, number>();
+  for (const row of orderRows) {
+    const value = Number(row.sort_order);
+    if (Number.isFinite(value)) explicitOrder.set(row.flag_key, value);
+  }
+
   const entries: SaintEntry[] = [];
   for (const [base, tokens] of childrenByBase) {
     const options: SaintHymnOption[] = [];
@@ -224,12 +248,20 @@ async function buildIndex(): Promise<SaintEntry[]> {
       });
     }
     if (!options.length) continue;
+    // A saint whose only hymn is the Axios veneration doesn't earn a menu row.
+    // That Axios is sung on his feast, and the calendar already turns it on
+    // there through the saint's own `:Feast` condition — picking it by hand on
+    // any other day isn't a real need. These are the bulk of the book, so
+    // dropping them is what makes the remaining list navigable.
+    if (options.every((option) => option.category === 'Veneration')) continue;
     options.sort((a, b) => a.sort - b.sort || a.token.localeCompare(b.token));
+    const explicit = explicitOrder.get(base);
     entries.push({
       base,
       name: nameByFlag.get(base) || humanizeSaintBase(base),
       options,
-      sort: sortByBase.get(base) ?? Number.MAX_SAFE_INTEGER,
+      // UNLISTED_OFFSET keeps every curated row ahead of every inferred one.
+      sort: explicit !== undefined ? explicit : UNLISTED_OFFSET + (sortByBase.get(base) ?? Number.MAX_SAFE_INTEGER / 2),
     });
   }
 

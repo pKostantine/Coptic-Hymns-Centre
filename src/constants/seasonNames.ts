@@ -125,11 +125,8 @@ export const EVENT_SHORT_NAMES: Record<string, string> = {
 // Ranking the span below its own feasts keeps the pill on the more specific of
 // the two.
 //
-// 'nativity-period', 'theophany-period' and 'nayrouz-period' are inert: no
-// season_ranges row carries those keys and nothing computes them client-side,
-// so they can never be scored. They are left here as a record of the intent —
-// see the note in calendarService.ts about the periods that still have no data
-// source — and are harmless until something actually produces them.
+// Nativity, Theophany and Nayrouz periods are absent from season_ranges;
+// calendarService maps their live context flags into these keys instead.
 const SEASON_INDICATOR_PRIORITIES: Record<string, number> = {
   // The three periods rank below the 50 their own feasts use, for the same
   // reason the fasts do: a period is the least specific thing true on a given
@@ -150,7 +147,9 @@ const SEASON_INDICATOR_PRIORITIES: Record<string, number> = {
 
 const EVENT_INDICATOR_PRIORITIES: Record<string, number> = {
   nativity: 80,
+  'nativity-paramoun': 70,
   theophany: 80,
+  'theophany-paramoun': 70,
   'second-day-of-theophany': 60,
   resurrection: 80,
   'holy-thursday': 80,
