@@ -76,6 +76,8 @@ export interface DocumentAction {
   sectionId?: string;
   verseId?: string | null;
   collapsed?: boolean;
+  /** "contentHeight" only: how tall the laid-out document is, for anything embedding it at its natural size. */
+  height?: number;
 }
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, coptic: true, arabic: true };
@@ -467,6 +469,26 @@ export function buildDocumentHtml(
       // section the reader was on may be exactly the one the changed setting
       // just hid, so scroll to the first candidate that still rendered and
       // leave the page at the top only if none of them did.
+      // How tall the document actually is. Anything embedding this at its
+      // natural size rather than in a full screen — the saint picker's hymn
+      // preview — has no other way to know: the content is laid out in here.
+      // Reported once the fonts and layout have settled, and again whenever
+      // the width changes and the columns reflow.
+      function reportContentHeight() {
+        var body = document.body;
+        var html = document.documentElement;
+        postAction('contentHeight', {
+          height: Math.max(
+            body ? body.scrollHeight : 0,
+            html ? html.scrollHeight : 0,
+          ),
+        });
+      }
+      window.addEventListener('load', function () {
+        reportContentHeight();
+        setTimeout(reportContentHeight, 120);
+      });
+      window.addEventListener('resize', reportContentHeight);
       window.scrollToSection = function (sectionId) {
         var candidates = Array.isArray(sectionId) ? sectionId : [sectionId];
         for (var i = 0; i < candidates.length; i += 1) {

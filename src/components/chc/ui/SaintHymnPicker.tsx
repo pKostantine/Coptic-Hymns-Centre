@@ -4,17 +4,20 @@ import {
   FlatList,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon from '@/components/chc/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import DocumentWebView, { DocumentAction } from '@/components/chc/DocumentWebView';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
+import { fontScaleToPx } from '@/utils/preferencesStorage';
 import {
   getSaintHymnIndex,
   getSaintHymnPreview,
@@ -76,6 +79,11 @@ export default function SaintHymnPicker({
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [previewHymns, setPreviewHymns] = useState<SaintHymnPreviewHymn[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  // The laid-out height the document reports back, so the window is the size
+  // of the hymn rather than a fixed box with a one-line Axios adrift in it.
+  const [previewContentHeight, setPreviewContentHeight] = useState<number | null>(null);
+  const { height: windowHeight } = useWindowDimensions();
+  const { preferences } = useReadingPreferences();
 
   const label = (entry: { english: string; arabic: string }) => (isArabic ? entry.arabic : entry.english);
   const localized = isArabic && styles.arabicText;
@@ -119,7 +127,44 @@ export default function SaintHymnPicker({
   const openPreview = (target: PreviewTarget) => {
     setPreviewHymns(null);
     setPreviewError(null);
+    setPreviewContentHeight(null);
     setPreview(target);
+  };
+
+  /**
+   * The hymn as the document itself would lay it out — the same renderer, the
+   * same three-column table, the same fonts, speaker labels and alternating
+   * colours, reading the reader's own language and display settings. A preview
+   * that reflowed the verses into a list would be showing something the
+   * service never looks like.
+   *
+   * Slideshow Mode is the one setting deliberately ignored: this is a window
+   * onto a hymn, not a place to page through one.
+   */
+  const previewSections = useMemo(
+    () =>
+      (previewHymns || []).map((hymn) => ({
+        id: hymn.hymnKey,
+        title: hymn.title,
+        titlePrayerType: hymn.titlePrayerType,
+        verses: hymn.verses,
+      })),
+    [previewHymns],
+  );
+
+  // Capped well under the window: a 24-verse Psali should scroll inside the
+  // window rather than push its own Close button off the screen.
+  const previewBodyHeight = Math.min(previewContentHeight ?? 220, Math.round(windowHeight * 0.6));
+
+  // The reader's own size, but held to something a window this wide can still
+  // show three columns of. At the top of the text-size range a real document
+  // line is taller than this whole window.
+  const previewFontSize = Math.min(fontScaleToPx(preferences.fontScale), 20);
+
+  const handlePreviewAction = (action: DocumentAction) => {
+    if (action.type === 'contentHeight' && typeof action.height === 'number' && action.height > 0) {
+      setPreviewContentHeight(Math.ceil(action.height));
+    }
   };
 
   // Closing clears this sheet's own transient state, so it never reopens with
@@ -348,27 +393,24 @@ export default function SaintHymnPicker({
             ) : previewHymns.length === 0 ? (
               <Text style={[styles.message, localized]}>{label(LABELS.noPreview)}</Text>
             ) : (
-              <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewContent}>
-                {previewHymns.map((hymn) => (
-                  <View key={hymn.hymnKey} style={styles.previewHymn}>
-                    {/* Named only when the choice brings in more than one hymn
-                        — an Adam and a Vatos Psali, say — since otherwise the
-                        header above already says what this is. */}
-                    {previewHymns.length > 1 && (hymn.title.english || hymn.title.arabic) ? (
-                      <Text style={[styles.previewHymnTitle, localized]}>
-                        {isArabic ? hymn.title.arabic || hymn.title.english : hymn.title.english || hymn.title.arabic}
-                      </Text>
-                    ) : null}
-                    {hymn.verses.map((verse, index) => (
-                      <View key={index} style={styles.previewVerse}>
-                        {verse.coptic.trim() ? <Text style={styles.previewCoptic}>{verse.coptic}</Text> : null}
-                        {verse.english.trim() ? <Text style={styles.previewEnglish}>{verse.english}</Text> : null}
-                        {verse.arabic.trim() ? <Text style={styles.previewArabic}>{verse.arabic}</Text> : null}
-                      </View>
-                    ))}
-                  </View>
-                ))}
-              </ScrollView>
+              <View style={[styles.previewBody, { height: previewBodyHeight }]}>
+                <DocumentWebView
+                  sections={previewSections}
+                  fontSize={previewFontSize}
+                  visibleColumns={{
+                    english: preferences.visibleLanguages.english,
+                    coptic: preferences.visibleLanguages.coptic,
+                    arabic: preferences.visibleLanguages.arabic,
+                  }}
+                  appLanguage={preferences.appLanguage}
+                  selectText={false}
+                  displayComments={preferences.displayComments}
+                  displaySilentPrayers={preferences.displaySilentPrayers}
+                  bishopPresent={preferences.bishopPresent}
+                  copticRecitedPrayers={preferences.visibleLanguages.copticRecitedPrayers}
+                  onAction={handlePreviewAction}
+                />
+              </View>
             )}
 
             <View style={styles.popoverActions}>
@@ -492,29 +534,19 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 16,
     borderWidth: 1,
-    // Tall enough to read a doxology in without becoming a second document
-    // screen — a preview is for recognising the hymn, not praying it.
-    maxHeight: '78%',
     maxWidth: 460,
     padding: SPACING.md,
     width: '100%',
   },
   previewSubtitle: { color: COLORS.gold, fontSize: 13, fontWeight: '700', marginBottom: SPACING.sm },
   previewLoading: { paddingVertical: SPACING.xl },
-  previewScroll: { flexGrow: 0 },
-  previewContent: { gap: SPACING.md, paddingBottom: SPACING.xs },
-  previewHymn: { gap: SPACING.sm },
-  previewHymnTitle: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 14, fontWeight: '800' },
-  previewVerse: { gap: 2 },
-  previewCoptic: { color: COLORS.white, fontFamily: TYPOGRAPHY.coptic, fontSize: 17, lineHeight: 24 },
-  previewEnglish: { color: COLORS.white, fontSize: 14, lineHeight: 20 },
-  previewArabic: {
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.arabic,
-    fontSize: 15,
-    lineHeight: 24,
-    textAlign: 'right',
-    writingDirection: 'rtl',
+  // The document renderer fills whatever it is given, so the height set on
+  // this is what decides the window's size — see previewBodyHeight.
+  previewBody: {
+    borderColor: COLORS.border,
+    borderRadius: RADII.sm,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   popoverActions: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end', marginTop: SPACING.xs },
   popoverAction: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs },

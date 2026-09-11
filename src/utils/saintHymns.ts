@@ -1,3 +1,5 @@
+import type { DocumentVerse } from '../components/chc/documentHtml';
+import { buildVerseFromTextRow } from './hymnLibrary';
 import { supabase } from './supabase';
 
 /**
@@ -289,16 +291,13 @@ const CATEGORY_SOURCE: Record<SaintHymnCategory, { schema: string; orderTable: s
 
 const VENERATION_HYMN_KEY = 'axios';
 
-export interface SaintHymnPreviewVerse {
-  english: string;
-  coptic: string;
-  arabic: string;
-}
-
 export interface SaintHymnPreviewHymn {
   hymnKey: string;
   title: { english: string; arabic: string };
-  verses: SaintHymnPreviewVerse[];
+  /** The hymn's own prayer_type, which a verse without one of its own inherits — exactly as a section's does in a real document. */
+  titlePrayerType: string | null;
+  /** Built by the same function the document builds its verses with, so the preview can be handed straight to the document renderer. */
+  verses: DocumentVerse[];
 }
 
 function escapeForRegExp(value: string) {
@@ -317,7 +316,7 @@ function referencesToken(condition: string | null | undefined, token: string): b
   return new RegExp(`${escapeForRegExp(token)}(?![A-Za-z0-9_])`).test(condition);
 }
 
-function hasText(verse: SaintHymnPreviewVerse) {
+function hasText(verse: DocumentVerse) {
   return Boolean(verse.english.trim() || verse.coptic.trim() || verse.arabic.trim());
 }
 
@@ -327,22 +326,36 @@ interface TextRow {
   english: string | null;
   coptic: string | null;
   arabic: string | null;
+  person_type: string | null;
+  prayer_type: string | null;
 }
 
-function toVerse(row: TextRow): SaintHymnPreviewVerse {
-  return { english: row.english || '', coptic: row.coptic || '', arabic: row.arabic || '' };
-}
+/** Every column the document's own verse builder reads, so a previewed verse is the verse. */
+const TEXT_COLUMNS = 'hymn_key, line_order, english, coptic, arabic, person_type, prayer_type';
 
 const byLineOrder = (a: TextRow, b: TextRow) => (Number(a.line_order) || 0) - (Number(b.line_order) || 0);
 
+function toVerses(rows: TextRow[], titlePrayerType: string | null): DocumentVerse[] {
+  return rows
+    .sort(byLineOrder)
+    .map((row) => buildVerseFromTextRow(row, titlePrayerType) as DocumentVerse)
+    .filter(hasText);
+}
+
+interface HymnTitle {
+  english: string;
+  arabic: string;
+  prayerType: string | null;
+}
+
 async function loadTitles(schema: string, hymnKeys: string[]) {
-  const titles = new Map<string, { english: string; arabic: string }>();
+  const titles = new Map<string, HymnTitle>();
   if (!hymnKeys.length) return titles;
 
   const { data } = await supabase
     .schema(schema)
     .from('hymn_titles')
-    .select('hymn_key, title_english, title_arabic')
+    .select('hymn_key, title_english, title_arabic, prayer_type')
     .in('hymn_key', hymnKeys);
 
   // Only real titles go in the map, so a row that exists with nothing in it
@@ -351,10 +364,17 @@ async function loadTitles(schema: string, hymnKeys: string[]) {
   // all, which arrives here as no data and is handled by the same fallback --
   // the error is deliberately not raised, since a missing name is no reason to
   // refuse to show the hymn.
-  for (const row of (data || []) as { hymn_key: string; title_english: string | null; title_arabic: string | null }[]) {
+  for (const row of (data || []) as {
+    hymn_key: string;
+    title_english: string | null;
+    title_arabic: string | null;
+    prayer_type: string | null;
+  }[]) {
     const english = row.title_english || '';
     const arabic = row.title_arabic || '';
-    if (english || arabic) titles.set(row.hymn_key, { english, arabic });
+    if (english || arabic || row.prayer_type) {
+      titles.set(row.hymn_key, { english, arabic, prayerType: row.prayer_type || null });
+    }
   }
   return titles;
 }
@@ -366,21 +386,25 @@ async function loadPreview(token: string, category: SaintHymnCategory): Promise<
     const { data, error } = await supabase
       .schema(source.schema)
       .from('hymn_texts')
-      .select('hymn_key, line_order, english, coptic, arabic, condition')
+      .select(`${TEXT_COLUMNS}, condition`)
       .eq('hymn_key', VENERATION_HYMN_KEY)
       .ilike('condition', `%${token}%`);
     if (error) throw new Error(`Unable to load this hymn: ${error.message}`);
 
+    const titles = await loadTitles(source.schema, [VENERATION_HYMN_KEY]);
+    const title = titles.get(VENERATION_HYMN_KEY);
     const rows = ((data || []) as (TextRow & { condition: string | null })[])
-      .filter((row) => referencesToken(row.condition, token))
-      .sort(byLineOrder);
-    const verses = rows.map(toVerse).filter(hasText);
+      .filter((row) => referencesToken(row.condition, token));
+    const verses = toVerses(rows, title?.prayerType ?? null);
     if (!verses.length) return [];
 
-    const titles = await loadTitles(source.schema, [VENERATION_HYMN_KEY]);
     return [{
       hymnKey: VENERATION_HYMN_KEY,
-      title: titles.get(VENERATION_HYMN_KEY) || { english: CATEGORY_LABEL[category], arabic: '' },
+      title: {
+        english: title?.english || CATEGORY_LABEL[category],
+        arabic: title?.arabic || '',
+      },
+      titlePrayerType: title?.prayerType ?? null,
       verses,
     }];
   }
@@ -409,7 +433,7 @@ async function loadPreview(token: string, category: SaintHymnCategory): Promise<
     supabase
       .schema(source.schema)
       .from('hymn_texts')
-      .select('hymn_key, line_order, english, coptic, arabic')
+      .select(TEXT_COLUMNS)
       .in('hymn_key', hymnKeys),
     loadTitles(source.schema, hymnKeys),
   ]);
@@ -422,11 +446,18 @@ async function loadPreview(token: string, category: SaintHymnCategory): Promise<
   }
 
   return hymnKeys
-    .map((hymnKey) => ({
-      hymnKey,
-      title: titles.get(hymnKey) || { english: humanizeSaintBase(hymnKey), arabic: '' },
-      verses: (linesByHymn.get(hymnKey) || []).sort(byLineOrder).map(toVerse).filter(hasText),
-    }))
+    .map((hymnKey) => {
+      const title = titles.get(hymnKey);
+      return {
+        hymnKey,
+        title: {
+          english: title?.english || humanizeSaintBase(hymnKey),
+          arabic: title?.arabic || '',
+        },
+        titlePrayerType: title?.prayerType ?? null,
+        verses: toVerses(linesByHymn.get(hymnKey) || [], title?.prayerType ?? null),
+      };
+    })
     .filter((hymn) => hymn.verses.length > 0);
 }
 

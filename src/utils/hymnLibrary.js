@@ -798,24 +798,10 @@ export function assembleServiceSections(rawRows) {
 
     if (row.english || row.coptic || row.arabic) {
       sectionMap.get(key).verses.push({
-        english: row.english || "",
-        coptic: row.coptic || "",
-        arabic: row.arabic || "",
+        ...buildVerseFromTextRow(row, row.title_prayer_type),
+        // The flattened service row carries the line's condition under its own
+        // name, since the row also carries the placement's condition.
         condition: normalizeText(row.line_condition),
-        type: resolveEffectiveVerseType(row.person_type, row.prayer_type, row.title_prayer_type),
-        prayerType: row.prayer_type || null,
-        // Preserved separately from `type` so a Silent/Recited Prayer or
-        // Refrain line said by a specific speaker still shows/tracks that
-        // speaker — see resolvePersonRole.
-        personRole: resolvePersonRole(row.person_type),
-        // "Invincible Coptic" lines have no English/Arabic counterpart by
-        // design (a Coptic-only exclamation like "Glory to our God") — they
-        // render as a single centered column rather than trying to line up
-        // against blank parallel columns.
-        invincibleCoptic: row.prayer_type === "Invincible Coptic",
-        // Pre-Refrain keeps its natural type/role (see resolveEffectiveVerseType
-        // above) but always renders italic on top of it.
-        italic: shouldItalicizeAsPreRefrain(row.prayer_type, row.title_prayer_type, row.person_type),
       });
     }
   }
@@ -915,6 +901,42 @@ function resolveEffectiveVerseType(personType, prayerType, sectionTitlePrayerTyp
   const inheritedPrayerType = isPreRefrainPrayerType(sectionTitlePrayerType) ? "" : sectionTitlePrayerType;
   const effectivePrayerType = ownPrayerType || (personType === "Comment" ? "" : inheritedPrayerType) || "";
   return getServiceVerseType(personType, effectivePrayerType);
+}
+
+/**
+ * A hymn_texts row as the renderers want it. Pulled out so anything reading
+ * those rows outside a full hydration — the saint picker's hymn preview, say
+ * — lands on exactly the verse the document would build from the same row,
+ * rather than on a second, quietly diverging interpretation of person_type
+ * and prayer_type.
+ *
+ * `sectionTitlePrayerType` is the hymn's own overall prayer_type, which a
+ * verse without one of its own inherits.
+ *
+ * @param {{ english?: string | null, coptic?: string | null, arabic?: string | null, condition?: string | null, person_type?: string | null, prayer_type?: string | null }} row
+ * @param {string | null} [sectionTitlePrayerType]
+ */
+export function buildVerseFromTextRow(row, sectionTitlePrayerType = null) {
+  return {
+    english: row.english || "",
+    coptic: row.coptic || "",
+    arabic: row.arabic || "",
+    condition: normalizeText(row.condition),
+    type: resolveEffectiveVerseType(row.person_type, row.prayer_type, sectionTitlePrayerType),
+    prayerType: row.prayer_type || null,
+    // Preserved separately from `type` so a Silent/Recited Prayer or
+    // Refrain line said by a specific speaker still shows/tracks that
+    // speaker — see resolvePersonRole.
+    personRole: resolvePersonRole(row.person_type),
+    // "Invincible Coptic" lines have no English/Arabic counterpart by
+    // design (a Coptic-only exclamation like "Glory to our God") — they
+    // render across the whole row rather than trying to line up against
+    // blank parallel columns.
+    invincibleCoptic: row.prayer_type === "Invincible Coptic",
+    // Pre-Refrain keeps its natural type/role (see resolveEffectiveVerseType
+    // above) but always renders italic on top of it.
+    italic: shouldItalicizeAsPreRefrain(row.prayer_type, sectionTitlePrayerType, row.person_type),
+  };
 }
 
 function isPreRefrainPrayerType(prayerType) {
