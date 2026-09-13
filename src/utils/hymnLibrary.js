@@ -429,6 +429,34 @@ function getSynaxariumForDate(isoDate) {
 }
 
 
+/** Said by the priest over the congregation before the day's introduction is read. */
+const SIGN_OF_THE_CROSS = {
+  english: "In the name of the Father and the Son and the Holy Spirit, one God. Amen.",
+  arabic: "باسمِ الآبِ والابنِ والرّوحِ القُدُسِ الإلهِ الواحدِ. آمين.",
+};
+
+const SYNAXARIUM_INTRO_PERSON_TYPE = "Bishop/Priest";
+const SYNAXARIUM_ENTRY_PERSON_TYPE = "Reader";
+
+/**
+ * A Synaxarium verse. These sections are assembled here rather than read from
+ * a hymn_texts table, so the speaker role has to be resolved the same way
+ * buildVerseFromTextRow would have resolved it from a person_type column --
+ * `type` for the rubric, `personRole` so the label survives whatever `type`
+ * later collapses to.
+ */
+function synaxariumVerse({ english, arabic }, personType) {
+  return {
+    english: english || "",
+    arabic: arabic ?? null,
+    coptic: null,
+    type: getServiceVerseType(personType, null),
+    personRole: resolvePersonRole(personType),
+    person_type: personType,
+    prayer_type: null,
+  };
+}
+
 /** Fetches today's Synaxarium via get_day_json and maps it to hydrated sections:
  *  one title-only header for the Coptic date, then one section per saint entry
  *  with its long body text split on double-newlines for slide pagination. */
@@ -458,37 +486,34 @@ async function resolveSynaxariumSections(isoDate) {
     });
   }
 
+  // The introduction is the priest's, and it opens with the sign of the cross
+  // -- the same words every day, so they live here rather than in each day's
+  // row. The section is built whenever the day has entries at all, so the
+  // cross is never dropped on a day get_intro has no sentence for.
+  const introVerses = [synaxariumVerse(SIGN_OF_THE_CROSS, SYNAXARIUM_INTRO_PERSON_TYPE)];
   if (dayData.intro) {
-    sections.push({
-      id: "synaxarium-intro",
-      title: { english: "", arabic: "" },
-      titlePrayerType: null,
-      collapsible: false,
-      defaultCollapsed: false,
-      verses: [{
-        english: dayData.intro.english || "",
-        arabic: dayData.intro.arabic || "",
-        coptic: null,
-        type: "text",
-        person_type: null,
-        prayer_type: null,
-      }],
-      isReading: true,
-      forceWhiteVerses: true,
-      prayerType: null,
-      alternateEvery: null,
-    });
+    introVerses.push(synaxariumVerse(
+      { english: dayData.intro.english || "", arabic: dayData.intro.arabic || "" },
+      SYNAXARIUM_INTRO_PERSON_TYPE,
+    ));
   }
+  sections.push({
+    id: "synaxarium-intro",
+    title: { english: "", arabic: "" },
+    titlePrayerType: null,
+    collapsible: false,
+    defaultCollapsed: false,
+    verses: introVerses,
+    isReading: true,
+    forceWhiteVerses: true,
+    prayerType: null,
+    alternateEvery: null,
+  });
 
   for (const entry of dayData.entries) {
-    const verses = (entry.paragraphs || []).map((p) => ({
-      english: p.english || "",
-      arabic: p.arabic ?? null,
-      coptic: null,
-      type: "text",
-      person_type: null,
-      prayer_type: null,
-    }));
+    // The commemorations themselves are read out, not prayed by the priest.
+    const verses = (entry.paragraphs || []).map((p) =>
+      synaxariumVerse({ english: p.english || "", arabic: p.arabic ?? null }, SYNAXARIUM_ENTRY_PERSON_TYPE));
     sections.push({
       id: entry.entry_key,
       title: { english: entry.title_english || "", arabic: entry.title_arabic || "" },
