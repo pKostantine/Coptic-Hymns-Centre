@@ -510,10 +510,15 @@ async function resolveSynaxariumSections(isoDate) {
     alternateEvery: null,
   });
 
-  for (const entry of dayData.entries) {
-    // The commemorations themselves are read out, not prayed by the priest.
+  dayData.entries.forEach((entry, index) => {
+    // The commemorations are read out, not prayed by the priest -- but the
+    // reader is named once, on the first of them, and simply carries on
+    // through the rest. Each entry is its own titled section, so leaving the
+    // role on all of them would restart the rubric and print "Reader:" over
+    // every commemoration in the day.
+    const personType = index === 0 ? SYNAXARIUM_ENTRY_PERSON_TYPE : null;
     const verses = (entry.paragraphs || []).map((p) =>
-      synaxariumVerse({ english: p.english || "", arabic: p.arabic ?? null }, SYNAXARIUM_ENTRY_PERSON_TYPE));
+      synaxariumVerse({ english: p.english || "", arabic: p.arabic ?? null }, personType));
     sections.push({
       id: entry.entry_key,
       title: { english: entry.title_english || "", arabic: entry.title_arabic || "" },
@@ -526,7 +531,7 @@ async function resolveSynaxariumSections(isoDate) {
       prayerType: null,
       alternateEvery: null,
     });
-  }
+  });
 
   return sections;
 }
