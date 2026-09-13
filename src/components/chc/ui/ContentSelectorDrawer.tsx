@@ -3,6 +3,7 @@ import { Animated, Easing, type LayoutChangeEvent, Modal, Platform, Pressable, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { formatArabicDigits } from '../../../utils/displayText';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
@@ -96,6 +97,15 @@ function isDividerSection(section: DocumentSection): boolean {
 }
 
 function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
+  const title = resolveSectionSelectorTitle(section);
+  // Arabic carries its own numerals wherever the app writes Arabic, so a
+  // reading listed as متى 11:11-19 belongs here as متى ١١:١١-١٩. Applied to the
+  // title once, rather than at each place one is drawn, because every one of
+  // those falls back to the Arabic when a section has no English title.
+  return { english: title?.english || '', arabic: formatArabicDigits(title?.arabic || '') };
+}
+
+function resolveSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
   const readingReference = section.verses.find((verse) => verse.type === 'readingReference');
   const baseTitle = getReadingReferenceSelectorBaseTitle(section);
   if (baseTitle) {
