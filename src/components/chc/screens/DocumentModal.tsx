@@ -10,6 +10,7 @@ import SeasonSelectorScreen from './SeasonSelectorScreen';
 import SettingsScreen from './SettingsScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
+import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
@@ -136,7 +137,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       const triggerSection = sections.find((s) => s.id === action.sectionId);
       if (triggerSection?.subdocumentSections) {
         setNestedModal({
-          title: triggerSection.title,
+          title: getSectionSelectorTitle(triggerSection),
           sections: triggerSection.subdocumentSections,
           subdocumentKey: triggerSection.subdocumentKey,
           collapseMemoryScope: `${collapseMemoryScope}:sub:${triggerSection.id}`,

@@ -3,11 +3,11 @@ import { Animated, Easing, type LayoutChangeEvent, Modal, Platform, Pressable, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
-import { formatArabicDigits } from '../../../utils/displayText';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection } from '../documentHtml';
+import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import Icon from './Icon';
 
 interface ContentSelectorDrawerProps {
@@ -30,44 +30,6 @@ interface ContentSelectorDrawerProps {
   copticGospelRite?: boolean;
   /** Drives which single language each list entry's title shows — falls back to whichever language has text when the selected one is missing. */
   appLanguage?: AppLanguage;
-}
-
-const READING_REFERENCE_SELECTOR_TITLES = new Set(['pauline epistle', 'catholic epistle', 'praxis']);
-const READING_REFERENCE_SELECTOR_KEY_PATTERN = /^(PAULINE_EPISTLE|CATHOLIC_EPISTLE|PRAXIS)(_|$)/;
-const READING_REFERENCE_SELECTOR_KEY_TITLES: Record<string, { english: string; arabic: string }> = {
-  PAULINE_EPISTLE: { english: 'Pauline Epistle', arabic: 'البولس' },
-  CATHOLIC_EPISTLE: { english: 'Catholic Epistle', arabic: 'الكاثوليكون' },
-  PRAXIS: { english: 'Praxis', arabic: 'الإبركسيس' },
-};
-
-function normalizeSelectorTitle(value?: string) {
-  return String(value || '')
-    .trim()
-    .replace(/^the\s+/i, '')
-    .replace(/\s+/g, ' ')
-    .toLowerCase();
-}
-
-function shouldAppendReadingReference(section: DocumentSection, readingReference?: { english?: string; arabic?: string }) {
-  if (!readingReference?.english && !readingReference?.arabic) return false;
-  const key = String(section.hymnKey || (section as DocumentSection & { hymn_key?: string }).hymn_key || '').toUpperCase();
-  return READING_REFERENCE_SELECTOR_TITLES.has(normalizeSelectorTitle(section.title?.english)) ||
-    READING_REFERENCE_SELECTOR_KEY_PATTERN.test(key);
-}
-
-function getReadingReferenceSelectorBaseTitle(section: DocumentSection) {
-  if (section.title?.english || section.title?.arabic) return section.title;
-  const key = String(section.hymnKey || (section as DocumentSection & { hymn_key?: string }).hymn_key || '').toUpperCase();
-  const match = key.match(READING_REFERENCE_SELECTOR_KEY_PATTERN);
-  return match ? READING_REFERENCE_SELECTOR_KEY_TITLES[match[1]] : null;
-}
-
-function appendReadingReference(title: string, reference?: string) {
-  const cleanTitle = String(title || '').trim();
-  const cleanReference = String(reference || '').trim();
-  if (!cleanTitle || !cleanReference) return cleanTitle;
-  if (cleanTitle.includes(`(${cleanReference})`)) return cleanTitle;
-  return `${cleanTitle} (${cleanReference})`;
 }
 
 /**
@@ -94,31 +56,6 @@ const SECTION_DIVIDER_KEY = /^introduction(?!Of|To)[A-Za-z]*(?:Hour|Watch|Veil)$
 
 function isDividerSection(section: DocumentSection): boolean {
   return SECTION_DIVIDER_KEY.test(section.hymnKey || '');
-}
-
-function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
-  const title = resolveSectionSelectorTitle(section);
-  // Arabic carries its own numerals wherever the app writes Arabic, so a
-  // reading listed as متى 11:11-19 belongs here as متى ١١:١١-١٩. Applied to the
-  // title once, rather than at each place one is drawn, because every one of
-  // those falls back to the Arabic when a section has no English title.
-  return { english: title?.english || '', arabic: formatArabicDigits(title?.arabic || '') };
-}
-
-function resolveSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
-  const readingReference = section.verses.find((verse) => verse.type === 'readingReference');
-  const baseTitle = getReadingReferenceSelectorBaseTitle(section);
-  if (baseTitle) {
-    if (!shouldAppendReadingReference(section, readingReference)) return section.title;
-    return {
-      english: appendReadingReference(baseTitle.english || '', readingReference?.english),
-      arabic: appendReadingReference(baseTitle.arabic || '', readingReference?.arabic),
-    };
-  }
-  return {
-    english: readingReference?.english || '',
-    arabic: readingReference?.arabic || '',
-  };
 }
 
 /** CHC ContentSelectorDrawer — ported 1:1 from HymnDisplayScreen.js's selector Modal/panel. */

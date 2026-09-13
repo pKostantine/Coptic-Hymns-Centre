@@ -17,6 +17,7 @@ import { useCalendar } from '../../../context/CalendarContext';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
 import { getEpistleConditionFlags } from '../../../utils/readingsService';
+import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import { getLastDocumentPosition, setLastDocumentPosition } from '../../../utils/lastDocumentPosition';
 import { goBack } from '../../../utils/navigation';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
@@ -285,7 +286,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     const triggerSection = sections.find((s) => s.subdocumentKey === initialSubdocumentKey);
     if (triggerSection?.subdocumentSections) {
       setSubdocumentModal({
-        title: triggerSection.title,
+        title: getSectionSelectorTitle(triggerSection),
         sections: triggerSection.subdocumentSections,
         subdocumentKey: triggerSection.subdocumentKey,
         collapseMemoryScope: `${documentPositionKey}:sub:${triggerSection.id}`,
@@ -486,7 +487,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
 
     if (action.type === 'openSubdocument') {
       setSubdocumentModal({
-        title: triggerSection.title,
+        title: getSectionSelectorTitle(triggerSection),
         sections: triggerSection.subdocumentSections,
         subdocumentKey: triggerSection.subdocumentKey,
         collapseMemoryScope: `${documentPositionKey}:sub:${triggerSection.id}`,
