@@ -195,6 +195,12 @@ export const HYPERLINK_TARGETS: Record<string, HyperlinkTarget> = {
   LITURGY_OF_ST_GREGORY: hyperlinkTarget('/liturgy/divine-liturgy/liturgy_of_st_gregory', DIVINE_LITURGY_SERVICES, 'liturgy_of_st_gregory'),
   LITURGY_OF_ST_CYRIL: hyperlinkTarget('/liturgy/divine-liturgy/liturgy_of_st_cyril', DIVINE_LITURGY_SERVICES, 'liturgy_of_st_cyril'),
   DISTRIBUTION: hyperlinkTarget('/liturgy/divine-liturgy/distribution', DIVINE_LITURGY_SERVICES, 'distribution'),
+  // The lectionary's three services link on from one to the next. Their keys
+  // carry the LECTIONARY_ prefix because VESPERS and MATINS above already
+  // name the Raising of Incense services, which are a different document.
+  LECTIONARY_VESPERS: hyperlinkTarget('/lectionary/vespers', SERVICES_BY_CATEGORY.lectionary, 'vespers'),
+  LECTIONARY_MATINS: hyperlinkTarget('/lectionary/matins', SERVICES_BY_CATEGORY.lectionary, 'matins'),
+  LECTIONARY_LITURGY: hyperlinkTarget('/lectionary/liturgy', SERVICES_BY_CATEGORY.lectionary, 'liturgy'),
 };
 
 /**
