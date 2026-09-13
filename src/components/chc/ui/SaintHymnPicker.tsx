@@ -25,7 +25,7 @@ import {
   SaintHymnCategory,
   SaintHymnPreviewHymn,
 } from '@/utils/saintHymns';
-import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
+import { DISABLED_TEXT_SELECTION_STYLE, EDITABLE_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
 interface SaintHymnPickerProps {
   visible: boolean;
@@ -260,7 +260,7 @@ export default function SaintHymnPicker({
               onChangeText={setQuery}
               placeholder={label(LABELS.search)}
               placeholderTextColor={COLORS.muted}
-              style={[styles.searchInput, localized]}
+              style={[styles.searchInput, localized, EDITABLE_TEXT_SELECTION_STYLE]}
               autoCorrect={false}
               autoCapitalize="none"
               returnKeyType="search"
