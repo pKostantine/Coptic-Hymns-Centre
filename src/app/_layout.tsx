@@ -1,43 +1,50 @@
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts as useLocalFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View } from 'react-native';
 
 import { COLORS } from '@/constants/theme';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { CalendarProvider } from '@/context/CalendarContext';
+import type { OrientationMode } from '@/utils/preferencesStorage';
 
 SplashScreen.preventAutoHideAsync();
 
-const ORIENTATION_LOCKS = {
-  auto: 'UNLOCK',
-  landscape: 'LANDSCAPE_RIGHT',
-  reverseLandscape: 'LANDSCAPE_LEFT',
-  portrait: 'PORTRAIT_UP',
-} as const;
+type StackOrientation = 'default' | 'landscape_right' | 'landscape_left' | 'portrait_up';
 
-function OrientationLock() {
+const STACK_ORIENTATIONS: Record<OrientationMode, StackOrientation> = {
+  auto: 'default',
+  landscape: 'landscape_right',
+  reverseLandscape: 'landscape_left',
+  portrait: 'portrait_up',
+};
+
+function AppStack() {
   const { preferences } = useReadingPreferences();
+  const orientation = STACK_ORIENTATIONS[preferences.orientationMode];
 
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-
-    (async () => {
-      const ScreenOrientation = await import('expo-screen-orientation');
-      const mode = ORIENTATION_LOCKS[preferences.orientationMode];
-      if (mode === 'UNLOCK') {
-        await ScreenOrientation.unlockAsync();
-      } else {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock[mode]);
-      }
-    })();
-  }, [preferences.orientationMode]);
-
-  return null;
+  // Expo Router delegates this option to the native screen controller. That
+  // keeps its bounds and orientation in one lifecycle, including when an iPad
+  // scene returns from the background. Calling lockAsync from AppState's
+  // immediate "active" event can race the scene's restored dimensions and
+  // leave the route rendered with portrait-width bounds in landscape.
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: COLORS.black },
+        orientation,
+      }}
+    >
+      {/* Books <-> App Settings behaves like switching tabs, not pushing a
+          subpage - no slide transition between them. */}
+      <Stack.Screen name="index" options={{ animation: 'none' }} />
+      <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
+    </Stack>
+  );
 }
 
 export default function RootLayout() {
@@ -64,18 +71,7 @@ export default function RootLayout() {
       <ReadingPreferencesProvider>
         <CalendarProvider>
           <StatusBar style="light" />
-          <OrientationLock />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: COLORS.black },
-            }}
-          >
-            {/* Books <-> App Settings behaves like switching tabs, not pushing a
-                subpage — no slide transition between them. */}
-            <Stack.Screen name="index" options={{ animation: 'none' }} />
-            <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
-          </Stack>
+          <AppStack />
         </CalendarProvider>
       </ReadingPreferencesProvider>
     </SafeAreaProvider>

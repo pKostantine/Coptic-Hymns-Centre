@@ -1051,6 +1051,36 @@ function deriveStructuralFlags(schema, table) {
   return flags;
 }
 
+/**
+ * Finishes a section built outside the full service hydrator so it renders
+ * exactly like a real document section: inherited Pre-Refrain italics,
+ * Single/Double/etc. alternation metadata, and the one-capital Coptic casing
+ * pass all live here.
+ */
+export function formatDocumentHymnSection(section) {
+  const titlePrayerType = section?.titlePrayerType || null;
+  const verses = applyInheritedPreRefrainItalic(section?.verses || [], titlePrayerType);
+  const dominantPrayerType = getDominantPrayerType(titlePrayerType, verses);
+  const formatted = {
+    ...section,
+    titlePrayerType,
+    verses,
+    prayerType: dominantPrayerType,
+  };
+
+  if (dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)) {
+    formatted.alternateEvery = ALTERNATE_EVERY[dominantPrayerType];
+    formatted.reverseAlternating = dominantPrayerType === "Reverse Alternating";
+    formatted.forceWhiteVerses = false;
+  } else {
+    formatted.alternateEvery = null;
+    formatted.reverseAlternating = false;
+    formatted.forceWhiteVerses = true;
+  }
+
+  return applyCopticCaseToSection(formatted);
+}
+
 export async function hydrateSupabaseServiceHymn(schema, table, date, extraContext = {}, weekdayDate, depth = 0) {
   const structuralFlags = deriveStructuralFlags(schema, table);
   const flags = await getContextFlags(date, { ...structuralFlags, ...extraContext }, weekdayDate);
