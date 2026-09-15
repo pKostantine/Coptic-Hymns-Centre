@@ -10,6 +10,7 @@ import {
   getMeasurementBatch,
   getPageTurnForKey,
   getPageTurnForTap,
+  getPageTurnForViewportTap,
   getSlideContentBudget,
   getSlidePadding,
   getSlideshowChromeMetrics,
@@ -230,6 +231,8 @@ test("speaker-only visible columns remain in the aligned layout", () => {
 test("tap, keyboard, clicker, and adjacent-page controls are deterministic", () => {
   assert.equal(getPageTurnForTap(10, 100), "previous");
   assert.equal(getPageTurnForTap(90, 100), "next");
+  assert.equal(getPageTurnForViewportTap(510, 320, 400), "previous");
+  assert.equal(getPageTurnForViewportTap(690, 320, 400), "next");
   assert.equal(getPageTurnForKey("PageDown"), "next");
   assert.equal(getPageTurnForKey(" "), "next");
   assert.equal(getPageTurnForKey("ArrowUp"), "previous");
@@ -238,4 +241,25 @@ test("tap, keyboard, clicker, and adjacent-page controls are deterministic", () 
   assert.equal(getPageTurnForKey("Escape"), null);
   assert.deepEqual(getAdjacentSlideIndexes(4, 10), [3, 4, 5]);
   assert.deepEqual(getAdjacentSlideIndexes(0, 1), [0]);
+});
+
+test("a maximum-font decoration page cannot trap forward navigation", () => {
+  const decorationPage = [{
+    id: "offering-row",
+    sourceItemId: "offering-row",
+    sectionId: "offering-of-the-lamb",
+    slideshowLineRanges: {},
+    slideshowSegmentIndex: 0,
+  }];
+  const firstTextPage = [{
+    id: "offering-row-segment-1",
+    sourceItemId: "offering-row",
+    sectionId: "offering-of-the-lamb",
+    slideshowLineRanges: { english: { start: 0, end: 1 } },
+    slideshowSegmentIndex: 1,
+  }];
+  const slides = [decorationPage, firstTextPage];
+
+  assert.equal(findSlideIndexForAnchor(slides, createSlideAnchor(decorationPage)), 0);
+  assert.equal(findSlideIndexForAnchor(slides, createSlideAnchor(firstTextPage)), 1);
 });
