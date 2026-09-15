@@ -170,7 +170,7 @@ async function buildIndex(): Promise<SaintEntry[]> {
       return (data || []) as { item_order: string | number; condition: string | null }[];
     })(),
     fetchConditions('verses_of_the_cymbals', 'verses_of_the_cymbals'),
-    fetchConditions('psalmody', 'midnight_praises'),
+    fetchConditions('psalmody', 'psalies_saints'),
     fetchConditions('hymn_of_the_intercessions', 'hymn_of_the_intercessions'),
     fetchConditions('praxis_response', 'praxis_response'),
     (async () => {
@@ -281,7 +281,7 @@ async function buildIndex(): Promise<SaintEntry[]> {
 const CATEGORY_SOURCE: Record<SaintHymnCategory, { schema: string; orderTable: string | null }> = {
   Doxology: { schema: 'doxologies', orderTable: 'doxologies' },
   VOC: { schema: 'verses_of_the_cymbals', orderTable: 'verses_of_the_cymbals' },
-  Psali: { schema: 'psalmody', orderTable: 'midnight_praises' },
+  Psali: { schema: 'psalmody', orderTable: 'psalies_saints' },
   Hiten: { schema: 'hymn_of_the_intercessions', orderTable: 'hymn_of_the_intercessions' },
   PraxisResponse: { schema: 'praxis_response', orderTable: 'praxis_response' },
   // The Axios is one hymn carrying a line per saint, so the condition sits on
