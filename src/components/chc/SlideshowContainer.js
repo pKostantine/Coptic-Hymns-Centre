@@ -14,6 +14,7 @@ import {
   getMeasurementBatch,
   getPageTurnForKey,
   getPageTurnForTap,
+  getPageTurnForViewportTap,
   getSlideContentBudget,
   getSlideKey,
   getSlidePadding,
@@ -657,8 +658,43 @@ export function NavigationSurface({
   onOpenSelector,
 }) {
   const { width: windowWidth } = useWindowDimensions();
-  const screenWidth = Math.max(windowWidth || width || 1, 1);
-  const selectorEdgeWidth = Math.min(240, Math.max(96, screenWidth * 0.18));
+  // The slideshow does not always occupy the whole browser window (drawers,
+  // modals, and split layouts can all inset it). Comparing a page-level tap
+  // against windowWidth made every tap in an inset/narrow surface look like
+  // it happened on the left half. At very large font sizes there is also no
+  // blank background to tap, so the fallback locationX can belong to a child
+  // Text node instead of this surface. Cache the surface's actual viewport
+  // bounds and normalize every page/client coordinate into them first.
+  const fallbackSurfaceWidth = Math.max(width || windowWidth || 1, 1);
+  const surfaceRef = useRef(null);
+  const [surfaceBounds, setSurfaceBounds] = useState({
+    left: 0,
+    width: fallbackSurfaceWidth,
+  });
+
+  const measureSurface = useCallback((layoutWidth) => {
+    const safeLayoutWidth = Number.isFinite(layoutWidth) && layoutWidth > 0
+      ? layoutWidth
+      : fallbackSurfaceWidth;
+    setSurfaceBounds((current) => current.width === safeLayoutWidth
+      ? current
+      : { ...current, width: safeLayoutWidth });
+
+    surfaceRef.current?.measureInWindow?.((left, _top, measuredWidth) => {
+      setSurfaceBounds((current) => {
+        const next = {
+          left: Number.isFinite(left) ? left : current.left,
+          width: Number.isFinite(measuredWidth) && measuredWidth > 0
+            ? measuredWidth
+            : safeLayoutWidth,
+        };
+        return next.left === current.left && next.width === current.width
+          ? current
+          : next;
+      });
+    });
+  }, [fallbackSurfaceWidth]);
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -669,9 +705,14 @@ export function NavigationSurface({
           Math.abs(gestureState.dx) > 18 &&
           Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2,
         onPanResponderRelease: (_, gestureState) => {
+          const selectorEdgeWidth = Math.min(
+            240,
+            Math.max(96, surfaceBounds.width * 0.18),
+          );
+          const localStartX = gestureState.x0 - surfaceBounds.left;
           if (
             Boolean(onOpenSelector) &&
-            gestureState.x0 > Math.max((screenWidth || 0) - selectorEdgeWidth, 0) &&
+            localStartX > Math.max(surfaceBounds.width - selectorEdgeWidth, 0) &&
             gestureState.dx < -36
           ) {
             onOpenSelector?.();
@@ -688,22 +729,60 @@ export function NavigationSurface({
           }
         },
       }),
-    [onNext, onOpenSelector, onPrevious, screenWidth, selectorEdgeWidth],
+    [onNext, onOpenSelector, onPrevious, surfaceBounds],
   );
 
   return (
     <Pressable
+      ref={surfaceRef}
       accessible={false}
       tabIndex={-1}
       style={styles.navigationSurface}
+      onLayout={(event) => measureSurface(event.nativeEvent.layout.width)}
       onPress={(event) => {
-        // locationX belongs to the deepest touched Text/View on some native
-        // platforms, not this full-width surface. pageX remains stable when
-        // a tap bubbles from any verse column.
-        const tapX = Number.isFinite(event.nativeEvent.pageX)
-          ? event.nativeEvent.pageX
-          : event.nativeEvent.locationX;
-        const turn = getPageTurnForTap(tapX, screenWidth);
+        const nativeEvent = event.nativeEvent || {};
+        let turn = null;
+
+        // React Native Web exposes the real DOM currentTarget. clientX and
+        // getBoundingClientRect use the same coordinate space, so this path
+        // stays correct even when the slideshow is inset or the tapped child
+        // is a full-size Text node.
+        const targetRect = event.currentTarget?.getBoundingClientRect?.();
+        if (
+          targetRect &&
+          targetRect.width > 0 &&
+          Number.isFinite(nativeEvent.clientX)
+        ) {
+          turn = getPageTurnForTap(
+            nativeEvent.clientX - targetRect.left,
+            targetRect.width,
+          );
+        }
+
+        if (!turn) {
+          const touch = nativeEvent.changedTouches?.[0] || nativeEvent.touches?.[0];
+          const pageX = Number.isFinite(touch?.pageX)
+            ? touch.pageX
+            : nativeEvent.pageX;
+
+          if (Number.isFinite(pageX)) {
+            turn = getPageTurnForViewportTap(
+              pageX,
+              surfaceBounds.left,
+              surfaceBounds.width,
+            );
+          } else {
+            // Last-resort support for platforms which provide only a local
+            // coordinate. This is safe when the Pressable itself is the
+            // native responder, while the viewport/page paths above cover
+            // nested text targets.
+            turn = getPageTurnForTap(
+              nativeEvent.locationX,
+              surfaceBounds.width || fallbackSurfaceWidth,
+            );
+          }
+        }
+
         if (turn === "previous") onPrevious?.();
         if (turn === "next") onNext?.();
       }}
