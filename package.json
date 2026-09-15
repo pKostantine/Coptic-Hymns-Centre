@@ -51,7 +51,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test:slideshow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/slideshowLayout.test.mjs tests/bibleSlideshowHtml.test.cjs"
   },
   "private": true
 }

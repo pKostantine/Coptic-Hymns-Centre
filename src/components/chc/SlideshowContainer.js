@@ -5,6 +5,24 @@ import { formatEnglishDisplayText } from "../../utils/displayText";
 import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
+import {
+  createSlideAnchor,
+  estimateItemHeight,
+  findSlideIndexForAnchor,
+  getAdjacentSlideIndexes,
+  getItemSignature,
+  getMeasurementBatch,
+  getPageTurnForKey,
+  getPageTurnForSwipe,
+  getPageTurnForTap,
+  getPageTurnForViewportTap,
+  getSlideContentBudget,
+  getSlideKey,
+  getSlidePadding,
+  getSlideshowChromeMetrics,
+  normalizeLanguageMetric,
+  paginateItems,
+} from "./slideshowLayout";
 
 export default function SlideshowContainer({
   sections,
@@ -30,17 +48,11 @@ export default function SlideshowContainer({
   const [measuredHeights, setMeasuredHeights] = useState({});
   const [measuredLanguageHeights, setMeasuredLanguageHeights] = useState({});
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  // Collapsible title rows and Subdocument/Antiphonary open-buttons can land
-  // anywhere within a slide (collapsible titles deliberately don't force a
-  // fresh slide break — see flattenSections), so neither can rely on "the top
-  // of the slide" the way the old topReserved gap assumed. Instead each one
-  // reports its own y offset here, and a dedicated overlay (rendered after,
-  // i.e. on top of, NavigationOverlay) places a real tappable control exactly
-  // there — RN has no cross-subtree z-index, so "render on top" is the only
-  // way for a control anywhere in the slide to ever receive a touch over the
-  // full-screen swipe layer.
-  const [collapsibleTitleLayouts, setCollapsibleTitleLayouts] = useState({});
-  const [buttonLayouts, setButtonLayouts] = useState({});
+  const navigationIndexRef = useRef(0);
+  // Unlike a numeric page index, this survives front-to-back measurement and
+  // repagination. An anchor identifies the source row plus its line offset,
+  // so the reader never jumps to unrelated content while estimates settle.
+  const [currentAnchor, setCurrentAnchor] = useState(null);
   const measurementSignatureRef = useRef("");
   const lastAppliedSelectedSectionId = useRef(null);
   const pendingHeightsRef = useRef({});
@@ -79,9 +91,16 @@ export default function SlideshowContainer({
     () => flattenSections(sections, bishopPresent, suppressAllSpeakerLabels),
     [sections, bishopPresent, suppressAllSpeakerLabels],
   );
+  const itemSignatures = useMemo(
+    () => new Map(items.map((item) => [
+      item.id,
+      getItemSignature(item, getDisplayedItemTitle(item, visibleLanguages, titleHelpers)),
+    ])),
+    [items, titleHelpers, visibleLanguages],
+  );
   const itemsSignature = useMemo(
-    () => items.map(getItemSignature).join("|"),
-    [items],
+    () => items.map((item) => itemSignatures.get(item.id)).join("|"),
+    [itemSignatures, items],
   );
   const slideTableWidth = Math.max(viewportWidth || tableWidth || 1, 1);
   const slideColumnWidth =
@@ -114,8 +133,6 @@ export default function SlideshowContainer({
     ],
   );
   const measuredKey = `${globalMeasurementKey}:${itemsSignature}`;
-  measurementSignatureRef.current = measuredKey;
-
   useLayoutEffect(() => {
     measurementSignatureRef.current = measuredKey;
     pendingHeightsRef.current = {};
@@ -131,7 +148,7 @@ export default function SlideshowContainer({
     );
     sectionIdOrderRef.current = getSectionIdOrder(items);
 
-    const newSignatures = new Map(items.map((item) => [item.id, getItemSignature(item)]));
+    const newSignatures = itemSignatures;
     // Nothing that affects every item's height changed -- only the item set
     // itself did (most commonly: minimizing/expanding one hymn, which just
     // adds or removes that section's verse items). Keep every item whose own
@@ -153,9 +170,7 @@ export default function SlideshowContainer({
     setMeasuredLanguageHeights(keepUnchanged);
     lastGlobalMeasurementKeyRef.current = globalMeasurementKey;
     lastItemSignaturesRef.current = newSignatures;
-    setCurrentSlideIndex(0);
-    lastAppliedSelectedSectionId.current = null;
-  }, [measuredKey, refreshKey]);
+  }, [globalMeasurementKey, itemSignatures, items, measuredKey, refreshKey]);
 
   useEffect(
     () => () => {
@@ -273,11 +288,8 @@ export default function SlideshowContainer({
       viewportHeight && viewportHeightOverride
         ? Math.min(viewportHeight, viewportHeightOverride)
         : viewportHeight || viewportHeightOverride;
-    const slidePadding = getSlidePadding();
-    const effectiveViewportHeight =
-      measuredViewportHeight - slidePadding.top - slidePadding.bottom;
 
-    if (!effectiveViewportHeight) {
+    if (!measuredViewportHeight) {
       return dropEmptySlides([items.slice(0, 1)]);
     }
 
@@ -288,7 +300,10 @@ export default function SlideshowContainer({
         estimateItemHeight(item, fontSize, visibleLanguages, slideTableWidth);
     });
 
-    const budget = Math.max(effectiveViewportHeight - 8, 120);
+    const budget = getSlideContentBudget(
+      measuredViewportHeight,
+      getSlidePadding(measuredViewportHeight),
+    );
     const paginated = paginateItems(
       items,
       effectiveHeights,
@@ -310,7 +325,14 @@ export default function SlideshowContainer({
     viewportHeightOverride,
     visibleLanguages,
   ]);
-  const slidePadding = useMemo(() => getSlidePadding(), []);
+  const measuredViewportHeight =
+    viewportHeight && viewportHeightOverride
+      ? Math.min(viewportHeight, viewportHeightOverride)
+      : viewportHeight || viewportHeightOverride;
+  const slidePadding = useMemo(
+    () => getSlidePadding(measuredViewportHeight),
+    [measuredViewportHeight],
+  );
   // The next bounded batch of items still missing a real measured height.
   // Mounting EVERY unmeasured item in one commit is what made this slow:
   // anything that changes globalMeasurementKey (font size, a language
@@ -321,16 +343,18 @@ export default function SlideshowContainer({
   // land its heights, advance the filter, and mount the next batch on a
   // later frame, so the UI stays responsive the whole way through.
   // Pagination keeps falling back to estimateItemHeight for anything not yet
-  // measured, and items are scanned in document order, so slides settle
-  // front-to-back -- where the reader already is.
+  // measured. The current anchor is measured first after a jump or resize;
+  // the remaining document then settles in bounded batches.
   const measurementBatch = useMemo(() => {
     if (!(viewportHeight || viewportHeightOverride)) return [];
-    const batch = [];
-    for (let i = 0; i < items.length && batch.length < MEASUREMENT_BATCH_SIZE; i += 1) {
-      if (typeof measuredHeights[items[i].id] !== "number") batch.push(items[i]);
-    }
-    return batch;
-  }, [items, measuredHeights, viewportHeight, viewportHeightOverride]);
+    return getMeasurementBatch(
+      items,
+      measuredHeights,
+      MEASUREMENT_BATCH_SIZE,
+      currentAnchor,
+      selectedSectionId || currentAnchor?.sectionId,
+    );
+  }, [currentAnchor, items, measuredHeights, selectedSectionId, viewportHeight, viewportHeightOverride]);
   // An empty batch means nothing is left unmeasured, so this stays equivalent
   // to the old items.every(...) check without rescanning the whole document
   // on every render.
@@ -339,11 +363,18 @@ export default function SlideshowContainer({
     [measurementBatch, viewportHeight, viewportHeightOverride],
   );
 
-  useEffect(() => {
-    setCurrentSlideIndex((current) =>
-      Math.min(current, Math.max(slides.length - 1, 0)),
-    );
-  }, [slides.length]);
+  const resolvedSlideIndex = useMemo(() => {
+    const anchoredIndex = findSlideIndexForAnchor(slides, currentAnchor);
+    if (anchoredIndex >= 0) return anchoredIndex;
+    return Math.min(currentSlideIndex, Math.max(slides.length - 1, 0));
+  }, [currentAnchor, currentSlideIndex, slides]);
+
+  // Update synchronously after every committed page so rapid taps/clicker
+  // presses can advance repeatedly without waiting for the next render's
+  // callback closure to capture a newer resolvedSlideIndex.
+  useLayoutEffect(() => {
+    navigationIndexRef.current = resolvedSlideIndex;
+  }, [resolvedSlideIndex]);
 
   useEffect(() => {
     // A fresh, explicit content-selector pick always wins over (and cancels)
@@ -353,19 +384,29 @@ export default function SlideshowContainer({
     // it. Runs as its own effect, keyed only on selectedSectionId, so it
     // fires (and clears the stale target) in the same commit as — but before
     // — the jump effect right below, which shares this same trigger.
-    if (selectedSectionId) {
+    if (selectedSectionId && lastAppliedSelectedSectionId.current !== selectedSectionId) {
       pendingRestoreSectionIdRef.current = null;
     }
   }, [selectedSectionId]);
 
   useEffect(() => {
-    // An explicit content-selector jump (selectedSectionId) takes priority;
-    // otherwise, if a settings/rotation/minimization change just forced a
-    // repagination, jump back to the START of whatever hymn the user had
-    // been reading (pendingRestoreSectionIdRef) — always its title's own
-    // slide, never partway through it, matching scroll mode's own
-    // settings-change behavior.
-    const requestedSectionId = selectedSectionId || pendingRestoreSectionIdRef.current;
+    const hasFreshExplicitSelection = Boolean(
+      selectedSectionId && lastAppliedSelectedSectionId.current !== selectedSectionId,
+    );
+    const anchoredIndex = findSlideIndexForAnchor(slides, currentAnchor);
+
+    // Measurement, a resize, or a font/language change can rebuild every
+    // page. If the precise row/line anchor survived, it is strictly better
+    // than the old section-level fallback and requires no state update.
+    if (!hasFreshExplicitSelection && anchoredIndex >= 0) {
+      pendingRestoreSectionIdRef.current = null;
+      pendingRestoreCandidatesRef.current = [];
+      return;
+    }
+
+    const requestedSectionId = hasFreshExplicitSelection
+      ? selectedSectionId
+      : pendingRestoreSectionIdRef.current;
 
     if (!requestedSectionId) return;
 
@@ -381,7 +422,7 @@ export default function SlideshowContainer({
     // came before it and take the nearest one that survived. An explicit
     // content-selector pick never needs this: it can only name something
     // currently on the list.
-    if (nextSlideIndex < 0 && !selectedSectionId) {
+    if (nextSlideIndex < 0 && !hasFreshExplicitSelection) {
       const candidates = pendingRestoreCandidatesRef.current;
       for (let i = 0; i < candidates.length; i += 1) {
         const candidateSlideIndex = findSlideFor(candidates[i]);
@@ -393,11 +434,12 @@ export default function SlideshowContainer({
       }
     }
 
-    if (lastAppliedSelectedSectionId.current === targetSectionId) return;
-
     if (nextSlideIndex >= 0) {
       setCurrentSlideIndex(nextSlideIndex);
-      lastAppliedSelectedSectionId.current = targetSectionId;
+      setCurrentAnchor(createSlideAnchor(slides[nextSlideIndex]));
+      if (hasFreshExplicitSelection) {
+        lastAppliedSelectedSectionId.current = targetSectionId;
+      }
     }
 
     // Only the auto-restore path (no explicit selectedSectionId) clears here;
@@ -405,11 +447,11 @@ export default function SlideshowContainer({
     // happen too early — before setCurrentSlideIndex's update has actually
     // landed — letting the reporting effect below see a still-stale slide
     // with nothing left to compare it against.
-    if (!selectedSectionId) {
+    if (!hasFreshExplicitSelection) {
       pendingRestoreSectionIdRef.current = null;
       pendingRestoreCandidatesRef.current = [];
     }
-  }, [selectedSectionId, slides]);
+  }, [currentAnchor, selectedSectionId, slides]);
 
   useEffect(() => {
     // A transient viewport collapse -- the container's own height briefly
@@ -420,19 +462,13 @@ export default function SlideshowContainer({
     // overwrite the real remembered position right as the user leaves.
     if (!(viewportHeight || viewportHeightOverride)) return;
 
-    const currentSlide = slides[currentSlideIndex];
+    const currentSlide = slides[resolvedSlideIndex];
     const currentSectionId = findSlideSectionId(currentSlide);
     if (!currentSectionId) return;
 
-    // A measuredKey reset (settings change, minimization, rotation/resize,
-    // or even just the surrounding layout shifting while navigating to
-    // another screen) always snaps currentSlideIndex to 0 for a moment
-    // before the jump effect above can correct it back to
-    // pendingRestoreSectionIdRef.current. That transient "slide 0" is not
-    // where the user actually is — reporting it here (and to the host app,
-    // which persists it as "last known position") would overwrite the real
-    // position with a reset artifact before the correction even gets a
-    // chance to land.
+    // A section-level fallback may still be pending when the exact anchored
+    // row was filtered out (for example, after collapsing its section). Do
+    // not persist an intermediate slide while that fallback is resolving.
     if (pendingRestoreSectionIdRef.current && pendingRestoreSectionIdRef.current !== currentSectionId) {
       return;
     }
@@ -443,38 +479,22 @@ export default function SlideshowContainer({
     pendingRestoreSectionIdRef.current = null;
     preservedSectionIdRef.current = currentSectionId;
     onCurrentSectionChange?.(currentSectionId);
-  }, [currentSlideIndex, onCurrentSectionChange, slides, viewportHeight, viewportHeightOverride]);
+  }, [onCurrentSectionChange, resolvedSlideIndex, slides, viewportHeight, viewportHeightOverride]);
+
+  const goToSlide = useCallback((requestedIndex) => {
+    const nextIndex = Math.min(Math.max(requestedIndex, 0), Math.max(slides.length - 1, 0));
+    navigationIndexRef.current = nextIndex;
+    setCurrentSlideIndex(nextIndex);
+    setCurrentAnchor(createSlideAnchor(slides[nextIndex]));
+  }, [slides]);
 
   const goToPreviousSlide = useCallback(() => {
-    setCurrentSlideIndex((current) => Math.max(current - 1, 0));
-  }, []);
+    goToSlide(navigationIndexRef.current - 1);
+  }, [goToSlide]);
 
   const goToNextSlide = useCallback(() => {
-    setCurrentSlideIndex((current) => Math.min(current + 1, Math.max(slides.length - 1, 0)));
-  }, [slides.length]);
-
-  // Stable across renders (unlike an inline arrow function) so SlideView --
-  // memoized below -- doesn't see a "changed" prop and re-render its entire
-  // subtree just because a title/button landed at a new y offset on the
-  // slide that's already on screen; that used to mean every slide
-  // navigation actually rendered the new slide's content TWICE (once to
-  // mount it, once more the instant its own layout callbacks fired back up
-  // here), which is most of why paging felt slow.
-  const handleTitleLayout = useCallback((sectionId, y, height) => {
-    setCollapsibleTitleLayouts((current) =>
-      current[sectionId]?.y === y && current[sectionId]?.height === height
-        ? current
-        : { ...current, [sectionId]: { y, height } }
-    );
-  }, []);
-
-  const handleButtonLayout = useCallback((sectionId, y, height) => {
-    setButtonLayouts((current) =>
-      current[sectionId]?.y === y && current[sectionId]?.height === height
-        ? current
-        : { ...current, [sectionId]: { y, height } }
-    );
-  }, []);
+    goToSlide(navigationIndexRef.current + 1);
+  }, [goToSlide]);
 
   useEffect(() => {
     if (
@@ -487,25 +507,20 @@ export default function SlideshowContainer({
     }
 
     function handleKeyDown(event) {
-      if (event.defaultPrevented) {
-        return;
-      }
-
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        goToPreviousSlide();
-      }
-
-      if (event.key === "ArrowRight") {
-        event.preventDefault();
-        goToNextSlide();
-      }
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || isEditableKeyboardTarget(event.target)) return;
+      const pageTurn = getPageTurnForKey(event.key);
+      if (!pageTurn) return;
+      event.preventDefault();
+      if (pageTurn === "previous") goToPreviousSlide();
+      if (pageTurn === "next") goToNextSlide();
+      if (pageTurn === "first") goToSlide(0);
+      if (pageTurn === "last") goToSlide(slides.length - 1);
     }
 
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToNextSlide, goToPreviousSlide, keyboardNavigationEnabled]);
+  }, [goToNextSlide, goToPreviousSlide, goToSlide, keyboardNavigationEnabled, slides.length]);
 
   return (
     <View
@@ -546,74 +561,62 @@ export default function SlideshowContainer({
         </View>
       ) : null}
 
-      <SlideView
-        items={slides[currentSlideIndex] || []}
-        visibleLanguages={visibleLanguages}
-        fontSize={fontSize}
-        theme={theme}
-        columnWidth={slideColumnWidth}
-        tableWidth={slideTableWidth}
-        titleHelpers={titleHelpers}
-        slidePadding={slidePadding}
-        onToggleCollapse={onToggleCollapse}
-        onAction={onAction}
-        onTitleLayout={handleTitleLayout}
-        onButtonLayout={handleButtonLayout}
-        copticGospelRite={copticGospelRite}
-      />
-
-      <NavigationOverlay
+      <NavigationSurface
+        width={viewportWidth || slideTableWidth}
         onPrevious={goToPreviousSlide}
         onNext={goToNextSlide}
         onOpenSelector={onOpenSelector}
-      />
+      >
+        <SlideDeck
+          slides={slides}
+          currentIndex={resolvedSlideIndex}
+          visibleLanguages={visibleLanguages}
+          fontSize={fontSize}
+          theme={theme}
+          columnWidth={slideColumnWidth}
+          tableWidth={slideTableWidth}
+          titleHelpers={titleHelpers}
+          slidePadding={slidePadding}
+          onToggleCollapse={onToggleCollapse}
+          onAction={onAction}
+          copticGospelRite={copticGospelRite}
+        />
+      </NavigationSurface>
 
-      {onAction
-        ? (slides[currentSlideIndex] || [])
-            .filter((item) => (item.type === "button" || item.type === "gospelRiteToggle") && buttonLayouts[item.sectionId])
-            .map((item) => {
-              const layout = buttonLayouts[item.sectionId];
-              const action =
-                item.type === "gospelRiteToggle"
-                  ? { type: "toggleCopticGospelRite", sectionId: item.sectionId }
-                  : { type: item.buttonAction, sectionId: item.sectionId };
-              return (
-                <Pressable
-                  key={item.sectionId}
-                  style={[styles.openButtonOverlay, { top: layout.y, height: layout.height }]}
-                  onPress={() => onAction(action)}
-                />
-              );
-            })
-        : null}
-
-      {onToggleCollapse
-        ? (slides[currentSlideIndex] || [])
-            .filter((item) => item.type === "title" && item.collapsible && collapsibleTitleLayouts[item.sectionId])
-            .map((item) => {
-              const layout = collapsibleTitleLayouts[item.sectionId];
-              return (
-                <View
-                  key={item.sectionId}
-                  pointerEvents="box-none"
-                  style={[styles.collapseButtonOverlay, { top: layout.y, height: layout.height }]}
-                >
-                  <CollapseButton
-                    collapsed={Boolean(item.currentlyCollapsed)}
-                    onPress={() => onToggleCollapse(item.sectionId)}
-                  />
-                </View>
-              );
-            })
-        : null}
+      <Text
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={`Slide ${resolvedSlideIndex + 1} of ${Math.max(slides.length, 1)}`}
+        style={styles.screenReaderStatus}
+      >
+        {`Slide ${resolvedSlideIndex + 1} of ${Math.max(slides.length, 1)}`}
+      </Text>
     </View>
   );
 }
 
-// Memoized so a parent re-render that doesn't actually change any of these
-// props (e.g. the title/button layout-overlay state settling right after
-// this same slide's own content just mounted) skips re-rendering the whole
-// slide a second time -- see handleTitleLayout/handleButtonLayout above.
+const SlideDeck = memo(function SlideDeck({ slides, currentIndex, ...slideProps }) {
+  const mountedIndexes = getAdjacentSlideIndexes(currentIndex, slides.length);
+
+  return (
+    <View style={styles.slideDeck}>
+      {mountedIndexes.map((index) => {
+        const isCurrent = index === currentIndex;
+        return (
+          <View
+            key={getSlideKey(slides[index], index)}
+            accessibilityElementsHidden={!isCurrent}
+            importantForAccessibility={isCurrent ? "yes" : "no-hide-descendants"}
+            pointerEvents={isCurrent ? "auto" : "none"}
+            style={[styles.slideLayer, !isCurrent && styles.preloadedSlide]}
+          >
+            <SlideView items={slides[index] || []} {...slideProps} />
+          </View>
+        );
+      })}
+    </View>
+  );
+});
+
 export const SlideView = memo(function SlideView({
   items,
   visibleLanguages,
@@ -624,8 +627,6 @@ export const SlideView = memo(function SlideView({
   titleHelpers,
   slidePadding,
   onToggleCollapse,
-  onTitleLayout,
-  onButtonLayout,
   onAction,
   copticGospelRite,
 }) {
@@ -651,8 +652,6 @@ export const SlideView = memo(function SlideView({
           tableWidth={tableWidth}
           titleHelpers={titleHelpers}
           onToggleCollapse={onToggleCollapse}
-          onTitleLayout={onTitleLayout}
-          onButtonLayout={onButtonLayout}
           onAction={onAction}
           copticGospelRite={copticGospelRite}
         />
@@ -661,62 +660,154 @@ export const SlideView = memo(function SlideView({
   );
 });
 
-export function NavigationOverlay({
+export function NavigationSurface({
+  children,
+  width,
   onPrevious,
   onNext,
   onOpenSelector,
 }) {
-  const { width: screenWidth } = useWindowDimensions();
-  const selectorEdgeWidth = Math.min(240, Math.max(128, (screenWidth || 0) * 0.18));
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_, gestureState) =>
-          Math.abs(gestureState.dx) > 18 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2,
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          Math.abs(gestureState.dx) > 18 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2,
+  const { width: windowWidth } = useWindowDimensions();
+  // The slideshow does not always occupy the whole browser window (drawers,
+  // modals, and split layouts can all inset it). Comparing a page-level tap
+  // against windowWidth made every tap in an inset/narrow surface look like
+  // it happened on the left half. At very large font sizes there is also no
+  // blank background to tap, so the fallback locationX can belong to a child
+  // Text node instead of this surface. Cache the surface's actual viewport
+  // bounds and normalize every page/client coordinate into them first.
+  const fallbackSurfaceWidth = Math.max(width || windowWidth || 1, 1);
+  const surfaceRef = useRef(null);
+  const [surfaceBounds, setSurfaceBounds] = useState({
+    left: 0,
+    width: fallbackSurfaceWidth,
+  });
+
+  const measureSurface = useCallback((layoutWidth) => {
+    const safeLayoutWidth = Number.isFinite(layoutWidth) && layoutWidth > 0
+      ? layoutWidth
+      : fallbackSurfaceWidth;
+    setSurfaceBounds((current) => current.width === safeLayoutWidth
+      ? current
+      : { ...current, width: safeLayoutWidth });
+
+    surfaceRef.current?.measureInWindow?.((left, _top, measuredWidth) => {
+      setSurfaceBounds((current) => {
+        const next = {
+          left: Number.isFinite(left) ? left : current.left,
+          width: Number.isFinite(measuredWidth) && measuredWidth > 0
+            ? measuredWidth
+            : safeLayoutWidth,
+        };
+        return next.left === current.left && next.width === current.width
+          ? current
+          : next;
+      });
+    });
+  }, [fallbackSurfaceWidth]);
+
+  const panResponder = useMemo(() => {
+    return PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+          const direction = getPageTurnForSwipe(gestureState.dx);
+          const shouldCapture = Boolean(direction) &&
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
+          return shouldCapture;
+        },
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          const direction = getPageTurnForSwipe(gestureState.dx);
+          const shouldCapture = Boolean(direction) &&
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
+          return shouldCapture;
+        },
         onPanResponderRelease: (_, gestureState) => {
+          const pageTurn = getPageTurnForSwipe(gestureState.dx);
+          const selectorEdgeWidth = Math.min(
+            240,
+            Math.max(96, surfaceBounds.width * 0.18),
+          );
+          const localStartX = gestureState.x0 - surfaceBounds.left;
           if (
             Boolean(onOpenSelector) &&
-            gestureState.x0 > Math.max((screenWidth || 0) - selectorEdgeWidth, 0) &&
-            gestureState.dx < -36
+            localStartX > Math.max(surfaceBounds.width - selectorEdgeWidth, 0) &&
+            pageTurn === "next"
           ) {
             onOpenSelector?.();
             return;
           }
 
-          if (gestureState.dx < -60) {
+          if (pageTurn === "next") {
             onNext?.();
             return;
           }
 
-          if (gestureState.dx > 60) {
+          if (pageTurn === "previous") {
             onPrevious?.();
           }
         },
-      }),
-    [onNext, onOpenSelector, onPrevious, screenWidth, selectorEdgeWidth],
-  );
+      });
+  }, [onNext, onOpenSelector, onPrevious, surfaceBounds]);
 
   return (
-    <View
-      style={styles.navigationLayer}
-      pointerEvents="auto"
+    <Pressable
+      ref={surfaceRef}
+      accessible={false}
+      tabIndex={-1}
+      style={styles.navigationSurface}
+      onLayout={(event) => measureSurface(event.nativeEvent.layout.width)}
+      onPress={(event) => {
+        const nativeEvent = event.nativeEvent || {};
+        let turn = null;
+
+        // React Native Web exposes the real DOM currentTarget. clientX and
+        // getBoundingClientRect use the same coordinate space, so this path
+        // stays correct even when the slideshow is inset or the tapped child
+        // is a full-size Text node.
+        const targetRect = event.currentTarget?.getBoundingClientRect?.();
+        if (
+          targetRect &&
+          targetRect.width > 0 &&
+          Number.isFinite(nativeEvent.clientX)
+        ) {
+          turn = getPageTurnForTap(
+            nativeEvent.clientX - targetRect.left,
+            targetRect.width,
+          );
+        }
+
+        if (!turn) {
+          const touch = nativeEvent.changedTouches?.[0] || nativeEvent.touches?.[0];
+          const pageX = Number.isFinite(touch?.pageX)
+            ? touch.pageX
+            : nativeEvent.pageX;
+
+          if (Number.isFinite(pageX)) {
+            turn = getPageTurnForViewportTap(
+              pageX,
+              surfaceBounds.left,
+              surfaceBounds.width,
+            );
+          }
+
+          if (!turn) {
+            // Last-resort support for platforms which provide only a local
+            // coordinate, or report a synthesized page coordinate outside
+            // the surface. This is safe when the Pressable itself is the
+            // native responder, while valid viewport/page coordinates above
+            // cover nested text targets.
+            turn = getPageTurnForTap(
+              nativeEvent.locationX,
+              surfaceBounds.width || fallbackSurfaceWidth,
+            );
+          }
+        }
+
+        if (turn === "previous") onPrevious?.();
+        if (turn === "next") onNext?.();
+      }}
       {...panResponder.panHandlers}
     >
-      <Pressable
-        accessibilityLabel="Previous slide"
-        onPress={onPrevious}
-        style={styles.tapZone}
-      />
-      <Pressable
-        accessibilityLabel="Next slide"
-        onPress={onNext}
-        style={styles.tapZone}
-      />
-    </View>
+      {children}
+    </Pressable>
   );
 }
 
@@ -739,7 +830,11 @@ function CollapseButton({ collapsed, onPress }) {
   return (
     <Pressable
       accessibilityLabel={collapsed ? "Expand section" : "Collapse section"}
-      onPress={onPress}
+      accessibilityRole="button"
+      onPress={(event) => {
+        event.stopPropagation?.();
+        onPress?.();
+      }}
       style={styles.collapseButton}
       hitSlop={8}
     >
@@ -753,11 +848,8 @@ function CollapseButton({ collapsed, onPress }) {
   );
 }
 
-// Memoized so, on the visible (non-measurement-layer) path, a re-render
-// triggered by unrelated sibling state (e.g. an overlay's layout tracking
-// settling) doesn't re-render every verse on the current slide -- `item`
-// itself keeps the same reference across those renders since `slides`
-// doesn't change from state that isn't its own useMemo dependency.
+// Memoized so measurement flushes and adjacent-page preloading do not
+// re-render every verse whose item reference is unchanged.
 const SlideItem = memo(function SlideItem({
   item,
   visibleLanguages,
@@ -770,34 +862,36 @@ const SlideItem = memo(function SlideItem({
   onLanguageMeasured,
   measurementSignature,
   onToggleCollapse,
-  onTitleLayout,
-  onButtonLayout,
   onAction,
   copticGospelRite,
 }) {
+  const chrome = getSlideshowChromeMetrics(fontSize);
+
   if (item.type === "gospelRiteToggle") {
     return (
       <View
         style={styles.gospelRiteToggleRow}
-        onLayout={(event) => {
-          onMeasured?.(event.nativeEvent.layout.height, measurementSignature);
-          onButtonLayout?.(item.sectionId, event.nativeEvent.layout.y, event.nativeEvent.layout.height);
-        }}
+        onLayout={(event) => onMeasured?.(event.nativeEvent.layout.height, measurementSignature)}
       >
-        {/* Same full-screen-swipe-layer problem as the Subdocument/Antiphonary
-            open button below -- this Pressable is not actually reachable by
-            touch on its own; the real tap target is the overlay rendered
-            after NavigationOverlay, using the y/height reported above. */}
         <Pressable
           style={[styles.gospelRiteToggle, copticGospelRite && styles.gospelRiteToggleOn]}
-          onPress={() => onAction?.({ type: "toggleCopticGospelRite", sectionId: item.sectionId })}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: Boolean(copticGospelRite) }}
+          onPress={(event) => {
+            event.stopPropagation?.();
+            onAction?.({ type: "toggleCopticGospelRite", sectionId: item.sectionId });
+          }}
         >
           <View style={[styles.gospelRiteToggleDot, copticGospelRite && styles.gospelRiteToggleDotOn]} />
           <Text
             selectable={false}
             style={[
               styles.gospelRiteToggleText,
-              { fontSize: Math.round(fontSize * 0.65), color: copticGospelRite ? COLORS.black : theme.colors.text },
+              {
+                color: copticGospelRite ? COLORS.black : theme.colors.text,
+                fontSize: chrome.buttonFontSize,
+                lineHeight: chrome.buttonLineHeight,
+              },
             ]}
           >
             Coptic Gospel Rite
@@ -815,21 +909,26 @@ const SlideItem = memo(function SlideItem({
     return (
       <View
         style={styles.openButtonRow}
-        onLayout={(event) => {
-          onMeasured?.(event.nativeEvent.layout.height, measurementSignature);
-          onButtonLayout?.(item.sectionId, event.nativeEvent.layout.y, event.nativeEvent.layout.height);
-        }}
+        onLayout={(event) => onMeasured?.(event.nativeEvent.layout.height, measurementSignature)}
       >
         <Pressable
+          accessibilityRole="button"
           style={[styles.openButton, item.isHyperlink && styles.hyperlinkButton]}
-          onPress={() => onAction?.({ type: item.buttonAction, sectionId: item.sectionId })}
+          onPress={(event) => {
+            event.stopPropagation?.();
+            onAction?.({ type: item.buttonAction, sectionId: item.sectionId });
+          }}
         >
           {label ? (
             <Text
               selectable={false}
               style={[
                 styles.openButtonText,
-                { color: item.isHyperlink ? COLORS.link : COLORS.subdoc, fontSize: Math.round(fontSize * 0.65) },
+                {
+                  color: item.isHyperlink ? COLORS.link : COLORS.subdoc,
+                  fontSize: chrome.buttonFontSize,
+                  lineHeight: chrome.buttonLineHeight,
+                },
               ]}
             >
               {label}
@@ -841,7 +940,11 @@ const SlideItem = memo(function SlideItem({
               style={[
                 styles.openButtonText,
                 styles.openButtonTextArabic,
-                { color: item.isHyperlink ? COLORS.link : COLORS.subdoc, fontSize: Math.round(fontSize * 0.65) },
+                {
+                  color: item.isHyperlink ? COLORS.link : COLORS.subdoc,
+                  fontSize: chrome.buttonFontSize,
+                  lineHeight: chrome.buttonLineHeight,
+                },
               ]}
             >
               {arabicLabel}
@@ -859,7 +962,8 @@ const SlideItem = memo(function SlideItem({
 
   if (item.type === "title") {
     const hasButton = Boolean(item.collapsible && onToggleCollapse);
-    const titleTableWidth = tableWidth;
+    const titleInset = hasButton ? COLLAPSE_BUTTON_SIZE : 0;
+    const titleTableWidth = Math.max(tableWidth - titleInset * 2, 1);
     const titleLanguages = buildTitleLanguages(
       item.title,
       visibleLanguages,
@@ -875,12 +979,9 @@ const SlideItem = memo(function SlideItem({
         style={styles.titleRow}
         onLayout={(event) => {
           onMeasured?.(event.nativeEvent.layout.height, measurementSignature);
-          if (hasButton) {
-            onTitleLayout?.(item.sectionId, event.nativeEvent.layout.y, event.nativeEvent.layout.height);
-          }
         }}
       >
-        <View style={[styles.titleTable, { width: titleTableWidth }]}>
+        <View style={[styles.titleTable, { marginHorizontal: titleInset, width: titleTableWidth }]}>
           {titleLanguages.map(
             (language) => (
               <View
@@ -902,8 +1003,8 @@ const SlideItem = memo(function SlideItem({
                       {
                         color: isSilentPrayerHymn ? COLORS.silentTitle : theme.colors.gold,
                         fontStyle: isSilentPrayerHymn ? "italic" : "normal",
-                        fontSize: Math.max(Math.round(fontSize * 0.5), 14),
-                        lineHeight: Math.max(Math.round(fontSize * 0.62), 18),
+                        fontSize: chrome.titleFontSize,
+                        lineHeight: chrome.titleLineHeight,
                         textAlign: language.align,
                       },
                     ]}
@@ -1013,9 +1114,7 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
           type: "button",
           title: section.title,
           // A Hyperlink leaves the document entirely rather than opening a
-          // modal over it, so it gets its own action and its own (green)
-          // treatment in SlideItem. The tap itself still rides the same
-          // button overlay as the other two -- see NavigationOverlay.
+          // modal over it, so it gets its own action and green treatment.
           isHyperlink: Boolean(section.isHyperlinkButton),
           buttonAction: section.isHyperlinkButton
             ? "openHyperlink"
@@ -1065,6 +1164,7 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         verse,
         colorIndex: getVerseColorIndex(section, verseIndex, bishopPresent),
         suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || Boolean(suppressMap.get(verse)),
+        hasSpeakerLabel: Boolean(getSpeakerRole(verse.personRole || verse.type, bishopPresent)),
         // Computed here rather than in VerseBlock because the decision needs
         // the section (its title) as well as the verse — see
         // shouldUsePeopleLineColor, the one definition the WebView renderer
@@ -1177,40 +1277,11 @@ function getSectionIdOrder(items = []) {
   return order;
 }
 
-function getItemSignature(item) {
-  if (item.type === "title") {
-    const title = typeof item.title === "string"
-      ? item.title
-      : [item.title?.english, item.title?.arabic].filter(Boolean).join("/");
-
-    return `${item.id}:title:${title.length}:${item.isCollapsed ? "collapsed" : "open"}`;
-  }
-
-  if (item.type === "button") {
-    const title = [item.title?.english, item.title?.arabic].filter(Boolean).join("/");
-    return `${item.id}:button:${title.length}`;
-  }
-
-  if (item.type === "gospelRiteToggle") {
-    // Its own height never depends on whether the toggle is currently on or
-    // off (only its fill color does, which SlideItem re-renders from the
-    // live copticGospelRite prop directly, not from a cached measurement) —
-    // a fixed signature is enough to skip remeasuring it.
-    return `${item.id}:gospelRiteToggle`;
-  }
-
-  const verse = item.verse || {};
-
-  return [
-    item.id,
-    "verse",
-    verse.type || "",
-    String(verse.english || "").length,
-    String(verse.coptic || "").length,
-    String(verse.arabic || "").length,
-    verse.seasonalHoosVersePrefix || "",
-    item.suppressSpeakerLabel ? "speaker-hidden" : "speaker-visible",
-  ].join(":");
+function getDisplayedItemTitle(item, visibleLanguages, titleHelpers) {
+  if (item.type !== "title" && item.type !== "button") return "";
+  return buildTitleLanguages(item.title, visibleLanguages, titleHelpers)
+    .map((language) => `${language.key}:${language.text}`)
+    .join("|");
 }
 
 function buildTitleLanguages(title, visibleLanguages, titleHelpers) {
@@ -1284,7 +1355,9 @@ function slideHasVisibleContent(slide = []) {
       return Boolean(
         String(verse.english || "").trim() ||
           String(verse.coptic || "").trim() ||
-          String(verse.arabic || "").trim(),
+          String(verse.arabic || "").trim() ||
+          (item.hasSpeakerLabel && !item.suppressSpeakerLabel) ||
+          verse.slideshowSeasonalPrefixVisible,
       );
     }
 
@@ -1299,584 +1372,14 @@ function dropEmptySlides(slides) {
   return withContent.length ? withContent : slides;
 }
 
-/** A section with no title text (e.g. a flat reading-citation splice, or a mid-hymn continuation chunk) has nothing to visually separate — forcing a fresh slide for it wastes the rest of the previous slide for no benefit, unlike a real titled hymn starting. */
-function hasVisibleTitleText(title) {
-  return Boolean(title?.english || title?.arabic);
-}
-
-/**
- * Keeps each rendered row as its own pagination unit, like the Bible pager.
- * Visible titles and standalone buttons still begin a fresh page, while
- * verses are passed to the same overflow and oversized-row logic as every
- * other row.
- */
-function buildPaginationUnits(items) {
-  return items.map((item) => ({
-    items: [item],
-    breakBefore:
-      (item.type === "title" && !item.isCollapsed && hasVisibleTitleText(item.title)) ||
-      item.type === "button",
-  }));
-}
-
-function paginateItems(
-  items,
-  heights,
-  languageHeights,
-  availableHeight,
-  fontSize,
-  visibleLanguages,
-  tableWidth,
-) {
-  const units = buildPaginationUnits(items);
-  const slides = [];
-  let currentSlide = [];
-  let currentHeight = 0;
-
-  const flushSlide = () => {
-    if (currentSlide.length) slides.push(currentSlide);
-    currentSlide = [];
-    currentHeight = 0;
-  };
-
-  // A normal-document verse is one manually aligned data row, but each
-  // language may consume a different number of its own lines. The segment
-  // builder below advances those language cursors independently.
-  const placeVerse = (verseItem) => {
-    const verseHeight = Math.ceil((heights[verseItem.id] || 0) + 2);
-
-    if (currentHeight + verseHeight <= availableHeight) {
-      currentSlide.push(verseItem);
-      currentHeight += verseHeight;
-      return;
-    }
-
-    if (currentSlide.length && verseHeight <= availableHeight) {
-      flushSlide();
-      currentSlide.push(verseItem);
-      currentHeight += verseHeight;
-      return;
-    }
-
-    const languageMetric = hasMeasuredVerseLines(languageHeights[verseItem.id])
-      ? languageHeights[verseItem.id]
-      : createEstimatedVerseMetric(verseItem, fontSize, visibleLanguages, tableWidth);
-
-    if (!hasMeasuredVerseLines(languageMetric)) {
-      if (currentSlide.length) flushSlide();
-      currentSlide.push(verseItem);
-      currentHeight += verseHeight;
-      return;
-    }
-
-    const result = appendTallVerseSegments({
-      item: verseItem,
-      languageMetric,
-      slides,
-      currentSlide,
-      currentHeight,
-      availableHeight,
-      fontSize,
-      tableWidth,
-    });
-    currentSlide = result.currentSlide;
-    currentHeight = result.currentHeight;
-  };
-
-  for (const unit of units) {
-    if (currentSlide.length && unit.breakBefore) {
-      flushSlide();
-    }
-
-    const item = unit.items[0];
-    if (item.type === "verse") {
-      placeVerse(item);
-      continue;
-    }
-
-    const itemHeight = Math.ceil((heights[item.id] || 0) + 2);
-    if (currentSlide.length && currentHeight + itemHeight > availableHeight) {
-      flushSlide();
-    }
-    currentSlide.push(item);
-    currentHeight += itemHeight;
-  }
-
-  flushSlide();
-  return slides.length ? slides : [[]];
-}
-
-function appendTallVerseSegments({
-  item,
-  languageMetric,
-  slides,
-  currentSlide,
-  currentHeight,
-  availableHeight,
-  fontSize,
-  tableWidth,
-}) {
-  const state = createVerseLineState(languageMetric, fontSize, item);
-  let segmentIndex = 0;
-
-  while (hasRemainingVerseLines(state)) {
-    const remainingHeight = availableHeight - currentHeight;
-    const capacityItem =
-      segmentIndex > 0 ? { ...item, suppressSpeakerLabel: true } : item;
-    let lineCapacities = getIndependentLineCapacities(state, remainingHeight, fontSize, capacityItem);
-
-    if (!hasPositiveLineCapacity(lineCapacities) && currentSlide.length) {
-      slides.push(currentSlide);
-      currentSlide = [];
-      currentHeight = 0;
-      continue;
-    }
-
-    if (!hasPositiveLineCapacity(lineCapacities)) {
-      lineCapacities = getMinimumLineCapacities(state);
-    }
-
-    const segment = createVerseLineSegment(item, state, lineCapacities, segmentIndex);
-    const segmentHeight = getVerseLineSegmentHeight(segment, fontSize);
-
-    currentSlide.push(segment.item);
-    currentHeight += segmentHeight;
-    segmentIndex += 1;
-
-    if (hasRemainingVerseLines(state)) {
-      slides.push(currentSlide);
-      currentSlide = [];
-      currentHeight = 0;
-    }
-  }
-
-  return { currentSlide, currentHeight };
-}
-
-function hasMeasuredVerseLines(metric = {}) {
-  return ["english", "coptic", "arabic"].some(
-    (language) => Array.isArray(metric[language]?.lines) && metric[language].lines.length,
-  );
-}
-
-function createVerseLineState(languageMetric = {}, fontSize, item = {}) {
-  const languages = ["english", "coptic", "arabic"]
-    .map((language) => ({
-      language,
-      lineHeight: getLanguageLineHeight(language, fontSize),
-      lines: getMetricLinesForLanguage(languageMetric[language]?.lines || [], language, item),
-      offset: 0,
-    }))
-    .filter((entry) => entry.lines.length);
-
-  return {
-    languages,
-  };
-}
-
-function hasRemainingVerseLines(state) {
-  return state.languages.some((entry) => entry.offset < entry.lines.length);
-}
-
-function getIndependentLineCapacities(state, height, fontSize, item) {
-  const usableHeight = height - getVerseVerticalPadding(item);
-
-  if (usableHeight <= 0) {
-    return {};
-  }
-
-  return state.languages
-    .filter((entry) => entry.offset < entry.lines.length)
-    .reduce((acc, entry) => {
-      // Each column gets its own line budget. In particular, Arabic is never
-      // assigned English's line count or token count; it advances only by the
-      // Arabic lines that fit in this segment's remaining vertical space.
-      const languageHeight = usableHeight - getLanguageExtraTopPadding(entry.language, item, fontSize);
-      acc[entry.language] = Math.max(0, Math.floor(languageHeight / entry.lineHeight));
-
-      return acc;
-    }, {});
-}
-
-function hasPositiveLineCapacity(lineCapacities = {}) {
-  return Object.values(lineCapacities).some((capacity) => capacity > 0);
-}
-
-function getMinimumLineCapacities(state) {
-  return state.languages
-    .filter((entry) => entry.offset < entry.lines.length)
-    .reduce((capacities, entry) => {
-      capacities[entry.language] = 1;
-
-      return capacities;
-    }, {});
-}
-
-function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
-  const originalLanguageKeys = state.languages.map((entry) => entry.language);
-  const verse = {
-    ...item.verse,
-    arabic: "",
-    coptic: "",
-    english: "",
-  };
-  const lineCounts = {};
-  // The exact pre-measured lines handed to each language's render, keyed the
-  // same way onLines/onTextLayout report them -- see VerseBlock.js's
-  // forceLines plumbing (JustifiedVerseBody -> JustifiedText). Rendering
-  // these directly, instead of joining them into one text blob and asking a
-  // fresh JustifiedText/canvas pass to re-wrap it, is what keeps a split
-  // segment's actual rendered line breaks identical to what pagination
-  // measured and budgeted room for -- a shorter re-wrapped string can
-  // legitimately break at different word boundaries than the original did,
-  // which is what produces visibly wrong splits.
-  const forcedLines = {};
-  const segmentEntries = [];
-  // A language can finish earlier than its siblings in a split verse. Keep
-  // the original language set for every segment so the table columns do not
-  // collapse or jump while the verse continues across slides.
-  state.languages.forEach((entry) => {
-    const remainingCount = entry.lines.length - entry.offset;
-    const takeCount = Math.min(lineCapacities[entry.language] || 0, remainingCount);
-    const lines = entry.lines.slice(entry.offset, entry.offset + takeCount);
-
-    if (lines.length) {
-      segmentEntries.push({ entry, lines });
-    }
-
-    entry.offset += takeCount;
-  });
-
-  segmentEntries.forEach(({ entry, lines }) => {
-    verse[entry.language] = joinRenderedLines(lines);
-    lineCounts[entry.language] = lines.length;
-    forcedLines[entry.language] = lines;
-  });
-
-  verse.slideshowLanguageKeys = originalLanguageKeys;
-  verse.slideshowForcedLines = forcedLines;
-
-  return {
-    item: {
-      ...item,
-      id: segmentIndex ? `${item.id}-segment-${segmentIndex}` : item.id,
-      slideId: `${item.id}-segment-${segmentIndex}`,
-      suppressSpeakerLabel: Boolean(item.suppressSpeakerLabel) || segmentIndex > 0,
-      verse,
-      slideshowLineCounts: lineCounts,
-    },
-  };
-}
-
-function joinRenderedLines(lines) {
-  return lines
-    .map((line) => line.text || "")
-    .join("\n")
-    .replace(/[ \t]+/g, " ")
-    .trim();
-}
-
-function getVerseLineSegmentHeight(segment, fontSize) {
-  const counts = segment.item.slideshowLineCounts || {};
-  const languageHeights = Object.entries(counts)
-    .filter(([, count]) => count > 0)
-    .map(([language, count]) =>
-      count * getLanguageLineHeight(language, fontSize) +
-      getLanguageExtraTopPadding(language, segment.item, fontSize),
-    );
-
-  if (!languageHeights.length) {
-    return getVerseVerticalPadding(segment.item);
-  }
-
-  return Math.max(...languageHeights) + getVerseVerticalPadding(segment.item);
-}
-
-function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
-  if (item.type === "title") {
-    return Math.max(Math.round(fontSize * 0.8), 20) + SPACING.sm * 2;
-  }
-
-  if (item.type === "button") {
-    return 96 + SPACING.md * 2;
-  }
-
-  if (item.type === "gospelRiteToggle") {
-    return Math.round(fontSize * 0.8) + SPACING.sm * 2 + SPACING.lg;
-  }
-
-  const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
-  const languageHeights = layout.languages
-    .map((language) => {
-      const text = item.verse?.[language];
-
-      if (!String(text || "").trim()) {
-        return 0;
-      }
-
-      return estimateLanguageLineCount(
-        text,
-        language,
-        fontSize,
-        layout.rowColumnWidth,
-        item,
-      ) *
-        getLanguageLineHeight(language, fontSize) +
-        getLanguageExtraTopPadding(language, item, fontSize);
-    })
-    .filter(Boolean);
-
-  if (!languageHeights.length) {
-    return getVerseVerticalPadding(item);
-  }
-
-  return Math.max(...languageHeights) + getVerseVerticalPadding(item);
-}
-
-function createEstimatedVerseMetric(item, fontSize, visibleLanguages, tableWidth) {
-  const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
-
-  return layout.languages.reduce((metric, language) => {
-    const text = item.verse?.[language];
-
-    if (!String(text || "").trim()) {
-      return metric;
-    }
-
-    const lines = createEstimatedTextLines(
-      text,
-      getEstimatedLineLength(language, fontSize, layout.rowColumnWidth, item),
-    );
-
-    return {
-      ...metric,
-      [language]: {
-        height: lines.length * getLanguageLineHeight(language, fontSize),
-        lines,
-        lineSignature: lines.map((line) => line.text).join("\n"),
-      },
-    };
-  }, {});
-}
-
-function getVerseLanguageLayout(item, visibleLanguages = {}, tableWidth = 0) {
-  const languages = getVisibleVerseLanguages(item, visibleLanguages);
-  const rowColumnWidth = (tableWidth || 0) / Math.max(languages.length, 1);
-
-  return {
-    languages,
-    rowColumnWidth: Math.max(rowColumnWidth, 1),
-  };
-}
-
-function getVisibleVerseLanguages(item, visibleLanguages = {}) {
-  const verse = item.verse || {};
-
-  // Only when the Coptic really is the whole line does it get the whole
-  // width -- an Invincible Coptic row that carries its own translation lays
-  // out in the normal columns, and estimating it as a single full-width
-  // Coptic column made every height derived from it wrong. Same rule
-  // VerseBlock renders by (copticStandsAlone).
-  const hasTranslationText = Boolean(
-    (verse.english && verse.english.trim()) || (verse.arabic && verse.arabic.trim()),
-  );
-
-  if (verse.invincibleCoptic && !hasTranslationText) {
-    return String(verse.coptic || "").trim() ? ["coptic"] : [];
-  }
-
-  return ["english", "coptic", "arabic"].filter((language) => {
-    if (!String(verse[language] || "").trim()) {
-      return false;
-    }
-
-    if (language === "english" || language === "arabic") {
-      return Boolean(visibleLanguages[language]);
-    }
-
-    // Same force-visible rule VerseBlock renders by: Invincible Coptic
-    // survives both Coptic toggles. Reached only by an Invincible Coptic row
-    // that carries its own translation (one without a translation returns
-    // above), which is exactly the case that would otherwise be estimated as
-    // having no Coptic at all with the Coptic column switched off.
-    const forceCoptic = verse.forceCopticVisible || verse.invincibleCoptic;
-
-    return (visibleLanguages.coptic || forceCoptic) &&
-      (!item.isRecitedPrayer || visibleLanguages.copticRecitedPrayers || forceCoptic);
-  });
-}
-
 function getVisibleLanguageCount(visibleLanguages = {}) {
   return ["english", "coptic", "arabic"].filter((language) => visibleLanguages[language]).length || 1;
 }
 
-function createEstimatedTextLines(text, maxLineLength) {
-  return String(text || "")
-    .split(/\n+/)
-    .flatMap((line) => splitEstimatedLine(line, maxLineLength))
-    .filter((line) => line.text.trim());
-}
-
-function splitEstimatedLine(line, maxLineLength) {
-  const words = String(line || "").trim().split(/\s+/).filter(Boolean);
-  const lines = [];
-  let current = "";
-
-  words.forEach((word) => {
-    const next = current ? `${current} ${word}` : word;
-
-    if (current && next.length > maxLineLength) {
-      lines.push({ text: current });
-      current = word;
-      return;
-    }
-
-    current = next;
-  });
-
-  if (current) {
-    lines.push({ text: current });
-  }
-
-  return lines.length ? lines : [{ text: String(line || "") }];
-}
-
-function estimateLanguageLineCount(text, language, fontSize, rowColumnWidth, item) {
-  return Math.max(
-    1,
-    String(text || "")
-      .split(/\n+/)
-      .reduce(
-        (count, line) =>
-          count + Math.max(
-            1,
-            Math.ceil(
-              String(line || "").length /
-              getEstimatedLineLength(language, fontSize, rowColumnWidth, item),
-            ),
-          ),
-        0,
-      ),
-  );
-}
-
-function getEstimatedLineLength(language, fontSize, rowColumnWidth, item) {
-  const horizontalPadding = SPACING.xs * 2;
-  const availableWidth = Math.max((rowColumnWidth || 0) - horizontalPadding, 40);
-  const languageFontSize = getLanguageFontSize(language, item, fontSize);
-  const characterWidthFactor =
-    language === "coptic"
-      ? 0.72
-      : language === "arabic"
-        ? 0.62
-        : 0.56;
-  const estimatedLength = Math.floor(
-    availableWidth / Math.max(languageFontSize * characterWidthFactor, 1),
-  );
-
-  return Math.min(Math.max(estimatedLength, 8), 80);
-}
-
-function getLanguageFontSize(language, item, fontSize) {
-  if (item.verse?.type === "refrainLabel") {
-    return Math.max(Math.round(fontSize * 0.5), 11);
-  }
-
-  if (language === "coptic") {
-    return Math.round(fontSize * 1.25);
-  }
-
-  if (language === "arabic") {
-    return Math.round(fontSize * 1.15);
-  }
-
-  return fontSize;
-}
-
-function normalizeLanguageMetric(metric) {
-  if (!metric.lines) {
-    return metric;
-  }
-
-  const lines = metric.lines.map((line) => ({
-    text: line.text || "",
-  }));
-
-  return {
-    ...metric,
-    lines,
-    lineSignature: lines.map((line) => line.text).join("\n"),
-  };
-}
-
-function getLanguageLineHeight(language, fontSize) {
-  if (language === "coptic") {
-    return Math.round(Math.round(fontSize * 1.25) * 1);
-  }
-
-  return Math.round(fontSize * 1.25);
-}
-
-function getVerseVerticalPadding(item = {}) {
-  return item.verse?.seasonalHoosVersePrefix ? 4 : SPACING.sm * 2;
-}
-
-function getLanguageExtraTopPadding(language, item, fontSize) {
-  if (language === "coptic" && hasSeasonalPrefixLine(item?.verse)) {
-    return getSeasonalPrefixLineHeight(getLanguageFontSize(language, item, fontSize));
-  }
-
-  if (
-    language !== "coptic" ||
-    item.suppressSpeakerLabel ||
-    !getSpeakerRole(item.verse?.personRole || item.verse?.type)
-  ) {
-    return 0;
-  }
-
-  return SPACING.sm + getLanguageLineHeight(language, fontSize);
-}
-
-function getMetricLinesForLanguage(lines, language, item = {}) {
-  if (language !== "coptic" || !hasSeasonalPrefixLine(item?.verse)) {
-    return lines;
-  }
-
-  const prefix = String(item?.verse?.seasonalHoosVersePrefix || "").trim();
-
-  if (!prefix) {
-    return lines;
-  }
-
-  return lines.filter((line, index) =>
-    index !== 0 || String(line?.text || "").trim() !== prefix,
-  );
-}
-
-function hasSeasonalPrefixLine(verse = {}) {
-  const prefix = String(verse.seasonalHoosVersePrefix || "").trim();
-
-  if (!prefix) {
-    return false;
-  }
-
-  return ["english", "arabic"].some((language) =>
-    String(verse[language] || "").trimStart().startsWith(prefix),
-  );
-}
-
-function getSeasonalPrefixLineHeight(fontSize) {
-  const prefixFontSize = Math.max(Math.round((fontSize || 0) * 0.5), 8);
-
-  return Math.max(Math.round(prefixFontSize * 1.1), 9);
-}
-
-function getSlidePadding() {
-  // SafeAreaView (in both ServiceDocument and DocumentModal) already handles
-  // all edge insets before SlideshowContainer renders, so adding safeAreaInsets
-  // here would double-count the notch/home-indicator on iOS. SPACING.xl gives
-  // visual breathing room without consuming the already-excluded safe area.
-  return { bottom: SPACING.xl, top: SPACING.xl };
+function isEditableKeyboardTarget(target) {
+  if (!target || typeof target !== "object") return false;
+  const tagName = String(target.tagName || "").toLowerCase();
+  return target.isContentEditable || ["button", "input", "select", "textarea", "a"].includes(tagName);
 }
 
 function requestMeasurementFrame(callback) {
@@ -1910,13 +1413,19 @@ const styles = StyleSheet.create({
     top: 0,
     width: "100%",
   },
-  navigationLayer: {
-    ...StyleSheet.absoluteFillObject,
+  navigationSurface: {
     backgroundColor: "transparent",
-    elevation: 10,
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    zIndex: 10,
+    flex: 1,
+    width: "100%",
+    ...Platform.select({
+      web: {
+        cursor: "default",
+        outlineStyle: "none",
+        outlineWidth: 0,
+        WebkitTapHighlightColor: "transparent",
+      },
+      default: {},
+    }),
   },
   titleRow: {
     alignItems: "center",
@@ -1934,18 +1443,6 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -COLLAPSE_BUTTON_SIZE / 2 }],
     width: COLLAPSE_BUTTON_SIZE,
     zIndex: 20,
-  },
-  // Rendered as a sibling AFTER NavigationOverlay (higher in the stack), at
-  // the exact y/height the title row reported via onTitleLayout, left-aligned
-  // to match where the (otherwise untappable) inline button sits.
-  collapseButtonOverlay: {
-    alignItems: "center",
-    justifyContent: "center",
-    left: 0,
-    position: "absolute",
-    width: COLLAPSE_BUTTON_SIZE,
-    zIndex: 30,
-    elevation: 20,
   },
   collapseButtonCircle: {
     alignItems: "center",
@@ -1981,11 +1478,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: SPACING.xs,
     justifyContent: "center",
-    maxWidth: 320,
+    maxWidth: 520,
     minHeight: 96,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    width: "72%",
+    width: "84%",
   },
   // Shorter and green rather than tall and gold: a Hyperlink is a transition
   // out of this service, not a document to open on top of it.
@@ -2056,17 +1553,6 @@ const styles = StyleSheet.create({
     fontFamily: "Georgia",
     fontWeight: "700",
   },
-  // Rendered as a sibling AFTER NavigationOverlay (same reasoning as
-  // collapseButtonOverlay above) so the Subdocument/Antiphonary open-button
-  // is actually tappable instead of losing every touch to the full-screen
-  // swipe layer.
-  openButtonOverlay: {
-    left: 0,
-    position: "absolute",
-    width: "100%",
-    zIndex: 30,
-    elevation: 20,
-  },
   sectionTitle: {
     flexShrink: 1,
     fontFamily: "Georgia",
@@ -2084,19 +1570,25 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: "hidden",
   },
-  tapZone: {
-    backgroundColor: "transparent",
-    borderWidth: 0,
+  slideDeck: {
     flex: 1,
-    ...Platform.select({
-      web: {
-        cursor: "pointer",
-        outlineStyle: "none",
-        outlineWidth: 0,
-        WebkitTapHighlightColor: "transparent",
-      },
-      default: {},
-    }),
+    overflow: "hidden",
+    position: "relative",
+    width: "100%",
+  },
+  slideLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  preloadedSlide: {
+    opacity: 0,
+  },
+  screenReaderStatus: {
+    height: 1,
+    left: -10000,
+    overflow: "hidden",
+    position: "absolute",
+    top: 0,
+    width: 1,
   },
   titleTable: {
     flexDirection: "row",
