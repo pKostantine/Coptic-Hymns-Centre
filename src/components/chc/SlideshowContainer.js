@@ -13,6 +13,7 @@ import {
   getItemSignature,
   getMeasurementBatch,
   getPageTurnForKey,
+  getPageTurnForSwipe,
   getPageTurnForTap,
   getPageTurnForViewportTap,
   getSlideContentBudget,
@@ -47,6 +48,7 @@ export default function SlideshowContainer({
   const [measuredHeights, setMeasuredHeights] = useState({});
   const [measuredLanguageHeights, setMeasuredLanguageHeights] = useState({});
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const navigationIndexRef = useRef(0);
   // Unlike a numeric page index, this survives front-to-back measurement and
   // repagination. An anchor identifies the source row plus its line offset,
   // so the reader never jumps to unrelated content while estimates settle.
@@ -367,6 +369,13 @@ export default function SlideshowContainer({
     return Math.min(currentSlideIndex, Math.max(slides.length - 1, 0));
   }, [currentAnchor, currentSlideIndex, slides]);
 
+  // Update synchronously after every committed page so rapid taps/clicker
+  // presses can advance repeatedly without waiting for the next render's
+  // callback closure to capture a newer resolvedSlideIndex.
+  useLayoutEffect(() => {
+    navigationIndexRef.current = resolvedSlideIndex;
+  }, [resolvedSlideIndex]);
+
   useEffect(() => {
     // A fresh, explicit content-selector pick always wins over (and cancels)
     // whatever the reset effect above was hoping to auto-restore — otherwise
@@ -474,17 +483,18 @@ export default function SlideshowContainer({
 
   const goToSlide = useCallback((requestedIndex) => {
     const nextIndex = Math.min(Math.max(requestedIndex, 0), Math.max(slides.length - 1, 0));
+    navigationIndexRef.current = nextIndex;
     setCurrentSlideIndex(nextIndex);
     setCurrentAnchor(createSlideAnchor(slides[nextIndex]));
   }, [slides]);
 
   const goToPreviousSlide = useCallback(() => {
-    goToSlide(resolvedSlideIndex - 1);
-  }, [goToSlide, resolvedSlideIndex]);
+    goToSlide(navigationIndexRef.current - 1);
+  }, [goToSlide]);
 
   const goToNextSlide = useCallback(() => {
-    goToSlide(resolvedSlideIndex + 1);
-  }, [goToSlide, resolvedSlideIndex]);
+    goToSlide(navigationIndexRef.current + 1);
+  }, [goToSlide]);
 
   useEffect(() => {
     if (
@@ -695,16 +705,22 @@ export function NavigationSurface({
     });
   }, [fallbackSurfaceWidth]);
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_, gestureState) =>
-          Math.abs(gestureState.dx) > 18 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2,
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          Math.abs(gestureState.dx) > 18 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2,
+  const panResponder = useMemo(() => {
+    return PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+          const direction = getPageTurnForSwipe(gestureState.dx);
+          const shouldCapture = Boolean(direction) &&
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
+          return shouldCapture;
+        },
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          const direction = getPageTurnForSwipe(gestureState.dx);
+          const shouldCapture = Boolean(direction) &&
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
+          return shouldCapture;
+        },
         onPanResponderRelease: (_, gestureState) => {
+          const pageTurn = getPageTurnForSwipe(gestureState.dx);
           const selectorEdgeWidth = Math.min(
             240,
             Math.max(96, surfaceBounds.width * 0.18),
@@ -713,24 +729,23 @@ export function NavigationSurface({
           if (
             Boolean(onOpenSelector) &&
             localStartX > Math.max(surfaceBounds.width - selectorEdgeWidth, 0) &&
-            gestureState.dx < -36
+            pageTurn === "next"
           ) {
             onOpenSelector?.();
             return;
           }
 
-          if (gestureState.dx < -60) {
+          if (pageTurn === "next") {
             onNext?.();
             return;
           }
 
-          if (gestureState.dx > 60) {
+          if (pageTurn === "previous") {
             onPrevious?.();
           }
         },
-      }),
-    [onNext, onOpenSelector, onPrevious, surfaceBounds],
-  );
+      });
+  }, [onNext, onOpenSelector, onPrevious, surfaceBounds]);
 
   return (
     <Pressable
@@ -771,11 +786,14 @@ export function NavigationSurface({
               surfaceBounds.left,
               surfaceBounds.width,
             );
-          } else {
+          }
+
+          if (!turn) {
             // Last-resort support for platforms which provide only a local
-            // coordinate. This is safe when the Pressable itself is the
-            // native responder, while the viewport/page paths above cover
-            // nested text targets.
+            // coordinate, or report a synthesized page coordinate outside
+            // the surface. This is safe when the Pressable itself is the
+            // native responder, while valid viewport/page coordinates above
+            // cover nested text targets.
             turn = getPageTurnForTap(
               nativeEvent.locationX,
               surfaceBounds.width || fallbackSurfaceWidth,
