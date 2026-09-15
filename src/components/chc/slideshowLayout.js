@@ -718,14 +718,29 @@ export function createSlideAnchor(slide = []) {
   const offsets = Object.fromEntries(
     Object.entries(item.slideshowLineRanges || {}).map(([language, range]) => [language, range.start]),
   );
+  const primaryLanguage = Object.keys(offsets)[0] || null;
   return {
     sourceItemId: getSourceItemId(item),
     sectionId: item.sectionId || null,
     segmentIndex: Number.isFinite(item.slideshowSegmentIndex)
       ? item.slideshowSegmentIndex
       : null,
+    primaryLanguage,
     offsets,
   };
+}
+
+function getLineRangeDistance(range, offset) {
+  if (!range) return 100000;
+  if (offset >= range.start && offset < range.end) return 0;
+
+  // Line ranges are half-open: [start, end). The first line of the next
+  // segment therefore has offset === the previous segment's end. Giving
+  // that boundary a distance of zero tied the two pages, and the resolver
+  // always kept the earlier page. This was the common forward-navigation
+  // failure for any long verse, at every font size.
+  if (offset < range.start) return range.start - offset;
+  return offset - range.end + 1;
 }
 
 function anchorDistance(item, anchor) {
@@ -755,13 +770,26 @@ function anchorDistance(item, anchor) {
     return 0;
   }
 
-  return languages.reduce((total, language) => {
-    const range = ranges[language];
-    if (!range) return total + 100000;
-    const offset = offsets[language];
-    if (offset >= range.start && offset < range.end) return total;
-    return total + Math.min(Math.abs(offset - range.start), Math.abs(offset - range.end));
-  }, 0);
+  // Independent language columns do not always retain identical boundaries
+  // after a resize. Preserve the first visible column exactly, then use the
+  // remaining columns only as tie-breakers. Summing every language equally
+  // could otherwise choose a compromise page containing none of the lines
+  // that were actually at the top before repagination.
+  const primaryLanguage = languages.includes(anchor.primaryLanguage)
+    ? anchor.primaryLanguage
+    : languages[0];
+  const primaryDistance = getLineRangeDistance(
+    ranges[primaryLanguage],
+    offsets[primaryLanguage],
+  );
+  const secondaryDistance = languages
+    .filter((language) => language !== primaryLanguage)
+    .reduce(
+      (total, language) => total + getLineRangeDistance(ranges[language], offsets[language]),
+      0,
+    );
+
+  return primaryDistance * 1000000 + secondaryDistance;
 }
 
 export function findSlideIndexForAnchor(slides = [], anchor) {
@@ -821,6 +849,18 @@ export function getPageTurnForKey(key) {
   return null;
 }
 
+export const SLIDESHOW_SWIPE_ACTIVATION_DISTANCE = 36;
+
+export function getPageTurnForSwipe(deltaX) {
+  if (
+    Number.isFinite(deltaX) &&
+    Math.abs(deltaX) >= SLIDESHOW_SWIPE_ACTIVATION_DISTANCE
+  ) {
+    return deltaX < 0 ? "next" : "previous";
+  }
+  return null;
+}
+
 export function getPageTurnForTap(locationX, width) {
   if (!Number.isFinite(locationX) || !Number.isFinite(width) || width <= 0) return null;
   return locationX < width / 2 ? "previous" : "next";
@@ -828,6 +868,15 @@ export function getPageTurnForTap(locationX, width) {
 
 /** Resolve a viewport/page coordinate against the slideshow's real bounds. */
 export function getPageTurnForViewportTap(pageX, surfaceLeft, surfaceWidth) {
-  if (!Number.isFinite(pageX) || !Number.isFinite(surfaceLeft)) return null;
+  if (
+    !Number.isFinite(pageX) ||
+    !Number.isFinite(surfaceLeft) ||
+    !Number.isFinite(surfaceWidth) ||
+    surfaceWidth <= 0 ||
+    pageX < surfaceLeft ||
+    pageX > surfaceLeft + surfaceWidth
+  ) {
+    return null;
+  }
   return getPageTurnForTap(pageX - surfaceLeft, surfaceWidth);
 }
