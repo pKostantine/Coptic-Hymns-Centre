@@ -113,7 +113,8 @@ export function buildBibleChapterHtml({
       <main id="source-document" class="slideshow-source">${chapterHtml}</main>
     </div>
     <button class="tap-zone previous" aria-label="Previous page"></button>
-    <button class="tap-zone next" aria-label="Next page"></button>`
+    <button class="tap-zone next" aria-label="Next page"></button>
+    <div id="pager-status" class="screen-reader-status" aria-live="polite"></div>`
     : `<main class="chapter" id="chapter">${chapterHtml}</main>`;
 
   return `<!doctype html>
@@ -135,6 +136,7 @@ export function buildBibleChapterHtml({
         --psalm-introduction: ${COLORS.refrain};
         --preface-red: #d9534f;
         --font-size: ${safeFontSize}px;
+        --verse-line-height: ${Math.round(safeFontSize * 1.3)}px;
       }
       html, body {
         margin: 0;
@@ -189,7 +191,7 @@ export function buildBibleChapterHtml({
         word-break: normal;
         color: var(--text-color);
         font-size: var(--font-size);
-        line-height: 1.25;
+        line-height: var(--verse-line-height);
         text-align: justify;
         text-justify: inter-word;
       }
@@ -258,6 +260,7 @@ export function buildBibleChapterHtml({
       .pager {
         background: #000;
         height: 100vh;
+        height: 100dvh;
         overflow: hidden;
         position: relative;
         touch-action: manipulation;
@@ -268,6 +271,7 @@ export function buildBibleChapterHtml({
         display: flex;
         flex-direction: row;
         height: 100vh;
+        height: 100dvh;
         transition: none;
         will-change: transform;
         width: max-content;
@@ -276,8 +280,9 @@ export function buildBibleChapterHtml({
         box-sizing: border-box;
         flex: 0 0 100vw;
         height: 100vh;
+        height: 100dvh;
         overflow: hidden;
-        padding: calc(18px + env(safe-area-inset-top)) 18px calc(22px + env(safe-area-inset-bottom));
+        padding: calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-top)) 18px calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-bottom));
         width: 100vw;
       }
       .slideshow-source {
@@ -310,6 +315,14 @@ export function buildBibleChapterHtml({
       }
       .tap-zone.previous { left: 0; }
       .tap-zone.next { right: 0; }
+      .screen-reader-status {
+        height: 1px;
+        left: -10000px;
+        overflow: hidden;
+        position: fixed;
+        top: 0;
+        width: 1px;
+      }
     </style>
   </head>
   <body class="${isSlideshow ? 'slideshow' : 'scroll'}">
@@ -319,6 +332,7 @@ export function buildBibleChapterHtml({
         var sourceDocument = document.getElementById('source-document');
         var pager = document.getElementById('pager');
         var pages = document.getElementById('pages');
+        var pagerStatus = document.getElementById('pager-status');
         var currentPage = 0;
         var pageCount = 1;
         var pageWidth = 1;
@@ -336,6 +350,8 @@ export function buildBibleChapterHtml({
         };
         var startX = 0;
         var startY = 0;
+        var suppressClickUntil = 0;
+        var resizeFrame = 0;
 
         function post(message) {
           var payload = JSON.stringify(message);
@@ -578,6 +594,22 @@ export function buildBibleChapterHtml({
           return (pages && pages.children[Math.min(Math.max(currentPage, 0), pageCount - 1)]) || null;
         }
 
+        function splitGraphemes(text) {
+          if (window.Intl && typeof window.Intl.Segmenter === 'function') {
+            return Array.from(new window.Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), function (entry) {
+              return entry.segment;
+            });
+          }
+          return Array.from(text).reduce(function (graphemes, character) {
+            if (/[̀-ͯ᪰-᫿︠-︯]/.test(character) && graphemes.length) {
+              graphemes[graphemes.length - 1] += character;
+            } else {
+              graphemes.push(character);
+            }
+            return graphemes;
+          }, []);
+        }
+
         function getRowTextEntries(sourceRow) {
           return Array.prototype.slice.call(sourceRow.querySelectorAll('.verse-text')).map(function (textNode) {
             var text = (textNode.innerText || textNode.textContent || '').replace(/\\s+/g, ' ').trim();
@@ -585,7 +617,7 @@ export function buildBibleChapterHtml({
             return {
               offset: 0,
               separator: hasWordSeparators ? ' ' : '',
-              tokens: hasWordSeparators ? text.split(/\\s+/).filter(Boolean) : text.split(''),
+              tokens: hasWordSeparators ? text.split(/\\s+/).filter(Boolean) : splitGraphemes(text),
             };
           });
         }
@@ -598,10 +630,19 @@ export function buildBibleChapterHtml({
           return entries.reduce(function (max, entry) { return Math.max(max, entry.tokens.length - entry.offset); }, 0);
         }
 
+        function getRowProgress(entries) {
+          if (!entries.length) return 0;
+          return entries.reduce(function (smallest, entry) {
+            if (!entry.tokens.length) return smallest;
+            return Math.min(smallest, entry.offset / entry.tokens.length);
+          }, 1);
+        }
+
         function cloneSegmentRow(sourceRow, entries, takeCount, includeVerseNumbers) {
           var rowClone = sourceRow.cloneNode(true);
           var textNodes = Array.prototype.slice.call(rowClone.querySelectorAll('.verse-text'));
           stripIds(rowClone);
+          rowClone.setAttribute('data-segment-progress', String(getRowProgress(entries)));
           if (!includeVerseNumbers) {
             Array.prototype.slice.call(rowClone.querySelectorAll('.verse-number')).forEach(function (numberNode) {
               numberNode.remove();
@@ -680,12 +721,26 @@ export function buildBibleChapterHtml({
           if (!isSlideshow || !pages) return;
           currentPage = Math.min(Math.max(currentPage, 0), pageCount - 1);
           pages.style.transform = 'translate3d(' + -currentPage * pageWidth + 'px, 0, 0)';
+          Array.prototype.forEach.call(pages.children || [], function (page, index) {
+            page.setAttribute('aria-hidden', index === currentPage ? 'false' : 'true');
+          });
+          if (previousButton) {
+            previousButton.disabled = currentPage <= 0;
+            previousButton.setAttribute('aria-disabled', currentPage <= 0 ? 'true' : 'false');
+          }
+          if (nextButton) {
+            nextButton.disabled = currentPage >= pageCount - 1;
+            nextButton.setAttribute('aria-disabled', currentPage >= pageCount - 1 ? 'true' : 'false');
+          }
+          if (pagerStatus) pagerStatus.textContent = 'Slide ' + (currentPage + 1) + ' of ' + pageCount;
         }
 
-        function paginate(preferredVerse) {
+        function paginate(preferredAnchor) {
           if (!isSlideshow || !sourceDocument || !pages || !pager) return;
           var rows = Array.prototype.slice.call(sourceDocument.querySelectorAll('.verse-row'));
-          var previousVerse = preferredVerse || getCurrentVerse();
+          var previousAnchor = typeof preferredAnchor === 'string'
+            ? { verse: preferredAnchor, progress: 0 }
+            : preferredAnchor || getCurrentAnchor();
           var page = null;
 
           pages.style.visibility = 'hidden';
@@ -696,6 +751,7 @@ export function buildBibleChapterHtml({
             if (!page) page = createPage();
             var clone = row.cloneNode(true);
             stripIds(clone);
+            clone.setAttribute('data-segment-progress', '0');
             page.appendChild(clone);
             if (!pageOverflows(page)) return;
             page.removeChild(clone);
@@ -720,24 +776,54 @@ export function buildBibleChapterHtml({
 
           pageCount = Math.max(1, pages.children.length);
           pages.style.visibility = 'visible';
-          if (previousVerse) {
-            selectVerse(previousVerse);
+          if (previousAnchor && previousAnchor.verse) {
+            selectAnchor(previousAnchor);
           } else {
             applyPage();
           }
         }
 
-        function getCurrentVerse() {
+        function getCurrentAnchor() {
           var page = getCurrentPageNode();
           var row = page ? page.querySelector('[data-verse]') : null;
-          return row ? row.getAttribute('data-verse') : '';
+          return row
+            ? {
+                verse: row.getAttribute('data-verse') || '',
+                progress: Number(row.getAttribute('data-segment-progress')) || 0
+              }
+            : null;
         }
 
-        function pageForVerse(verse) {
-          if (!pages) return -1;
-          return Array.prototype.slice.call(pages.children || []).findIndex(function (page) {
-            return Boolean(page.querySelector('[data-verse="' + String(verse).replace(/"/g, '\\\\22 ') + '"]'));
+        function getCurrentVerse() {
+          var anchor = getCurrentAnchor();
+          return anchor ? anchor.verse : '';
+        }
+
+        function pageForAnchor(anchor) {
+          if (!pages || !anchor || !anchor.verse) return -1;
+          var selector = '[data-verse="' + String(anchor.verse).replace(/"/g, '\\\\22 ') + '"]';
+          var desiredProgress = Number(anchor.progress) || 0;
+          var bestIndex = -1;
+          var bestDistance = Infinity;
+          Array.prototype.forEach.call(pages.children || [], function (page, index) {
+            var row = page.querySelector(selector);
+            if (!row) return;
+            var progress = Number(row.getAttribute('data-segment-progress')) || 0;
+            var distance = progress <= desiredProgress
+              ? desiredProgress - progress
+              : 1000 + progress - desiredProgress;
+            if (distance < bestDistance) {
+              bestDistance = distance;
+              bestIndex = index;
+            }
           });
+          return bestIndex;
+        }
+
+        function selectAnchor(anchor) {
+          var targetPage = pageForAnchor(anchor);
+          if (targetPage >= 0) currentPage = targetPage;
+          applyPage();
         }
 
         function previousPage() {
@@ -755,11 +841,7 @@ export function buildBibleChapterHtml({
         function selectVerse(verse) {
           var target = document.querySelector('[data-verse="' + String(verse).replace(/"/g, '\\\\22 ') + '"]');
           if (isSlideshow) {
-            var targetPage = pageForVerse(verse);
-            if (targetPage >= 0) {
-              currentPage = targetPage;
-              applyPage();
-            }
+            selectAnchor({ verse: String(verse), progress: 0 });
             return;
           }
           if (target) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -768,12 +850,43 @@ export function buildBibleChapterHtml({
         window.selectBibleVerse = selectVerse;
         var previousButton = document.querySelector('.tap-zone.previous');
         var nextButton = document.querySelector('.tap-zone.next');
-        if (previousButton) previousButton.addEventListener('click', previousPage);
-        if (nextButton) nextButton.addEventListener('click', nextPage);
+        function handleTapPageTurn(callback) {
+          return function (event) {
+            if (Date.now() < suppressClickUntil) {
+              event.preventDefault();
+              return;
+            }
+            callback();
+          };
+        }
+        if (previousButton) previousButton.addEventListener('click', handleTapPageTurn(previousPage));
+        if (nextButton) nextButton.addEventListener('click', handleTapPageTurn(nextPage));
+
+        function isEditableTarget(target) {
+          if (!target || target.nodeType !== 1) return false;
+          var tag = String(target.tagName || '').toLowerCase();
+          return target.isContentEditable || ['a', 'button', 'input', 'select', 'textarea'].indexOf(tag) >= 0;
+        }
 
         document.addEventListener('keydown', function (event) {
-          if (event.key === 'ArrowLeft') previousPage();
-          if (event.key === 'ArrowRight') nextPage();
+          if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || isEditableTarget(event.target)) return;
+          var previousKeys = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'];
+          var nextKeys = ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Spacebar', 'Enter'];
+          if (previousKeys.indexOf(event.key) >= 0) {
+            event.preventDefault();
+            previousPage();
+          } else if (nextKeys.indexOf(event.key) >= 0) {
+            event.preventDefault();
+            nextPage();
+          } else if (event.key === 'Home') {
+            event.preventDefault();
+            currentPage = 0;
+            applyPage();
+          } else if (event.key === 'End') {
+            event.preventDefault();
+            currentPage = pageCount - 1;
+            applyPage();
+          }
         });
         document.addEventListener('touchstart', function (event) {
           var touch = event.touches && event.touches[0];
@@ -787,6 +900,10 @@ export function buildBibleChapterHtml({
           var dx = touch.clientX - startX;
           var dy = touch.clientY - startY;
           if (Math.abs(dx) < 36 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+          // Mobile browsers synthesize a click after touchend. Without this,
+          // one swipe advances here and then advances a second time through
+          // the transparent tap-zone button underneath it.
+          suppressClickUntil = Date.now() + 500;
           if (startX < Math.min(96, Math.max(56, window.innerWidth * 0.16)) && dx > 60) {
             post({ type: 'previousLevel' });
             return;
@@ -820,13 +937,24 @@ export function buildBibleChapterHtml({
         if (isSlideshow) {
           requestAnimationFrame(function () {
             paginate(initialVerse);
-            setTimeout(function () { paginate(getCurrentVerse()); }, 80);
-            setTimeout(function () {
-              paginate(getCurrentVerse());
+            var finishInitialLayout = function () {
+              paginate(getCurrentAnchor());
               if (initialVerse) highlightVerse(initialVerse);
-            }, 240);
+            };
+            if (document.fonts && document.fonts.ready) {
+              document.fonts.ready.then(finishInitialLayout);
+            } else {
+              setTimeout(finishInitialLayout, 120);
+            }
           });
-          window.addEventListener('resize', function () { paginate(getCurrentVerse()); });
+          window.addEventListener('resize', function () {
+            var anchor = getCurrentAnchor();
+            if (resizeFrame) cancelAnimationFrame(resizeFrame);
+            resizeFrame = requestAnimationFrame(function () {
+              resizeFrame = 0;
+              paginate(anchor);
+            });
+          });
         } else if (initialVerse) {
           requestAnimationFrame(function () {
             var target = document.querySelector('[data-verse="' + String(initialVerse).replace(/"/g, '\\\\22 ') + '"]');
@@ -944,8 +1072,8 @@ function getLanguageFontSize(fontSize: number, language: BibleLanguageKey) {
 }
 
 function getLanguageLineHeight(fontSize: number, language: BibleLanguageKey) {
-  if (language === 'coptic') return Math.round(getLanguageFontSize(fontSize, language));
-  return Math.round(fontSize * 1.25);
+  if (isArabicLanguage(language)) return Math.round(fontSize * 1.6);
+  return Math.round(fontSize * 1.3);
 }
 
 function escapeHtml(value: string) {
