@@ -25,6 +25,12 @@ export const SUBDOCUMENT_MAP = {
   PRAXIS_RESPONSE: { schema: "praxis_response", table: "praxis_response" },
   HYMN_OF_THE_INTERCESSIONS: { schema: "hymn_of_the_intercessions", table: "hymn_of_the_intercessions" },
   VERSES_OF_THE_CYMBALS: { schema: "verses_of_the_cymbals", table: "verses_of_the_cymbals" },
+  // Extracted order-table blocks that are spliced back into their parent
+  // services through all-caps Inline sentinels.
+  LITURGY_AGPEYA: { schema: "liturgy", table: "liturgy_agpeya" },
+  PSALIES_SAINTS: { schema: "psalmody", table: "psalies_saints" },
+  PSALIES_SEASONAL: { schema: "psalmody", table: "psalies_seasonal" },
+  PSALIES_DAILY: { schema: "psalmody", table: "psalies_daily" },
   // The intro/reading/conclusion wrapper tables for each epistle-style
   // reading — PAULINE_EPISTLE/CATHOLIC_EPISTLE/PRAXIS are the "Inline"
   // (English-only) variant spliced directly into the document flow;
@@ -1032,8 +1038,17 @@ const LITURGY_SCHEMA_TABLES = new Set([
   "liturgy_of_st_gregory",
   "liturgy_of_st_cyril",
   "distribution",
+  "liturgy_agpeya",
 ]);
-const PSALMODY_SCHEMA_TABLES = new Set(["vespers_praises", "midnight_praises", "morning_doxology", "antiphonary"]);
+const PSALMODY_SCHEMA_TABLES = new Set([
+  "vespers_praises",
+  "midnight_praises",
+  "morning_doxology",
+  "antiphonary",
+  "psalies_saints",
+  "psalies_seasonal",
+  "psalies_daily",
+]);
 
 function deriveStructuralFlags(schema, table) {
   const flags = { ...(STRUCTURAL_FLAGS_BY_TABLE[table] || {}) };
@@ -1046,7 +1061,12 @@ function deriveStructuralFlags(schema, table) {
     // them. Morning Doxology used to be swept in here too, which made the two
     // impossible to tell apart in a condition; it now answers only to
     // MorningDoxology above, and Vespers Praises only to VespersPraises.
-    flags.MidnightPraises = table === "midnight_praises" || table === "antiphonary";
+    flags.MidnightPraises =
+      table === "midnight_praises" ||
+      table === "antiphonary" ||
+      table === "psalies_saints" ||
+      table === "psalies_seasonal" ||
+      table === "psalies_daily";
   }
   return flags;
 }
