@@ -9,6 +9,7 @@ import {
   getItemSignature,
   getMeasurementBatch,
   getPageTurnForKey,
+  getPageTurnForSwipe,
   getPageTurnForTap,
   getPageTurnForViewportTap,
   getSlideContentBudget,
@@ -233,6 +234,10 @@ test("tap, keyboard, clicker, and adjacent-page controls are deterministic", () 
   assert.equal(getPageTurnForTap(90, 100), "next");
   assert.equal(getPageTurnForViewportTap(510, 320, 400), "previous");
   assert.equal(getPageTurnForViewportTap(690, 320, 400), "next");
+  assert.equal(getPageTurnForViewportTap(0, 320, 400), null);
+  assert.equal(getPageTurnForSwipe(-36), "next");
+  assert.equal(getPageTurnForSwipe(36), "previous");
+  assert.equal(getPageTurnForSwipe(-20), null);
   assert.equal(getPageTurnForKey("PageDown"), "next");
   assert.equal(getPageTurnForKey(" "), "next");
   assert.equal(getPageTurnForKey("ArrowUp"), "previous");
@@ -262,4 +267,144 @@ test("a maximum-font decoration page cannot trap forward navigation", () => {
 
   assert.equal(findSlideIndexForAnchor(slides, createSlideAnchor(decorationPage)), 0);
   assert.equal(findSlideIndexForAnchor(slides, createSlideAnchor(firstTextPage)), 1);
+});
+
+test("every continuation-page anchor resolves to that page, not the previous segment", () => {
+  const slides = [0, 3, 6, 9].map((start, segmentIndex) => [{
+    id: `long-row-segment-${segmentIndex}`,
+    sourceItemId: "long-row",
+    sectionId: "offering-of-the-lamb",
+    slideshowLineRanges: { english: { start, end: start + 3 } },
+    slideshowSegmentIndex: segmentIndex,
+  }]);
+
+  slides.forEach((slide, index) => {
+    assert.equal(findSlideIndexForAnchor(slides, createSlideAnchor(slide)), index);
+  });
+});
+
+test("all generated slides round-trip through anchors across sizes and languages", () => {
+  const languageSets = [
+    { english: true, coptic: false, copticRecitedPrayers: true, arabic: false },
+    { english: false, coptic: true, copticRecitedPrayers: true, arabic: false },
+    { english: false, coptic: false, copticRecitedPrayers: true, arabic: true },
+    ALL_LANGUAGES,
+  ];
+  let checkedSlides = 0;
+
+  for (const fontSize of [14, 24, 40, 58, 78]) {
+    for (const availableHeight of [160, 240, 320, 480, 720]) {
+      for (const visibleLanguages of languageSets) {
+        for (const hasSpeakerLabel of [false, true]) {
+          const item = verseItem({ hasSpeakerLabel });
+          const lines = 24;
+          const metric = {
+            english: { lines: metricLines("English", lines) },
+            coptic: { lines: metricLines("ⲕⲟⲡⲧ", lines) },
+            arabic: { lines: metricLines("عربي", lines) },
+          };
+          const slides = paginateItems(
+            [item],
+            { [item.id]: 99999 },
+            { [item.id]: metric },
+            availableHeight,
+            fontSize,
+            visibleLanguages,
+            1024,
+          );
+
+          slides.forEach((slide, index) => {
+            assert.equal(
+              findSlideIndexForAnchor(slides, createSlideAnchor(slide)),
+              index,
+              `anchor mismatch at font=${fontSize}, height=${availableHeight}, speaker=${hasSpeakerLabel}, slide=${index}`,
+            );
+            checkedSlides += 1;
+          });
+        }
+      }
+    }
+  }
+
+  assert.ok(checkedSlides > 1000, `expected broad coverage, checked ${checkedSlides} slides`);
+});
+
+test("anchors remain monotonic and on-source across broad repagination changes", () => {
+  const heights = [180, 260, 360, 540];
+  const languageSets = [
+    { english: true, coptic: false, copticRecitedPrayers: true, arabic: false },
+    ALL_LANGUAGES,
+  ];
+  let checkedMoves = 0;
+
+  for (const fontSize of [14, 40, 78]) {
+    for (const visibleLanguages of languageSets) {
+      for (const hasSpeakerLabel of [false, true]) {
+        const item = verseItem({ hasSpeakerLabel });
+        const metric = {
+          english: { lines: metricLines("English", 30) },
+          coptic: { lines: metricLines("ⲕⲟⲡⲧ", 30) },
+          arabic: { lines: metricLines("عربي", 30) },
+        };
+        const paginateAt = (availableHeight) => paginateItems(
+          [item],
+          { [item.id]: 99999 },
+          { [item.id]: metric },
+          availableHeight,
+          fontSize,
+          visibleLanguages,
+          1024,
+        );
+
+        for (const beforeHeight of heights) {
+          const before = paginateAt(beforeHeight);
+          for (const afterHeight of heights) {
+            const after = paginateAt(afterHeight);
+            const previousResolvedIndexByLanguage = new Map();
+            before.forEach((slide) => {
+              const anchor = createSlideAnchor(slide);
+              const resolvedIndex = findSlideIndexForAnchor(after, anchor);
+              assert.ok(resolvedIndex >= 0);
+              const previousResolvedIndex = previousResolvedIndexByLanguage.get(anchor.primaryLanguage) ?? -1;
+              assert.ok(
+                resolvedIndex >= previousResolvedIndex,
+                `anchor moved backward within ${anchor.primaryLanguage}: font=${fontSize}, ${beforeHeight}->${afterHeight}`,
+              );
+              previousResolvedIndexByLanguage.set(anchor.primaryLanguage, resolvedIndex);
+              const resolvedItem = after[resolvedIndex].find(
+                (entry) => (entry.sourceItemId || entry.id) === anchor.sourceItemId,
+              );
+              assert.ok(resolvedItem);
+
+              const anchoredLanguages = Object.entries(anchor.offsets);
+              // Independently paginated language columns can acquire
+              // different page boundaries after a resize. The first visible
+              // language is the stable reading-position anchor; remaining
+              // columns are tie-breakers.
+              if (anchoredLanguages.length) {
+                const range = resolvedItem.slideshowLineRanges[anchor.primaryLanguage];
+                const offset = anchor.offsets[anchor.primaryLanguage];
+                assert.ok(
+                  range && offset >= range.start && offset < range.end,
+                  `lost primary line: font=${fontSize}, ${beforeHeight}->${afterHeight}`,
+                );
+              }
+              checkedMoves += 1;
+            });
+          }
+        }
+      }
+    }
+  }
+
+  assert.ok(checkedMoves > 1000, `expected broad repagination coverage, checked ${checkedMoves} moves`);
+});
+
+test("viewport tap direction remains correct across inset surface sizes", () => {
+  for (const width of [240, 320, 768, 1400]) {
+    for (const left of [0, 24, 180, 420]) {
+      assert.equal(getPageTurnForViewportTap(left + width * 0.25, left, width), "previous");
+      assert.equal(getPageTurnForViewportTap(left + width * 0.75, left, width), "next");
+    }
+  }
 });
