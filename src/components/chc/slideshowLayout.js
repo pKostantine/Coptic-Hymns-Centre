@@ -721,6 +721,9 @@ export function createSlideAnchor(slide = []) {
   return {
     sourceItemId: getSourceItemId(item),
     sectionId: item.sectionId || null,
+    segmentIndex: Number.isFinite(item.slideshowSegmentIndex)
+      ? item.slideshowSegmentIndex
+      : null,
     offsets,
   };
 }
@@ -730,7 +733,27 @@ function anchorDistance(item, anchor) {
   const ranges = item.slideshowLineRanges || {};
   const offsets = anchor.offsets || {};
   const languages = Object.keys(offsets);
-  if (!languages.length || !Object.keys(ranges).length) return 0;
+  const rangeLanguages = Object.keys(ranges);
+
+  // At the largest font sizes a speaker label or seasonal prefix can need a
+  // decoration-only page immediately before the row's first text page. Both
+  // pages intentionally share one sourceItemId, but only the text page has
+  // line ranges. Treating the range-less decoration as a zero-distance match
+  // for a text anchor made findSlideIndexForAnchor choose the earlier page,
+  // so pressing Next appeared to do nothing and the reader became trapped.
+  if (languages.length && !rangeLanguages.length) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (!languages.length) {
+    if (
+      Number.isFinite(anchor.segmentIndex) &&
+      Number.isFinite(item.slideshowSegmentIndex)
+    ) {
+      return Math.abs(anchor.segmentIndex - item.slideshowSegmentIndex);
+    }
+    return 0;
+  }
 
   return languages.reduce((total, language) => {
     const range = ranges[language];
@@ -801,4 +824,10 @@ export function getPageTurnForKey(key) {
 export function getPageTurnForTap(locationX, width) {
   if (!Number.isFinite(locationX) || !Number.isFinite(width) || width <= 0) return null;
   return locationX < width / 2 ? "previous" : "next";
+}
+
+/** Resolve a viewport/page coordinate against the slideshow's real bounds. */
+export function getPageTurnForViewportTap(pageX, surfaceLeft, surfaceWidth) {
+  if (!Number.isFinite(pageX) || !Number.isFinite(surfaceLeft)) return null;
+  return getPageTurnForTap(pageX - surfaceLeft, surfaceWidth);
 }
