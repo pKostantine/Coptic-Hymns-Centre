@@ -5,6 +5,7 @@ import type {
   MusicConsumerRelease,
   MusicHomePayload,
   MusicLibraryPayload,
+  MusicPlaylistPayload,
   MusicSearchPayload,
   PublishedTrackLyricsPayload,
 } from '@/types/musicConsumer';
@@ -60,6 +61,14 @@ export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayloa
   return assertRpcData(data as MusicLibraryPayload | null, error, 'Load music library');
 }
 
+export async function getMusicPlaylist(playlistId: string, locale = 'en'): Promise<MusicPlaylistPayload> {
+  const { data, error } = await supabase.rpc('get_music_playlist', {
+    p_playlist_id: playlistId,
+    p_locale: locale,
+  });
+  return assertRpcData(data as MusicPlaylistPayload | null, error, 'Load playlist');
+}
+
 export async function setTrackLiked(trackId: string, liked: boolean): Promise<boolean> {
   const { data, error } = await supabase.rpc('set_track_liked', { p_track_id: trackId, p_liked: liked });
   return assertRpcData(data as boolean | null, error, liked ? 'Like track' : 'Unlike track');
@@ -113,6 +122,7 @@ export const musicService = {
   getArtist: getMusicArtist,
   search: searchMusic,
   getLibrary: getMusicLibrary,
+  getPlaylist: getMusicPlaylist,
   setLiked: setTrackLiked,
   createPlaylist: createMusicPlaylist,
   addToPlaylist: addTrackToMusicPlaylist,
