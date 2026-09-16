@@ -79,6 +79,16 @@ export interface MusicLibraryPayload {
   playlists: MusicLibraryPlaylist[];
 }
 
+export interface MusicPlaylistPayload {
+  id: string;
+  name: string;
+  description: string | null;
+  visibility: MusicPlaylistVisibility;
+  ownerUserId: string;
+  coverAsset: MusicConsumerAsset | null;
+  tracks: MusicConsumerTrack[];
+}
+
 export interface PublishedLyricWord {
   id: string;
   sequence: number;
