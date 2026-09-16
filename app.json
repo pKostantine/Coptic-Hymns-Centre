@@ -42,6 +42,15 @@
         {
           "initialOrientation": "DEFAULT"
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false,
+          "recordAudioAndroid": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {
