@@ -8,12 +8,16 @@ import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer, type MusicQueueItem } from '@/context/MusicPlayerContext';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerRelease } from '@/types/musicConsumer';
 
 export default function MusicReleaseScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
+  const { preferences } = useReadingPreferences();
+  const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
+  const isArabic = locale === 'ar';
   const releaseId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [release, setRelease] = useState<MusicConsumerRelease | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,11 +26,13 @@ export default function MusicReleaseScreen() {
   useEffect(() => {
     if (!releaseId) return;
     let active = true;
-    musicService.getRelease(releaseId)
+    setRelease(null);
+    setError(null);
+    musicService.getRelease(releaseId, locale)
       .then((payload) => { if (active) setRelease(payload); })
       .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Unable to load release.'); });
     return () => { active = false; };
-  }, [releaseId]);
+  }, [locale, releaseId]);
 
   const queue = useMemo<MusicQueueItem[]>(() => release?.tracks.map((track) => ({
     track,
@@ -38,39 +44,45 @@ export default function MusicReleaseScreen() {
   if (!release) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Header onBack={() => router.back()} title="Release" />
+        <Header onBack={() => router.back()} title={isArabic ? 'الإصدار' : 'Release'} isArabic={isArabic} />
         {error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={COLORS.gold} style={styles.loader} />}
       </SafeAreaView>
     );
   }
 
   const artistName = release.primaryArtist?.displayName ?? 'Coptic Hymns Centre';
+  const releaseType = isArabic
+    ? release.releaseType === 'album' ? 'ألبوم' : release.releaseType === 'ep' ? 'EP' : 'أغنية منفردة'
+    : release.releaseType === 'album' ? 'Album' : release.releaseType === 'ep' ? 'EP' : 'Single';
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Header onBack={() => router.back()} title={release.releaseType === 'album' ? 'Album' : release.releaseType === 'ep' ? 'EP' : 'Single'} />
+      <Header onBack={() => router.back()} title={releaseType} isArabic={isArabic} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <MusicArtwork asset={release.coverAsset} size={220} label={release.title} />
           <View style={styles.meta}>
-            <Text style={styles.title}>{release.title}</Text>
-            {release.subtitle ? <Text style={styles.subtitle}>{release.subtitle}</Text> : null}
+            <Text style={[styles.title, isArabic && styles.arabic]}>{release.title}</Text>
+            {release.subtitle ? <Text style={[styles.subtitle, isArabic && styles.arabic]}>{release.subtitle}</Text> : null}
             <Pressable disabled={!release.primaryArtist?.id} onPress={() => release.primaryArtist?.id && router.push(`/music/artist/${release.primaryArtist.id}`)}>
-              <Text style={styles.artist}>{artistName}</Text>
+              <Text style={[styles.artist, isArabic && styles.arabic]}>{artistName}</Text>
             </Pressable>
-            <Text style={styles.releaseMeta}>
-              {[release.releaseType.toUpperCase(), release.releaseDate?.slice(0, 4), `${release.tracks.length} track${release.tracks.length === 1 ? '' : 's'}`].filter(Boolean).join(' • ')}
+            <Text style={[styles.releaseMeta, isArabic && styles.arabic]}>
+              {[releaseType, release.releaseDate?.slice(0, 4), isArabic ? `${release.tracks.length} ترنيمة` : `${release.tracks.length} track${release.tracks.length === 1 ? '' : 's'}`].filter(Boolean).join(' • ')}
             </Text>
-            {release.description ? <Text style={styles.description}>{release.description}</Text> : null}
+            {release.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{release.description}</Text> : null}
             <View style={styles.actions}>
               <Pressable style={styles.playAll} onPress={() => queue.length && playQueue(queue, 0)}>
-                <Text style={styles.playAllText}>▶  Play</Text>
+                <Text style={styles.playAllText}>▶  {isArabic ? 'تشغيل' : 'Play'}</Text>
               </Pressable>
               <Pressable
                 style={styles.download}
-                onPress={() => Alert.alert('Download', 'The download action is ready in Music. Full local storage and offline playback are implemented in the dedicated Offline Downloads phase.')}
+                onPress={() => Alert.alert(
+                  isArabic ? 'التنزيل' : 'Download',
+                  isArabic ? 'إجراء التنزيل موجود الآن في تجربة الموسيقى. التخزين الكامل والاستماع بلا اتصال سيتم تفعيله في مرحلة التنزيلات.' : 'The download action is ready in Music. Full local storage and offline playback are implemented in the dedicated Offline Downloads phase.',
+                )}
               >
-                <Text style={styles.downloadText}>↓  Download</Text>
+                <Text style={styles.downloadText}>↓  {isArabic ? 'تنزيل' : 'Download'}</Text>
               </Pressable>
             </View>
           </View>
@@ -93,11 +105,11 @@ export default function MusicReleaseScreen() {
   );
 }
 
-function Header({ onBack, title }: { onBack: () => void; title: string }) {
+function Header({ onBack, title, isArabic }: { onBack: () => void; title: string; isArabic: boolean }) {
   return (
     <View style={styles.header}>
       <Pressable accessibilityLabel="Back" onPress={onBack} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
-      <Text numberOfLines={1} style={styles.headerTitle}>{title}</Text>
+      <Text numberOfLines={1} style={[styles.headerTitle, isArabic && styles.arabic]}>{title}</Text>
       <View style={styles.headerSpacer} />
     </View>
   );
@@ -115,8 +127,8 @@ const styles = StyleSheet.create({
   meta: { width: '100%', maxWidth: 680, alignItems: 'center', marginTop: SPACING.lg },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 28, fontWeight: '700', textAlign: 'center' },
   subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, textAlign: 'center', marginTop: SPACING.xs },
-  artist: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700', marginTop: SPACING.sm },
-  releaseMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: SPACING.xs },
+  artist: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700', marginTop: SPACING.sm, textAlign: 'center' },
+  releaseMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: SPACING.xs, textAlign: 'center' },
   description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: SPACING.md },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
   playAll: { paddingHorizontal: SPACING.xl, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, backgroundColor: COLORS.gold },
@@ -126,4 +138,5 @@ const styles = StyleSheet.create({
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   loader: { marginTop: SPACING.xl },
   error: { color: COLORS.priest, textAlign: 'center', margin: SPACING.xl, fontFamily: TYPOGRAPHY.body },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });
