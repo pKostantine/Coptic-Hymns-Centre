@@ -197,7 +197,7 @@ returns boolean
 language plpgsql
 security invoker
 set search_path = ''
-as $$;
+as $$
 begin
   if auth.uid() is null then
     raise exception 'Authentication required' using errcode = '28000';
