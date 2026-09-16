@@ -14,6 +14,7 @@ import {
   getPageTurnForViewportTap,
   getSlideContentBudget,
   getSlidePadding,
+  getSlideRenderLayers,
   getSlideshowChromeMetrics,
   getSlideshowLanguageLineHeight,
   getVerseLineSegmentHeight,
@@ -246,6 +247,17 @@ test("tap, keyboard, clicker, and adjacent-page controls are deterministic", () 
   assert.equal(getPageTurnForKey("Escape"), null);
   assert.deepEqual(getAdjacentSlideIndexes(4, 10), [3, 4, 5]);
   assert.deepEqual(getAdjacentSlideIndexes(0, 1), [0]);
+});
+
+test("the visible native slide stays in flex flow while neighbors preload as overlays", () => {
+  assert.deepEqual(getSlideRenderLayers(4, 10), [
+    { index: 4, inFlow: true },
+    { index: 3, inFlow: false },
+    { index: 5, inFlow: false },
+  ]);
+  assert.deepEqual(getSlideRenderLayers(0, 1), [
+    { index: 0, inFlow: true },
+  ]);
 });
 
 test("a maximum-font decoration page cannot trap forward navigation", () => {

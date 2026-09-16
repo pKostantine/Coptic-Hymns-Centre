@@ -9,7 +9,6 @@ import {
   createSlideAnchor,
   estimateItemHeight,
   findSlideIndexForAnchor,
-  getAdjacentSlideIndexes,
   getItemSignature,
   getMeasurementBatch,
   getPageTurnForKey,
@@ -19,6 +18,7 @@ import {
   getSlideContentBudget,
   getSlideKey,
   getSlidePadding,
+  getSlideRenderLayers,
   getSlideshowChromeMetrics,
   normalizeLanguageMetric,
   paginateItems,
@@ -595,19 +595,24 @@ export default function SlideshowContainer({
 }
 
 const SlideDeck = memo(function SlideDeck({ slides, currentIndex, ...slideProps }) {
-  const mountedIndexes = getAdjacentSlideIndexes(currentIndex, slides.length);
+  // Keep the visible slide in normal flex flow. React Native/Yoga does not
+  // use absolutely positioned children to establish a parent's size; when
+  // every layer was absolute, the native deck could collapse to a thin strip
+  // even though the same hierarchy filled the browser correctly. Adjacent
+  // slides can still be pre-rendered absolutely without affecting layout.
+  const renderLayers = getSlideRenderLayers(currentIndex, slides.length);
 
   return (
     <View style={styles.slideDeck}>
-      {mountedIndexes.map((index) => {
-        const isCurrent = index === currentIndex;
+      {renderLayers.map(({ index, inFlow }) => {
+        const isCurrent = inFlow;
         return (
           <View
             key={getSlideKey(slides[index], index)}
             accessibilityElementsHidden={!isCurrent}
             importantForAccessibility={isCurrent ? "yes" : "no-hide-descendants"}
             pointerEvents={isCurrent ? "auto" : "none"}
-            style={[styles.slideLayer, !isCurrent && styles.preloadedSlide]}
+            style={isCurrent ? styles.currentSlideLayer : styles.preloadedSlideLayer}
           >
             <SlideView items={slides[index] || []} {...slideProps} />
           </View>
@@ -1402,9 +1407,15 @@ function cancelMeasurementFrame(frameId) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    height: "100%",
+    minHeight: 0,
     overflow: "hidden",
     width: "100%",
+    ...Platform.select({
+      web: {
+        height: "100%",
+      },
+      default: {},
+    }),
   },
   measurementLayer: {
     left: 0,
@@ -1416,6 +1427,7 @@ const styles = StyleSheet.create({
   navigationSurface: {
     backgroundColor: "transparent",
     flex: 1,
+    minHeight: 0,
     width: "100%",
     ...Platform.select({
       web: {
@@ -1572,14 +1584,18 @@ const styles = StyleSheet.create({
   },
   slideDeck: {
     flex: 1,
+    minHeight: 0,
     overflow: "hidden",
     position: "relative",
     width: "100%",
   },
-  slideLayer: {
-    ...StyleSheet.absoluteFillObject,
+  currentSlideLayer: {
+    flex: 1,
+    minHeight: 0,
+    width: "100%",
   },
-  preloadedSlide: {
+  preloadedSlideLayer: {
+    ...StyleSheet.absoluteFillObject,
     opacity: 0,
   },
   screenReaderStatus: {

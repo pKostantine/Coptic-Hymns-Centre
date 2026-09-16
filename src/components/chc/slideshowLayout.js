@@ -819,6 +819,23 @@ export function getAdjacentSlideIndexes(currentIndex, slideCount) {
     .filter((index) => index >= 0 && index < slideCount);
 }
 
+/**
+ * The current slide must be the one layer that participates in flex layout.
+ * Native Yoga does not let absolute children establish their parent's size,
+ * so rendering every preloaded layer as an overlay can collapse the deck.
+ */
+export function getSlideRenderLayers(currentIndex, slideCount) {
+  const indexes = getAdjacentSlideIndexes(currentIndex, slideCount);
+  return [
+    ...indexes
+      .filter((index) => index === currentIndex)
+      .map((index) => ({ index, inFlow: true })),
+    ...indexes
+      .filter((index) => index !== currentIndex)
+      .map((index) => ({ index, inFlow: false })),
+  ];
+}
+
 export function getMeasurementBatch(items, measuredHeights, limit, anchor, preferredSectionId) {
   const missing = items.filter((item) => typeof measuredHeights[item.id] !== "number");
   if (missing.length <= limit) return missing;
