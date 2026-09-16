@@ -27,4 +27,4 @@ jobs:
         run: npx tsc --noEmit
       - name: Synchronized lyric tests
         run: npm run test:lyrics
-      # Final Phase 8 branch verification after the consumer UI and localized release API were completed.
+      # Final verification against the latest completed Phase 8 implementation.
