@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { COLORS } from '@/constants/theme';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { CalendarProvider } from '@/context/CalendarContext';
+import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import type { OrientationMode } from '@/utils/preferencesStorage';
 
 SplashScreen.preventAutoHideAsync();
@@ -39,9 +40,10 @@ function AppStack() {
         orientation,
       }}
     >
-      {/* Books <-> App Settings behaves like switching tabs, not pushing a
-          subpage - no slide transition between them. */}
+      {/* Books, Music, and App Settings behave like peer top-level sections,
+          not subpages, so switching between them never grows a back stack. */}
       <Stack.Screen name="index" options={{ animation: 'none' }} />
+      <Stack.Screen name="music" options={{ animation: 'none' }} />
       <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
     </Stack>
   );
@@ -70,8 +72,10 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ReadingPreferencesProvider>
         <CalendarProvider>
-          <StatusBar style="light" />
-          <AppStack />
+          <MusicPlayerProvider>
+            <StatusBar style="light" />
+            <AppStack />
+          </MusicPlayerProvider>
         </CalendarProvider>
       </ReadingPreferencesProvider>
     </SafeAreaProvider>
