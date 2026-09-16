@@ -1,12 +1,13 @@
 # Phase 3 Secure Creator Upload Pipeline
 
-Status: implemented and deployed, pending authenticated creator end-to-end upload validation.
+Status: complete.
 
 ## Supabase
 
 Migration:
 
 - `supabase/migrations/20260916143010_create_media_upload_intents.sql`
+- `supabase/migrations/20260916185209_fix_upload_intent_path_regex.sql`
 
 Created:
 
@@ -30,7 +31,7 @@ Worker:
 
 - `workers/upload-authorizer`
 - Deployed URL: `https://chc-upload-authorizer.hrmpdd8d6c.workers.dev`
-- Current deployed version: `9c646a89-a644-496e-9249-3fedff91b556`
+- Current deployed version: `1e9162fa-22a9-4452-910f-f73ebb2d9018`
 
 Bindings and secrets:
 
@@ -69,22 +70,20 @@ Completed:
 - `PUT /uploads/{uuid}` without a bearer token returned `401 auth_required`.
 - `POST /uploads/authorize` with a malformed bearer token reached Supabase and returned `401 PGRST301`.
 - Supabase migration list includes `20260916143010 create_media_upload_intents`.
+- Supabase migration list includes `20260916185209 fix_upload_intent_path_regex`.
 - `media.upload_intents` has RLS enabled, one select policy, and indexed creator/requester/expiry access paths.
 - Creator/media foreign-key coverage check returned no missing FK indexes.
+- Authenticated authorized happy-path upload passed for `creator-test@coptichymnscentre.com`.
+- Upload intent `b414ff43-67ae-49d1-8b75-21e714f83a64` finalized as `uploaded`.
+- Private R2 object path:
 
-Not completed:
+```text
+chc-submissions/submissions/5facb1fd-4aff-43ed-9cf7-6f5670cf693a/b414ff43-67ae-49d1-8b75-21e714f83a64/original.wav
+```
 
-- Authenticated authorized happy-path upload. The Supabase project currently has zero auth users, so there is no real creator session/access token to use without creating a permanent test account in production auth.
-
-## Next Validation Step
-
-After creating or signing in as a real CHC Artists creator user:
-
-1. Insert or approve a `creator.creator_accounts` row for that user.
-2. Add a `creator.creator_account_members` row with `owner`, `manager`, `editor`, or `uploader`.
-3. Call `POST /uploads/authorize` with that user's Supabase access token.
-4. Upload the exact authorized file bytes to the returned `uploadUrl`.
-5. Confirm `media.upload_intents.status = 'uploaded'` and the object exists only in `chc-submissions`.
+- Uploaded size: `16044` bytes.
+- SHA-256: `56d4af65701c26df20bd4021eda95b6e830348ce3a746086079fe89285548dc9`.
+- Wrangler download verification returned `16044` bytes and the same SHA-256.
 
 ## Notes
 

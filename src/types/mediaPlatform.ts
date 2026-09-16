@@ -12,6 +12,17 @@ export type MediaProcessingStatus = 'pending' | 'uploaded' | 'queued' | 'process
 
 export type UploadIntentStatus = 'authorized' | 'uploaded' | 'failed' | 'expired' | 'cancelled';
 
+export type MediaProcessingJobType = 'audio_delivery' | 'video_delivery' | 'metadata_probe';
+
+export type MediaProcessingJobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+
+export type MediaSubmissionType =
+  | 'music_release'
+  | 'learning_album'
+  | 'learning_lesson_set'
+  | 'artist_update'
+  | 'cantor_update';
+
 export type PublicationStatus =
   | 'draft'
   | 'uploading'
@@ -23,6 +34,18 @@ export type PublicationStatus =
   | 'published'
   | 'rejected'
   | 'archived';
+
+export type MediaSubmissionStatus = Exclude<PublicationStatus, 'archived'>;
+
+export type MusicReleaseType = 'single' | 'ep' | 'album';
+
+export type MusicTrackArtistRole = 'primary' | 'featured' | 'composer' | 'lyricist' | 'arranger' | 'producer';
+
+export type MusicPlaylistVisibility = 'private' | 'unlisted' | 'public';
+
+export type MusicLyricKind = 'original' | 'translation' | 'transliteration';
+
+export type MusicLyricSyncPrecision = 'unsynced' | 'line' | 'word';
 
 export type KnownLocaleCode = 'en' | 'ar' | 'cop' | 'fr';
 
@@ -167,6 +190,304 @@ export interface CompletedMediaUpload {
   bucket: 'chc-submissions';
   objectPath: string;
   uploadedAt: string;
+}
+
+export interface MediaProcessingJob extends TimestampFields {
+  id: string;
+  upload_intent_id: string | null;
+  media_asset_id: string | null;
+  media_asset_version_id: string | null;
+  job_type: MediaProcessingJobType;
+  status: MediaProcessingJobStatus;
+  attempt_count: number;
+  max_attempts: number;
+  worker_id: string | null;
+  input_bucket: 'chc-submissions' | 'chc-masters';
+  input_path: string;
+  output_bucket: 'chc-masters' | 'chc-music' | 'chc-learning' | 'chc-images';
+  output_path: string | null;
+  output_mime_type: string | null;
+  output_size_bytes: number | null;
+  output_checksum_sha256: string | null;
+  probe: Record<string, unknown>;
+  error_message: string | null;
+  queued_at: string;
+  available_at: string;
+  claimed_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface MediaSubmission extends TimestampFields, UserAuditFields {
+  id: string;
+  creator_account_id: string;
+  submission_type: MediaSubmissionType;
+  title: string;
+  description: string | null;
+  status: MediaSubmissionStatus;
+  submitted_at: string | null;
+  review_due_at: string | null;
+  reviewer_id: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  approved_at: string | null;
+  published_at: string | null;
+  rejected_at: string | null;
+}
+
+export interface MediaSubmissionItem extends TimestampFields {
+  id: string;
+  submission_id: string;
+  upload_intent_id: string | null;
+  media_asset_id: string | null;
+  media_processing_job_id: string | null;
+  title: string | null;
+  sort_order: number;
+  required: boolean;
+}
+
+export interface MediaSubmissionEvent {
+  id: string;
+  submission_id: string;
+  actor_id: string | null;
+  action: string;
+  from_status: MediaSubmissionStatus | null;
+  to_status: MediaSubmissionStatus | null;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface MusicArtist extends TimestampFields, UserAuditFields {
+  id: string;
+  owner_creator_account_id: string | null;
+  profile_image_asset_id: string | null;
+  display_name: string;
+  sort_name: string | null;
+  biography: string | null;
+  publication_status: PublicationStatus;
+  metadata: Record<string, unknown>;
+}
+
+export interface MusicArtistLocalization extends TimestampFields, UserAuditFields {
+  id: string;
+  artist_id: string;
+  locale: LocaleCode;
+  display_name: string;
+  sort_name: string | null;
+  biography: string | null;
+  is_primary: boolean;
+  publication_status: PublicationStatus;
+}
+
+export interface MusicArtistMembership extends TimestampFields {
+  id: string;
+  artist_id: string;
+  creator_account_id: string;
+  role: string;
+}
+
+export interface MusicRelease extends TimestampFields, UserAuditFields {
+  id: string;
+  owner_creator_account_id: string | null;
+  primary_artist_id: string | null;
+  cover_asset_id: string | null;
+  release_type: MusicReleaseType;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  release_date: string | null;
+  publication_status: PublicationStatus;
+  metadata: Record<string, unknown>;
+}
+
+export interface MusicReleaseLocalization extends TimestampFields, UserAuditFields {
+  id: string;
+  release_id: string;
+  locale: LocaleCode;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  is_primary: boolean;
+  publication_status: PublicationStatus;
+}
+
+export interface MusicTrack extends TimestampFields, UserAuditFields {
+  id: string;
+  owner_creator_account_id: string | null;
+  media_asset_id: string | null;
+  title: string;
+  subtitle: string | null;
+  duration_ms: number | null;
+  publication_status: PublicationStatus;
+  metadata: Record<string, unknown>;
+}
+
+export interface MusicTrackLocalization extends TimestampFields, UserAuditFields {
+  id: string;
+  track_id: string;
+  locale: LocaleCode;
+  title: string;
+  subtitle: string | null;
+  is_primary: boolean;
+  publication_status: PublicationStatus;
+}
+
+export interface MusicReleaseTrack {
+  id: string;
+  release_id: string;
+  track_id: string;
+  disc_number: number;
+  track_number: number;
+  created_at: string;
+}
+
+export interface MusicTrackArtist {
+  track_id: string;
+  artist_id: string;
+  role: MusicTrackArtistRole;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface MusicTrackLike {
+  user_id: string;
+  track_id: string;
+  created_at: string;
+}
+
+export interface MusicArtistFollow {
+  user_id: string;
+  artist_id: string;
+  created_at: string;
+}
+
+export interface MusicPlaylist extends TimestampFields {
+  id: string;
+  owner_user_id: string;
+  name: string;
+  description: string | null;
+  visibility: MusicPlaylistVisibility;
+  cover_asset_id: string | null;
+}
+
+export interface MusicPlaylistTrack {
+  playlist_id: string;
+  track_id: string;
+  sort_order: number;
+  added_by: string | null;
+  created_at: string;
+}
+
+export interface MusicPlayHistory {
+  id: string;
+  user_id: string;
+  track_id: string;
+  media_asset_id: string | null;
+  played_at: string;
+  progress_ms: number | null;
+  completed: boolean;
+}
+
+export interface MusicLyricSet extends TimestampFields, UserAuditFields {
+  id: string;
+  track_id: string;
+  locale: LocaleCode;
+  kind: MusicLyricKind;
+  sync_precision: MusicLyricSyncPrecision;
+  title: string | null;
+  source: string | null;
+  publication_status: PublicationStatus;
+  metadata: Record<string, unknown>;
+}
+
+export interface MusicLyricLine extends TimestampFields {
+  id: string;
+  lyric_set_id: string;
+  sequence: number;
+  start_ms: number | null;
+  end_ms: number | null;
+  text: string;
+}
+
+export interface MusicLyricWord extends TimestampFields {
+  id: string;
+  lyric_line_id: string;
+  sequence: number;
+  start_ms: number | null;
+  end_ms: number | null;
+  text: string;
+}
+
+export interface PublishedMusicReleaseTrack {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  discNumber: number;
+  trackNumber: number;
+  durationMs: number | null;
+  mediaAsset: MediaAssetReference & {
+    id: string;
+    mimeType: string | null;
+    fileSizeBytes: number | null;
+    checksum: string | null;
+  };
+  artists: Array<{
+    id: string;
+    displayName: string;
+    role: MusicTrackArtistRole;
+    sortOrder: number;
+  }>;
+}
+
+export interface PublishedMusicRelease {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  releaseType: MusicReleaseType;
+  releaseDate: string | null;
+  publicationStatus: Extract<PublicationStatus, 'published'>;
+  primaryArtist: {
+    id: string;
+    displayName: string;
+    profileImageAssetId: string | null;
+  } | null;
+  tracks: PublishedMusicReleaseTrack[];
+}
+
+export interface PublishedMusicLyricWord {
+  id: string;
+  sequence: number;
+  startMs: number | null;
+  endMs: number | null;
+  text: string;
+}
+
+export interface PublishedMusicLyricLine {
+  id: string;
+  sequence: number;
+  startMs: number | null;
+  endMs: number | null;
+  text: string;
+  words: PublishedMusicLyricWord[];
+}
+
+export interface PublishedMusicLyricSet {
+  id: string;
+  trackId: string;
+  locale: LocaleCode;
+  kind: MusicLyricKind;
+  syncPrecision: MusicLyricSyncPrecision;
+  title: string | null;
+  source: string | null;
+  publicationStatus: Extract<PublicationStatus, 'published'>;
+  lines: PublishedMusicLyricLine[];
+}
+
+export interface PublishedTrackLyrics {
+  trackId: string;
+  lyricSets: PublishedMusicLyricSet[];
 }
 
 export interface LocalizedText extends TimestampFields, UserAuditFields {

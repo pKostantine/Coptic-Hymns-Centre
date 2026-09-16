@@ -234,6 +234,8 @@ async function callSupabaseRpc<T>(
     headers: {
       apikey: env.SUPABASE_PUBLISHABLE_KEY,
       authorization: `Bearer ${bearerToken}`,
+      'accept-profile': 'public',
+      'content-profile': 'public',
       'content-type': 'application/json',
     },
     body: JSON.stringify(payload),

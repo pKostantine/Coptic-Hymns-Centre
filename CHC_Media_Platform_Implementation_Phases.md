@@ -696,7 +696,7 @@ Custom domain note: `media.coptichymnscentre.com` is not configured yet because 
 
 ---
 
-# Phase 3 — Secure Creator Upload Pipeline
+# Phase 3 ✅ — Secure Creator Upload Pipeline
 
 ## Goal
 
@@ -752,11 +752,12 @@ A creator must not be able to:
 
 An authenticated authorized test creator can upload an original file directly into the correct private submission path without routing the file through Supabase.
 
-## Phase 3 Progress — 2026-09-16
+## Phase 3 Completion — 2026-09-16
 
 Implemented:
 
 - Added `media.upload_intent_status` and `media.upload_intents`.
+- Added corrective migration `20260916185209_fix_upload_intent_path_regex.sql` for private submission object keys with file extensions.
 - Added upload-intent RPCs:
   - `public.create_media_upload_intent(...)`
   - `public.get_media_upload_intent_for_upload(...)`
@@ -777,15 +778,22 @@ Verified:
 - Malformed bearer token reaches Supabase and returns `401 PGRST301`.
 - `media.upload_intents` has RLS enabled and creator/requester/expiry indexes.
 - Creator/media foreign-key coverage check returns no missing FK indexes.
+- Authenticated test creator `creator-test@coptichymnscentre.com` uploaded an original WAV directly through the upload Worker into private R2.
+- Upload intent: `b414ff43-67ae-49d1-8b75-21e714f83a64`
+- Creator account: `5facb1fd-4aff-43ed-9cf7-6f5670cf693a`
+- R2 object: `chc-submissions/submissions/5facb1fd-4aff-43ed-9cf7-6f5670cf693a/b414ff43-67ae-49d1-8b75-21e714f83a64/original.wav`
+- Size: `16044` bytes
+- SHA-256: `56d4af65701c26df20bd4021eda95b6e830348ce3a746086079fe89285548dc9`
+- Database finalized `media.upload_intents.status = 'uploaded'`, `uploaded_size = 16044`, and an R2 ETag was recorded.
+- Downloading the private object via Wrangler returned the same byte count and SHA-256.
 
-Not marked complete yet:
+Implementation note:
 
-- The Supabase project currently has zero auth users, so there is no real authenticated CHC Artists creator token available for the required happy-path upload test.
-- The current deployed flow uses a Worker-authorized upload URL with an R2 binding rather than R2 S3 presigned URLs because R2 S3 credentials have not been provisioned yet. The file still bypasses Supabase and lands directly in the private R2 submission bucket.
+- The deployed flow uses a Worker-authorized upload URL with an R2 binding rather than R2 S3 presigned URLs because R2 S3 credentials have not been provisioned yet. The file still bypasses Supabase and lands directly in the private R2 submission bucket.
 
 ---
 
-# Phase 4 — Media Processing Pipeline
+# Phase 4 ✅ — Media Processing Pipeline
 
 ## Goal
 
@@ -883,9 +891,39 @@ Do not add unnecessary adaptive-streaming complexity yet.
 
 A test WAV/FLAC source can enter the queue and automatically produce a valid, playable 256 kbps AAC M4A delivery file in R2.
 
+## Phase 4 Completion — 2026-09-16
+
+Implemented:
+
+- Added media processing job enums and queue table.
+- Added safe worker claiming with `FOR UPDATE SKIP LOCKED`.
+- Added token-guarded worker RPCs for claim, complete, and failure reporting.
+- Added creator enqueue RPC for uploaded audio intents.
+- Added Docker-ready media processor in `workers/media-processor`.
+- Added `ffmpeg-static` and `ffprobe-static` processor dependencies.
+- Added S3-compatible R2 runtime path plus Wrangler fallback for this workspace.
+- Added Phase 4 TypeScript types in `src/types/mediaPlatform.ts`.
+- Added implementation notes in `docs/media-platform/phase-4-media-processing-pipeline.md`.
+
+Verified:
+
+- Authenticated test creator uploaded a 44.1 kHz stereo WAV source.
+- Upload intent `85712f4f-0873-4cd8-b80f-bf5aad1a85c8` entered the processing queue.
+- Job `407d666b-8ed6-4cbf-90fa-0be90b79fc84` was claimed and completed by the media processor.
+- Output object:
+  `chc-music/processed/5facb1fd-4aff-43ed-9cf7-6f5670cf693a/85712f4f-0873-4cd8-b80f-bf5aad1a85c8/v1/audio.m4a`
+- Output size: `162028` bytes
+- Output SHA-256: `c877fb3936ee3255973f558718d9240bc4f66e7517db7e650b6793fbabf2fc86`
+- Resolver HEAD returned `200`, `Content-Type: audio/mp4`, immutable cache headers, CORS, and byte-range support.
+- ffprobe confirmed M4A/MP4 container, AAC-LC audio, stereo 44.1 kHz, and audio bit rate about `255378` bps.
+
+Implementation note:
+
+- The current workspace processor uses Wrangler for R2 object transfer because R2 S3 credentials are not provisioned yet. The Docker worker already supports an S3-compatible R2 path for production credentials.
+
 ---
 
-# Phase 5 — Submission, Moderation, and Publishing
+# Phase 5 ✅ — Submission, Moderation, and Publishing
 
 ## Goal
 
@@ -979,9 +1017,50 @@ Do not partially publish broken albums or incomplete learning sets.
 
 A complete test submission can move successfully from draft through approval, processing, and publication.
 
+## Phase 5 Completion — 2026-09-16
+
+Status: complete. The creator submission, admin moderation, processing, and publication workflow is now implemented and verified against the live Supabase project and Cloudflare media path.
+
+Implemented:
+
+- Added `media.submission_type`.
+- Added `media.submissions`, `media.submission_items`, and `media.submission_events`.
+- Added RLS-backed read access for creator-account members/admins.
+- Added submission workflow RPCs:
+  - `public.create_media_submission`
+  - `public.add_media_submission_item`
+  - `public.submit_media_submission`
+  - `public.review_media_submission`
+  - `public.publish_media_submission`
+- Added Phase 5 TypeScript contracts in `src/types/mediaPlatform.ts`.
+- Added follow-up FK covering indexes reported by Supabase performance advisor.
+- Added implementation notes in `docs/media-platform/phase-5-submission-moderation-publishing.md`.
+
+Migrations:
+
+- `20260916192454_create_submission_moderation_publication_workflow.sql`
+- `20260916192807_add_submission_workflow_fk_indexes.sql`
+
+Verified:
+
+- Fresh creator upload was submitted as a music release.
+- Submission `961b382b-5ce4-41a7-b3cb-438ad7dc9ebd` moved through:
+  `draft -> ready_to_submit -> pending_review -> approved -> processing -> published`.
+- Processing job `214b0928-d529-42ea-b924-ebbf0663f9a9` completed.
+- Media asset `9bab5973-0ec9-41fa-852e-7225a15f29db` was published.
+- Published object:
+  `chc-music/processed/5facb1fd-4aff-43ed-9cf7-6f5670cf693a/5339f85a-7efc-40a2-96fb-e9f458146394/v1/audio.m4a`
+- Resolver HEAD returned `200`, `Content-Type: audio/mp4`, immutable cache headers, and byte-range support.
+- `npx.cmd tsc --noEmit` passed.
+
+Implementation note:
+
+- The Phase 5 RPCs are intentionally exposed to authenticated users and guarded internally with creator membership/admin checks. Supabase advisors still report this class of `SECURITY DEFINER` warning, plus older project-wide backup/staging-table warnings that predate this phase.
+- The temporary smoke-test admin role should be removed or rotated before production use.
+
 ---
 
-# Phase 6 — Hymns & Songs Data Model
+# Phase 6 ✅ — Hymns & Songs Data Model
 
 ## Goal
 
@@ -1038,6 +1117,44 @@ There should be no public orphan tracks.
 ## Deliverable
 
 A complete published album can exist in Supabase, reference R2 delivery assets, and be queried cleanly by the consumer application.
+
+## Phase 6 Completion — 2026-09-16
+
+Status: complete. The canonical Hymns & Songs backend schema now exists and has been verified with a published album that references a Phase 5/6 published R2 delivery asset.
+
+Implemented:
+
+- Added the `music` schema.
+- Added music catalog enums:
+  - `music.release_type`
+  - `music.track_artist_role`
+  - `music.playlist_visibility`
+- Added artist, release, track, localization, membership, credit, playlist, like, follow, and play-history tables.
+- Added RLS policies for published catalog reads, creator/admin catalog management, and user-owned library data.
+- Added admin publishing RPC `public.publish_music_release`.
+- Added anonymous consumer read RPC `public.get_published_music_release`.
+- Added Phase 6 TypeScript contracts in `src/types/mediaPlatform.ts`.
+- Added implementation notes in `docs/media-platform/phase-6-hymns-songs-data-model.md`.
+
+Migrations:
+
+- `20260916193730_create_music_catalog_schema.sql`
+- `20260916193923_add_music_catalog_audit_fk_indexes.sql`
+
+Verified:
+
+- Created and published test artist `425654dd-e56c-4845-ab6c-d7ea89766e05`.
+- Created and published test album `436a9f01-f74a-4279-be13-37fc6545db48`.
+- Created and published test track `003b6ff2-b639-4050-ac72-f19c33dba82f`.
+- Track references published media asset `9bab5973-0ec9-41fa-852e-7225a15f29db`.
+- Anonymous `get_published_music_release` returned album title, release type, primary artist, ordered track, track artist, R2 bucket/path, and `audio/mp4` media metadata.
+- Focused music-schema FK-index check returned no missing covering indexes.
+- `npx.cmd tsc --noEmit` passed.
+
+Implementation note:
+
+- `publish_music_release` is intentionally a `SECURITY DEFINER` authenticated RPC guarded by the admin role. Supabase advisors flag this class of function by design.
+- Supabase advisors still report older project-wide backup/staging-table and security-definer findings outside this phase.
 
 ---
 
