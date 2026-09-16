@@ -1,0 +1,61 @@
+name: Phase 9 Verify
+
+on:
+  push:
+    branches:
+      - phase-9-global-playback-engine
+    paths:
+      - .github/workflows/phase-9-verify.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase-9-global-playback-engine
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Expose repeat and shuffle controls
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/app/music/now-playing.tsx')
+          text = path.read_text(encoding='utf-8')
+          import_anchor = "import MusicArtwork from '@/components/music/MusicArtwork';"
+          import_line = "import MusicPlaybackModeControls from '@/components/music/MusicPlaybackModeControls';"
+          if import_line not in text:
+              text = text.replace(import_anchor, import_anchor + "\n" + import_line, 1)
+          control_anchor = "          <View style={styles.trackActions}>"
+          if '<MusicPlaybackModeControls />' not in text:
+              if control_anchor not in text:
+                  raise SystemExit('Now Playing track-actions anchor not found')
+              text = text.replace(control_anchor, "          <MusicPlaybackModeControls />\n\n" + control_anchor, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Install exact dependencies
+        run: npm ci --ignore-scripts
+      - name: Validate Expo native config
+        run: npx expo config --type public > /tmp/expo-config.json
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Playback engine tests
+        run: npm run test:playback
+      - name: Synchronized lyric regression tests
+        run: npm run test:lyrics
+      - name: Commit verified Now Playing controls
+        run: |
+          if git diff --quiet -- src/app/music/now-playing.tsx; then
+            echo "Now Playing controls already wired"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/music/now-playing.tsx
+          git commit -m "Expose Phase 9 repeat and shuffle controls"
+          git push origin HEAD:phase-9-global-playback-engine
