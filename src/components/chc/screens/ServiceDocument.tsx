@@ -20,6 +20,7 @@ import { getEpistleConditionFlags } from '../../../utils/readingsService';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import { getLastDocumentPosition, setLastDocumentPosition } from '../../../utils/lastDocumentPosition';
 import { goBack } from '../../../utils/navigation';
+import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 
 interface ServiceDocumentProps {
@@ -65,13 +66,17 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const router = useRouter();
   const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent, toggleCopticGospelRite } = useReadingPreferences();
   const { effectiveDate, vespersEffectiveDate } = useCalendar();
-  // Saturday-evening Vespers Praises and Vespers still chant in Saturday's
-  // (Vatos) weekday tune even after the liturgical day rolls to Sunday for
-  // every other service — see CalendarContext's vespersEffectiveDate.
-  const isVespersService =
-    (schema === 'psalmody' && table === 'vespers_praises') ||
-    (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true) ||
-    (schema === 'liturgy' && table === 'lectionary_vespers');
+  const weekdayConditionDate = useMemo(
+    () =>
+      getServiceWeekdayConditionDate({
+        schema,
+        table,
+        extraContext,
+        effectiveDate,
+        vespersEffectiveDate,
+      }),
+    [schema, table, extraContext, effectiveDate, vespersEffectiveDate],
+  );
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
@@ -212,7 +217,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           table,
           effectiveDate,
           { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...userConditionFlags, ...extraContext },
-          isVespersService ? vespersEffectiveDate : undefined,
+          weekdayConditionDate,
         ),
       )
       .then((result) => {
@@ -244,7 +249,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, extraContext, userConditionFlags]);
+  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags]);
 
   // The scrolling WebView reader has no equivalent "seed the initial prop"
   // option (scrollToSection is imperative and needs the WebView mounted

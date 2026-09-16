@@ -16,10 +16,10 @@ interface CalendarContextValue {
    */
   effectiveDate: Date;
   /**
-   * Always `rawDate`, never rolled forward. Saturday-evening Vespers Praises
-   * and Vespers still chant in Saturday's (Vatos) weekday tune even though
-   * `effectiveDate` has already rolled to Sunday for every other service —
-   * pass this as the `weekdayDate` override for those two documents.
+   * Always `rawDate`, never rolled forward. Vespers still chants in the raw
+   * day's weekday tune when evening has rolled `effectiveDate` forward.
+   * Vespers Praises has its own previous-day weekday override in
+   * serviceConditionDates.ts.
    */
   vespersEffectiveDate: Date;
   liturgicalDayPeriod: LiturgicalDayPeriod;

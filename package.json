@@ -52,7 +52,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test:slideshow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/slideshowLayout.test.mjs tests/bibleSlideshowHtml.test.cjs"
+    "test:slideshow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/slideshowLayout.test.mjs tests/bibleSlideshowHtml.test.cjs",
+    "test:conditions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/serviceConditionDates.test.cjs"
   },
   "private": true
 }

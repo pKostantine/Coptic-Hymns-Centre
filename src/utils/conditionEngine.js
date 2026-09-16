@@ -191,17 +191,15 @@ async function fetchContextFlags(isoDate, extraContext) {
 }
 
 // get_context_flags computes weekday flags (Saturday/Saturdays, Weekend(s)/
-// Weekday(s), AdamDays/VatosDays, ...) from its one p_date argument — but
-// Saturday-evening Vespers Praises and Vespers still chant in Saturday's
-// (Vatos) weekday tune even once the 5pm liturgical-day boundary has already
-// rolled `date` itself forward to Sunday for every other flag (fixed
-// commemorations, season, etc.) — see CalendarContext.tsx's
-// vespersEffectiveDate. The RPC has no separate "weekday date" parameter, so
-// when the caller passes a distinct weekdayDate, this fetches flags for it
-// too and swaps in just its weekday-derived keys, closing over the exact
-// vocabulary the old client-side weekday computation used to set (confirmed
-// against calendar.get_context_flags directly: it never emits any weekday
-// key outside this list).
+// Weekday(s), AdamDays/VatosDays, ...) from its one p_date argument. A caller
+// can pass a distinct weekdayDate when a service needs only that day-family
+// vocabulary swapped: Vespers keeps the raw day's weekday after the evening
+// rollover, while Vespers Praises uses the previous liturgical day's weekday.
+// The RPC has no separate "weekday date" parameter, so this fetches flags for
+// the override date too and swaps in just its weekday-derived keys, closing
+// over the exact vocabulary the old client-side weekday computation used to
+// set (confirmed against calendar.get_context_flags directly: it never emits
+// any weekday key outside this list).
 const WEEKDAY_FLAG_KEYS = [
   "Sunday", "Sundays", "Monday", "Mondays", "Tuesday", "Tuesdays",
   "Wednesday", "Wednesdays", "Thursday", "Thursdays", "Friday", "Fridays",
