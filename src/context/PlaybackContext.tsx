@@ -106,9 +106,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         name: entry.playable.title,
       });
 
-      if (positionMs > 0) {
-        restorePositionMs.current = positionMs;
-      }
+      restorePositionMs.current = positionMs > 0 ? positionMs : null;
       if (autoplay) player.play();
     } catch (cause) {
       if (requestId !== sourceRequestId.current) return;
@@ -286,21 +284,12 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       queue,
       originalQueue: originalQueue.length ? originalQueue : queue,
       currentIndex,
-      positionMs: currentTimeMs,
+      positionMs: persistenceBucket * 5000,
       repeatMode,
       shuffleEnabled,
     };
     void savePlaybackSnapshot(snapshot);
-  }, [
-    currentIndex,
-    currentTimeMs,
-    hydrated,
-    originalQueue,
-    persistenceBucket,
-    queue,
-    repeatMode,
-    shuffleEnabled,
-  ]);
+  }, [currentIndex, hydrated, originalQueue, persistenceBucket, queue, repeatMode, shuffleEnabled]);
 
   const value = useMemo<PlaybackContextValue>(() => ({
     queue,
@@ -325,7 +314,6 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     cycleRepeatMode,
     toggleShuffle,
   }), [
-    buffering,
     clearQueue,
     currentIndex,
     currentItem,
