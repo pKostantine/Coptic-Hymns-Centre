@@ -32,8 +32,11 @@ export async function getMusicHome(locale = 'en'): Promise<MusicHomePayload> {
   return assertRpcData(data as MusicHomePayload | null, error, 'Load music home');
 }
 
-export async function getMusicRelease(releaseId: string): Promise<MusicConsumerRelease> {
-  const { data, error } = await supabase.rpc('get_published_music_release', { p_release_id: releaseId });
+export async function getMusicRelease(releaseId: string, locale = 'en'): Promise<MusicConsumerRelease> {
+  const { data, error } = await supabase.rpc('get_published_music_release_for_locale', {
+    p_release_id: releaseId,
+    p_locale: locale,
+  });
   return assertRpcData(data as MusicConsumerRelease | null, error, 'Load release');
 }
 
