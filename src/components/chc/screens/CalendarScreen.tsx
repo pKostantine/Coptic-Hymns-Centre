@@ -76,29 +76,18 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
   const [events, setEvents] = useState<SingleDayEvent[]>([]);
   const [contextIndicatorKeys, setContextIndicatorKeys] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // The year column's window is frozen at whatever year was showing when the
-  // panel opened. Deriving it from the live selection meant picking a year
-  // re-centred the range and slid all 61 rows out from under the finger.
   const [pickerYearAnchor, setPickerYearAnchor] = useState<number | null>(null);
   const monthListRef = useRef<ScrollView>(null);
   const yearListRef = useRef<ScrollView>(null);
 
-  // The grid highlight always tracks the literal calendar day, even after
-  // the liturgical day has rolled forward past 5pm — only the day/night
-  // toggle communicates that content is now for the evening.
   const selectedIso = rawDate.toISOString().slice(0, 10);
   const indicatorIso = effectiveDate.toISOString().slice(0, 10);
   const todayIso = todayIsoDate();
 
-  // Keeps the visible month grid following `rawDate` when it changes from
-  // outside this screen (e.g. teleporting here via the season selector, which
-  // pops back to this same still-mounted screen instance rather than
-  // remounting it, so the initial useState seed above never re-runs).
   useEffect(() => {
     setGregorianYear(rawDate.getUTCFullYear());
     setGregorianMonth(rawDate.getUTCMonth() + 1);
     setCopticYear(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the timestamp, not the Date instance
   }, [rawDate.getTime()]);
 
   useEffect(() => {
@@ -130,9 +119,6 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
     };
   }, [indicatorIso]);
 
-  // Multi-day periods and feast observances live in calendar.get_context_flags, the
-  // same source that drives hymn selection. Query the rolled liturgical date
-  // so the indicator changes at the evening boundary with the document.
   useEffect(() => {
     let cancelled = false;
     getContextIndicatorKeys(indicatorIso)
@@ -208,8 +194,6 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
 
   const leadingBlanks = days && days.length ? WEEKDAY_INDEX[days[0].weekday] : 0;
 
-  // The indicator follows the rolled liturgical date while the calendar grid
-  // continues highlighting the literal selected Gregorian date.
   const activeSeasons = useMemo(
     () => [
       ...seasons
@@ -226,7 +210,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
     ],
     [events, indicatorIso, contextIndicatorKeys],
   );
-  const activeSeasonLabel = getSeasonIndicatorName(activeSeasons, activeEvents);
+  const activeSeasonLabel = getSeasonIndicatorName(activeSeasons, activeEvents, isArabic);
   const displayedYear = mode === 'gregorian' ? gregorianYear : copticYear;
   const displayedMonth = mode === 'gregorian' ? gregorianMonth : copticMonth;
   const displayedMonthName = mode === 'gregorian'
@@ -238,16 +222,11 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
     [yearWindowAnchor],
   );
   const pickerMonths = mode === 'gregorian' ? GREGORIAN_MONTHS_EN.map((_, index) => index + 1) : COPTIC_MONTHS.map((_, index) => index + 1);
-  // Positions both columns once, as the panel opens, and never again while it
-  // is open. Keying this on the current month as well meant every month you
-  // picked snapped the list straight back — the jump that made selecting feel
-  // so abrupt. Selection now only moves the highlight; the list stays where
-  // your finger left it.
+
   useEffect(() => {
     if (!pickerOpen) return;
     monthListRef.current?.scrollTo({ y: Math.max((displayedMonth || 1) - 1, 0) * PICKER_ROW_HEIGHT, animated: false });
     yearListRef.current?.scrollTo({ y: Math.max(pickerYears.indexOf(displayedYear ?? yearWindowAnchor), 0) * PICKER_ROW_HEIGHT, animated: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- positions on open only; re-running on selection is the bug this replaced
   }, [pickerOpen]);
 
   const openDatePicker = () => {
@@ -258,433 +237,182 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
   const weekdayLabels = isArabic ? WEEKDAYS_AR : WEEKDAYS;
   const goVisualLeftMonth = () => {
     if (isArabic) {
-      mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1);
+      if (mode === 'gregorian') goNextGregorian(); else void goAdjacentCoptic(1);
     } else {
-      mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1);
+      if (mode === 'gregorian') goPrevGregorian(); else void goAdjacentCoptic(-1);
     }
   };
   const goVisualRightMonth = () => {
     if (isArabic) {
-      mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1);
+      if (mode === 'gregorian') goPrevGregorian(); else void goAdjacentCoptic(-1);
     } else {
-      mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1);
+      if (mode === 'gregorian') goNextGregorian(); else void goAdjacentCoptic(1);
     }
   };
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.screen, DISABLED_TEXT_SELECTION_STYLE]}>
-      {/* Only the real route owns the browser tab title — rendered as a modal
-          over a document, this screen is an overlay on that document's page,
-          not a page of its own. */}
-      {isHosted ? null : (
-        <Head>
-          <title>{`CHC ${labelText(CALENDAR_LABELS.calendar)}`}</title>
-        </Head>
-      )}
-      <View style={[styles.header, { paddingTop: safeAreaInsets.top }]}>
-        <Pressable accessibilityLabel="Close calendar" style={styles.headerButton} onPress={closeScreen}>
-          <Icon name="chevron-back" size={30} color={COLORS.white} />
-        </Pressable>
-        <Text style={[styles.headerTitle, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.calendar)}</Text>
-        <View style={styles.headerButton} />
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={isHosted ? [] : ['top', 'bottom']}>
+      <Head><title>{labelText(CALENDAR_LABELS.calendar)}</title></Head>
+      <View style={[styles.container, isHosted && { paddingTop: safeAreaInsets.top }]}> 
+        <View style={styles.headerRow}>
+          <Pressable onPress={closeScreen} hitSlop={10} style={styles.iconButton}>
+            <Icon name={isArabic ? 'chevron-right' : 'chevron-left'} size={24} color={COLORS.textPrimary} />
+          </Pressable>
+          <Text style={[styles.title, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.calendar)}</Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
-      <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
-        <View style={[styles.liveRow, isArabic && styles.rowReverse]}>
-          {isLive ? (
-            <View style={[styles.liveStatus, isArabic && styles.rowReverse]}>
-              <View style={styles.liveDot} />
-              <Text style={[styles.liveText, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.live)}</Text>
-            </View>
-          ) : (
-            <Pressable accessibilityLabel="Set calendar to live date" style={styles.setLiveButton} onPress={goLive}>
-              <Text style={[styles.setLiveText, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.setLive)}</Text>
-            </Pressable>
-          )}
-          <Pressable accessibilityLabel="Open season selector" style={[styles.seasonSummary, isArabic && styles.rowReverse]} onPress={openSeasonSelector}>
+        <View style={styles.summaryRow}>
+          <Pressable onPress={openSeasonSelector} style={styles.summaryPill}>
             <Text numberOfLines={1} style={[styles.summaryText, isArabic && styles.arabicText]}>
               {activeSeasonLabel}
             </Text>
-            <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={22} color={COLORS.white} />
+          </Pressable>
+          {!isLive ? (
+            <Pressable onPress={goLive} style={styles.liveButton}>
+              <Text style={[styles.liveButtonText, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.setLive)}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View style={styles.periodToggle}>
+          <Pressable
+            onPress={() => setLiturgicalDayPeriod('day')}
+            style={[styles.periodOption, liturgicalDayPeriod === 'day' && styles.periodOptionActive]}
+          >
+            <Text style={[styles.periodText, liturgicalDayPeriod === 'day' && styles.periodTextActive, isArabic && styles.arabicText]}>{isArabic ? 'نهار' : 'Day'}</Text>
           </Pressable>
           <Pressable
-            accessibilityLabel={liturgicalDayPeriod === 'morning' ? 'Switch to evening liturgical day' : 'Switch to morning liturgical day'}
-            style={[
-              styles.periodToggle,
-              {
-                backgroundColor: liturgicalDayPeriod === 'evening' ? 'rgba(142, 197, 255, 0.22)' : 'rgba(255, 255, 255, 0.08)',
-                borderColor: liturgicalDayPeriod === 'morning' ? COLORS.gold : COLORS.rowBlue,
-              },
-            ]}
-            onPress={() => {
-              if (isLive) {
-                // Any manual period change while live unsets live mode so the
-                // auto-clock-flip stops and the chosen period stays fixed.
-                // selectDate always resets the period to morning; only add a
-                // second call when the user wants evening instead.
-                selectDate(rawDate);
-                if (liturgicalDayPeriod === 'morning') {
-                  setLiturgicalDayPeriod('evening');
-                }
-              } else {
-                setLiturgicalDayPeriod(liturgicalDayPeriod === 'morning' ? 'evening' : 'morning');
-              }
-            }}
+            onPress={() => setLiturgicalDayPeriod('evening')}
+            style={[styles.periodOption, liturgicalDayPeriod === 'evening' && styles.periodOptionActive]}
           >
-            <Icon
-              name={liturgicalDayPeriod === 'morning' ? 'sunny' : 'moon'}
-              size={24}
-              color={liturgicalDayPeriod === 'morning' ? COLORS.gold : COLORS.rowBlue}
-            />
+            <Text style={[styles.periodText, liturgicalDayPeriod === 'evening' && styles.periodTextActive, isArabic && styles.arabicText]}>{isArabic ? 'مساء' : 'Evening'}</Text>
           </Pressable>
         </View>
 
-        <View style={styles.divider} />
+        <View style={styles.modeToggle}>
+          <Pressable onPress={() => setMode('gregorian')} style={[styles.modeOption, mode === 'gregorian' && styles.modeOptionActive]}>
+            <Text style={[styles.modeText, mode === 'gregorian' && styles.modeTextActive, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.gregorian)}</Text>
+          </Pressable>
+          <Pressable onPress={() => setMode('coptic')} style={[styles.modeOption, mode === 'coptic' && styles.modeOptionActive]}>
+            <Text style={[styles.modeText, mode === 'coptic' && styles.modeTextActive, isArabic && styles.arabicText]}>{labelText(CALENDAR_LABELS.coptic)}</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.monthHeader}>
-          <Pressable
-            accessibilityLabel={isArabic ? 'Next month' : 'Previous month'}
-            style={styles.monthButton}
-            onPress={goVisualLeftMonth}
-          >
-            <Icon name="chevron-back" size={28} color={COLORS.rowBlue} />
+          <Pressable onPress={goVisualLeftMonth} hitSlop={10} style={styles.iconButton}>
+            <Icon name='chevron-left' size={22} color={COLORS.textPrimary} />
           </Pressable>
-
-          <View style={styles.monthTitleGroup}>
-            <Pressable
-              accessibilityLabel="Choose month and year"
-              style={styles.datePickerTrigger}
-              onPress={openDatePicker}
-            >
-              <Text style={[styles.monthTitle, isArabic && styles.arabicText]}>
-                {displayedMonthName}
-                {displayedYear === null ? '' : ` ${formatCalendarDay(displayedYear, isArabic)}`}
-              </Text>
-              <Icon name="chevron-down" size={16} color={COLORS.gold} />
-            </Pressable>
-            <View style={[styles.modeSelector, isArabic && styles.rowReverse]}>
-              {(['gregorian', 'coptic'] as Mode[]).map((option) => {
-                const isActive = mode === option;
-                return (
-                  <Pressable
-                    key={option}
-                    accessibilityLabel={`Use ${option} calendar`}
-                    style={[styles.modeOption, isActive && styles.modeOptionActive]}
-                    onPress={() => setMode(option)}
-                  >
-                    <Text style={[styles.modeText, isArabic && styles.arabicText, { color: isActive ? COLORS.navyDark : COLORS.muted }]} numberOfLines={1}>
-                      {labelText(option === 'gregorian' ? CALENDAR_LABELS.gregorian : CALENDAR_LABELS.coptic)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <Pressable
-            accessibilityLabel={isArabic ? 'Previous month' : 'Next month'}
-            style={styles.monthButton}
-            onPress={goVisualRightMonth}
-          >
-            <Icon name="chevron-forward" size={28} color={COLORS.rowBlue} />
+          <Pressable onPress={openDatePicker} style={styles.monthTitleButton}>
+            <Text style={[styles.monthTitle, isArabic && styles.arabicText]}>{displayedMonthName} {displayedYear ?? ''}</Text>
+          </Pressable>
+          <Pressable onPress={goVisualRightMonth} hitSlop={10} style={styles.iconButton}>
+            <Icon name='chevron-right' size={22} color={COLORS.textPrimary} />
           </Pressable>
         </View>
 
-        <View style={[styles.weekdayGrid, isArabic && styles.rowReverse]}>
-          {weekdayLabels.map((weekday) => (
-            <Text key={weekday} style={[styles.weekday, isArabic && styles.arabicText]}>
-              {weekday}
-            </Text>
-          ))}
+        <View style={styles.weekdayRow}>
+          {weekdayLabels.map((weekday) => <Text key={weekday} style={[styles.weekdayText, isArabic && styles.arabicText]}>{weekday}</Text>)}
         </View>
 
         {!days ? (
           <ActivityIndicator color={COLORS.gold} style={{ marginTop: SPACING.xl }} />
         ) : (
-          <View style={[styles.dayGrid, isArabic && styles.rowReverse]}>
-            {Array.from({ length: leadingBlanks }).map((_, i) => (
-              <View key={`blank-${i}`} style={styles.dayCell} />
-            ))}
+          <View style={styles.grid}>
+            {Array.from({ length: leadingBlanks }).map((_, index) => <View key={`blank-${index}`} style={styles.dayCell} />)}
             {days.map((day) => {
-              const isSelected = day.gregorianDate === selectedIso;
-
+              const selected = day.gregorianDate === selectedIso;
+              const today = day.gregorianDate === todayIso;
+              const date = new Date(`${day.gregorianDate}T00:00:00Z`);
               return (
-                <Pressable accessibilityLabel={`Select ${day.gregorianDate}`} key={day.gregorianDate} style={styles.dayCell} onPress={() => pickDate(new Date(`${day.gregorianDate}T00:00:00Z`))}>
-                  <View style={[styles.dayCircle, isSelected && styles.dayCircleSelected]}>
-                    <Text style={[styles.dayText, isArabic && styles.arabicText, isSelected && styles.dayTextSelected]}>
-                      {formatCalendarDay(day.displayDay, isArabic)}
-                    </Text>
-                  </View>
+                <Pressable key={day.gregorianDate} onPress={() => pickDate(date)} style={[styles.dayCell, selected && styles.dayCellSelected]}>
+                  <Text style={[styles.dayPrimary, selected && styles.dayPrimarySelected, isArabic && styles.arabicText]}>{formatCalendarDay(day, mode, isArabic)}</Text>
+                  {today ? <View style={styles.todayDot} /> : null}
                 </Pressable>
               );
             })}
           </View>
         )}
-      </ScrollView>
 
-      <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
-        <Pressable style={[styles.pickerBackdrop, DISABLED_TEXT_SELECTION_STYLE]} onPress={() => setPickerOpen(false)}>
-          <Pressable style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
-            <View style={[styles.pickerColumns, isArabic && styles.rowReverse]}>
-              <View style={styles.pickerColumn}>
-                <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>
-                  {isArabic ? 'الشهر' : 'Month'}
-                </Text>
-                <ScrollView
-                  ref={monthListRef}
-                  style={styles.pickerList}
-                  showsVerticalScrollIndicator={false}
-                  snapToInterval={PICKER_ROW_HEIGHT}
-                  decelerationRate="fast"
-                >
-                  {pickerMonths.map((value) => {
-                    const isSelected = value === displayedMonth;
-                    const label = mode === 'gregorian'
-                      ? (isArabic ? GREGORIAN_MONTHS_AR[value - 1] : GREGORIAN_MONTHS_EN[value - 1])
-                      : formatCopticMonthName(COPTIC_MONTHS[value - 1], isArabic);
+        <Modal transparent visible={pickerOpen} animationType='fade' onRequestClose={() => setPickerOpen(false)}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setPickerOpen(false)}>
+            <Pressable style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
+              <View style={styles.pickerColumns}>
+                <ScrollView ref={monthListRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                  {pickerMonths.map((monthNumber) => {
+                    const selected = monthNumber === displayedMonth;
+                    const text = mode === 'gregorian'
+                      ? (isArabic ? GREGORIAN_MONTHS_AR[monthNumber - 1] : GREGORIAN_MONTHS_EN[monthNumber - 1])
+                      : formatCopticMonthName(COPTIC_MONTHS[monthNumber - 1], isArabic);
                     return (
-                      <Pressable
-                        key={value}
-                        style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
-                        onPress={() => {
-                          if (mode === 'gregorian') {
-                            setGregorianMonth(value);
-                          } else {
-                            setCopticMonth(value);
-                            setCopticMonthName(COPTIC_MONTHS[value - 1]);
-                          }
-                        }}
-                      >
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.pickerOptionText, isSelected && styles.pickerOptionTextSelected, isArabic && styles.arabicText]}
-                        >
-                          {label}
-                        </Text>
+                      <Pressable key={monthNumber} onPress={() => mode === 'gregorian' ? setGregorianMonth(monthNumber) : setCopticMonth(monthNumber)} style={styles.pickerRow}>
+                        <Text style={[styles.pickerText, selected && styles.pickerTextSelected, isArabic && styles.arabicText]}>{text}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <ScrollView ref={yearListRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                  {pickerYears.map((year) => {
+                    const selected = year === displayedYear;
+                    return (
+                      <Pressable key={year} onPress={() => mode === 'gregorian' ? setGregorianYear(year) : setCopticYear(year)} style={styles.pickerRow}>
+                        <Text style={[styles.pickerText, selected && styles.pickerTextSelected]}>{year}</Text>
                       </Pressable>
                     );
                   })}
                 </ScrollView>
               </View>
-
-              <View style={styles.pickerColumnDivider} />
-
-              <View style={styles.pickerColumn}>
-                <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>
-                  {isArabic ? 'السنة' : 'Year'}
-                </Text>
-                <ScrollView
-                  ref={yearListRef}
-                  style={styles.pickerList}
-                  showsVerticalScrollIndicator={false}
-                  snapToInterval={PICKER_ROW_HEIGHT}
-                  decelerationRate="fast"
-                >
-                  {pickerYears.map((value) => {
-                    const isSelected = value === displayedYear;
-                    return (
-                      <Pressable
-                        key={value}
-                        style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
-                        onPress={() => {
-                          if (mode === 'gregorian') setGregorianYear(value);
-                          else setCopticYear(value);
-                        }}
-                      >
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.pickerOptionText, isSelected && styles.pickerOptionTextSelected, isArabic && styles.arabicText]}
-                        >
-                          {formatCalendarDay(value, isArabic)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </View>
-
-            {/* Selecting no longer dismisses: with both columns visible you
-                usually want to set one then the other, so the panel stays put
-                and this closes it (as does tapping the scrim). */}
-            <Pressable accessibilityLabel="Close date picker" style={styles.pickerDone} onPress={() => setPickerOpen(false)}>
-              <Text style={[styles.pickerDoneText, isArabic && styles.arabicText]}>{isArabic ? 'تم' : 'Done'}</Text>
+              <Pressable onPress={() => setPickerOpen(false)} style={styles.doneButton}><Text style={styles.doneButtonText}>{isArabic ? 'تم' : 'Done'}</Text></Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: COLORS.black },
-  rowReverse: { flexDirection: 'row-reverse' },
-  header: {
-    alignItems: 'center',
-    backgroundColor: COLORS.navy,
-    flexDirection: 'row',
-    minHeight: 64,
-    paddingHorizontal: SPACING.md,
-  },
-  headerButton: { alignItems: 'center', height: 48, justifyContent: 'center', width: 48 },
-  headerTitle: {
-    color: COLORS.white,
-    flex: 1,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 24,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  sheetContent: { padding: SPACING.lg, paddingBottom: SPACING.xl },
-  liveRow: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md, justifyContent: 'space-between' },
-  liveStatus: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, minWidth: 88 },
-  liveDot: { backgroundColor: '#A94438', borderRadius: 5, height: 10, width: 10 },
-  liveText: { fontSize: 16, fontWeight: '700', color: COLORS.white },
-  setLiveButton: {
-    alignItems: 'center',
-    backgroundColor: '#4A4A4A',
-    borderRadius: 22,
-    justifyContent: 'center',
-    minHeight: 44,
-    minWidth: 88,
-    paddingHorizontal: SPACING.md,
-  },
-  setLiveText: { color: COLORS.white, fontSize: 15, fontWeight: '800' },
-  seasonSummary: {
-    alignItems: 'center',
-    backgroundColor: '#4A4A4A',
-    borderRadius: 24,
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'center',
-    minHeight: 48,
-    paddingHorizontal: SPACING.md,
-  },
-  summaryText: { fontSize: 18, fontWeight: '700', color: COLORS.white },
-  periodToggle: {
-    alignItems: 'center',
-    borderRadius: 24,
-    borderWidth: 2,
-    height: 48,
-    justifyContent: 'center',
-    width: 58,
-  },
-  divider: { height: 1, marginBottom: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.border },
-  monthHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.lg },
-  monthButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
-  monthTitleGroup: { alignItems: 'center', flex: 1 },
-  // Month and year read as one date on one control, rather than two adjacent
-  // dropdowns each with its own chevron competing for the same glance. No
-  // filled chrome: this is the screen's headline, and a gold-tinted box here
-  // fought the solid-gold selected-day circle for the same glance. The
-  // chevron alone carries the "opens a picker" affordance.
-  datePickerTrigger: {
-    alignItems: 'center',
-    borderRadius: 999,
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    minHeight: 40,
-    paddingHorizontal: SPACING.sm,
-  },
-  monthTitle: { fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700', letterSpacing: 0.2, textAlign: 'center', color: COLORS.white },
-  // Colours only — the shape is the original segmented control. Two things were
-  // wrong with the old palette: the ring was #262626, a dead grey belonging to
-  // no palette, and the active pill was `navy` on a `surface` track, which is a
-  // 1.4:1 contrast ratio — the selected side could never look raised, whatever
-  // the geometry. Solid gold clears 7:1 on the same track and is already this
-  // screen's "selected" colour on the day circle. Never a translucent tint
-  // here: the Soft tokens are mixed against black, so over a dark navy track
-  // the warm gold goes muddy.
-  modeSelector: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.surfaceSoft,
-    borderRadius: 999,
-    borderWidth: 1,
-    flexDirection: 'row',
-    marginTop: SPACING.md,
-    padding: 3,
-    width: 260,
-  },
-  modeOption: {
-    alignItems: 'center',
-    borderRadius: 999,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 34,
-    paddingHorizontal: SPACING.sm,
-  },
-  modeOptionActive: { backgroundColor: COLORS.gold },
-  modeText: { fontSize: 15, fontWeight: '700' },
-  weekdayGrid: { flexDirection: 'row', marginBottom: SPACING.sm },
-  weekday: { fontSize: 18, textAlign: 'center', width: `${100 / 7}%`, color: COLORS.muted },
-  dayGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  dayCell: { alignItems: 'center', height: 58, justifyContent: 'center', width: `${100 / 7}%` },
-  dayCircle: { alignItems: 'center', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  dayCircleSelected: { backgroundColor: COLORS.gold },
-  dayText: { fontSize: 24, fontWeight: '500', color: COLORS.white },
-  dayTextSelected: { color: COLORS.white, fontWeight: '800' },
-  arabicText: {
-    fontFamily: TYPOGRAPHY.arabic,
-    writingDirection: 'rtl',
-  },
-  // Centred over a scrim rather than pinned under whichever word was tapped —
-  // no anchor measuring, no clamping to the screen edge, and it reads as part
-  // of the app instead of an OS menu.
-  pickerBackdrop: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.66)',
-    flex: 1,
-    justifyContent: 'center',
-    padding: SPACING.lg,
-  },
-  pickerPanel: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.goldLine,
-    borderRadius: 18,
-    borderWidth: 1,
-    elevation: 12,
-    maxWidth: 380,
-    overflow: 'hidden',
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
-    width: '100%',
-  },
-  pickerColumns: { flexDirection: 'row', maxHeight: 320 },
-  pickerColumn: { flex: 1, paddingTop: SPACING.md },
-  pickerColumnDivider: { backgroundColor: COLORS.border, width: 1 },
-  pickerColumnLabel: {
-    color: COLORS.muted,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-    paddingBottom: SPACING.sm,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  pickerList: { paddingHorizontal: SPACING.sm },
-  // minHeight + marginVertical must stay equal to PICKER_ROW_HEIGHT, which is
-  // what the open-scroll positions against.
-  pickerOption: {
-    alignItems: 'center',
-    borderRadius: 10,
-    justifyContent: 'center',
-    marginVertical: 1,
-    minHeight: 44,
-    paddingHorizontal: SPACING.sm,
-  },
-  pickerOptionSelected: { backgroundColor: COLORS.goldSoft },
-  pickerOptionText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '600' },
-  pickerOptionTextSelected: { color: COLORS.gold, fontWeight: '800' },
-  pickerDone: {
-    alignItems: 'center',
-    borderTopColor: COLORS.border,
-    borderTopWidth: 1,
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  pickerDoneText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '800' },
+  safeArea: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg },
+  headerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.md },
+  iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  title: { flex: 1, textAlign: 'center', color: COLORS.textPrimary, fontSize: TYPOGRAPHY.lg, fontWeight: '600' },
+  headerSpacer: { width: 40 },
+  summaryRow: { flexDirection: 'row', gap: SPACING.sm, alignItems: 'center', marginBottom: SPACING.md },
+  summaryPill: { flex: 1, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, backgroundColor: COLORS.surface },
+  summaryText: { color: COLORS.textPrimary, textAlign: 'center', fontSize: TYPOGRAPHY.sm },
+  liveButton: { borderRadius: 999, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, backgroundColor: COLORS.gold },
+  liveButtonText: { color: COLORS.background, fontWeight: '700' },
+  periodToggle: { flexDirection: 'row', backgroundColor: COLORS.surface, borderRadius: 999, padding: 3, marginBottom: SPACING.sm },
+  periodOption: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 999 },
+  periodOptionActive: { backgroundColor: COLORS.backgroundElevated },
+  periodText: { color: COLORS.textSecondary },
+  periodTextActive: { color: COLORS.textPrimary, fontWeight: '600' },
+  modeToggle: { flexDirection: 'row', backgroundColor: COLORS.surface, borderRadius: 999, padding: 3, marginBottom: SPACING.md },
+  modeOption: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 999 },
+  modeOptionActive: { backgroundColor: COLORS.backgroundElevated },
+  modeText: { color: COLORS.textSecondary },
+  modeTextActive: { color: COLORS.textPrimary, fontWeight: '600' },
+  monthHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
+  monthTitleButton: { flex: 1, alignItems: 'center' },
+  monthTitle: { color: COLORS.textPrimary, fontSize: TYPOGRAPHY.md, fontWeight: '600' },
+  weekdayRow: { flexDirection: 'row' },
+  weekdayText: { width: '14.2857%', textAlign: 'center', color: COLORS.textSecondary, paddingVertical: 8, fontSize: TYPOGRAPHY.xs },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  dayCell: { width: '14.2857%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  dayCellSelected: { backgroundColor: COLORS.gold },
+  dayPrimary: { color: COLORS.textPrimary, fontSize: TYPOGRAPHY.sm },
+  dayPrimarySelected: { color: COLORS.background, fontWeight: '700' },
+  todayDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: COLORS.gold, marginTop: 2 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
+  pickerPanel: { width: '100%', maxWidth: 420, maxHeight: '70%', backgroundColor: COLORS.surface, borderRadius: 20, padding: SPACING.md },
+  pickerColumns: { flexDirection: 'row', gap: SPACING.sm, flex: 1 },
+  pickerColumn: { flex: 1 },
+  pickerRow: { minHeight: 44, marginVertical: 1, justifyContent: 'center', paddingHorizontal: SPACING.sm, borderRadius: 10 },
+  pickerText: { color: COLORS.textSecondary, textAlign: 'center' },
+  pickerTextSelected: { color: COLORS.textPrimary, fontWeight: '700' },
+  doneButton: { marginTop: SPACING.md, alignSelf: 'stretch', alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: COLORS.gold },
+  doneButtonText: { color: COLORS.background, fontWeight: '700' },
+  arabicText: { writingDirection: 'rtl' },
+  ...DISABLED_TEXT_SELECTION_STYLE,
 });
