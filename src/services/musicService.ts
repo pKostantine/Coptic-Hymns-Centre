@@ -4,10 +4,11 @@ import type {
   MusicConsumerAsset,
   MusicConsumerRelease,
   MusicHomePayload,
+  MusicLibraryPayload,
   MusicSearchPayload,
   PublishedTrackLyricsPayload,
 } from '@/types/musicConsumer';
-import type { MusicLyricKind } from '@/types/mediaPlatform';
+import type { MusicLyricKind, MusicPlaylistVisibility } from '@/types/mediaPlatform';
 import { supabase } from '@/utils/supabase';
 
 function assertRpcData<T>(data: T | null, error: { message: string } | null, operation: string): T {
@@ -54,6 +55,45 @@ export async function searchMusic(query: string, locale = 'en'): Promise<MusicSe
   return assertRpcData(data as MusicSearchPayload | null, error, 'Search music');
 }
 
+export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayload> {
+  const { data, error } = await supabase.rpc('get_my_music_library', { p_locale: locale });
+  return assertRpcData(data as MusicLibraryPayload | null, error, 'Load music library');
+}
+
+export async function setTrackLiked(trackId: string, liked: boolean): Promise<boolean> {
+  const { data, error } = await supabase.rpc('set_track_liked', { p_track_id: trackId, p_liked: liked });
+  return assertRpcData(data as boolean | null, error, liked ? 'Like track' : 'Unlike track');
+}
+
+export async function createMusicPlaylist(
+  name: string,
+  description?: string | null,
+  visibility: MusicPlaylistVisibility = 'private',
+): Promise<string> {
+  const { data, error } = await supabase.rpc('create_music_playlist', {
+    p_name: name,
+    p_description: description ?? null,
+    p_visibility: visibility,
+  });
+  return assertRpcData(data as string | null, error, 'Create playlist');
+}
+
+export async function addTrackToMusicPlaylist(playlistId: string, trackId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('add_track_to_music_playlist', {
+    p_playlist_id: playlistId,
+    p_track_id: trackId,
+  });
+  return assertRpcData(data as boolean | null, error, 'Add track to playlist');
+}
+
+export async function removeTrackFromMusicPlaylist(playlistId: string, trackId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('remove_track_from_music_playlist', {
+    p_playlist_id: playlistId,
+    p_track_id: trackId,
+  });
+  return assertRpcData(data as boolean | null, error, 'Remove track from playlist');
+}
+
 export async function getTrackLyrics(
   trackId: string,
   locale?: string | null,
@@ -72,6 +112,11 @@ export const musicService = {
   getRelease: getMusicRelease,
   getArtist: getMusicArtist,
   search: searchMusic,
+  getLibrary: getMusicLibrary,
+  setLiked: setTrackLiked,
+  createPlaylist: createMusicPlaylist,
+  addToPlaylist: addTrackToMusicPlaylist,
+  removeFromPlaylist: removeTrackFromMusicPlaylist,
   getLyrics: getTrackLyrics,
   resolveAsset: resolveMusicAsset,
 } as const;
