@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MusicArtwork from '@/components/music/MusicArtwork';
@@ -28,6 +28,7 @@ function lyricSetLabel(set: PublishedLyricSet): string {
 export default function MusicNowPlayingScreen() {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
+  const isArabic = preferences.appLanguage === 'ar';
   const {
     currentItem,
     queue,
@@ -46,6 +47,9 @@ export default function MusicNowPlayingScreen() {
   const [selectedLyricSetId, setSelectedLyricSetId] = useState<string | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
 
   useEffect(() => {
     if (!currentItem) {
@@ -76,6 +80,24 @@ export default function MusicNowPlayingScreen() {
     return () => { active = false; };
   }, [currentItem?.track.id, preferences.appLanguage]);
 
+  useEffect(() => {
+    if (!currentItem) return;
+    let active = true;
+    musicService.getLibrary(preferences.appLanguage === 'ar' ? 'ar' : 'en')
+      .then((library) => {
+        if (!active) return;
+        setLibraryAuthenticated(library.authenticated);
+        setLiked(library.likedTracks.some((track) => track.id === currentItem.track.id));
+      })
+      .catch(() => {
+        if (active) {
+          setLibraryAuthenticated(false);
+          setLiked(false);
+        }
+      });
+    return () => { active = false; };
+  }, [currentItem?.track.id, preferences.appLanguage]);
+
   const selectedSet = lyricSets.find((set) => set.id === selectedLyricSetId) ?? null;
   const activeLineId = useMemo(() => {
     if (!selectedSet) return null;
@@ -87,6 +109,36 @@ export default function MusicNowPlayingScreen() {
     });
     return active?.id ?? null;
   }, [currentTimeMs, selectedSet]);
+
+  const toggleLike = async () => {
+    if (!currentItem || likeBusy) return;
+    if (!libraryAuthenticated) {
+      Alert.alert(
+        isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
+        isArabic ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.' : 'Sign in to your CHC account to save Liked Songs.',
+      );
+      return;
+    }
+    setLikeBusy(true);
+    try {
+      const nextLiked = !liked;
+      await musicService.setLiked(currentItem.track.id, nextLiked);
+      setLiked(nextLiked);
+    } catch (cause) {
+      Alert.alert(isArabic ? 'الأغاني المعجبة' : 'Liked Songs', cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
+    } finally {
+      setLikeBusy(false);
+    }
+  };
+
+  const showDownloadAction = () => {
+    Alert.alert(
+      isArabic ? 'التنزيل' : 'Download',
+      isArabic
+        ? 'تم تجهيز إجراء التنزيل في تجربة الموسيقى. التخزين الكامل والاستماع بلا اتصال سيتم تفعيله في مرحلة التنزيلات.'
+        : 'The download action is part of the Music experience. Full local storage and offline playback are implemented in the dedicated Offline Downloads phase.',
+    );
+  };
 
   if (!currentItem) {
     return (
@@ -129,11 +181,20 @@ export default function MusicNowPlayingScreen() {
             <Pressable onPress={next} style={styles.sideControl}><Text style={styles.sideControlText}>▶|</Text></Pressable>
             <Pressable onPress={() => void seekToMs(currentTimeMs + 15000)} style={styles.smallControl}><Text style={styles.smallControlText}>+15</Text></Pressable>
           </View>
+
+          <View style={styles.trackActions}>
+            <Pressable disabled={likeBusy} style={[styles.trackAction, liked && styles.trackActionActive]} onPress={() => void toggleLike()}>
+              <Text style={[styles.trackActionText, liked && styles.trackActionTextActive]}>{liked ? '♥' : '♡'} {isArabic ? 'إعجاب' : 'Like'}</Text>
+            </Pressable>
+            <Pressable style={styles.trackAction} onPress={showDownloadAction}>
+              <Text style={styles.trackActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.segmentRow}>
-          <Pressable style={[styles.segment, !showQueue && styles.segmentActive]} onPress={() => setShowQueue(false)}><Text style={[styles.segmentText, !showQueue && styles.segmentTextActive]}>Lyrics</Text></Pressable>
-          <Pressable style={[styles.segment, showQueue && styles.segmentActive]} onPress={() => setShowQueue(true)}><Text style={[styles.segmentText, showQueue && styles.segmentTextActive]}>Queue</Text></Pressable>
+          <Pressable style={[styles.segment, !showQueue && styles.segmentActive]} onPress={() => setShowQueue(false)}><Text style={[styles.segmentText, !showQueue && styles.segmentTextActive]}>{isArabic ? 'الكلمات' : 'Lyrics'}</Text></Pressable>
+          <Pressable style={[styles.segment, showQueue && styles.segmentActive]} onPress={() => setShowQueue(true)}><Text style={[styles.segmentText, showQueue && styles.segmentTextActive]}>{isArabic ? 'قائمة الانتظار' : 'Queue'}</Text></Pressable>
         </View>
 
         {showQueue ? (
@@ -221,6 +282,11 @@ const styles = StyleSheet.create({
   sideControlText: { color: COLORS.white, fontSize: 19, fontWeight: '700' },
   smallControl: { width: 42, height: 36, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border },
   smallControlText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '700' },
+  trackActions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.md },
+  trackAction: { minHeight: 36, minWidth: 100, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  trackActionActive: { borderColor: COLORS.goldLine, backgroundColor: COLORS.goldSoft },
+  trackActionText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
+  trackActionTextActive: { color: COLORS.goldBright },
   segmentRow: { flexDirection: 'row', alignSelf: 'center', marginTop: SPACING.xl, backgroundColor: COLORS.surface, borderRadius: RADII.pill, padding: 4, borderWidth: 1, borderColor: COLORS.border },
   segment: { minWidth: 110, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill },
   segmentActive: { backgroundColor: COLORS.goldSoft },
