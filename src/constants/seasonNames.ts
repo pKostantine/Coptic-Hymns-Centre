@@ -1,3 +1,5 @@
+import { getCurrentAppLanguage } from '@/utils/preferencesStorage';
+
 /**
  * Two naming systems for the same underlying season/feast data:
  * - "Selector" names are the full, formal English + Arabic names shown
@@ -128,11 +130,6 @@ export const EVENT_SHORT_NAMES: Record<string, FormalName> = {
 // Nativity, Theophany and Nayrouz periods are absent from season_ranges;
 // calendarService maps their live context flags into these keys instead.
 const SEASON_INDICATOR_PRIORITIES: Record<string, number> = {
-  // The three periods rank below the 50 their own feasts use, for the same
-  // reason the fasts do: a period is the least specific thing true on a given
-  // day, so Circumcision and Wedding at Cana should win inside the Nativity and
-  // Theophany periods rather than being flattened into them. Nativity and
-  // Theophany themselves sit at 80 and still outrank their periods.
   'nativity-period': 40,
   'theophany-period': 40,
   'holy-50-days': 60,
@@ -186,8 +183,8 @@ type SeasonIndicatorItem = { key: string; date?: string };
 export function getSeasonIndicatorName(
   activeSeasons: SeasonIndicatorItem[],
   activeEvents: SeasonIndicatorItem[],
-  isArabic = false,
 ): string {
+  const isArabic = getCurrentAppLanguage() === 'ar';
   const candidates = [
     ...activeSeasons.map((season) => ({ key: season.key, priority: SEASON_INDICATOR_PRIORITIES[season.key] ?? 0 })),
     ...activeEvents.map((event) => ({ key: event.key, priority: EVENT_INDICATOR_PRIORITIES[event.key] ?? 0 })),
