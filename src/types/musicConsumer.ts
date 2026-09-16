@@ -1,4 +1,4 @@
-import type { MediaAssetReference, MusicLyricKind, MusicLyricSyncPrecision, MusicReleaseType } from '@/types/mediaPlatform';
+import type { MediaAssetReference, MusicLyricKind, MusicLyricSyncPrecision, MusicPlaylistVisibility, MusicReleaseType } from '@/types/mediaPlatform';
 
 export interface MusicConsumerAsset extends MediaAssetReference {
   id: string;
@@ -62,6 +62,21 @@ export interface MusicSearchPayload {
   artists: MusicConsumerArtistSummary[];
   releases: MusicConsumerReleaseSummary[];
   tracks: MusicConsumerTrack[];
+}
+
+export interface MusicLibraryPlaylist {
+  id: string;
+  name: string;
+  description: string | null;
+  visibility: MusicPlaylistVisibility;
+  trackCount: number;
+  coverAsset: MusicConsumerAsset | null;
+}
+
+export interface MusicLibraryPayload {
+  authenticated: boolean;
+  likedTracks: MusicConsumerTrack[];
+  playlists: MusicLibraryPlaylist[];
 }
 
 export interface PublishedLyricWord {
