@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MusicArtwork from '@/components/music/MusicArtwork';
@@ -62,9 +62,17 @@ export default function MusicReleaseScreen() {
               {[release.releaseType.toUpperCase(), release.releaseDate?.slice(0, 4), `${release.tracks.length} track${release.tracks.length === 1 ? '' : 's'}`].filter(Boolean).join(' • ')}
             </Text>
             {release.description ? <Text style={styles.description}>{release.description}</Text> : null}
-            <Pressable style={styles.playAll} onPress={() => queue.length && playQueue(queue, 0)}>
-              <Text style={styles.playAllText}>▶  Play</Text>
-            </Pressable>
+            <View style={styles.actions}>
+              <Pressable style={styles.playAll} onPress={() => queue.length && playQueue(queue, 0)}>
+                <Text style={styles.playAllText}>▶  Play</Text>
+              </Pressable>
+              <Pressable
+                style={styles.download}
+                onPress={() => Alert.alert('Download', 'The download action is ready in Music. Full local storage and offline playback are implemented in the dedicated Offline Downloads phase.')}
+              >
+                <Text style={styles.downloadText}>↓  Download</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -110,8 +118,11 @@ const styles = StyleSheet.create({
   artist: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700', marginTop: SPACING.sm },
   releaseMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: SPACING.xs },
   description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: SPACING.md },
-  playAll: { marginTop: SPACING.lg, paddingHorizontal: SPACING.xl, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, backgroundColor: COLORS.gold },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
+  playAll: { paddingHorizontal: SPACING.xl, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, backgroundColor: COLORS.gold },
   playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800' },
+  download: { paddingHorizontal: SPACING.lg, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, backgroundColor: COLORS.goldSoft, borderWidth: 1, borderColor: COLORS.goldLine },
+  downloadText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   loader: { marginTop: SPACING.xl },
   error: { color: COLORS.priest, textAlign: 'center', margin: SPACING.xl, fontFamily: TYPOGRAPHY.body },
