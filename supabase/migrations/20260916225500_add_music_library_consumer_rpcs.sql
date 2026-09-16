@@ -77,29 +77,33 @@ begin
       ) liked
     ), '[]'::jsonb),
     'playlists', coalesce((
-      select jsonb_agg(jsonb_build_object(
-        'id', playlist.id,
-        'name', playlist.name,
-        'description', playlist.description,
-        'visibility', playlist.visibility,
-        'trackCount', (
-          select count(*)
-          from music.playlist_tracks playlist_track
-          where playlist_track.playlist_id = playlist.id
-        ),
-        'coverAsset', case when cover.id is null then null else jsonb_build_object(
-          'id', cover.id,
-          'provider', cover.provider,
-          'bucket', cover.bucket,
-          'path', cover.path,
-          'mimeType', cover.mime_type
-        ) end
-      ) order by playlist.updated_at desc), '[]'::jsonb)
-    from music.playlists playlist
-    left join media.media_assets cover
-      on cover.id = playlist.cover_asset_id
-     and cover.publication_status = 'published'::media.publication_status
-    where playlist.owner_user_id = request_user_id)
+      select jsonb_agg(
+        jsonb_build_object(
+          'id', playlist.id,
+          'name', playlist.name,
+          'description', playlist.description,
+          'visibility', playlist.visibility,
+          'trackCount', (
+            select count(*)
+            from music.playlist_tracks playlist_track
+            where playlist_track.playlist_id = playlist.id
+          ),
+          'coverAsset', case when cover.id is null then null else jsonb_build_object(
+            'id', cover.id,
+            'provider', cover.provider,
+            'bucket', cover.bucket,
+            'path', cover.path,
+            'mimeType', cover.mime_type
+          ) end
+        )
+        order by playlist.updated_at desc
+      )
+      from music.playlists playlist
+      left join media.media_assets cover
+        on cover.id = playlist.cover_asset_id
+       and cover.publication_status = 'published'::media.publication_status
+      where playlist.owner_user_id = request_user_id
+    ), '[]'::jsonb)
   ) into payload;
 
   return payload;
@@ -193,7 +197,7 @@ returns boolean
 language plpgsql
 security invoker
 set search_path = ''
-as $$
+as $$;
 begin
   if auth.uid() is null then
     raise exception 'Authentication required' using errcode = '28000';
