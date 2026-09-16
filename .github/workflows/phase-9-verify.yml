@@ -1,4 +1,4 @@
-name: Phase 9 Verify
+name: Phase 9 Final Verify
 
 on:
   push:
@@ -21,41 +21,42 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Expose repeat and shuffle controls
+      - name: Mark Phase 9 complete in implementation plan
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path('src/app/music/now-playing.tsx')
+          path = Path('CHC_Media_Platform_Implementation_Phases.md')
           text = path.read_text(encoding='utf-8')
-          import_anchor = "import MusicArtwork from '@/components/music/MusicArtwork';"
-          import_line = "import MusicPlaybackModeControls from '@/components/music/MusicPlaybackModeControls';"
-          if import_line not in text:
-              text = text.replace(import_anchor, import_anchor + "\n" + import_line, 1)
-          control_anchor = "          <View style={styles.trackActions}>"
-          if '<MusicPlaybackModeControls />' not in text:
-              if control_anchor not in text:
-                  raise SystemExit('Now Playing track-actions anchor not found')
-              text = text.replace(control_anchor, "          <MusicPlaybackModeControls />\n\n" + control_anchor, 1)
+          text = text.replace('# Phase 9 — Global Playback Engine', '# Phase 9 ✅ — Global Playback Engine', 1)
+          if '# Phase 9 ✅ — Global Playback Engine' not in text:
+              raise SystemExit('Phase 9 heading was not updated')
           path.write_text(text, encoding='utf-8')
           PY
       - name: Install exact dependencies
         run: npm ci --ignore-scripts
-      - name: Validate Expo native config
+      - name: Validate Expo config
         run: npx expo config --type public > /tmp/expo-config.json
+      - name: Validate Android background playback native config
+        run: |
+          cp -R . /tmp/chc-phase9-prebuild
+          cd /tmp/chc-phase9-prebuild
+          npx expo prebuild --no-install --platform android
+          grep -q 'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK' android/app/src/main/AndroidManifest.xml
+          grep -q 'expo.modules.audio.service.AudioControlsService' android/app/src/main/AndroidManifest.xml
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Playback engine tests
         run: npm run test:playback
       - name: Synchronized lyric regression tests
         run: npm run test:lyrics
-      - name: Commit verified Now Playing controls
+      - name: Commit Phase 9 completion status
         run: |
-          if git diff --quiet -- src/app/music/now-playing.tsx; then
-            echo "Now Playing controls already wired"
+          if git diff --quiet -- CHC_Media_Platform_Implementation_Phases.md; then
+            echo "Phase 9 heading already current"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/app/music/now-playing.tsx
-          git commit -m "Expose Phase 9 repeat and shuffle controls"
+          git add CHC_Media_Platform_Implementation_Phases.md
+          git commit -m "Mark Phase 9 complete"
           git push origin HEAD:phase-9-global-playback-engine
