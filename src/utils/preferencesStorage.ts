@@ -85,6 +85,13 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   inMonastery: false,
 };
 
+let currentAppLanguage: AppLanguage = DEFAULT_READING_PREFERENCES.appLanguage;
+
+/** Current menu/chrome language for synchronous label helpers outside React components. */
+export function getCurrentAppLanguage(): AppLanguage {
+  return currentAppLanguage;
+}
+
 /** Lowest selectable font scale. */
 export const MIN_FONT_SCALE = 0;
 /** Highest selectable font scale. */
@@ -151,21 +158,32 @@ export async function loadReadingPreferences(): Promise<ReadingPreferences> {
   try {
     if (Platform.OS === 'web') {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      return mergePreferences(raw ? JSON.parse(raw) : null);
+      const preferences = mergePreferences(raw ? JSON.parse(raw) : null);
+      currentAppLanguage = preferences.appLanguage;
+      return preferences;
     }
 
     const FileSystem = await import('expo-file-system/legacy');
     const fileUri = `${FileSystem.documentDirectory}${STORAGE_KEY}.json`;
     const info = await FileSystem.getInfoAsync(fileUri);
-    if (!info.exists) return mergePreferences(null);
+    if (!info.exists) {
+      const preferences = mergePreferences(null);
+      currentAppLanguage = preferences.appLanguage;
+      return preferences;
+    }
     const raw = await FileSystem.readAsStringAsync(fileUri);
-    return mergePreferences(JSON.parse(raw));
+    const preferences = mergePreferences(JSON.parse(raw));
+    currentAppLanguage = preferences.appLanguage;
+    return preferences;
   } catch {
-    return mergePreferences(null);
+    const preferences = mergePreferences(null);
+    currentAppLanguage = preferences.appLanguage;
+    return preferences;
   }
 }
 
 export async function saveReadingPreferences(preferences: ReadingPreferences): Promise<void> {
+  currentAppLanguage = preferences.appLanguage;
   try {
     if (Platform.OS === 'web') {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
