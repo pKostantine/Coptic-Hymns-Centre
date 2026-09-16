@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicPlaybackModeControls from '@/components/music/MusicPlaybackModeControls';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -181,6 +182,8 @@ export default function MusicNowPlayingScreen() {
             <Pressable onPress={next} style={styles.sideControl}><Text style={styles.sideControlText}>▶|</Text></Pressable>
             <Pressable onPress={() => void seekToMs(currentTimeMs + 15000)} style={styles.smallControl}><Text style={styles.smallControlText}>+15</Text></Pressable>
           </View>
+
+          <MusicPlaybackModeControls />
 
           <View style={styles.trackActions}>
             <Pressable disabled={likeBusy} style={[styles.trackAction, liked && styles.trackActionActive]} onPress={() => void toggleLike()}>
