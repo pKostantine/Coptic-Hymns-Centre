@@ -1,0 +1,69 @@
+name: Phase 10 Final Verify
+
+on:
+  push:
+    branches:
+      - phase-10-learn-study-backend
+    paths:
+      - .github/workflows/phase-10-final-verify.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase-10-learn-study-backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Mark Phase 10 complete
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('CHC_Media_Platform_Implementation_Phases.md')
+          text = path.read_text(encoding='utf-8')
+          old = '# Phase 10 — Learn & Study Backend'
+          new = '# Phase 10 ✅ — Learn & Study Backend'
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('Phase 10 heading not found')
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Verify Phase 10 source contracts
+        run: |
+          grep -R -q 'create table learning.cantors' supabase/migrations
+          grep -R -q 'create table learning.seasons' supabase/migrations
+          grep -R -q 'create table learning.hymns' supabase/migrations
+          grep -R -q 'create table learning.albums' supabase/migrations
+          grep -R -q 'create table learning.lesson_sets' supabase/migrations
+          grep -R -q 'create table learning.hymn_progress' supabase/migrations
+          grep -R -q 'get_learning_home' supabase/migrations
+          grep -R -q 'set_learning_progress' supabase/migrations
+          grep -R -q 'publish_learning_lesson_set' supabase/migrations
+          test -f src/types/learningPlatform.ts
+          test -f docs/media-platform/phase-10-learn-study-backend.md
+      - name: Install exact dependencies
+        run: npm ci --ignore-scripts
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Playback regression tests
+        run: npm run test:playback
+      - name: Synchronized lyric regression tests
+        run: npm run test:lyrics
+      - name: Commit Phase 10 completion status
+        run: |
+          if git diff --quiet -- CHC_Media_Platform_Implementation_Phases.md; then
+            echo 'Phase 10 heading already current'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add CHC_Media_Platform_Implementation_Phases.md
+          git commit -m 'Mark Phase 10 complete'
+          git push origin HEAD:phase-10-learn-study-backend
