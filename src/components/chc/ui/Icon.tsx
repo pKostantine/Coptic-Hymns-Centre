@@ -14,6 +14,7 @@ export type IconName =
   | 'remove'
   | 'book'
   | 'library-outline'
+  | 'school-outline'
   | 'list-outline'
   | 'sunny'
   | 'moon'
@@ -183,6 +184,27 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
             fill="none"
             stroke={color}
             strokeWidth={32}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    case 'school-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M32 176 256 64l224 112-224 112L32 176Z"
+            fill="none"
+            stroke={color}
+            strokeWidth={30}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M112 224v112c0 42 65 80 144 80s144-38 144-80V224M480 176v144"
+            fill="none"
+            stroke={color}
+            strokeWidth={30}
+            strokeLinecap="round"
             strokeLinejoin="round"
           />
         </Svg>

@@ -99,7 +99,7 @@ export interface LearningCantorDetail extends LearningCantorSummary {
 }
 
 export interface LearningSeasonDetail extends Omit<LearningSeasonSummary, 'sortOrder'> {
-  hymns: Array<LearningHymnSummary & { sortOrder: number }>;
+  hymns: (LearningHymnSummary & { sortOrder: number })[];
   albums: LearningAlbumSummary[];
   lessonSets: LearningLessonSetSummary[];
 }
@@ -110,7 +110,7 @@ export interface LearningRelatedHymn extends LearningHymnSummary {
 
 export interface LearningHymnDetail extends LearningHymnSummary {
   description: string | null;
-  seasons: Array<Pick<LearningSeasonSummary, 'id' | 'slug' | 'title'> & { sortOrder: number }>;
+  seasons: (Pick<LearningSeasonSummary, 'id' | 'slug' | 'title'> & { sortOrder: number })[];
   relatedHymns: LearningRelatedHymn[];
   lessonSets: LearningLessonSetSummary[];
 }
@@ -133,6 +133,14 @@ export interface LearningProgressItem {
 export interface LearningProgressPayload {
   authenticated: boolean;
   items: LearningProgressItem[];
+}
+
+export interface LearningProgressMutationResult {
+  hymnId: string;
+  state: LearningProgressState;
+  startedAt: string | null;
+  finishedAt: string | null;
+  updatedAt: string;
 }
 
 export interface LearningPlaylistSummary {
@@ -176,4 +184,21 @@ export interface LearningPlaylistDetail {
 export interface LearningPlaylistLibraryPayload {
   authenticated: boolean;
   playlists: LearningPlaylistSummary[];
+}
+
+export interface LearningLessonSearchResult extends Omit<LearningLesson, 'sortOrder'> {
+  lessonSetId: string;
+  lessonSetTitle: string;
+  cantorId: string;
+  cantorName: string;
+  hymnId: string;
+}
+
+export interface LearningSearchPayload {
+  cantors: LearningCantorSummary[];
+  seasons: LearningSeasonSummary[];
+  hymns: LearningHymnSummary[];
+  albums: LearningAlbumSummary[];
+  lessonSets: LearningLessonSetSummary[];
+  lessons: LearningLessonSearchResult[];
 }

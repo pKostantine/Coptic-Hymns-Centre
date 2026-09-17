@@ -34,6 +34,14 @@ export const COLORS = {
   linkSoft: 'rgba(87, 192, 138, 0.13)',
   linkLine: 'rgba(87, 192, 138, 0.45)',
 
+  // Learn & Study uses a restrained teal accent so it reads as a focused
+  // educational space while retaining CHC's navy, gold, type, and surfaces.
+  learning: '#73C7B5',
+  learningBright: '#A8E2D5',
+  learningSoft: 'rgba(115, 199, 181, 0.13)',
+  learningLine: 'rgba(115, 199, 181, 0.45)',
+  learningDeep: '#09282C',
+
   // Subdocument (open-a-nested-document) accent. Same hue as rowBlue, which is
   // already proven against this background, but given its own trio so the two
   // can move independently. Blue rather than the app's gold because gold is
