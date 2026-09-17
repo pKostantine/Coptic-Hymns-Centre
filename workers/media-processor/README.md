@@ -1,10 +1,27 @@
 # CHC Media Processor
 
-Docker-ready FFmpeg worker for Phase 4 media normalization.
+FFmpeg worker that turns uploaded submission files into delivery assets.
 
 ## Runtime
 
-The worker claims one queued Supabase processing job, downloads the source object from private R2, probes it, transcodes audio to AAC-LC M4A at `256k`, uploads the delivery object, and completes the job in Supabase.
+The worker claims a queued Supabase processing job, downloads the source object
+from private R2, probes it, produces the delivery rendition, uploads it to the
+delivery bucket, and completes the job in Supabase. Completing a job writes the
+`media.media_assets` row, links it to the submission item, and — when it was the
+last item a submission was waiting on — takes that submission out of
+`processing` so it can be published.
+
+Job types it handles:
+
+| Job type         | Source | Output             | Delivery bucket |
+| ---------------- | ------ | ------------------ | --------------- |
+| `audio_delivery` | audio  | AAC-LC M4A `256k`  | `chc-music` / `chc-learning` |
+| `video_delivery` | video  | H.264 MP4, ≤1080p  | `chc-learning`  |
+| `image_delivery` | image  | JPEG, ≤3000px edge | `chc-images`    |
+
+Images are flattened onto white (so a transparent PNG does not go black),
+forced to square pixels, and capped at 3000px on the longer edge without ever
+being upscaled.
 
 Required environment:
 
@@ -24,14 +41,37 @@ Local workspace fallback:
 - `R2_DRIVER=wrangler`
 - authenticated Wrangler CLI
 
+Optional:
+
+- `MEDIA_WORKER_ID` — identifies this worker on claimed jobs (default `media-processor-<pid>`)
+- `MEDIA_POLL_INTERVAL_MS` — idle poll interval, default `15000`
+- `MEDIA_ERROR_BACKOFF_MS` / `MEDIA_MAX_ERROR_BACKOFF_MS` — backoff when Supabase is unreachable, default `5000` / `300000`
+- `MEDIA_WORK_DIR` — scratch directory, default the OS temp dir
+- `MEDIA_KEEP_WORK_DIR=1` — keep the per-job scratch directory for debugging
+
 ## Commands
 
-```powershell
+```bash
 npm install
+
+# Long-lived worker: drains the queue, then polls. This is what deployments run.
+npm start
+
+# Single job, then exit. Useful for manual runs and smoke tests.
 npm run process:once
 ```
 
-```powershell
+```bash
 docker build -t chc-media-processor .
 docker run --env-file .env chc-media-processor
 ```
+
+## Failure handling
+
+A job failure never stops the worker. The failure is reported to
+`fail_media_processing_job`, which requeues the job with exponential backoff
+(4 min, 16 min, capped at 1 hour) until `max_attempts` is reached, then marks it
+`failed` and records a `processing_failed` event on the submission so the error
+is visible in review rather than leaving the submission stuck in `processing`.
+
+`SIGINT` / `SIGTERM` finish the job in flight and then exit.

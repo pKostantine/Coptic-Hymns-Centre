@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "process:once": "node src/process-once.mjs"
+    "start": "node src/worker.mjs",
+    "process:once": "node src/process-once.mjs",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1133.0",
