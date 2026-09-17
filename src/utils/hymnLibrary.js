@@ -49,6 +49,11 @@ export const SUBDOCUMENT_MAP = {
   FIRST_HOUR: { schema: "agpeya", table: "first_hour" },
   MIDNIGHT_HOUR: { schema: "agpeya", table: "midnight_hour" },
   OTHER_PRAYERS: { schema: "agpeya", table: "other_prayers" },
+  // The Agpeya block prayed inside the Offering of the Lamb. Its own
+  // table in the liturgy schema, not one of the agpeya hours above: the
+  // Offering spliced it in as a whole-table Inline rather than keeping
+  // those rows in its own order.
+  LITURGY_AGPEYA: { schema: "liturgy", table: "liturgy_agpeya" },
   PROCESSION_OF_THE_CROSS: null, // not yet in database
   VENERATION: { schema: "veneration", table: "veneration" },
   VENERATION_MELODIES: null, // target table unclear, see project memory
