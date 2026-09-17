@@ -16,18 +16,18 @@ class WebDownloadManager implements OfflineDownloadManager {
 
   getRevision = (): number => this.revision;
 
-  private unavailable(): never {
-    throw new Error('Offline downloads are available in the CHC iOS and Android apps.');
+  private unavailableError(): Error {
+    return new Error('Offline downloads are available in the CHC iOS and Android apps.');
   }
 
   enqueue(_request: OfflineDownloadRequest): Promise<void> {
-    return Promise.reject(new Error('Offline downloads are available in the CHC iOS and Android apps.'));
+    return Promise.reject(this.unavailableError());
   }
 
-  pause(_packageKey: string): Promise<void> { return Promise.reject(this.unavailable()); }
-  resume(_packageKey: string): Promise<void> { return Promise.reject(this.unavailable()); }
-  cancel(_packageKey: string): Promise<void> { return Promise.reject(this.unavailable()); }
-  retry(_packageKey: string): Promise<void> { return Promise.reject(this.unavailable()); }
+  pause(_packageKey: string): Promise<void> { return Promise.reject(this.unavailableError()); }
+  resume(_packageKey: string): Promise<void> { return Promise.reject(this.unavailableError()); }
+  cancel(_packageKey: string): Promise<void> { return Promise.reject(this.unavailableError()); }
+  retry(_packageKey: string): Promise<void> { return Promise.reject(this.unavailableError()); }
   remove(_packageKey: string): Promise<void> { return Promise.resolve(); }
   getProgress(_packageKey: string): Promise<OfflineDownloadProgress | null> { return Promise.resolve(null); }
   isDownloaded(_entityType: OfflineDownloadRequest['entityType'], _entityId: string): Promise<boolean> { return Promise.resolve(false); }
