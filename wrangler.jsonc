@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The consumer app: the Expo web export, served as static assets. No server
+  // code of its own -- the CHC Workers it talks to (chc-upload-authorizer,
+  // chc-media-resolver) are deployed separately from workers/.
+  "name": "chc-app",
+  "compatibility_date": "2026-09-16",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./dist",
+    // expo-router owns the URL space, so /bible/genesis/1 and /lectionary/matins
+    // are real routes with no file behind them. Without this they 404 on a
+    // refresh or a shared link.
+    "not_found_handling": "single-page-application"
+  }
+}
