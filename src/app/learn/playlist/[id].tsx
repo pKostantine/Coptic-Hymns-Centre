@@ -12,6 +12,7 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
+import { learningPlaylistDownloadRequest } from '@/services/offlineDownloadRequests';
 import type { LearningPlaylistDetail, LearningPlaylistItem } from '@/types/learningPlatform';
 
 function toQueueItem(item: LearningPlaylistItem): LearningQueueItem | null {
@@ -61,19 +62,24 @@ export default function LearningPlaylistScreen() {
   const audioQueue = useMemo(() => (
     playlist?.items.map(toQueueItem).filter((item): item is LearningQueueItem => Boolean(item)) ?? []
   ), [playlist]);
+  const downloadRequest = useMemo(
+    () => playlist ? learningPlaylistDownloadRequest(playlist, locale) : null,
+    [playlist, locale],
+  );
 
   useEffect(() => {
     if (!playlistId) return;
     let active = true;
-    Promise.all([
-      learningService.getPlaylist(playlistId, locale),
-      learningService.getPlaylists(locale),
-    ])
-      .then(([detail, library]) => {
+    learningService.getPlaylist(playlistId, locale)
+      .then((detail) => {
         if (!active) return;
         setError(null);
         setPlaylist(detail);
-        setOwned(library.authenticated && library.playlists.some((item) => item.id === playlistId));
+        void learningService.getPlaylists(locale)
+          .then((library) => {
+            if (active) setOwned(library.authenticated && library.playlists.some((item) => item.id === playlistId));
+          })
+          .catch(() => { if (active) setOwned(false); });
       })
       .catch((cause) => {
         if (active) setError(cause instanceof Error ? cause.message : 'Unable to load learning playlist.');
@@ -129,7 +135,9 @@ export default function LearningPlaylistScreen() {
               <Pressable disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playQueue(audioQueue, 0)}>
                 <Text style={styles.playAllText}>▶  {isArabic ? 'تشغيل الصوت' : 'Play Audio'}</Text>
               </Pressable>
-              <LearningDownloadButton isArabic={isArabic} />
+              {downloadRequest ? (
+                <LearningDownloadButton packageKey={downloadRequest.packageKey} request={downloadRequest} isArabic={isArabic} />
+              ) : null}
             </View>
           </View>
 

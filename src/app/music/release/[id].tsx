@@ -1,16 +1,21 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer, type MusicQueueItem } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
-import type { MusicConsumerRelease } from '@/types/musicConsumer';
+import {
+  musicReleaseDownloadRequest,
+  musicTrackDownloadRequest,
+} from '@/services/offlineDownloadRequests';
+import type { MusicConsumerRelease, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 
 export default function MusicReleaseScreen() {
   const router = useRouter();
@@ -40,6 +45,23 @@ export default function MusicReleaseScreen() {
     releaseTitle: release.title,
     coverAsset: release.coverAsset ?? null,
   })) ?? [], [release]);
+  const downloadRequest = useMemo(
+    () => release ? musicReleaseDownloadRequest(release, locale) : null,
+    [locale, release],
+  );
+
+  const prepareReleaseDownload = async () => {
+    if (!release) throw new Error('Release is not loaded.');
+    const lyrics = await Promise.all(release.tracks.map(async (track) => {
+      try { return [track.id, await musicService.getLyrics(track.id, locale)] as const; }
+      catch { return [track.id, null] as const; }
+    }));
+    return musicReleaseDownloadRequest(
+      release,
+      locale,
+      Object.fromEntries(lyrics) as Record<string, PublishedTrackLyricsPayload | null>,
+    );
+  };
 
   if (!release) {
     return (
@@ -75,29 +97,54 @@ export default function MusicReleaseScreen() {
               <Pressable style={styles.playAll} onPress={() => queue.length && playQueue(queue, 0)}>
                 <Text style={styles.playAllText}>▶  {isArabic ? 'تشغيل' : 'Play'}</Text>
               </Pressable>
-              <Pressable
-                style={styles.download}
-                onPress={() => Alert.alert(
-                  isArabic ? 'التنزيل' : 'Download',
-                  isArabic ? 'إجراء التنزيل موجود الآن في تجربة الموسيقى. التخزين الكامل والاستماع بلا اتصال سيتم تفعيله في مرحلة التنزيلات.' : 'The download action is ready in Music. Full local storage and offline playback are implemented in the dedicated Offline Downloads phase.',
-                )}
-              >
-                <Text style={styles.downloadText}>↓  {isArabic ? 'تنزيل' : 'Download'}</Text>
-              </Pressable>
+              {downloadRequest ? (
+                <MusicDownloadButton
+                  packageKey={downloadRequest.packageKey}
+                  request={prepareReleaseDownload}
+                  isArabic={isArabic}
+                />
+              ) : null}
             </View>
           </View>
         </View>
 
         <View style={styles.trackList}>
-          {release.tracks.map((track, index) => (
-            <MusicTrackRow
-              key={track.id}
-              track={track}
-              index={index}
-              active={currentItem?.track.id === track.id}
-              onPress={() => playQueue(queue, index)}
-            />
-          ))}
+          {release.tracks.map((track, index) => {
+            const trackRequest = musicTrackDownloadRequest({
+              track,
+              locale,
+              releaseTitle: release.title,
+              coverAsset: release.coverAsset,
+            });
+            return (
+              <MusicTrackRow
+                key={track.id}
+                track={track}
+                index={index}
+                active={currentItem?.track.id === track.id}
+                onPress={() => playQueue(queue, index)}
+                trailing={(
+                  <MusicDownloadButton
+                    packageKey={trackRequest.packageKey}
+                    request={async () => {
+                      let lyrics: PublishedTrackLyricsPayload | null = null;
+                      try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional offline metadata */ }
+                      return musicTrackDownloadRequest({
+                        track,
+                        locale,
+                        releaseTitle: release.title,
+                        coverAsset: release.coverAsset,
+                        lyrics,
+                      });
+                    }}
+                    isArabic={isArabic}
+                    compact
+                    label=""
+                  />
+                )}
+              />
+            );
+          })}
         </View>
       </ScrollView>
       <MusicMiniPlayer />
@@ -133,8 +180,6 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
   playAll: { paddingHorizontal: SPACING.xl, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, backgroundColor: COLORS.gold },
   playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800' },
-  download: { paddingHorizontal: SPACING.lg, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, backgroundColor: COLORS.goldSoft, borderWidth: 1, borderColor: COLORS.goldLine },
-  downloadText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   loader: { marginTop: SPACING.xl },
   error: { color: COLORS.priest, textAlign: 'center', margin: SPACING.xl, fontFamily: TYPOGRAPHY.body },

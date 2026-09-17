@@ -13,7 +13,9 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { learningLessonSetAudioQueue, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { usePlayback } from '@/context/PlaybackContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { downloadManager } from '@/services/downloadManager';
 import { learningService, type LearningLessonDetailPayload } from '@/services/learningService';
+import { learningLessonDownloadRequest } from '@/services/offlineDownloadRequests';
 
 export default function LearningLessonScreen() {
   const router = useRouter();
@@ -25,10 +27,15 @@ export default function LearningLessonScreen() {
   const lessonSetId = Array.isArray(params.setId) ? params.setId[0] : params.setId;
   const [data, setData] = useState<LearningLessonDetailPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [videoUri, setVideoUri] = useState<string | null>(null);
   const { playQueue, currentItem, playing } = useLearningPlayer();
   const globalPlayback = usePlayback();
   const audioQueue = useMemo(() => data ? learningLessonSetAudioQueue(data.lessonSet) : [], [data]);
   const linkIncomplete = !lessonId || !lessonSetId;
+  const downloadRequest = useMemo(
+    () => data ? learningLessonDownloadRequest(data.lessonSet, data.lesson, locale) : null,
+    [data, locale],
+  );
 
   useEffect(() => {
     if (!lessonId || !lessonSetId) return;
@@ -49,13 +56,23 @@ export default function LearningLessonScreen() {
     }
   }, [data?.lesson.id, data?.lesson.mediaType, globalPlayback]);
 
+  useEffect(() => {
+    if (!data || data.lesson.mediaType !== 'video') {
+      setVideoUri(null);
+      return;
+    }
+    let active = true;
+    const remoteUri = learningService.resolveAsset(data.lesson.mediaAsset);
+    void downloadManager.resolvePlaybackUri('learning_video_audio', data.lesson.id, remoteUri)
+      .then((uri) => { if (active) setVideoUri(uri); });
+    return () => { active = false; };
+  }, [data]);
+
   const playAudio = () => {
     if (!data) return;
     const index = audioQueue.findIndex((item) => item.id === data.lesson.id);
     if (index >= 0) playQueue(audioQueue, index);
   };
-
-  const mediaUri = data ? learningService.resolveAsset(data.lesson.mediaAsset) : null;
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -66,7 +83,7 @@ export default function LearningLessonScreen() {
       {data ? (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {data.lesson.mediaType === 'video' ? (
-            <LearningVideoPlayer uri={mediaUri} />
+            <LearningVideoPlayer uri={videoUri} />
           ) : (
             <View style={styles.audioHero}>
               <View style={styles.audioIcon}><Text style={styles.audioGlyph}>♪</Text></View>
@@ -92,7 +109,11 @@ export default function LearningLessonScreen() {
             </Pressable>
             <Text style={[styles.cantor, isArabic && styles.arabic]}>{data.lessonSet.cantor.displayName}</Text>
             {data.lesson.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{data.lesson.description}</Text> : null}
-            <View style={styles.downloadWrap}><LearningDownloadButton isArabic={isArabic} /></View>
+            {downloadRequest ? (
+              <View style={styles.downloadWrap}>
+                <LearningDownloadButton packageKey={downloadRequest.packageKey} request={downloadRequest} isArabic={isArabic} />
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.progressCard}>

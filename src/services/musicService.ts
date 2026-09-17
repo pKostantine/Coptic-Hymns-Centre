@@ -1,4 +1,5 @@
 import { mediaService } from '@/services/mediaService';
+import { getOfflineSnapshot } from '@/services/offlineSnapshotStore';
 import type {
   MusicConsumerArtist,
   MusicConsumerAsset,
@@ -23,6 +24,21 @@ function assertRpcData<T>(data: T | null, error: { message: string } | null, ope
   return data;
 }
 
+async function offlineFallback<T>(
+  operation: () => Promise<T>,
+  entityType: 'music_release' | 'music_playlist' | 'music_library' | 'music_lyrics',
+  entityId: string,
+  locale: string,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (cause) {
+    const offline = await getOfflineSnapshot<T>(entityType, entityId, locale);
+    if (offline) return offline;
+    throw cause;
+  }
+}
+
 export function resolveMusicAsset(asset: MusicConsumerAsset | null | undefined): string | null {
   if (!asset || !mediaService.canResolve(asset)) return null;
   return mediaService.resolve(asset);
@@ -34,11 +50,13 @@ export async function getMusicHome(locale = 'en'): Promise<MusicHomePayload> {
 }
 
 export async function getMusicRelease(releaseId: string, locale = 'en'): Promise<MusicConsumerRelease> {
-  const { data, error } = await supabase.rpc('get_published_music_release_for_locale', {
-    p_release_id: releaseId,
-    p_locale: locale,
-  });
-  return assertRpcData(data as MusicConsumerRelease | null, error, 'Load release');
+  return offlineFallback(async () => {
+    const { data, error } = await supabase.rpc('get_published_music_release_for_locale', {
+      p_release_id: releaseId,
+      p_locale: locale,
+    });
+    return assertRpcData(data as MusicConsumerRelease | null, error, 'Load release');
+  }, 'music_release', releaseId, locale);
 }
 
 export async function getMusicArtist(artistId: string, locale = 'en'): Promise<MusicConsumerArtist> {
@@ -83,16 +101,20 @@ export async function searchMusic(query: string, locale = 'en'): Promise<MusicSe
 }
 
 export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayload> {
-  const { data, error } = await supabase.rpc('get_my_music_library', { p_locale: locale });
-  return assertRpcData(data as MusicLibraryPayload | null, error, 'Load music library');
+  return offlineFallback(async () => {
+    const { data, error } = await supabase.rpc('get_my_music_library', { p_locale: locale });
+    return assertRpcData(data as MusicLibraryPayload | null, error, 'Load music library');
+  }, 'music_library', 'library', locale);
 }
 
 export async function getMusicPlaylist(playlistId: string, locale = 'en'): Promise<MusicPlaylistPayload> {
-  const { data, error } = await supabase.rpc('get_music_playlist', {
-    p_playlist_id: playlistId,
-    p_locale: locale,
-  });
-  return assertRpcData(data as MusicPlaylistPayload | null, error, 'Load playlist');
+  return offlineFallback(async () => {
+    const { data, error } = await supabase.rpc('get_music_playlist', {
+      p_playlist_id: playlistId,
+      p_locale: locale,
+    });
+    return assertRpcData(data as MusicPlaylistPayload | null, error, 'Load playlist');
+  }, 'music_playlist', playlistId, locale);
 }
 
 export async function setTrackLiked(trackId: string, liked: boolean): Promise<boolean> {
@@ -134,12 +156,15 @@ export async function getTrackLyrics(
   locale?: string | null,
   kind?: MusicLyricKind | null,
 ): Promise<PublishedTrackLyricsPayload> {
-  const { data, error } = await supabase.rpc('get_published_track_lyrics', {
-    p_track_id: trackId,
-    p_locale: locale ?? null,
-    p_kind: kind ?? null,
-  });
-  return assertRpcData(data as PublishedTrackLyricsPayload | null, error, 'Load synchronized lyrics');
+  const requestedLocale = locale ?? 'en';
+  return offlineFallback(async () => {
+    const { data, error } = await supabase.rpc('get_published_track_lyrics', {
+      p_track_id: trackId,
+      p_locale: locale ?? null,
+      p_kind: kind ?? null,
+    });
+    return assertRpcData(data as PublishedTrackLyricsPayload | null, error, 'Load synchronized lyrics');
+  }, 'music_lyrics', trackId, requestedLocale);
 }
 
 export const musicService = {
