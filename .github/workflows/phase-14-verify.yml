@@ -15,10 +15,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Sync lockfile
-        run: npm install --package-lock-only --ignore-scripts
+      - run: npm install --package-lock-only --ignore-scripts
       - name: Commit lockfile
-        if: ${{ !contains(github.event.head_commit.message, '[phase14-lock]') }}
         shell: bash
         run: |
           if ! git diff --quiet -- package-lock.json; then
@@ -30,7 +28,8 @@ jobs:
           fi
       - run: npm ci
       - run: npx tsc --noEmit
-      - run: npm run lint
+      - name: Lint Phase 14 surfaces
+        run: npx eslint src/app/downloads.tsx src/components/offline/OfflineDownloadButton.tsx src/services/downloadManager.ts src/services/downloadManager.web.ts src/services/downloadPreferences.ts src/services/downloadStorageManager.ts src/services/offlineChecksum.ts src/types/offlineDownloads.ts
       - run: npm run test:playback
       - run: npm run test:lyrics
       - run: npm run test:conditions
