@@ -8,21 +8,20 @@ import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import Icon from './Icon';
 
 interface BottomTabBarProps {
-  /** Which tab is the current screen — "Books" is the main menu, "settings" is /app-settings. Both are peer screens reached via router.replace, so switching never grows a back-button stack and this same bar renders identically on both. */
-  active: 'books' | 'settings';
+  /** Top-level CHC section. Switching tabs uses replace(), so the peer sections
+   * never build a back-button stack on top of one another. */
+  active: 'books' | 'music' | 'learn' | 'settings' | null;
 }
 
 export default function BottomTabBar({ active }: BottomTabBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { preferences } = useReadingPreferences();
-  // On sideways phones, sitting the label beside the icon on tighter padding
-  // roughly halves the bar. Tablets retain the standard navigation size.
   const isCompactLandscape = useIsCompactLandscape();
   const isArabic = preferences.appLanguage === 'ar';
   const labels = isArabic
-    ? { books: 'الكتب', settings: 'إعدادات التطبيق' }
-    : { books: 'Books', settings: 'App Settings' };
+    ? { books: 'الكتب', music: 'الترانيم', learn: 'التعلّم', settings: 'الإعدادات' }
+    : { books: 'Books', music: 'Music', learn: 'Learn', settings: 'Settings' };
   const labelStyle = [styles.tabLabel, isCompactLandscape && styles.tabLabelLandscape, isArabic && styles.tabLabelArabic];
   const tabStyle = [styles.tab, isCompactLandscape && styles.tabLandscape];
   const iconSize = isCompactLandscape ? 22 : 27;
@@ -34,6 +33,19 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
         <Icon name="library-outline" size={iconSize} color={active === 'books' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'books' && styles.tabLabelActive]}>{labels.books}</Text>
       </Pressable>
+
+      <Pressable accessibilityLabel={labels.music} style={tabStyle} onPress={() => router.replace('/music')}>
+        {active === 'music' ? <View style={styles.activeIndicator} /> : null}
+        <Text style={[styles.musicGlyph, { fontSize: iconSize + 2 }, active === 'music' && styles.musicGlyphActive]}>♪</Text>
+        <Text numberOfLines={1} style={[labelStyle, active === 'music' && styles.tabLabelActive]}>{labels.music}</Text>
+      </Pressable>
+
+      <Pressable accessibilityLabel={labels.learn} style={tabStyle} onPress={() => router.replace('/learn')}>
+        {active === 'learn' ? <View style={[styles.activeIndicator, styles.learningIndicator]} /> : null}
+        <Icon name="school-outline" size={iconSize} color={active === 'learn' ? COLORS.learning : COLORS.muted} />
+        <Text numberOfLines={1} style={[labelStyle, active === 'learn' && styles.tabLabelLearning]}>{labels.learn}</Text>
+      </Pressable>
+
       <Pressable accessibilityLabel={labels.settings} style={tabStyle} onPress={() => router.replace('/app-settings')}>
         {active === 'settings' ? <View style={styles.activeIndicator} /> : null}
         <Icon name="settings-outline" size={iconSize} color={active === 'settings' ? COLORS.gold : COLORS.muted} />
@@ -58,6 +70,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
+  learningIndicator: { backgroundColor: COLORS.learning },
   tab: {
     alignItems: 'center',
     flex: 1,
@@ -91,4 +104,17 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: COLORS.gold,
   },
+  tabLabelLearning: {
+    color: COLORS.learningBright,
+  },
+  musicGlyph: {
+    width: 30,
+    height: 30,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    color: COLORS.muted,
+    fontWeight: '800',
+    lineHeight: 30,
+  },
+  musicGlyphActive: { color: COLORS.gold },
 });

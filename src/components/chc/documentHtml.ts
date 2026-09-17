@@ -474,14 +474,18 @@ export function buildDocumentHtml(
       // preview — has no other way to know: the content is laid out in here.
       // Reported once the fonts and layout have settled, and again whenever
       // the width changes and the columns reflow.
+      var lastReportedContentHeight = -1;
       function reportContentHeight() {
         var body = document.body;
         var html = document.documentElement;
+        var height = Math.max(
+          body ? body.scrollHeight : 0,
+          html ? html.scrollHeight : 0,
+        );
+        if (Math.abs(height - lastReportedContentHeight) <= 1) return;
+        lastReportedContentHeight = height;
         postAction('contentHeight', {
-          height: Math.max(
-            body ? body.scrollHeight : 0,
-            html ? html.scrollHeight : 0,
-          ),
+          height: height,
         });
       }
       window.addEventListener('load', function () {

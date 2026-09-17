@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
 
 const IS_WEB = Platform.OS === "web";
@@ -25,6 +25,10 @@ function splitWords(text) {
   return String(text || "")
     .split(/\s+/)
     .filter(Boolean);
+}
+
+function splitParagraphs(text) {
+  return String(text || "").replace(/\r\n?/g, "\n").split("\n");
 }
 
 /**
@@ -79,13 +83,23 @@ function getCanvasContext() {
 const canvasWidthCache = new Map();
 const MAX_CACHE_ENTRIES = 20000;
 
-function measureWidthWeb(token, fontSize, fontFamily) {
-  const key = `${fontFamily}|${fontSize}|${token}`;
+function getCanvasFont(fontSize, fontFamily, fontWeight, fontStyle) {
+  const families = String(fontFamily || "sans-serif")
+    .split(",")
+    .map((family) => family.trim())
+    .filter(Boolean)
+    .map((family) => /^['"].*['"]$/.test(family) ? family : `"${family.replace(/"/g, "\\\"")}"`)
+    .join(", ");
+  return `${fontStyle || "normal"} ${fontWeight || "400"} ${fontSize}px ${families || "sans-serif"}`;
+}
+
+function measureWidthWeb(token, fontSize, fontFamily, fontWeight, fontStyle) {
+  const key = `${fontFamily}|${fontSize}|${fontWeight}|${fontStyle}|${token}`;
   const cached = canvasWidthCache.get(key);
   if (cached != null) return cached;
 
   const ctx = getCanvasContext();
-  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.font = getCanvasFont(fontSize, fontFamily, fontWeight, fontStyle);
   const measured = ctx.measureText(token).width;
 
   if (!canvasWidthCache.has(key) && canvasWidthCache.size >= MAX_CACHE_ENTRIES) {
@@ -119,14 +133,14 @@ function getGraphemes(text) {
 // -- undercounting that verse's real line/height needs and, for a verse
 // split across slides, potentially budgeting room for a segment that
 // doesn't actually fit.
-function splitOverwidthWord(word, maxWidth, fontSize, fontFamily) {
+function splitOverwidthWord(word, maxWidth, fontSize, fontFamily, fontWeight, fontStyle) {
   const graphemes = getGraphemes(word);
   const chunks = [];
   let current = "";
 
   for (const grapheme of graphemes) {
     const candidate = current + grapheme;
-    if (current && measureWidthWeb(candidate, fontSize, fontFamily) > maxWidth) {
+    if (current && measureWidthWeb(candidate, fontSize, fontFamily, fontWeight, fontStyle) > maxWidth) {
       chunks.push(current);
       current = grapheme;
     } else {
@@ -137,25 +151,39 @@ function splitOverwidthWord(word, maxWidth, fontSize, fontFamily) {
   return chunks;
 }
 
-function computeLinesWeb(words, fontSize, fontFamily, maxWidth) {
+function computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth) {
   const widths = new Map();
   for (const word of words) {
-    if (!widths.has(word)) widths.set(word, measureWidthWeb(word, fontSize, fontFamily));
+    if (!widths.has(word)) widths.set(word, measureWidthWeb(word, fontSize, fontFamily, fontWeight, fontStyle));
   }
 
   const expandedWords = words.flatMap((word) => {
     const width = widths.get(word);
     if (width <= maxWidth) return [word];
 
-    const chunks = splitOverwidthWord(word, maxWidth, fontSize, fontFamily);
+    const chunks = splitOverwidthWord(word, maxWidth, fontSize, fontFamily, fontWeight, fontStyle);
     chunks.forEach((chunk) => {
-      if (!widths.has(chunk)) widths.set(chunk, measureWidthWeb(chunk, fontSize, fontFamily));
+      if (!widths.has(chunk)) widths.set(chunk, measureWidthWeb(chunk, fontSize, fontFamily, fontWeight, fontStyle));
     });
     return chunks;
   });
 
-  const spaceWidth = measureWidthWeb(" ", fontSize, fontFamily);
+  const spaceWidth = measureWidthWeb(" ", fontSize, fontFamily, fontWeight, fontStyle);
   return wrapWordsIntoLines(expandedWords, widths, spaceWidth, maxWidth);
+}
+
+function computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth) {
+  return splitParagraphs(text).flatMap((paragraph) => {
+    const words = splitWords(paragraph);
+    if (!words.length) {
+      return [{ words: [], isBlank: true, isParagraphEnd: true }];
+    }
+    const lines = computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth);
+    return lines.map((lineWords, index) => ({
+      words: lineWords,
+      isParagraphEnd: index === lines.length - 1,
+    }));
+  });
 }
 
 // Web-only line measurement for text that is NOT rendered through this
@@ -169,12 +197,13 @@ function computeLinesWeb(words, fontSize, fontFamily, maxWidth) {
 // always falls back to rough character-count estimation for every tall-verse
 // split -- this reuses the same canvas measurement this component's own web
 // path already relies on, just exposed standalone.
-export function measureJustifiedLinesWeb(text, fontSize, fontFamily, maxWidth) {
+export function measureJustifiedLinesWeb(text, fontSize, fontFamily, maxWidth, fontWeight = "400", fontStyle = "normal") {
   if (!IS_WEB) return null;
-  const words = splitWords(text);
-  if (!words.length) return [];
-  return computeLinesWeb(words, fontSize, fontFamily, maxWidth).map((lineWords) => ({
-    text: lineWords.join(" "),
+  if (!String(text || "").length) return [];
+  return computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth).map((line) => ({
+    text: line.words.join(" "),
+    isBlank: Boolean(line.isBlank),
+    isParagraphEnd: Boolean(line.isParagraphEnd),
   }));
 }
 
@@ -194,19 +223,50 @@ export function measureJustifiedLinesWeb(text, fontSize, fontFamily, maxWidth) {
 const nativeLineCache = new Map();
 const MAX_NATIVE_CACHE_ENTRIES = 2000;
 
-function nativeLineCacheKey(text, fontSize, fontFamily, width) {
-  return `${fontFamily}|${fontSize}|${width}|${text}`;
+function nativeLineCacheKey(text, fontSize, fontFamily, fontWeight, fontStyle, width) {
+  return `${fontFamily}|${fontSize}|${fontWeight}|${fontStyle}|${width}|${text}`;
 }
 
-function useNativeLines(text, style, fontSize, fontFamily, width) {
-  const cacheKey = nativeLineCacheKey(text, fontSize, fontFamily, width);
+function annotateNativeLines(nativeLines, text) {
+  const paragraphs = splitParagraphs(text).map(splitWords);
+  let paragraphIndex = 0;
+  let wordsInParagraph = 0;
+
+  return nativeLines.map((line, lineIndex) => {
+    const words = splitWords(line.text);
+    while (paragraphIndex < paragraphs.length && paragraphs[paragraphIndex].length === 0) {
+      if (!words.length) {
+        paragraphIndex += 1;
+        return { words: [], isBlank: true, isParagraphEnd: true };
+      }
+      paragraphIndex += 1;
+    }
+
+    wordsInParagraph += words.length;
+    const paragraphWordCount = paragraphs[paragraphIndex]?.length || 0;
+    const isParagraphEnd =
+      paragraphIndex >= paragraphs.length - 1 ||
+      wordsInParagraph >= paragraphWordCount ||
+      lineIndex === nativeLines.length - 1;
+
+    if (isParagraphEnd) {
+      paragraphIndex += 1;
+      wordsInParagraph = 0;
+    }
+
+    return { words, isParagraphEnd };
+  });
+}
+
+function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width) {
+  const cacheKey = nativeLineCacheKey(text, fontSize, fontFamily, fontWeight, fontStyle, width);
   const [state, setState] = useState(null); // { forKey, lines }
   const cached = nativeLineCache.get(cacheKey);
   const lines = cached ?? (state && state.forKey === cacheKey ? state.lines : null);
 
   function handleTextLayout(event) {
     const nativeLines = event.nativeEvent.lines || [];
-    const computed = nativeLines.map((line) => splitWords(line.text));
+    const computed = annotateNativeLines(nativeLines, text);
     if (!nativeLineCache.has(cacheKey) && nativeLineCache.size >= MAX_NATIVE_CACHE_ENTRIES) {
       nativeLineCache.delete(nativeLineCache.keys().next().value);
     }
@@ -265,6 +325,8 @@ export default function JustifiedText({
   style,
   fontSize,
   fontFamily,
+  fontWeight = "400",
+  fontStyle = "normal",
   width,
   rtl = false,
   firstWordStyle,
@@ -274,31 +336,46 @@ export default function JustifiedText({
   minWordsToJustify = 5,
   selectable = false,
 }) {
-  const words = useMemo(() => splitWords(text), [text]);
   const fallbackAlign = rtl ? "right" : "left";
   const reportedLinesForRef = useRef(null);
 
   const webLines = useMemo(
-    () => (IS_WEB && !forceLines ? computeLinesWeb(words, fontSize, fontFamily, width) : null),
-    [words, fontSize, fontFamily, width, forceLines],
+    () => (IS_WEB && !forceLines
+      ? computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width)
+      : null),
+    [text, fontSize, fontFamily, fontWeight, fontStyle, width, forceLines],
   );
   // Always called (never skipped), even when its result goes unused (web,
   // or forceLines supplied) -- calling a hook conditionally is a
   // Rules-of-Hooks violation regardless of whether the branch it feeds ever
   // actually runs.
-  const native = useNativeLines(text, style, fontSize, fontFamily, width);
+  const native = useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width);
 
   const forcedLines = useMemo(
-    () => (forceLines ? forceLines.map((line) => splitWords(line.text)) : null),
+    () => (forceLines ? forceLines.map((line) => ({
+      words: splitWords(line.text),
+      isBlank: Boolean(line.isBlank),
+      isParagraphEnd: Boolean(line.isParagraphEnd),
+    })) : null),
     [forceLines],
   );
   const lines = forcedLines ?? (IS_WEB ? webLines : native.lines);
 
-  const reportKey = `${fontFamily}|${fontSize}|${width}|${text}`;
-  if (lines && onLines && !forceLines && reportedLinesForRef.current !== reportKey) {
+  const reportKey = `${fontFamily}|${fontSize}|${fontWeight}|${fontStyle}|${width}|${text}`;
+  const reportableLines = useMemo(
+    () => lines?.map((line) => ({
+      text: line.words.join(" "),
+      isBlank: Boolean(line.isBlank),
+      isParagraphEnd: Boolean(line.isParagraphEnd),
+    })),
+    [lines],
+  );
+
+  useEffect(() => {
+    if (!reportableLines || !onLines || forceLines || reportedLinesForRef.current === reportKey) return;
     reportedLinesForRef.current = reportKey;
-    onLines(lines.map((lineWords) => ({ text: lineWords.join(" ") })));
-  }
+    onLines(reportableLines);
+  }, [forceLines, onLines, reportKey, reportableLines]);
 
   if (!forceLines && !IS_WEB && native.isMeasuring) {
     // No onLayout here (deliberately -- see native.measuringNode's own
@@ -321,13 +398,23 @@ export default function JustifiedText({
   }
 
   const lastIndex = lines.length - 1;
+  const firstContentLineIndex = lines.findIndex((line) => line.words.length);
   const selectionStyle = selectable ? null : DISABLED_SELECTION_STYLE;
 
   return (
     <View style={[{ width }, selectionStyle]} onLayout={onLayout}>
-      {lines.map((lineWords, index) => {
-        const isFirstLine = index === 0;
-        const isLastLine = index === lastIndex;
+      {lines.map((line, index) => {
+        const lineWords = line.words;
+        const isFirstLine = index === firstContentLineIndex;
+        const isLastLine = index === lastIndex || line.isParagraphEnd;
+
+        if (line.isBlank) {
+          return (
+            <Text key={index} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }]}>
+              {"\u00a0"}
+            </Text>
+          );
+        }
 
         if (isLastLine || lineWords.length < minWordsToJustify) {
           return (

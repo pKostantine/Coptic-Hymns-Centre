@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon from '@/components/chc/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import DocumentWebView, { DocumentAction } from '@/components/chc/DocumentWebView';
+import DocumentWebView from '@/components/chc/DocumentWebView';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { fontScaleToPx } from '@/utils/preferencesStorage';
@@ -79,9 +79,6 @@ export default function SaintHymnPicker({
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [previewHymns, setPreviewHymns] = useState<SaintHymnPreviewHymn[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  // The laid-out height the document reports back, so the window is the size
-  // of the hymn rather than a fixed box with a one-line Axios adrift in it.
-  const [previewContentHeight, setPreviewContentHeight] = useState<number | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const { preferences } = useReadingPreferences();
 
@@ -127,7 +124,6 @@ export default function SaintHymnPicker({
   const openPreview = (target: PreviewTarget) => {
     setPreviewHymns(null);
     setPreviewError(null);
-    setPreviewContentHeight(null);
     setPreview(target);
   };
 
@@ -147,25 +143,35 @@ export default function SaintHymnPicker({
         id: hymn.hymnKey,
         title: hymn.title,
         titlePrayerType: hymn.titlePrayerType,
+        alternateEvery: hymn.alternateEvery,
+        forceWhiteVerses: hymn.forceWhiteVerses,
+        reverseAlternating: hymn.reverseAlternating,
         verses: hymn.verses,
       })),
     [previewHymns],
   );
 
-  // Capped well under the window: a 24-verse Psali should scroll inside the
-  // window rather than push its own Close button off the screen.
-  const previewBodyHeight = Math.min(previewContentHeight ?? 220, Math.round(windowHeight * 0.6));
+  const previewVisibleColumns = useMemo(
+    () => ({
+      english: preferences.visibleLanguages.english,
+      coptic: preferences.visibleLanguages.coptic,
+      arabic: preferences.visibleLanguages.arabic,
+    }),
+    [
+      preferences.visibleLanguages.arabic,
+      preferences.visibleLanguages.coptic,
+      preferences.visibleLanguages.english,
+    ],
+  );
+
+  // Keep the WebView viewport stable after it mounts. Resizing it from its own
+  // content-height messages can make WKWebView repeatedly reflow on iOS.
+  const previewBodyHeight = Math.min(560, Math.max(180, Math.round(windowHeight * 0.55)));
 
   // The reader's own size, but held to something a window this wide can still
   // show three columns of. At the top of the text-size range a real document
   // line is taller than this whole window.
   const previewFontSize = Math.min(fontScaleToPx(preferences.fontScale), 20);
-
-  const handlePreviewAction = (action: DocumentAction) => {
-    if (action.type === 'contentHeight' && typeof action.height === 'number' && action.height > 0) {
-      setPreviewContentHeight(Math.ceil(action.height));
-    }
-  };
 
   // Closing clears this sheet's own transient state, so it never reopens with
   // a stale search or a saint's menu still hanging open behind it. Done on the
@@ -176,6 +182,18 @@ export default function SaintHymnPicker({
     setExpandedBase(null);
     setQuery('');
     onClose();
+  };
+
+  const closeTopLayer = () => {
+    if (preview) {
+      setPreview(null);
+      return;
+    }
+    if (expandedBase) {
+      setExpandedBase(null);
+      return;
+    }
+    closePicker();
   };
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -238,10 +256,11 @@ export default function SaintHymnPicker({
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={closePicker}
+      onRequestClose={closeTopLayer}
       supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
     >
-      <View style={styles.overlay}>
+      <View style={styles.modalRoot}>
+        <View style={styles.overlay}>
         <Pressable accessibilityLabel="Close saint hymns" style={styles.backdrop} onPress={closePicker} />
         <SafeAreaView edges={['bottom']} style={[styles.sheet, DISABLED_TEXT_SELECTION_STYLE]}>
           <View style={styles.grabber} />
@@ -314,18 +333,13 @@ export default function SaintHymnPicker({
               }}
             />
           )}
-        </SafeAreaView>
-      </View>
+          </SafeAreaView>
+        </View>
 
-      {/* One saint's own hymn menu, over the list it came from. */}
-      <Modal
-        visible={Boolean(expanded)}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setExpandedBase(null)}
-        supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
-      >
-        <View style={styles.popoverOverlay}>
+        {/* These are ordinary layers inside the picker modal. Stacking native
+            modals can leave iOS with an invisible view that captures touches. */}
+        {expanded ? (
+          <View style={[styles.popoverOverlay, styles.modalLayer]}>
           <Pressable
             accessibilityLabel="Close saint hymn menu"
             style={styles.backdrop}
@@ -367,19 +381,13 @@ export default function SaintHymnPicker({
               </Pressable>
             </View>
           </View>
-        </View>
-      </Modal>
+          </View>
+        ) : null}
 
-      {/* The hymn itself, over whichever layer asked for it. Declared last so
-          it presents above the saint's own menu when opened from there. */}
-      <Modal
-        visible={Boolean(preview)}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPreview(null)}
-        supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
-      >
-        <View style={styles.popoverOverlay}>
+        {/* Declared last and given a higher z-index so it covers either the
+            saint list or an open saint hymn menu. */}
+        {preview ? (
+          <View style={[styles.popoverOverlay, styles.modalLayer, styles.previewLayer]}>
           <Pressable accessibilityLabel="Close preview" style={styles.backdrop} onPress={() => setPreview(null)} />
           <View style={[styles.previewCard, DISABLED_TEXT_SELECTION_STYLE]}>
             <Text style={[styles.popoverTitle, localized]} numberOfLines={2}>
@@ -398,18 +406,13 @@ export default function SaintHymnPicker({
                 <DocumentWebView
                   sections={previewSections}
                   fontSize={previewFontSize}
-                  visibleColumns={{
-                    english: preferences.visibleLanguages.english,
-                    coptic: preferences.visibleLanguages.coptic,
-                    arabic: preferences.visibleLanguages.arabic,
-                  }}
+                  visibleColumns={previewVisibleColumns}
                   appLanguage={preferences.appLanguage}
                   selectText={false}
                   displayComments={preferences.displayComments}
                   displaySilentPrayers={preferences.displaySilentPrayers}
                   bishopPresent={preferences.bishopPresent}
                   copticRecitedPrayers={preferences.visibleLanguages.copticRecitedPrayers}
-                  onAction={handlePreviewAction}
                 />
               </View>
             )}
@@ -420,13 +423,15 @@ export default function SaintHymnPicker({
               </Pressable>
             </View>
           </View>
-        </View>
-      </Modal>
+          </View>
+        ) : null}
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalRoot: { flex: 1, position: 'relative' },
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
@@ -502,6 +507,8 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: COLORS.gold, fontSize: 13, fontWeight: '800' },
   popoverOverlay: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: SPACING.lg },
+  modalLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 1 },
+  previewLayer: { zIndex: 2 },
   popover: {
     backgroundColor: COLORS.black,
     borderColor: COLORS.border,
@@ -547,18 +554,19 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 16,
     borderWidth: 1,
+    maxHeight: '90%',
     maxWidth: 460,
     padding: SPACING.md,
     width: '100%',
   },
   previewSubtitle: { color: COLORS.gold, fontSize: 14, fontWeight: '700', marginBottom: SPACING.sm },
   previewLoading: { paddingVertical: SPACING.xl },
-  // The document renderer fills whatever it is given, so the height set on
-  // this is what decides the window's size — see previewBodyHeight.
+  // The document renderer scrolls within this stable viewport.
   previewBody: {
     borderColor: COLORS.border,
     borderRadius: RADII.sm,
     borderWidth: 1,
+    flexShrink: 1,
     overflow: 'hidden',
   },
   popoverActions: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end', marginTop: SPACING.xs },

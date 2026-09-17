@@ -20,6 +20,7 @@ import { getEpistleConditionFlags } from '../../../utils/readingsService';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import { getLastDocumentPosition, setLastDocumentPosition } from '../../../utils/lastDocumentPosition';
 import { goBack } from '../../../utils/navigation';
+import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 
 interface ServiceDocumentProps {
@@ -65,13 +66,17 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const router = useRouter();
   const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent, toggleCopticGospelRite } = useReadingPreferences();
   const { effectiveDate, vespersEffectiveDate } = useCalendar();
-  // Saturday-evening Vespers Praises and Vespers still chant in Saturday's
-  // (Vatos) weekday tune even after the liturgical day rolls to Sunday for
-  // every other service — see CalendarContext's vespersEffectiveDate.
-  const isVespersService =
-    (schema === 'psalmody' && table === 'vespers_praises') ||
-    (schema === 'liturgy' && table === 'raising_of_incense' && extraContext?.Vespers === true) ||
-    (schema === 'liturgy' && table === 'lectionary_vespers');
+  const weekdayConditionDate = useMemo(
+    () =>
+      getServiceWeekdayConditionDate({
+        schema,
+        table,
+        extraContext,
+        effectiveDate,
+        vespersEffectiveDate,
+      }),
+    [schema, table, extraContext, effectiveDate, vespersEffectiveDate],
+  );
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
@@ -166,20 +171,14 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const bookmarked = isBookmarked(bookmarkId);
   // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
   // to a saved subdocument bookmark) — fire once when sections first load.
-  const { sub: initialSubdocumentKey, viaHyperlink } = useLocalSearchParams<{ sub?: string; viaHyperlink?: string }>();
-  // Set by openHyperlink on the document it jumps TO. A hyperlink replaces the
-  // source document rather than stacking on top of it, so there is no longer a
-  // meaningful entry to pop back to — going back should leave via this
-  // document's own parent (Vespers -> Raising of Incense), not via whatever
-  // happened to precede the document that linked here.
-  const arrivedViaHyperlink = viaHyperlink === '1';
+  const { sub: initialSubdocumentKey } = useLocalSearchParams<{ sub?: string }>();
+  // Hyperlinks replace only the source document. The route underneath is still
+  // the place from which that source document was opened (its submenu,
+  // Bookmarks, and so on), so every exit should pop back to that existing route.
+  // The fallback still handles a direct deep link with no history.
   const leaveDocument = useCallback(() => {
-    if (arrivedViaHyperlink) {
-      router.replace(backHref);
-      return;
-    }
     goBack(router, backHref);
-  }, [arrivedViaHyperlink, router, backHref]);
+  }, [router, backHref]);
   const initialSubOpenedRef = useRef(false);
 
   useEffect(() => {
@@ -218,7 +217,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           table,
           effectiveDate,
           { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...userConditionFlags, ...extraContext },
-          isVespersService ? vespersEffectiveDate : undefined,
+          weekdayConditionDate,
         ),
       )
       .then((result) => {
@@ -250,7 +249,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, vespersEffectiveDate, isVespersService, extraContext, userConditionFlags]);
+  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags]);
 
   // The scrolling WebView reader has no equivalent "seed the initial prop"
   // option (scrollToSection is imperative and needs the WebView mounted
@@ -379,10 +378,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   };
 
   // A Hyperlink teleports to another service rather than opening anything over
-  // this one, so it navigates away exactly like Settings/Calendar do -- leaving
-  // this screen mounted behind the destination, which is what navigateAway's
-  // guard is for. Reached from both the document button and the content
-  // selector's own hyperlink row.
+  // this one. Replacing this route keeps the screen below it unchanged, so
+  // leaving the destination reveals that existing screen instead of inserting
+  // the destination's own submenu above it. Reached from both the document
+  // button and the content selector's hyperlink row.
   const openHyperlink = (hyperlinkKey?: string | null, options?: { fromSelector?: boolean }) => {
     const destination = hyperlinkKey ? HYPERLINK_TARGETS[hyperlinkKey] : undefined;
     if (!destination) return;
@@ -402,7 +401,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     setTimeout(() => {
       navigatingAwayRef.current = false;
     }, 3000);
-    router.replace({ pathname: destination.href, params: { viaHyperlink: '1' } } as never);
+    router.replace(destination.href as Href);
   };
 
   const handleAction = (action: DocumentAction) => {

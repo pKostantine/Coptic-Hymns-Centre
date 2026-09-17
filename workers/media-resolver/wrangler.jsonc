@@ -1,0 +1,26 @@
+{
+  "name": "chc-media-resolver",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-16",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "PUBLIC_CACHE_CONTROL": "public, max-age=31536000, immutable"
+  },
+  "r2_buckets": [
+    {
+      "binding": "CHC_MUSIC",
+      "bucket_name": "chc-music"
+    },
+    {
+      "binding": "CHC_LEARNING",
+      "bucket_name": "chc-learning"
+    },
+    {
+      "binding": "CHC_IMAGES",
+      "bucket_name": "chc-images"
+    }
+  ]
+}

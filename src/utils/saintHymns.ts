@@ -1,5 +1,5 @@
-import type { DocumentVerse } from '../components/chc/documentHtml';
-import { buildVerseFromTextRow } from './hymnLibrary';
+import type { DocumentSection, DocumentVerse } from '../components/chc/documentHtml';
+import { buildVerseFromTextRow, formatDocumentHymnSection } from './hymnLibrary';
 import { supabase } from './supabase';
 
 /**
@@ -170,7 +170,7 @@ async function buildIndex(): Promise<SaintEntry[]> {
       return (data || []) as { item_order: string | number; condition: string | null }[];
     })(),
     fetchConditions('verses_of_the_cymbals', 'verses_of_the_cymbals'),
-    fetchConditions('psalmody', 'midnight_praises'),
+    fetchConditions('psalmody', 'psalies_saints'),
     fetchConditions('hymn_of_the_intercessions', 'hymn_of_the_intercessions'),
     fetchConditions('praxis_response', 'praxis_response'),
     (async () => {
@@ -281,7 +281,7 @@ async function buildIndex(): Promise<SaintEntry[]> {
 const CATEGORY_SOURCE: Record<SaintHymnCategory, { schema: string; orderTable: string | null }> = {
   Doxology: { schema: 'doxologies', orderTable: 'doxologies' },
   VOC: { schema: 'verses_of_the_cymbals', orderTable: 'verses_of_the_cymbals' },
-  Psali: { schema: 'psalmody', orderTable: 'midnight_praises' },
+  Psali: { schema: 'psalmody', orderTable: 'psalies_saints' },
   Hiten: { schema: 'hymn_of_the_intercessions', orderTable: 'hymn_of_the_intercessions' },
   PraxisResponse: { schema: 'praxis_response', orderTable: 'praxis_response' },
   // The Axios is one hymn carrying a line per saint, so the condition sits on
@@ -296,6 +296,9 @@ export interface SaintHymnPreviewHymn {
   title: { english: string; arabic: string };
   /** The hymn's own prayer_type, which a verse without one of its own inherits — exactly as a section's does in a real document. */
   titlePrayerType: string | null;
+  alternateEvery?: number | null;
+  forceWhiteVerses?: boolean;
+  reverseAlternating?: boolean;
   /** Built by the same function the document builds its verses with, so the preview can be handed straight to the document renderer. */
   verses: DocumentVerse[];
 }
@@ -392,8 +395,40 @@ function toVerses(rows: TextRow[], titlePrayerType: string | null): DocumentVers
   return rows
     .sort(byLineOrder)
     .map((row) => buildVerseFromTextRow(row, titlePrayerType) as DocumentVerse)
-    .map((verse) => ({ ...verse, coptic: previewCopticCase(verse.coptic) }))
     .filter(hasText);
+}
+
+function toPreviewHymn({
+  hymnKey,
+  title,
+  titlePrayerType,
+  rows,
+}: {
+  hymnKey: string;
+  title: { english: string; arabic: string };
+  titlePrayerType: string | null;
+  rows: TextRow[];
+}): SaintHymnPreviewHymn | null {
+  const verses = toVerses(rows, titlePrayerType);
+  if (!verses.length) return null;
+
+  const section = formatDocumentHymnSection({
+    id: hymnKey,
+    hymnKey,
+    title,
+    titlePrayerType,
+    verses,
+  }) as DocumentSection;
+
+  return {
+    hymnKey,
+    title: section.title,
+    titlePrayerType: section.titlePrayerType ?? null,
+    alternateEvery: section.alternateEvery ?? null,
+    forceWhiteVerses: Boolean(section.forceWhiteVerses),
+    reverseAlternating: Boolean(section.reverseAlternating),
+    verses: section.verses,
+  };
 }
 
 interface HymnTitle {
@@ -449,18 +484,17 @@ async function loadPreview(token: string, category: SaintHymnCategory): Promise<
     const title = titles.get(VENERATION_HYMN_KEY);
     const rows = ((data || []) as (TextRow & { condition: string | null })[])
       .filter((row) => referencesToken(row.condition, token));
-    const verses = toVerses(rows, title?.prayerType ?? null);
-    if (!verses.length) return [];
-
-    return [{
+    const hymn = toPreviewHymn({
       hymnKey: VENERATION_HYMN_KEY,
       title: {
         english: title?.english || CATEGORY_LABEL[category],
         arabic: title?.arabic || '',
       },
       titlePrayerType: title?.prayerType ?? null,
-      verses,
-    }];
+      rows,
+    });
+
+    return hymn ? [hymn] : [];
   }
 
   const { data: orderData, error: orderError } = await supabase
@@ -502,17 +536,17 @@ async function loadPreview(token: string, category: SaintHymnCategory): Promise<
   return hymnKeys
     .map((hymnKey) => {
       const title = titles.get(hymnKey);
-      return {
+      return toPreviewHymn({
         hymnKey,
         title: {
           english: title?.english || humanizeSaintBase(hymnKey),
           arabic: title?.arabic || '',
         },
         titlePrayerType: title?.prayerType ?? null,
-        verses: toVerses(linesByHymn.get(hymnKey) || [], title?.prayerType ?? null),
-      };
+        rows: linesByHymn.get(hymnKey) || [],
+      });
     })
-    .filter((hymn) => hymn.verses.length > 0);
+    .filter((hymn): hymn is SaintHymnPreviewHymn => Boolean(hymn));
 }
 
 const previewCache = new Map<string, Promise<SaintHymnPreviewHymn[]>>();

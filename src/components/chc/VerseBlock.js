@@ -4,6 +4,12 @@ import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
 import { resolveRubricKey } from "../../utils/verseRubric";
 import JustifiedText from "./JustifiedText";
+import {
+  getSlideshowChromeMetrics,
+  getSlideshowLanguageFontSize,
+  getSlideshowLanguageLineHeight,
+  hasSeasonalPrefixLine as hasVisibleSeasonalPrefixLine,
+} from "./slideshowLayout";
 
 const REFRAIN_TAN = "#9FFFD0";
 const LIGHT_YELLOW = "#FFFF00";
@@ -22,7 +28,6 @@ export default function VerseBlock({
   visibleLanguages,
   fontSize,
   theme,
-  columnWidth,
   tableWidth,
   onLanguageLayout,
   isRecitedPrayer = false,
@@ -75,10 +80,10 @@ export default function VerseBlock({
       : forceWhiteText || verse.forceWhiteText || isRefrain || isRecitedPrayer || isReading || (colorIndex ?? index) % 2 === 0
       ? theme.colors.text
       : theme.colors.rowBlue;
-  const copticFontSize = Math.round(fontSize * 1.25);
-  const titleFontSize = Math.max(Math.round(fontSize * 0.5), 11);
-  const titleLineHeight = Math.max(Math.round(fontSize * 0.7), 15);
-  const hasSeasonalPrefixLine = doesVerseHaveSeasonalPrefixLine(verse);
+  const chrome = getSlideshowChromeMetrics(fontSize);
+  const hasSeasonalPrefixLine = hasVisibleSeasonalPrefixLine(verse);
+  const bodyFontStyle = isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal";
+  const bodyFontWeight = isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400";
   // "Invincible Coptic" only means "this Coptic must always render, even if
   // the language toggle or a translation is missing" -- it does NOT mean the
   // line structurally has no English/Arabic (some DB rows tagged this way do
@@ -89,19 +94,21 @@ export default function VerseBlock({
   // spanningLanguage).
   const hasTranslationText = Boolean((verse.english && verse.english.trim()) || (verse.arabic && verse.arabic.trim()));
   const copticStandsAlone = verse.invincibleCoptic && !hasTranslationText;
+  const bibleNumberFor = (language) =>
+    !Array.isArray(verse.slideshowBibleNumberLanguages) ||
+    verse.slideshowBibleNumberLanguages.includes(language)
+      ? verse.bibleVerseNumber
+      : "";
   const rowLanguages = [
     {
       key: "english",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "english", bishopPresent),
       text: formatEnglishDisplayText(verse.english),
-      bibleVerseNumber: verse.bibleVerseNumber,
-      seasonalHoosVersePrefix: verse.seasonalHoosVersePrefix,
-      fontSize: isRefrainLabel ? titleFontSize : fontSize,
+      bibleVerseNumber: bibleNumberFor("english"),
+      seasonalHoosVersePrefix: hasSeasonalPrefixLine ? verse.seasonalHoosVersePrefix : "",
+      fontSize: getSlideshowLanguageFontSize("english", { verse }, fontSize),
       fontFamily: "Georgia",
-      lineHeight:
-        isRefrainLabel
-          ? titleLineHeight
-          : Math.round(fontSize * 1.25),
+      lineHeight: getSlideshowLanguageLineHeight("english", { verse }, fontSize),
       styles: [styles.english],
       textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
       minWordsToJustify: 1,
@@ -110,16 +117,13 @@ export default function VerseBlock({
     {
       key: "coptic",
       text: formatCopticNumbers(verse.coptic, verse.preserveCopticDigits),
-      bibleVerseNumber: verse.bibleVerseNumber,
+      bibleVerseNumber: bibleNumberFor("coptic"),
       seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine
         ? verse.seasonalHoosVersePrefix
         : "",
-      fontSize: isRefrainLabel ? titleFontSize : copticFontSize,
+      fontSize: getSlideshowLanguageFontSize("coptic", { verse }, fontSize),
       fontFamily: TYPOGRAPHY.coptic,
-      lineHeight:
-        isRefrainLabel
-          ? titleLineHeight
-          : Math.round(copticFontSize * 1),
+      lineHeight: getSlideshowLanguageLineHeight("coptic", { verse }, fontSize),
       styles: [styles.coptic],
       textAlign: isRefrainLabel || isReadingReference || copticStandsAlone ? "center" : "justify",
       minWordsToJustify: 1,
@@ -129,17 +133,13 @@ export default function VerseBlock({
       key: "arabic",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "arabic", bishopPresent),
       text: formatArabicNumbers(verse.arabic),
-      bibleVerseNumber: verse.bibleVerseNumber,
-      seasonalHoosVersePrefix: formatArabicNumbers(verse.seasonalHoosVersePrefix),
-      fontSize:
-        isRefrainLabel
-          ? titleFontSize
-          : Math.round(fontSize * 1.15),
+      bibleVerseNumber: bibleNumberFor("arabic"),
+      seasonalHoosVersePrefix: hasSeasonalPrefixLine
+        ? formatArabicNumbers(verse.seasonalHoosVersePrefix)
+        : "",
+      fontSize: getSlideshowLanguageFontSize("arabic", { verse }, fontSize),
       fontFamily: "Arial",
-      lineHeight:
-        isRefrainLabel
-          ? titleLineHeight
-          : Math.round(fontSize * 1.25),
+      lineHeight: getSlideshowLanguageLineHeight("arabic", { verse }, fontSize),
       styles: [styles.arabic],
       textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
       minWordsToJustify: 1,
@@ -182,6 +182,7 @@ export default function VerseBlock({
   const rowColumnWidth = tableWidth / Math.max(columnLanguages.length, 1);
   const isCenteredAcrossPage = Boolean(verse.centeredAcrossPage);
   const hasSpeakerLabel = rowLanguages.some((language) => language.speakerLabel);
+  const speakerRowHeight = hasSpeakerLabel ? chrome.speakerLineHeight : 0;
 
   function reportLanguageMetric(language, metric) {
     onLanguageLayout?.(language, metric);
@@ -200,8 +201,8 @@ export default function VerseBlock({
         color: rowTextColor,
         fontFamily: language.fontFamily,
         fontSize: language.fontSize,
-        fontStyle: isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal",
-        fontWeight: isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400",
+        fontStyle: bodyFontStyle,
+        fontWeight: bodyFontWeight,
         letterSpacing: 0,
         lineHeight: language.lineHeight,
         ...(Platform.OS === "web"
@@ -220,24 +221,9 @@ export default function VerseBlock({
           styles.cell,
           isSeasonalHoosVerse && styles.seasonalHoosCell,
           isCenteredAcrossPage && styles.centeredCell,
-          // Reserves the line the speaker label occupies in the columns
-          // beside it, so Coptic starts level with their text. A spanning
-          // line is already below that row, so the gap would just be
-          // blank space above it.
-          language.key === "coptic" && hasSpeakerLabel && !spansRow
-            ? { paddingTop: SPACING.sm + language.lineHeight }
-            : null,
           cellWidthStyle,
         ]}
       >
-        {language.speakerLabel ? (
-          <Text
-            selectable={selectableText}
-            style={[textStyle, { textAlign: getSafeTextAlign(language), color: getSpeakerColor(rubricType, bishopPresent) }]}
-          >
-            {language.speakerLabel}
-          </Text>
-        ) : null}
         {isJustified ? (
           <JustifiedVerseBody
             language={language}
@@ -246,6 +232,8 @@ export default function VerseBlock({
             columnWidth={cellWidth - SPACING.xs * 2}
             forceLines={language.forceLines}
             minWordsToJustify={language.minWordsToJustify}
+            fontStyle={bodyFontStyle}
+            fontWeight={bodyFontWeight}
             onMetric={(metric) => reportLanguageMetric(language.key, metric)}
           />
         ) : (
@@ -270,18 +258,63 @@ export default function VerseBlock({
     );
   }
 
+  function renderSpeakerRow(languages, speakerColumnWidth) {
+    if (!speakerRowHeight || !languages.length) return null;
+    return (
+      <View style={styles.speakerRow}>
+        {languages.map((language) => (
+          <View
+            key={`speaker-${language.key}`}
+            style={[
+              styles.speakerCell,
+              {
+                flexBasis: speakerColumnWidth,
+                height: speakerRowHeight,
+                maxWidth: speakerColumnWidth,
+              },
+            ]}
+          >
+            {language.speakerLabel ? (
+              <Text
+                selectable={selectableText}
+                style={[
+                  ...language.styles,
+                  {
+                    color: getSpeakerColor(rubricType, bishopPresent),
+                    fontFamily: language.fontFamily,
+                    fontSize: chrome.speakerFontSize,
+                    fontStyle: bodyFontStyle,
+                    fontWeight: bodyFontWeight,
+                    lineHeight: speakerRowHeight,
+                    textAlign: getSafeTextAlign(language),
+                    width: "100%",
+                  },
+                ]}
+              >
+                {language.speakerLabel}
+              </Text>
+            ) : null}
+          </View>
+        ))}
+      </View>
+    );
+  }
+
   if (spanningLanguage) {
     return (
       <View style={styles.spanningRowGroup}>
-        {columnLanguages.length ? (
-          <View style={styles.row}>{columnLanguages.map((language) => renderLanguageCell(language))}</View>
-        ) : null}
+        {renderSpeakerRow(columnLanguages, rowColumnWidth)}
         <View style={styles.row}>{renderLanguageCell(spanningLanguage, true)}</View>
       </View>
     );
   }
 
-  return <View style={styles.row}>{rowLanguages.map((language) => renderLanguageCell(language))}</View>;
+  return (
+    <View style={styles.spanningRowGroup}>
+      {renderSpeakerRow(rowLanguages, rowColumnWidth)}
+      <View style={styles.row}>{rowLanguages.map((language) => renderLanguageCell(language))}</View>
+    </View>
+  );
 }
 
 /**
@@ -300,7 +333,7 @@ export default function VerseBlock({
  * split for how rarely it fires. It's unaffected everywhere else (scroll
  * mode, and every non-justified slideshow verse type).
  */
-function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, onMetric }) {
+function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, onMetric }) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
@@ -325,6 +358,8 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         style={textStyle}
         fontSize={language.fontSize}
         fontFamily={language.fontFamily}
+        fontStyle={fontStyle}
+        fontWeight={fontWeight}
         width={columnWidth}
         rtl={language.key === "arabic"}
         firstWordStyle={bibleVerseNumber ? { color: COLORS.gold } : null}
@@ -469,18 +504,6 @@ function getSeasonalHoosPrefixParts(text, prefix) {
     prefix: value.slice(0, normalizedPrefix.length),
     body: value.slice(normalizedPrefix.length).replace(/^\s+/, ""),
   };
-}
-
-function doesVerseHaveSeasonalPrefixLine(verse = {}) {
-  const prefix = String(verse.seasonalHoosVersePrefix || "").trim();
-
-  if (!prefix) {
-    return false;
-  }
-
-  return ["english", "arabic"].some((language) =>
-    String(verse[language] || "").trimStart().startsWith(prefix),
-  );
 }
 
 const COPTIC_DIGITS = {
@@ -639,6 +662,17 @@ const styles = StyleSheet.create({
     fontFamily: "Georgia",
   },
   row: {
+    flexDirection: "row",
+    overflow: "hidden",
+    width: "100%",
+  },
+  speakerCell: {
+    flexShrink: 1,
+    justifyContent: "center",
+    overflow: "hidden",
+    paddingHorizontal: SPACING.xs,
+  },
+  speakerRow: {
     flexDirection: "row",
     overflow: "hidden",
     width: "100%",

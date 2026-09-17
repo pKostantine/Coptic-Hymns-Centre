@@ -41,6 +41,13 @@ export function toIsoDate(date) {
   return d.toISOString().slice(0, 10);
 }
 
+/** Adds whole UTC calendar days to the app's date-only Date convention. */
+export function addUtcDays(date, delta) {
+  const d = date instanceof Date ? new Date(date) : new Date(date);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d;
+}
+
 /** The device's local "today" as a "YYYY-MM-DD" string — localDateAtUtcMidnight(new Date()) then toIsoDate, in one call. */
 export function todayIsoDate() {
   return toIsoDate(localDateAtUtcMidnight(new Date()));
