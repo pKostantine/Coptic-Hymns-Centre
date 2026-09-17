@@ -10,6 +10,7 @@ import type {
   PublishedTrackLyricsPayload,
 } from '@/types/musicConsumer';
 import type { MusicLyricKind, MusicPlaylistVisibility } from '@/types/mediaPlatform';
+import { unifiedSearchService } from '@/services/unifiedSearchService';
 import { supabase } from '@/utils/supabase';
 
 function assertRpcData<T>(data: T | null, error: { message: string } | null, operation: string): T {
@@ -52,11 +53,33 @@ export async function searchMusic(query: string, locale = 'en'): Promise<MusicSe
   const normalized = query.trim();
   if (!normalized) return { artists: [], releases: [], tracks: [] };
 
-  const { data, error } = await supabase.rpc('search_published_music', {
-    p_query: normalized,
-    p_locale: locale,
-  });
-  return assertRpcData(data as MusicSearchPayload | null, error, 'Search music');
+  const { results } = await unifiedSearchService.search(normalized, locale, 'music');
+  return {
+    artists: results.flatMap((result) => result.kind === 'music_artist' ? [{
+      id: result.entityId,
+      displayName: result.title,
+      biography: result.body,
+      profileImageAsset: result.metadata.profileImageAsset,
+    }] : []),
+    releases: results.flatMap((result) => result.kind === 'music_release' ? [{
+      id: result.entityId,
+      title: result.title,
+      subtitle: result.subtitle,
+      releaseType: result.metadata.releaseType,
+      releaseDate: result.metadata.releaseDate,
+      primaryArtist: result.metadata.primaryArtist,
+      coverAsset: result.metadata.coverAsset,
+    }] : []),
+    tracks: results.flatMap((result) => result.kind === 'music_track' ? [{
+      id: result.entityId,
+      title: result.title,
+      subtitle: result.subtitle,
+      durationMs: result.metadata.durationMs,
+      releaseId: result.metadata.releaseId,
+      mediaAsset: result.metadata.mediaAsset,
+      artists: result.metadata.artists,
+    }] : []),
+  };
 }
 
 export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayload> {

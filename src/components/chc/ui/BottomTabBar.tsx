@@ -10,7 +10,7 @@ import Icon from './Icon';
 interface BottomTabBarProps {
   /** Top-level CHC section. Switching tabs uses replace(), so the peer sections
    * never build a back-button stack on top of one another. */
-  active: 'books' | 'music' | 'learn' | 'settings';
+  active: 'books' | 'music' | 'learn' | 'settings' | null;
 }
 
 export default function BottomTabBar({ active }: BottomTabBarProps) {

@@ -1,15 +1,11 @@
 import { mediaService } from '@/services/mediaService';
 import type {
   LearningAlbumDetail,
-  LearningAlbumSummary,
   LearningCantorDetail,
   LearningHomePayload,
   LearningHymnDetail,
-  LearningHymnSummary,
   LearningLesson,
-  LearningLessonSearchResult,
   LearningLessonSetDetail,
-  LearningLessonSetSummary,
   LearningMediaAsset,
   LearningPlaylistDetail,
   LearningPlaylistItemKind,
@@ -22,6 +18,7 @@ import type {
   LearningSearchPayload,
   LearningSeasonDetail,
 } from '@/types/learningPlatform';
+import { unifiedSearchService } from '@/services/unifiedSearchService';
 import { supabase } from '@/utils/supabase';
 
 type RpcError = { message: string } | null;
@@ -30,14 +27,6 @@ export interface LearningLessonDetailPayload {
   lessonSet: LearningLessonSetDetail;
   lesson: LearningLesson;
 }
-
-interface SearchIndex {
-  expiresAt: number;
-  payload: LearningSearchPayload;
-}
-
-const SEARCH_CACHE_MS = 5 * 60 * 1000;
-const searchCache = new Map<string, SearchIndex>();
 
 function assertRpcData<T>(data: T | null, error: RpcError, operation: string): T {
   if (error) {
@@ -193,124 +182,54 @@ export async function removeLearningPlaylistItem(
   return assertRpcData(data as LearningPlaylistDetail | null, error, 'Remove from learning playlist');
 }
 
-function uniqueById<T extends { id: string }>(items: T[]): T[] {
-  return Array.from(new Map(items.map((item) => [item.id, item])).values());
-}
-
-function normalizeSearchText(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '')
-    .replace(/\u0640/g, '')
-    .replace(/[أإآٱ]/g, 'ا')
-    .replace(/ى/g, 'ي')
-    .replace(/ؤ/g, 'و')
-    .replace(/ئ/g, 'ي')
-    .toLocaleLowerCase()
-    .trim();
-}
-
-function includesQuery(query: string, values: (string | null | undefined)[]): boolean {
-  return normalizeSearchText(values.filter(Boolean).join(' ')).includes(query);
-}
-
-async function buildSearchIndex(locale: string): Promise<LearningSearchPayload> {
-  const home = await getLearningHome(locale);
-  const [cantorDetails, seasonDetails] = await Promise.all([
-    Promise.all(home.cantors.map((cantor) => getLearningCantor(cantor.id, locale))),
-    Promise.all(home.seasons.map((season) => getLearningSeason(season.id, locale))),
-  ]);
-
-  const albums = uniqueById<LearningAlbumSummary>([
-    ...cantorDetails.flatMap((cantor) => cantor.albums),
-    ...seasonDetails.flatMap((season) => season.albums),
-  ]);
-  const lessonSets = uniqueById<LearningLessonSetSummary>([
-    ...cantorDetails.flatMap((cantor) => cantor.lessonSets),
-    ...seasonDetails.flatMap((season) => season.lessonSets),
-  ]);
-  const [albumDetails, lessonSetDetails] = await Promise.all([
-    Promise.all(albums.map((album) => getLearningAlbum(album.id, locale))),
-    Promise.all(lessonSets.map((lessonSet) => getLearningLessonSet(lessonSet.id, locale))),
-  ]);
-  const hymns = uniqueById<LearningHymnSummary>([
-    ...seasonDetails.flatMap((season) => season.hymns),
-    ...lessonSetDetails.map((lessonSet) => lessonSet.hymn),
-  ]);
-
-  const cantorNames = new Map(home.cantors.map((cantor) => [cantor.id, cantor.displayName]));
-  const enrichedAlbums = albums.map((album) => {
-    const detail = albumDetails.find((item) => item.id === album.id);
-    return {
-      ...album,
-      description: album.description ?? detail?.description ?? null,
-      cantorId: album.cantorId ?? detail?.cantor.id,
-      seasonId: album.seasonId ?? detail?.season?.id ?? null,
-    };
-  });
-  const enrichedLessonSets = lessonSets.map((lessonSet) => {
-    const detail = lessonSetDetails.find((item) => item.id === lessonSet.id);
-    return {
-      ...lessonSet,
-      description: lessonSet.description ?? detail?.description ?? null,
-      cantorId: lessonSet.cantorId ?? detail?.cantor.id,
-      seasonId: lessonSet.seasonId ?? detail?.season?.id ?? null,
-    };
-  });
-  const lessons: LearningLessonSearchResult[] = lessonSetDetails.flatMap((lessonSet) => (
-    lessonSet.lessons.map((lesson) => ({
-      id: lesson.id,
-      mediaType: lesson.mediaType,
-      title: lesson.title,
-      description: lesson.description,
-      durationMs: lesson.durationMs,
-      mediaAsset: lesson.mediaAsset,
-      lessonSetId: lessonSet.id,
-      lessonSetTitle: lessonSet.title,
-      cantorId: lessonSet.cantor.id,
-      cantorName: cantorNames.get(lessonSet.cantor.id) ?? lessonSet.cantor.displayName,
-      hymnId: lessonSet.hymn.id,
-    }))
-  ));
-
-  return {
-    cantors: home.cantors,
-    seasons: home.seasons,
-    hymns,
-    albums: enrichedAlbums,
-    lessonSets: enrichedLessonSets,
-    lessons,
-  };
-}
-
-async function getSearchIndex(locale: string): Promise<LearningSearchPayload> {
-  const cached = searchCache.get(locale);
-  if (cached && cached.expiresAt > Date.now()) return cached.payload;
-  const payload = await buildSearchIndex(locale);
-  searchCache.set(locale, { payload, expiresAt: Date.now() + SEARCH_CACHE_MS });
-  return payload;
-}
-
 export async function searchLearning(query: string, locale = 'en'): Promise<LearningSearchPayload> {
-  const normalized = normalizeSearchText(query);
+  const normalized = query.trim();
   if (!normalized) {
     return { cantors: [], seasons: [], hymns: [], albums: [], lessonSets: [], lessons: [] };
   }
 
-  const index = await getSearchIndex(locale);
+  const { results } = await unifiedSearchService.search(normalized, locale, 'learning');
   return {
-    cantors: index.cantors.filter((item) => includesQuery(normalized, [item.displayName, item.biography])),
-    seasons: index.seasons.filter((item) => includesQuery(normalized, [item.title, item.description, item.slug])),
-    hymns: index.hymns.filter((item) => includesQuery(normalized, [item.title, item.subtitle, item.sourceHymnKey])),
-    albums: index.albums.filter((item) => includesQuery(normalized, [item.title, item.description])),
-    lessonSets: index.lessonSets.filter((item) => includesQuery(normalized, [item.title, item.description])),
-    lessons: index.lessons.filter((item) => includesQuery(normalized, [
-      item.title,
-      item.description,
-      item.lessonSetTitle,
-      item.cantorName,
-    ])),
+    cantors: results.flatMap((result) => result.kind === 'learning_cantor' ? [{
+      id: result.entityId,
+      displayName: result.title,
+      biography: result.body,
+      profileImageAsset: result.metadata.profileImageAsset,
+    }] : []),
+    seasons: results.flatMap((result) => result.kind === 'learning_season' ? [{
+      id: result.entityId,
+      slug: result.metadata.slug,
+      title: result.title,
+      description: result.body,
+      sortOrder: result.metadata.sortOrder,
+    }] : []),
+    hymns: results.flatMap((result) => result.kind === 'learning_hymn' ? [{
+      id: result.entityId,
+      sourceHymnKey: result.metadata.sourceHymnKey,
+      title: result.title,
+      subtitle: result.subtitle,
+    }] : []),
+    albums: results.flatMap((result) => result.kind === 'learning_album' ? [{
+      id: result.entityId,
+      title: result.title,
+      description: result.body,
+      cantorId: result.metadata.cantorId,
+      seasonId: result.metadata.seasonId,
+    }] : []),
+    lessonSets: [],
+    lessons: results.flatMap((result) => result.kind === 'learning_lesson' ? [{
+      id: result.entityId,
+      mediaType: result.metadata.mediaType,
+      title: result.title,
+      description: result.body,
+      durationMs: result.metadata.durationMs,
+      mediaAsset: result.metadata.mediaAsset,
+      lessonSetId: result.metadata.lessonSetId,
+      lessonSetTitle: result.metadata.lessonSetTitle,
+      cantorId: result.metadata.cantorId,
+      cantorName: result.metadata.cantorName,
+      hymnId: result.metadata.hymnId,
+    }] : []),
   };
 }
 
