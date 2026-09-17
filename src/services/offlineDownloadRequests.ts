@@ -23,6 +23,7 @@ import type {
 import type { PlaybackEntityKind } from '@/types/playback';
 
 type DownloadableAsset = MusicConsumerAsset | LearningMediaAsset;
+type LearningDownloadableLesson = Pick<LearningLesson, 'id' | 'mediaType' | 'mediaAsset'>;
 
 function entityKey(entityType: string, entityId: string, locale: string): string {
   return `${entityType}:${entityId}:${locale}`;
@@ -216,7 +217,7 @@ function learningRecordingResource(recording: LearningAlbumRecording): OfflineDo
   return mediaResource(recording.mediaAsset, 'learning_audio', recording.id);
 }
 
-function learningLessonResource(lesson: LearningLesson): OfflineDownloadResource | null {
+function learningLessonResource(lesson: LearningDownloadableLesson): OfflineDownloadResource | null {
   return mediaResource(lesson.mediaAsset, learningMediaKind(lesson), lesson.id);
 }
 
