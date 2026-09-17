@@ -15,6 +15,10 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { learningLessonSetAudioQueue, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
+import {
+  learningLessonDownloadRequest,
+  learningLessonSetDownloadRequest,
+} from '@/services/offlineDownloadRequests';
 import type { LearningLessonSetDetail } from '@/types/learningPlatform';
 
 export default function LearningLessonSetScreen() {
@@ -28,6 +32,10 @@ export default function LearningLessonSetScreen() {
   const [error, setError] = useState<string | null>(null);
   const { currentItem, playQueue } = useLearningPlayer();
   const audioQueue = useMemo(() => lessonSet ? learningLessonSetAudioQueue(lessonSet) : [], [lessonSet]);
+  const downloadRequest = useMemo(
+    () => lessonSet ? learningLessonSetDownloadRequest(lessonSet, locale) : null,
+    [lessonSet, locale],
+  );
 
   useEffect(() => {
     if (!lessonSetId) return;
@@ -81,7 +89,9 @@ export default function LearningLessonSetScreen() {
                 <Pressable disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playQueue(audioQueue, 0)}>
                   <Text style={styles.playAllText}>▶  {isArabic ? 'تشغيل الدروس الصوتية' : 'Play Audio Lessons'}</Text>
                 </Pressable>
-                <LearningDownloadButton isArabic={isArabic} />
+                {downloadRequest ? (
+                  <LearningDownloadButton packageKey={downloadRequest.packageKey} request={downloadRequest} isArabic={isArabic} />
+                ) : null}
               </View>
             </View>
           </View>
@@ -97,27 +107,39 @@ export default function LearningLessonSetScreen() {
             </Text>
           </View>
           <View style={styles.mediaList}>
-            {lessonSet.lessons.map((lesson, index) => (
-              <LearningMediaRow
-                key={lesson.id}
-                title={lesson.title}
-                subtitle={lesson.description}
-                durationMs={lesson.durationMs}
-                index={index}
-                mediaType={lesson.mediaType}
-                active={lesson.mediaType === 'audio' && currentItem?.id === lesson.id}
-                isArabic={isArabic}
-                onPress={() => openLesson(lesson.id, lesson.mediaType)}
-                trailing={(
-                  <LearningPlaylistPicker
-                    itemKind="lesson"
-                    itemId={lesson.id}
-                    locale={locale}
-                    isArabic={isArabic}
-                  />
-                )}
-              />
-            ))}
+            {lessonSet.lessons.map((lesson, index) => {
+              const lessonDownload = learningLessonDownloadRequest(lessonSet, lesson, locale);
+              return (
+                <LearningMediaRow
+                  key={lesson.id}
+                  title={lesson.title}
+                  subtitle={lesson.description}
+                  durationMs={lesson.durationMs}
+                  index={index}
+                  mediaType={lesson.mediaType}
+                  active={lesson.mediaType === 'audio' && currentItem?.id === lesson.id}
+                  isArabic={isArabic}
+                  onPress={() => openLesson(lesson.id, lesson.mediaType)}
+                  trailing={(
+                    <View style={styles.rowActions}>
+                      <LearningDownloadButton
+                        packageKey={lessonDownload.packageKey}
+                        request={lessonDownload}
+                        isArabic={isArabic}
+                        compact
+                        label=""
+                      />
+                      <LearningPlaylistPicker
+                        itemKind="lesson"
+                        itemId={lesson.id}
+                        locale={locale}
+                        isArabic={isArabic}
+                      />
+                    </View>
+                  )}
+                />
+              );
+            })}
             {!lessonSet.lessons.length ? <Text style={styles.empty}>{isArabic ? 'لا توجد دروس منشورة.' : 'No published lessons.'}</Text> : null}
           </View>
         </ScrollView>
@@ -149,6 +171,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   sectionMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
   mediaList: { overflow: 'hidden', borderRadius: RADII.lg, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center', padding: SPACING.lg },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });
