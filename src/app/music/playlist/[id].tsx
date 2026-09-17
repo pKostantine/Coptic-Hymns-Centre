@@ -4,13 +4,18 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
-import type { MusicPlaylistPayload } from '@/types/musicConsumer';
+import {
+  musicPlaylistDownloadRequest,
+  musicTrackDownloadRequest,
+} from '@/services/offlineDownloadRequests';
+import type { MusicPlaylistPayload, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 
 export default function MusicPlaylistScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -25,6 +30,10 @@ export default function MusicPlaylistScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const queue = useMemo(() => (playlist?.tracks ?? []).map((track) => ({ track, releaseId: track.releaseId, coverAsset: playlist?.coverAsset })), [playlist]);
+  const downloadRequest = useMemo(
+    () => playlist ? musicPlaylistDownloadRequest(playlist, locale) : null,
+    [locale, playlist],
+  );
 
   useEffect(() => {
     if (!playlistId) return;
@@ -37,6 +46,19 @@ export default function MusicPlaylistScreen() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [locale, playlistId]);
+
+  const preparePlaylistDownload = async () => {
+    if (!playlist) throw new Error('Playlist is not loaded.');
+    const lyrics = await Promise.all(playlist.tracks.map(async (track) => {
+      try { return [track.id, await musicService.getLyrics(track.id, locale)] as const; }
+      catch { return [track.id, null] as const; }
+    }));
+    return musicPlaylistDownloadRequest(
+      playlist,
+      locale,
+      Object.fromEntries(lyrics) as Record<string, PublishedTrackLyricsPayload | null>,
+    );
+  };
 
   const removeTrack = async (trackId: string) => {
     if (!playlistId) return;
@@ -73,30 +95,50 @@ export default function MusicPlaylistScreen() {
               {playlist.tracks.length ? (
                 <View style={styles.actions}>
                   <Pressable style={styles.playButton} onPress={() => playQueue(queue, 0)}><Text style={styles.playButtonText}>▶ {isArabic ? 'تشغيل' : 'Play'}</Text></Pressable>
-                  <Pressable style={styles.downloadButton} onPress={() => Alert.alert(isArabic ? 'التنزيل' : 'Download', isArabic ? 'سيتم تفعيل التنزيل الكامل بلا اتصال في مرحلة التنزيلات.' : 'Full offline downloads are implemented in the dedicated Offline Downloads phase.')}>
-                    <Text style={styles.downloadText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
-                  </Pressable>
+                  {downloadRequest ? (
+                    <MusicDownloadButton
+                      packageKey={downloadRequest.packageKey}
+                      request={preparePlaylistDownload}
+                      isArabic={isArabic}
+                    />
+                  ) : null}
                 </View>
               ) : null}
             </View>
           </View>
 
           <View style={styles.trackList}>
-            {playlist.tracks.length ? playlist.tracks.map((track, index) => (
-              <View key={track.id} style={styles.trackWrap}>
-                <View style={styles.trackFlex}>
-                  <MusicTrackRow
-                    track={track}
-                    index={index}
-                    active={currentItem?.track.id === track.id}
-                    onPress={() => playQueue(queue, index)}
-                  />
+            {playlist.tracks.length ? playlist.tracks.map((track, index) => {
+              const trackRequest = musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset });
+              return (
+                <View key={track.id} style={styles.trackWrap}>
+                  <View style={styles.trackFlex}>
+                    <MusicTrackRow
+                      track={track}
+                      index={index}
+                      active={currentItem?.track.id === track.id}
+                      onPress={() => playQueue(queue, index)}
+                      trailing={(
+                        <MusicDownloadButton
+                          packageKey={trackRequest.packageKey}
+                          request={async () => {
+                            let lyrics: PublishedTrackLyricsPayload | null = null;
+                            try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
+                            return musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset, lyrics });
+                          }}
+                          isArabic={isArabic}
+                          compact
+                          label=""
+                        />
+                      )}
+                    />
+                  </View>
+                  <Pressable accessibilityLabel="Remove from playlist" onPress={() => void removeTrack(track.id)} style={styles.removeButton}>
+                    <Text style={styles.removeText}>×</Text>
+                  </Pressable>
                 </View>
-                <Pressable accessibilityLabel="Remove from playlist" onPress={() => void removeTrack(track.id)} style={styles.removeButton}>
-                  <Text style={styles.removeText}>×</Text>
-                </Pressable>
-              </View>
-            )) : (
+              );
+            }) : (
               <View style={styles.empty}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'هذه القائمة فارغة.' : 'This playlist is empty.'}</Text></View>
             )}
           </View>
@@ -128,8 +170,6 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.md },
   playButton: { minHeight: 42, paddingHorizontal: SPACING.md, borderRadius: RADII.pill, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   playButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontWeight: '800' },
-  downloadButton: { minHeight: 42, paddingHorizontal: SPACING.md, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.goldSoft, alignItems: 'center', justifyContent: 'center' },
-  downloadText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontWeight: '700' },
   trackList: { marginTop: SPACING.lg, borderRadius: RADII.lg, overflow: 'hidden', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   trackWrap: { flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
   trackFlex: { flex: 1 },
