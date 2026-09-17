@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
 
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { downloadManager } from '@/services/downloadManager';
@@ -30,7 +30,11 @@ export default function OfflineDownloadButton({
   label,
   style,
 }: OfflineDownloadButtonProps) {
-  useSyncExternalStore(downloadManager.subscribe, downloadManager.getRevision, downloadManager.getRevision);
+  const revision = useSyncExternalStore(
+    downloadManager.subscribe,
+    downloadManager.getRevision,
+    downloadManager.getRevision,
+  );
   const [progress, setProgress] = useState<OfflineDownloadProgress | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,7 +46,7 @@ export default function OfflineDownloadButton({
     return () => { active = false; };
   }, [packageKey]);
 
-  useEffect(() => refresh(), [refresh, downloadManager.getRevision()]);
+  useEffect(() => refresh(), [refresh, revision]);
 
   const action = useCallback(async () => {
     if (busy) return;
