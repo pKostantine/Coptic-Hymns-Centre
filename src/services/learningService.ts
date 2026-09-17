@@ -1,4 +1,5 @@
 import { mediaService } from '@/services/mediaService';
+import { getOfflineSnapshot } from '@/services/offlineSnapshotStore';
 import type {
   LearningAlbumDetail,
   LearningCantorDetail,
@@ -36,6 +37,21 @@ function assertRpcData<T>(data: T | null, error: RpcError, operation: string): T
     throw new Error(operation + ': no data returned.');
   }
   return data;
+}
+
+async function offlineFallback<T>(
+  operation: () => Promise<T>,
+  entityType: 'learning_album' | 'learning_lesson_set' | 'learning_playlist',
+  entityId: string,
+  locale: string,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (cause) {
+    const offline = await getOfflineSnapshot<T>(entityType, entityId, locale);
+    if (offline) return offline;
+    throw cause;
+  }
 }
 
 async function hasAuthenticatedSession(): Promise<boolean> {
@@ -79,19 +95,23 @@ export async function getLearningHymn(hymnId: string, locale = 'en'): Promise<Le
 }
 
 export async function getLearningAlbum(albumId: string, locale = 'en'): Promise<LearningAlbumDetail> {
-  const { data, error } = await supabase.rpc('get_published_learning_album', {
-    p_album_id: albumId,
-    p_locale: locale,
-  });
-  return assertRpcData(data as LearningAlbumDetail | null, error, 'Load learning album');
+  return offlineFallback(async () => {
+    const { data, error } = await supabase.rpc('get_published_learning_album', {
+      p_album_id: albumId,
+      p_locale: locale,
+    });
+    return assertRpcData(data as LearningAlbumDetail | null, error, 'Load learning album');
+  }, 'learning_album', albumId, locale);
 }
 
 export async function getLearningLessonSet(lessonSetId: string, locale = 'en'): Promise<LearningLessonSetDetail> {
-  const { data, error } = await supabase.rpc('get_published_learning_lesson_set', {
-    p_lesson_set_id: lessonSetId,
-    p_locale: locale,
-  });
-  return assertRpcData(data as LearningLessonSetDetail | null, error, 'Load lesson set');
+  return offlineFallback(async () => {
+    const { data, error } = await supabase.rpc('get_published_learning_lesson_set', {
+      p_lesson_set_id: lessonSetId,
+      p_locale: locale,
+    });
+    return assertRpcData(data as LearningLessonSetDetail | null, error, 'Load lesson set');
+  }, 'learning_lesson_set', lessonSetId, locale);
 }
 
 export async function getLearningLesson(
@@ -132,11 +152,13 @@ export async function getLearningPlaylist(
   playlistId: string,
   locale = 'en',
 ): Promise<LearningPlaylistDetail> {
-  const { data, error } = await supabase.rpc('get_learning_playlist', {
-    p_playlist_id: playlistId,
-    p_locale: locale,
-  });
-  return assertRpcData(data as LearningPlaylistDetail | null, error, 'Load learning playlist');
+  return offlineFallback(async () => {
+    const { data, error } = await supabase.rpc('get_learning_playlist', {
+      p_playlist_id: playlistId,
+      p_locale: locale,
+    });
+    return assertRpcData(data as LearningPlaylistDetail | null, error, 'Load learning playlist');
+  }, 'learning_playlist', playlistId, locale);
 }
 
 export async function createLearningPlaylist(
