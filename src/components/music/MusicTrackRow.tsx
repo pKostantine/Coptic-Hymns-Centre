@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -16,11 +17,13 @@ export default function MusicTrackRow({
   index,
   active = false,
   onPress,
+  trailing,
 }: {
   track: MusicConsumerTrack;
   index: number;
   active?: boolean;
   onPress: () => void;
+  trailing?: ReactNode;
 }) {
   const artist = track.artists.find((item) => item.role === 'primary')?.displayName
     ?? track.artists[0]?.displayName
@@ -36,7 +39,7 @@ export default function MusicTrackRow({
         ) : null}
       </View>
       <Text style={styles.duration}>{formatDuration(track.durationMs)}</Text>
-      <Text style={[styles.play, active && styles.activeText]}>▶</Text>
+      {trailing ?? <Text style={[styles.play, active && styles.activeText]}>▶</Text>}
     </Pressable>
   );
 }
