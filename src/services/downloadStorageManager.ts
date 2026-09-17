@@ -1,23 +1,7 @@
 import { File } from 'expo-file-system';
 
 import { getOfflineDatabase, getPackageFiles, getStoredDownloadRequest, removeOfflinePackage } from '@/services/offlineDatabase';
-import type { OfflineDownloadProgress, OfflineDownloadRequest } from '@/types/offlineDownloads';
-
-export interface DownloadStorageSummary {
-  packageCount: number;
-  completeCount: number;
-  staleCount: number;
-  failedCount: number;
-  totalBytes: number;
-  musicBytes: number;
-  learningBytes: number;
-}
-
-export interface DownloadIntegrityResult {
-  checked: number;
-  invalid: number;
-  repaired: number;
-}
+import type { OfflineDownloadProgress, OfflineDownloadRequest, OfflineIntegrityResult, OfflineStorageSummary } from '@/types/offlineDownloads';
 
 function normalizedChecksum(value: string | null | undefined): { algorithm: 'MD5' | 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512'; digest: string } | null {
   if (!value) return null;
@@ -49,38 +33,26 @@ export async function listDownloads(): Promise<OfflineDownloadProgress[]> {
     title: string; status: OfflineDownloadProgress['status']; progress: number; bytes_written: number; total_bytes: number | null;
     error: string | null; updated_at: string;
   }>('SELECT package_key, domain, entity_type, entity_id, title, status, progress, bytes_written, total_bytes, error, updated_at FROM offline_packages ORDER BY updated_at DESC');
-  return rows.map((row) => ({
-    packageKey: row.package_key, domain: row.domain, entityType: row.entity_type, entityId: row.entity_id, title: row.title,
-    status: row.status, progress: row.progress, bytesWritten: row.bytes_written, totalBytes: row.total_bytes,
-    error: row.error, updatedAt: row.updated_at,
-  }));
+  return rows.map((row) => ({ packageKey: row.package_key, domain: row.domain, entityType: row.entity_type, entityId: row.entity_id, title: row.title,
+    status: row.status, progress: row.progress, bytesWritten: row.bytes_written, totalBytes: row.total_bytes, error: row.error, updatedAt: row.updated_at }));
 }
 
-export async function getDownloadStorageSummary(): Promise<DownloadStorageSummary> {
+export async function getDownloadStorageSummary(): Promise<OfflineStorageSummary> {
   const db = await getOfflineDatabase();
   const packages = await listDownloads();
   const sizes = await db.getAllAsync<{ domain: 'music' | 'learning'; bytes: number }>(
-    `SELECT p.domain, COALESCE(SUM(f.bytes_written), 0) AS bytes
-       FROM offline_files f
-       JOIN offline_package_files pf ON pf.file_key = f.file_key
-       JOIN offline_packages p ON p.package_key = pf.package_key
-      WHERE f.status = 'complete'
-      GROUP BY p.domain`,
+    `SELECT p.domain, COALESCE(SUM(f.bytes_written), 0) AS bytes FROM offline_files f
+       JOIN offline_package_files pf ON pf.file_key = f.file_key JOIN offline_packages p ON p.package_key = pf.package_key
+      WHERE f.status = 'complete' GROUP BY p.domain`,
   );
   const musicBytes = sizes.find((row) => row.domain === 'music')?.bytes ?? 0;
   const learningBytes = sizes.find((row) => row.domain === 'learning')?.bytes ?? 0;
-  return {
-    packageCount: packages.length,
-    completeCount: packages.filter((item) => item.status === 'complete').length,
-    staleCount: 0,
+  return { packageCount: packages.length, completeCount: packages.filter((item) => item.status === 'complete').length,
     failedCount: packages.filter((item) => item.status === 'failed' || item.status === 'cancelled').length,
-    totalBytes: musicBytes + learningBytes,
-    musicBytes,
-    learningBytes,
-  };
+    totalBytes: musicBytes + learningBytes, musicBytes, learningBytes };
 }
 
-export async function validateDownloadedFiles(): Promise<DownloadIntegrityResult> {
+export async function validateDownloadedFiles(): Promise<OfflineIntegrityResult> {
   const db = await getOfflineDatabase();
   const rows = await db.getAllAsync<{ file_key: string; local_uri: string | null; checksum: string | null; file_size_bytes: number | null }>(
     `SELECT file_key, local_uri, checksum, file_size_bytes FROM offline_files WHERE status = 'complete'`,
@@ -98,30 +70,21 @@ export async function validateDownloadedFiles(): Promise<DownloadIntegrityResult
     } catch { valid = false; }
     if (!valid) {
       invalid += 1;
-      await db.runAsync(
-        `UPDATE offline_files SET status = 'failed', local_uri = NULL, bytes_written = 0, resume_json = NULL,
-          error = 'Downloaded file failed integrity validation.', updated_at = ? WHERE file_key = ?`,
-        new Date().toISOString(), row.file_key,
-      );
-      await db.runAsync(
-        `UPDATE offline_packages SET status = 'failed', error = 'One or more downloaded files need to be downloaded again.', updated_at = ?
-          WHERE package_key IN (SELECT package_key FROM offline_package_files WHERE file_key = ?)`,
-        new Date().toISOString(), row.file_key,
-      );
+      const now = new Date().toISOString();
+      await db.runAsync(`UPDATE offline_files SET status = 'failed', local_uri = NULL, bytes_written = 0, resume_json = NULL,
+        error = 'Downloaded file failed integrity validation.', updated_at = ? WHERE file_key = ?`, now, row.file_key);
+      await db.runAsync(`UPDATE offline_packages SET status = 'failed', error = 'One or more downloaded files need to be downloaded again.', updated_at = ?
+        WHERE package_key IN (SELECT package_key FROM offline_package_files WHERE file_key = ?)`, now, row.file_key);
     }
   }
-  return { checked: rows.length, invalid, repaired: 0 };
+  return { checked: rows.length, invalid };
 }
 
 export async function cleanupIncompleteDownloads(): Promise<number> {
   const db = await getOfflineDatabase();
-  const rows = await db.getAllAsync<{ file_key: string; local_uri: string | null }>(
-    `SELECT file_key, local_uri FROM offline_files WHERE status IN ('failed', 'cancelled')`,
-  );
+  const rows = await db.getAllAsync<{ file_key: string; local_uri: string | null }>(`SELECT file_key, local_uri FROM offline_files WHERE status IN ('failed', 'cancelled')`);
   for (const row of rows) {
-    if (row.local_uri) {
-      try { const file = new File(row.local_uri); if (file.exists) file.delete(); } catch { /* database cleanup remains authoritative */ }
-    }
+    if (row.local_uri) { try { const file = new File(row.local_uri); if (file.exists) file.delete(); } catch { /* database cleanup remains authoritative */ } }
     await db.runAsync('UPDATE offline_files SET local_uri = NULL, bytes_written = 0, total_bytes = file_size_bytes, resume_json = NULL WHERE file_key = ?', row.file_key);
   }
   return rows.length;
