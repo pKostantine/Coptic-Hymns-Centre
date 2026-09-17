@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
@@ -14,7 +15,11 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
-import type { MusicLibraryPayload } from '@/types/musicConsumer';
+import {
+  musicLikedSongsDownloadRequest,
+  musicTrackDownloadRequest,
+} from '@/services/offlineDownloadRequests';
+import type { MusicLibraryPayload, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 
 export default function MusicLibraryScreen() {
   const router = useRouter();
@@ -27,6 +32,10 @@ export default function MusicLibraryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [creating, setCreating] = useState(false);
+  const likedDownload = useMemo(
+    () => library?.authenticated ? musicLikedSongsDownloadRequest(library, locale) : null,
+    [library, locale],
+  );
 
   const loadLibrary = useCallback(async () => {
     setLoading(true);
@@ -64,6 +73,19 @@ export default function MusicLibraryScreen() {
     playQueue(library.likedTracks.map((track) => ({ track, releaseId: track.releaseId })), startIndex);
   };
 
+  const prepareLikedDownload = async () => {
+    if (!library) throw new Error('Music library is not loaded.');
+    const lyrics = await Promise.all(library.likedTracks.map(async (track) => {
+      try { return [track.id, await musicService.getLyrics(track.id, locale)] as const; }
+      catch { return [track.id, null] as const; }
+    }));
+    return musicLikedSongsDownloadRequest(
+      library,
+      locale,
+      Object.fromEntries(lyrics) as Record<string, PublishedTrackLyricsPayload | null>,
+    );
+  };
+
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{isArabic ? 'مكتبتي — كوبتك هيمنز سنتر' : 'Your Library — Coptic Hymns Centre'}</title></Head>
@@ -98,23 +120,49 @@ export default function MusicLibraryScreen() {
                 </Text>
               </View>
               {library.likedTracks.length ? (
-                <Pressable style={styles.playAll} onPress={() => playLiked(0)}>
-                  <Text style={styles.playAllText}>▶ {isArabic ? 'تشغيل' : 'Play'}</Text>
-                </Pressable>
+                <View style={styles.likedActions}>
+                  <Pressable style={styles.playAll} onPress={() => playLiked(0)}>
+                    <Text style={styles.playAllText}>▶ {isArabic ? 'تشغيل' : 'Play'}</Text>
+                  </Pressable>
+                  {likedDownload ? (
+                    <MusicDownloadButton
+                      packageKey={likedDownload.packageKey}
+                      request={prepareLikedDownload}
+                      isArabic={isArabic}
+                      compact
+                    />
+                  ) : null}
+                </View>
               ) : null}
             </View>
 
             {library.likedTracks.length ? (
               <View style={styles.trackList}>
-                {library.likedTracks.map((track, index) => (
-                  <MusicTrackRow
-                    key={track.id}
-                    track={track}
-                    index={index}
-                    active={currentItem?.track.id === track.id}
-                    onPress={() => playLiked(index)}
-                  />
-                ))}
+                {library.likedTracks.map((track, index) => {
+                  const trackDownload = musicTrackDownloadRequest({ track, locale });
+                  return (
+                    <MusicTrackRow
+                      key={track.id}
+                      track={track}
+                      index={index}
+                      active={currentItem?.track.id === track.id}
+                      onPress={() => playLiked(index)}
+                      trailing={(
+                        <MusicDownloadButton
+                          packageKey={trackDownload.packageKey}
+                          request={async () => {
+                            let lyrics: PublishedTrackLyricsPayload | null = null;
+                            try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
+                            return musicTrackDownloadRequest({ track, locale, lyrics });
+                          }}
+                          isArabic={isArabic}
+                          compact
+                          label=""
+                        />
+                      )}
+                    />
+                  );
+                })}
               </View>
             ) : (
               <EmptyCard text={isArabic ? 'ضع علامة إعجاب على ترنيمة لتظهر هنا.' : 'Like a track and it will appear here.'} />
@@ -186,6 +234,7 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.md, marginTop: SPACING.sm },
   sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
   sectionMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
+  likedActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   playAll: { minHeight: 40, paddingHorizontal: SPACING.md, borderRadius: RADII.pill, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
   trackList: { borderRadius: RADII.lg, overflow: 'hidden', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
