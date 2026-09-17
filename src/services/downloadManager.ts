@@ -99,6 +99,12 @@ class NativeDownloadManager implements OfflineDownloadManager {
     for (const listener of this.listeners) listener();
   }
 
+  private async waitForWorker(packageKey: string): Promise<void> {
+    const worker = this.packageWorkers.get(packageKey);
+    if (!worker) return;
+    try { await worker; } catch { /* the worker persists its own failure state */ }
+  }
+
   async enqueue(request: OfflineDownloadRequest): Promise<void> {
     await saveDownloadRequest(request);
     const current = await getDownloadProgress(request.packageKey);
@@ -129,6 +135,7 @@ class NativeDownloadManager implements OfflineDownloadManager {
   async resume(packageKey: string): Promise<void> {
     const request = await getStoredDownloadRequest(packageKey);
     if (!request) throw new Error('This download is no longer available to resume.');
+    await this.waitForWorker(packageKey);
     await setPackageState(packageKey, 'queued');
     this.emit();
     this.startWorker(packageKey);
@@ -148,6 +155,7 @@ class NativeDownloadManager implements OfflineDownloadManager {
   async retry(packageKey: string): Promise<void> {
     const request = await getStoredDownloadRequest(packageKey);
     if (!request) throw new Error('This download is no longer available to retry.');
+    await this.waitForWorker(packageKey);
     const files = await getPackageFiles(packageKey);
     for (const file of files) {
       if (file.status === 'failed' || file.status === 'cancelled') {
@@ -162,6 +170,7 @@ class NativeDownloadManager implements OfflineDownloadManager {
   async remove(packageKey: string): Promise<void> {
     const active = this.activeTransfers.get(packageKey);
     if (active) active.task.cancel();
+    await this.waitForWorker(packageKey);
     const orphanedFiles = await removeOfflinePackage(packageKey);
     for (const row of orphanedFiles) {
       if (!row.local_uri) continue;
@@ -269,6 +278,9 @@ class NativeDownloadManager implements OfflineDownloadManager {
         const state = JSON.parse(row.resume_json) as DownloadPauseState;
         task = DownloadTask.fromSavable(state, { onProgress, headers: resource.headers ?? undefined });
       } catch {
+        if (destination.exists) {
+          try { destination.delete(); } catch { /* the new task reports a useful error below */ }
+        }
         task = File.createDownloadTask(resource.remoteUri, destination, {
           headers: resource.headers ?? undefined,
           onProgress,
@@ -320,7 +332,9 @@ class NativeDownloadManager implements OfflineDownloadManager {
       throw cause;
     } finally {
       this.activeTransfers.delete(packageKey);
-      try { task.release(); } catch { /* task already released by native runtime */ }
+      if (task.state !== 'paused') {
+        try { task.release(); } catch { /* task already released by native runtime */ }
+      }
     }
   }
 }
