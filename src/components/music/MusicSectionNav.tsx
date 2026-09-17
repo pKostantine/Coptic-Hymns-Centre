@@ -7,9 +7,9 @@ export type MusicSection = 'home' | 'search' | 'library';
 
 export default function MusicSectionNav({ active }: { active: MusicSection }) {
   const router = useRouter();
-  const items: Array<{ id: MusicSection; label: string; route: '/music' | '/music/search' | '/music/library' }> = [
+  const items: { id: MusicSection; label: string; route: '/music' | '/search?scope=music' | '/music/library' }[] = [
     { id: 'home', label: 'Home', route: '/music' },
-    { id: 'search', label: 'Search', route: '/music/search' },
+    { id: 'search', label: 'Search', route: '/search?scope=music' },
     { id: 'library', label: 'Library', route: '/music/library' },
   ];
 

@@ -45,6 +45,7 @@ function AppStack() {
       <Stack.Screen name="index" options={{ animation: 'none' }} />
       <Stack.Screen name="music" options={{ animation: 'none' }} />
       <Stack.Screen name="learn" options={{ animation: 'none' }} />
+      <Stack.Screen name="search" options={{ animation: 'none' }} />
       <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
     </Stack>
   );

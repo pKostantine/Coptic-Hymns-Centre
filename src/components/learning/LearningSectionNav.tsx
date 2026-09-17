@@ -13,10 +13,10 @@ export default function LearningSectionNav({ active }: { active: LearningSection
   const items: {
     id: LearningSection;
     label: string;
-    route: '/learn' | '/learn/search' | '/learn/library';
+    route: '/learn' | '/search?scope=learning' | '/learn/library';
   }[] = [
     { id: 'home', label: isArabic ? 'الرئيسية' : 'Discover', route: '/learn' },
-    { id: 'search', label: isArabic ? 'بحث' : 'Search', route: '/learn/search' },
+    { id: 'search', label: isArabic ? 'بحث' : 'Search', route: '/search?scope=learning' },
     { id: 'library', label: isArabic ? 'تعلّمي' : 'My Learning', route: '/learn/library' },
   ];
 
