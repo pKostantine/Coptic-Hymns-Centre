@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react';
 
+import { downloadManager } from '@/services/downloadManager';
 import type { PlaybackQueueEntry, PlaybackRepeatMode, PlaybackSnapshot } from '@/types/playback';
 import {
   choosePlaybackUri,
@@ -57,7 +58,13 @@ async function resolveEntryUri(entry: PlaybackQueueEntry): Promise<string | null
   const localUri = entry.playable.source.localUri?.trim() || null;
   const remoteUri = entry.playable.source.remoteUri?.trim() || null;
   const localAvailable = localUri ? await localPlaybackUriExists(localUri) : false;
-  return choosePlaybackUri(localUri, remoteUri, localAvailable);
+  if (localAvailable) return choosePlaybackUri(localUri, remoteUri, true);
+
+  return downloadManager.resolvePlaybackUri(
+    entry.playable.kind,
+    entry.playable.id,
+    remoteUri,
+  );
 }
 
 export function PlaybackProvider({ children }: { children: ReactNode }) {
