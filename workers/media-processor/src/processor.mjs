@@ -314,6 +314,23 @@ async function transcodeToM4a(inputPath, outputPath) {
   ]);
 }
 
+async function remuxAacToM4a(inputPath, outputPath) {
+  await spawnChecked(ffmpegPath, [
+    '-y',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-i',
+    inputPath,
+    '-vn',
+    '-c:a',
+    'copy',
+    '-movflags',
+    '+faststart',
+    outputPath,
+  ]);
+}
+
 async function transcodeToMp4(inputPath, outputPath) {
   await spawnChecked(ffmpegPath, [
     '-y',
@@ -373,7 +390,17 @@ export async function handleAudioDelivery(inputPath, jobDir) {
   const inputProbe = await probeMedia(inputPath);
 
   assertAudioInput(inputProbe);
-  await transcodeToM4a(inputPath, outputPath);
+  const inputAudio = inputProbe.streams?.find((stream) => stream.codec_type === 'audio');
+  const canStreamCopy = inputAudio?.codec_name === 'aac';
+
+  // CHC Artists commonly uploads M4A/AAC. Re-encoding that audio wastes time
+  // and quality for no benefit, so compatible AAC is only remuxed with
+  // +faststart. This is normally several times faster than real-time.
+  if (canStreamCopy) {
+    await remuxAacToM4a(inputPath, outputPath);
+  } else {
+    await transcodeToM4a(inputPath, outputPath);
+  }
 
   const outputProbe = await probeMedia(outputPath);
   assertM4aOutput(outputProbe);
@@ -384,11 +411,18 @@ export async function handleAudioDelivery(inputPath, jobDir) {
     probe: {
       input: inputProbe,
       output: outputProbe,
-      transcode: {
-        audioCodec: 'aac',
-        targetBitrate: AUDIO_BITRATE,
-        container: 'm4a',
-      },
+      transcode: canStreamCopy
+        ? {
+            audioCodec: 'aac',
+            mode: 'stream_copy',
+            container: 'm4a',
+          }
+        : {
+            audioCodec: 'aac',
+            mode: 'encode',
+            targetBitrate: AUDIO_BITRATE,
+            container: 'm4a',
+          },
     },
   };
 }
