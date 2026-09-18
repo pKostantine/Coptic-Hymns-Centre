@@ -15,7 +15,7 @@ Job types it handles:
 
 | Job type         | Source | Output             | Delivery bucket |
 | ---------------- | ------ | ------------------ | --------------- |
-| `audio_delivery` | audio  | AAC-LC M4A `256k`  | `chc-music` / `chc-learning` |
+| `audio_delivery` | audio  | AAC-LC M4A; existing AAC is fast-remuxed, other codecs encode at `256k` | `chc-music` / `chc-learning` |
 | `video_delivery` | video  | H.264 MP4, ≤1080p  | `chc-learning`  |
 | `image_delivery` | image  | JPEG, ≤3000px edge | `chc-images`    |
 
@@ -44,7 +44,7 @@ Local workspace fallback:
 Optional:
 
 - `MEDIA_WORKER_ID` — identifies this worker on claimed jobs (default `media-processor-<pid>`)
-- `MEDIA_POLL_INTERVAL_MS` — idle poll interval, default `15000`
+- `MEDIA_POLL_INTERVAL_MS` — idle poll interval, default `1000`
 - `MEDIA_ERROR_BACKOFF_MS` / `MEDIA_MAX_ERROR_BACKOFF_MS` — backoff when Supabase is unreachable, default `5000` / `300000`
 - `MEDIA_WORK_DIR` — scratch directory, default the OS temp dir
 - `MEDIA_KEEP_WORK_DIR=1` — keep the per-job scratch directory for debugging
