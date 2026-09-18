@@ -13,6 +13,21 @@ interface R2Bucket {
   delete(key: string): Promise<void>;
   get(key: string, options?: R2GetOptions): Promise<R2ObjectBody | R2Object | null>;
   head(key: string): Promise<R2Object | null>;
+  createMultipartUpload(key: string, options?: R2PutOptions): Promise<R2MultipartUpload>;
+  resumeMultipartUpload(key: string, uploadId: string): R2MultipartUpload;
+}
+
+interface R2UploadedPart {
+  partNumber: number;
+  etag: string;
+}
+
+interface R2MultipartUpload {
+  key: string;
+  uploadId: string;
+  uploadPart(partNumber: number, value: R2PutValue): Promise<R2UploadedPart>;
+  complete(parts: R2UploadedPart[]): Promise<R2Object>;
+  abort(): Promise<void>;
 }
 
 type R2PutValue = ReadableStream | ArrayBuffer | ArrayBufferView | string | null;
@@ -92,6 +107,21 @@ interface SupabaseErrorBody {
   hint?: string;
 }
 
+interface MultipartRoute {
+  uploadIntentId: string;
+  uploadId?: string;
+  partNumber?: number;
+  action: 'create' | 'part' | 'complete' | 'abort';
+}
+
+interface CompleteMultipartBody {
+  parts: R2UploadedPart[];
+}
+
+const RECOMMENDED_MULTIPART_PART_BYTES = 32 * 1024 * 1024;
+const MAX_MULTIPART_PART_BYTES = 64 * 1024 * 1024;
+const MAX_MULTIPART_PARTS = 10_000;
+
 class HttpError extends Error {
   constructor(
     public readonly status: number,
@@ -109,7 +139,7 @@ const CONTENT_TYPE_PATTERN = /^(audio|video|image)\/[a-z0-9.+-]+$/i;
 function corsHeaders(env: Env): Headers {
   return new Headers({
     'access-control-allow-origin': env.CORS_ALLOWED_ORIGIN ?? '*',
-    'access-control-allow-methods': 'GET, HEAD, POST, PUT, OPTIONS',
+    'access-control-allow-methods': 'GET, HEAD, POST, PUT, DELETE, OPTIONS',
     'access-control-allow-headers': 'Authorization, Content-Type, Content-Length, Range',
     'access-control-expose-headers': 'Accept-Ranges, Content-Length, Content-Range, Content-Type, ETag',
     'access-control-max-age': '86400',
@@ -328,6 +358,196 @@ async function handleAuthorize(request: Request, env: Env): Promise<Response> {
   );
 }
 
+async function getActiveUploadIntent(
+  env: Env,
+  bearerToken: string,
+  uploadIntentId: string,
+): Promise<SupabaseUploadIntentRow> {
+  const rows = await callSupabaseRpc<SupabaseUploadIntentRow>(
+    env,
+    bearerToken,
+    'get_media_upload_intent_for_upload',
+    { p_upload_intent_id: uploadIntentId },
+  );
+
+  const intent = rows[0];
+  if (!intent) {
+    throw new HttpError(404, 'upload_intent_not_found', 'The upload intent is not active or available to this user.');
+  }
+
+  return intent;
+}
+
+function parseMultipartRoute(pathname: string): MultipartRoute | null {
+  const create = pathname.match(/^\/uploads\/([0-9a-f-]+)\/multipart$/i);
+  if (create?.[1] && UUID_PATTERN.test(create[1])) {
+    return { uploadIntentId: create[1], action: 'create' };
+  }
+
+  const complete = pathname.match(/^\/uploads\/([0-9a-f-]+)\/multipart\/([^/]+)\/complete$/i);
+  if (complete?.[1] && complete?.[2] && UUID_PATTERN.test(complete[1])) {
+    return {
+      uploadIntentId: complete[1],
+      uploadId: decodeURIComponent(complete[2]),
+      action: 'complete',
+    };
+  }
+
+  const part = pathname.match(/^\/uploads\/([0-9a-f-]+)\/multipart\/([^/]+)\/parts\/(\d+)$/i);
+  if (part?.[1] && part?.[2] && part?.[3] && UUID_PATTERN.test(part[1])) {
+    const partNumber = Number(part[3]);
+    if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > MAX_MULTIPART_PARTS) {
+      throw new HttpError(400, 'invalid_part_number', 'Multipart part number is invalid.');
+    }
+    return {
+      uploadIntentId: part[1],
+      uploadId: decodeURIComponent(part[2]),
+      partNumber,
+      action: 'part',
+    };
+  }
+
+  const abort = pathname.match(/^\/uploads\/([0-9a-f-]+)\/multipart\/([^/]+)$/i);
+  if (abort?.[1] && abort?.[2] && UUID_PATTERN.test(abort[1])) {
+    return {
+      uploadIntentId: abort[1],
+      uploadId: decodeURIComponent(abort[2]),
+      action: 'abort',
+    };
+  }
+
+  return null;
+}
+
+async function handleMultipartCreate(request: Request, env: Env, route: MultipartRoute): Promise<Response> {
+  const bearerToken = requireBearerToken(request);
+  const intent = await getActiveUploadIntent(env, bearerToken, route.uploadIntentId);
+
+  const multipart = await env.CHC_SUBMISSIONS.createMultipartUpload(intent.object_path, {
+    httpMetadata: { contentType: intent.content_type },
+    customMetadata: {
+      uploadIntentId: intent.upload_intent_id,
+      creatorAccountId: intent.creator_account_id ?? '',
+      uploadedAt: new Date().toISOString(),
+    },
+  });
+
+  return json({
+    uploadIntentId: intent.upload_intent_id,
+    uploadId: multipart.uploadId,
+    partSize: RECOMMENDED_MULTIPART_PART_BYTES,
+    maxPartSize: MAX_MULTIPART_PART_BYTES,
+    maxParallel: 4,
+  }, env);
+}
+
+async function handleMultipartPart(request: Request, env: Env, route: MultipartRoute): Promise<Response> {
+  const bearerToken = requireBearerToken(request);
+  const intent = await getActiveUploadIntent(env, bearerToken, route.uploadIntentId);
+  const contentLength = Number(request.headers.get('content-length'));
+
+  if (!request.body) {
+    throw new HttpError(400, 'empty_part', 'Multipart part body is required.');
+  }
+
+  if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
+    throw new HttpError(411, 'content_length_required', 'Content-Length is required for multipart parts.');
+  }
+
+  if (contentLength > MAX_MULTIPART_PART_BYTES) {
+    throw new HttpError(413, 'multipart_part_too_large', 'Multipart part exceeds the CHC part-size limit.');
+  }
+
+  const multipart = env.CHC_SUBMISSIONS.resumeMultipartUpload(intent.object_path, route.uploadId!);
+  const uploaded = await multipart.uploadPart(route.partNumber!, request.body);
+
+  return json({
+    partNumber: uploaded.partNumber,
+    etag: uploaded.etag,
+  }, env);
+}
+
+function parseCompleteMultipartBody(body: Record<string, unknown>): CompleteMultipartBody {
+  if (!Array.isArray(body.parts) || !body.parts.length || body.parts.length > MAX_MULTIPART_PARTS) {
+    throw new HttpError(400, 'invalid_parts', 'Multipart completion requires a non-empty parts list.');
+  }
+
+  const parts = body.parts.map((value) => {
+    if (!value || typeof value !== 'object') {
+      throw new HttpError(400, 'invalid_parts', 'Multipart completion contains an invalid part.');
+    }
+
+    const record = value as Record<string, unknown>;
+    const partNumber = Number(record.partNumber);
+    const etag = typeof record.etag === 'string' ? record.etag : '';
+
+    if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > MAX_MULTIPART_PARTS || !etag) {
+      throw new HttpError(400, 'invalid_parts', 'Multipart completion contains an invalid part.');
+    }
+
+    return { partNumber, etag };
+  });
+
+  parts.sort((a, b) => a.partNumber - b.partNumber);
+  for (let index = 0; index < parts.length; index += 1) {
+    if (parts[index].partNumber !== index + 1) {
+      throw new HttpError(400, 'invalid_parts', 'Multipart parts must be complete and sequential.');
+    }
+  }
+
+  return { parts };
+}
+
+async function handleMultipartComplete(request: Request, env: Env, route: MultipartRoute): Promise<Response> {
+  const bearerToken = requireBearerToken(request);
+  const intent = await getActiveUploadIntent(env, bearerToken, route.uploadIntentId);
+  const body = parseCompleteMultipartBody(await readJsonObject(request));
+  const multipart = env.CHC_SUBMISSIONS.resumeMultipartUpload(intent.object_path, route.uploadId!);
+  const object = await multipart.complete(body.parts);
+
+  if (object.size !== Number(intent.content_length)) {
+    await env.CHC_SUBMISSIONS.delete(intent.object_path).catch(() => undefined);
+    throw new HttpError(400, 'content_length_mismatch', 'Multipart upload size does not match the authorized upload.');
+  }
+
+  try {
+    const completedRows = await callSupabaseRpc<SupabaseCompletedUploadRow>(
+      env,
+      bearerToken,
+      'complete_media_upload_intent',
+      {
+        p_upload_intent_id: intent.upload_intent_id,
+        p_uploaded_size: object.size,
+        p_r2_http_etag: object.httpEtag ?? object.etag ?? '',
+      },
+    );
+
+    const completed = completedRows[0];
+    if (!completed) {
+      throw new HttpError(502, 'completion_failed', 'The upload was stored but could not be finalized.');
+    }
+
+    return json({
+      uploadIntentId: completed.upload_intent_id,
+      status: completed.status,
+      bucket: completed.bucket,
+      objectPath: completed.object_path,
+      uploadedAt: completed.uploaded_at,
+    }, env);
+  } catch (error) {
+    await env.CHC_SUBMISSIONS.delete(intent.object_path).catch(() => undefined);
+    throw error;
+  }
+}
+
+async function handleMultipartAbort(request: Request, env: Env, route: MultipartRoute): Promise<Response> {
+  const bearerToken = requireBearerToken(request);
+  const intent = await getActiveUploadIntent(env, bearerToken, route.uploadIntentId);
+  const multipart = env.CHC_SUBMISSIONS.resumeMultipartUpload(intent.object_path, route.uploadId!);
+  await multipart.abort();
+  return json({ aborted: true }, env);
+}
+
 async function handleUpload(request: Request, env: Env, uploadIntentId: string): Promise<Response> {
   const bearerToken = requireBearerToken(request);
   const requestContentLength = Number(request.headers.get('content-length'));
@@ -345,15 +565,7 @@ async function handleUpload(request: Request, env: Env, uploadIntentId: string):
     throw new HttpError(413, 'upload_too_large', 'The upload exceeds the maximum allowed size.');
   }
 
-  const rows = await callSupabaseRpc<SupabaseUploadIntentRow>(env, bearerToken, 'get_media_upload_intent_for_upload', {
-    p_upload_intent_id: uploadIntentId,
-  });
-
-  const intent = rows[0];
-
-  if (!intent) {
-    throw new HttpError(404, 'upload_intent_not_found', 'The upload intent is not active or available to this user.');
-  }
+  const intent = await getActiveUploadIntent(env, bearerToken, uploadIntentId);
 
   if (requestContentLength !== Number(intent.content_length)) {
     throw new HttpError(400, 'content_length_mismatch', 'Content-Length does not match the authorized upload.');
@@ -525,6 +737,35 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
     return handleAuthorize(request, env);
+  }
+
+  const multipartRoute = parseMultipartRoute(url.pathname);
+  if (multipartRoute) {
+    if (multipartRoute.action === 'create') {
+      if (request.method !== 'POST') {
+        return json({ error: 'method_not_allowed' }, env, { status: 405, headers: { allow: 'POST, OPTIONS' } });
+      }
+      return handleMultipartCreate(request, env, multipartRoute);
+    }
+
+    if (multipartRoute.action === 'part') {
+      if (request.method !== 'PUT') {
+        return json({ error: 'method_not_allowed' }, env, { status: 405, headers: { allow: 'PUT, OPTIONS' } });
+      }
+      return handleMultipartPart(request, env, multipartRoute);
+    }
+
+    if (multipartRoute.action === 'complete') {
+      if (request.method !== 'POST') {
+        return json({ error: 'method_not_allowed' }, env, { status: 405, headers: { allow: 'POST, OPTIONS' } });
+      }
+      return handleMultipartComplete(request, env, multipartRoute);
+    }
+
+    if (request.method !== 'DELETE') {
+      return json({ error: 'method_not_allowed' }, env, { status: 405, headers: { allow: 'DELETE, OPTIONS' } });
+    }
+    return handleMultipartAbort(request, env, multipartRoute);
   }
 
   const adminPreviewItemId = parseAdminPreviewItemId(url.pathname);
