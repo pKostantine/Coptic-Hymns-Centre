@@ -10,9 +10,12 @@ interface Env {
 
 interface R2Bucket {
   put(key: string, value: R2PutValue, options?: R2PutOptions): Promise<R2Object>;
-  get(key: string, options?: R2GetOptions): Promise<R2ObjectBody | R2Object | null>;
   delete(key: string): Promise<void>;
+  get(key: string, options?: R2GetOptions): Promise<R2ObjectBody | R2Object | null>;
+  head(key: string): Promise<R2Object | null>;
 }
+
+type R2PutValue = ReadableStream | ArrayBuffer | ArrayBufferView | string | null;
 
 interface R2GetOptions {
   range?: Headers;
@@ -23,15 +26,6 @@ interface R2Range {
   length?: number;
   suffix?: number;
 }
-
-interface R2ObjectBody extends R2Object {
-  body: ReadableStream;
-  range?: R2Range;
-  size: number;
-  writeHttpMetadata(headers: Headers): void;
-}
-
-type R2PutValue = ReadableStream | ArrayBuffer | ArrayBufferView | string | null;
 
 interface R2PutOptions {
   httpMetadata?: {
@@ -46,7 +40,10 @@ interface R2Object {
   httpEtag?: string;
   etag?: string;
   range?: R2Range;
-  writeHttpMetadata?(headers: Headers): void;
+}
+
+interface R2ObjectBody extends R2Object {
+  body: ReadableStream;
 }
 
 interface AuthorizeUploadBody {
@@ -78,7 +75,7 @@ interface SupabaseCompletedUploadRow {
   uploaded_at: string;
 }
 
-interface SupabaseAdminPreviewRow {
+interface AdminPreviewItemRow {
   item_id: string;
   submission_id: string;
   bucket: 'chc-submissions';
@@ -112,9 +109,9 @@ const CONTENT_TYPE_PATTERN = /^(audio|video|image)\/[a-z0-9.+-]+$/i;
 function corsHeaders(env: Env): Headers {
   return new Headers({
     'access-control-allow-origin': env.CORS_ALLOWED_ORIGIN ?? '*',
-    'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+    'access-control-allow-methods': 'GET, HEAD, POST, PUT, OPTIONS',
     'access-control-allow-headers': 'Authorization, Content-Type, Content-Length, Range',
-    'access-control-expose-headers': 'ETag, Accept-Ranges, Content-Length, Content-Range, Content-Type',
+    'access-control-expose-headers': 'Accept-Ranges, Content-Length, Content-Range, Content-Type, ETag',
     'access-control-max-age': '86400',
   });
 }
@@ -409,18 +406,43 @@ async function handleUpload(request: Request, env: Env, uploadIntentId: string):
   }
 }
 
-/**
- * Streams the creator's original upload back to a reviewer.
- *
- * chc-submissions is private and has no public route, so review previews come
- * through here. Authorization is not decided in the Worker: the admin's own JWT
- * is passed to get_admin_submission_preview_item, which is SECURITY DEFINER and
- * refuses anyone without the admin role. A non-admin simply gets no row.
- */
+
+function getRangeContentLength(object: R2Object): number {
+  if (!object.range) return object.size;
+  if (typeof object.range.length === 'number') return object.range.length;
+  if (typeof object.range.suffix === 'number') return Math.min(object.range.suffix, object.size);
+  if (typeof object.range.offset === 'number') return Math.max(object.size - object.range.offset, 0);
+  return object.size;
+}
+
+function getContentRange(object: R2Object): string | null {
+  if (!object.range) return null;
+
+  const length = getRangeContentLength(object);
+  const offset =
+    typeof object.range.offset === 'number'
+      ? object.range.offset
+      : Math.max(object.size - length, 0);
+
+  if (length === 0) return `bytes */${object.size}`;
+
+  const end = Math.min(offset + length - 1, object.size - 1);
+  return `bytes ${offset}-${end}/${object.size}`;
+}
+
+function parseAdminPreviewItemId(pathname: string): string | null {
+  const match = pathname.match(/^\/admin\/submission-items\/([0-9a-f-]+)\/preview$/i);
+  const itemId = match?.[1];
+  return itemId && UUID_PATTERN.test(itemId) ? itemId : null;
+}
+
+function safeInlineFilename(filename: string): string {
+  return filename.replace(/[\r\n"]/g, '_').slice(0, 180) || 'preview';
+}
+
 async function handleAdminPreview(request: Request, env: Env, itemId: string): Promise<Response> {
   const bearerToken = requireBearerToken(request);
-
-  const rows = await callSupabaseRpc<SupabaseAdminPreviewRow>(
+  const rows = await callSupabaseRpc<AdminPreviewItemRow>(
     env,
     bearerToken,
     'get_admin_submission_preview_item',
@@ -428,76 +450,51 @@ async function handleAdminPreview(request: Request, env: Env, itemId: string): P
   );
 
   const item = rows[0];
-
   if (!item) {
-    throw new HttpError(404, 'preview_not_found', 'No uploaded file is available to preview for this item.');
+    throw new HttpError(404, 'preview_item_not_found', 'Submission item is not available for preview.');
   }
 
-  const rangeHeader = request.headers.get('range');
-  const object = await env.CHC_SUBMISSIONS.get(
-    item.object_path,
-    rangeHeader ? { range: request.headers } : undefined,
-  );
-
-  if (!object) {
-    throw new HttpError(404, 'object_missing', 'The stored file for this item is no longer in the bucket.');
+  if (item.bucket !== 'chc-submissions') {
+    throw new HttpError(409, 'unsupported_preview_bucket', 'This submission item is not stored in the private submissions bucket.');
   }
 
   const headers = withCors(new Headers(), env);
-  object.writeHttpMetadata?.(headers);
-
-  if (!headers.has('content-type')) {
-    headers.set('content-type', item.content_type);
-  }
-
+  headers.set('content-type', item.content_type);
   headers.set('accept-ranges', 'bytes');
-  headers.set('x-content-type-options', 'nosniff');
-  // An unpublished submission must never be cached by a shared cache.
   headers.set('cache-control', 'private, no-store');
+  // This route streams bytes a creator uploaded. Without nosniff a file stored
+  // as audio but sniffed as HTML would execute in the Worker's own origin.
+  headers.set('x-content-type-options', 'nosniff');
+  // The quoted form cannot carry a Coptic or Arabic filename; filename* can, and
+  // browsers that do not understand it fall back to the quoted one.
   headers.set(
     'content-disposition',
-    `inline; filename*=UTF-8''${encodeURIComponent(item.original_filename)}`,
+    `inline; filename="${safeInlineFilename(item.original_filename)}"; `
+      + `filename*=UTF-8''${encodeURIComponent(item.original_filename)}`,
   );
 
-  if (object.httpEtag) {
-    headers.set('etag', object.httpEtag);
+  if (request.method === 'HEAD') {
+    const object = await env.CHC_SUBMISSIONS.head(item.object_path);
+    if (!object) throw new HttpError(404, 'preview_object_not_found', 'The uploaded file could not be found.');
+
+    if (object.httpEtag || object.etag) headers.set('etag', object.httpEtag ?? object.etag ?? '');
+    headers.set('content-length', String(object.size));
+    return new Response(null, { headers });
   }
 
-  const body = 'body' in object ? object.body : null;
+  const object = await env.CHC_SUBMISSIONS.get(item.object_path, { range: request.headers });
+  if (!object) throw new HttpError(404, 'preview_object_not_found', 'The uploaded file could not be found.');
+  if (object.httpEtag || object.etag) headers.set('etag', object.httpEtag ?? object.etag ?? '');
 
-  if (request.method === 'HEAD' || !body) {
-    headers.set('content-length', String(item.content_length));
-    return new Response(null, { status: 200, headers });
+  const contentRange = getContentRange(object);
+  headers.set('content-length', String(getRangeContentLength(object)));
+  if (contentRange) headers.set('content-range', contentRange);
+
+  if (!('body' in object) || !object.body) {
+    return new Response(null, { status: 304, headers });
   }
 
-  // Seeking in a long audio file depends on honouring Range.
-  if (object.range) {
-    const offset = object.range.offset ?? 0;
-    const length = object.range.length
-      ?? (object.range.suffix !== undefined ? object.range.suffix : object.size - offset);
-    const start = object.range.suffix !== undefined ? object.size - object.range.suffix : offset;
-    const end = start + length - 1;
-
-    headers.set('content-range', `bytes ${start}-${end}/${object.size}`);
-    headers.set('content-length', String(length));
-
-    return new Response(body, { status: 206, headers });
-  }
-
-  headers.set('content-length', String(object.size));
-
-  return new Response(body, { status: 200, headers });
-}
-
-function parseAdminPreviewItemId(pathname: string): string | null {
-  const match = pathname.match(/^\/admin\/submission-items\/([0-9a-f-]+)\/preview$/i);
-  const itemId = match?.[1];
-
-  if (!itemId || !UUID_PATTERN.test(itemId)) {
-    return null;
-  }
-
-  return itemId;
+  return new Response(object.body, { status: contentRange ? 206 : 200, headers });
 }
 
 function parseUploadIntentId(pathname: string): string | null {
@@ -530,14 +527,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     return handleAuthorize(request, env);
   }
 
-  const previewItemId = parseAdminPreviewItemId(url.pathname);
-
-  if (previewItemId) {
+  const adminPreviewItemId = parseAdminPreviewItemId(url.pathname);
+  if (adminPreviewItemId) {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       return json({ error: 'method_not_allowed' }, env, { status: 405, headers: { allow: 'GET, HEAD, OPTIONS' } });
     }
-
-    return handleAdminPreview(request, env, previewItemId);
+    return handleAdminPreview(request, env, adminPreviewItemId);
   }
 
   const uploadIntentId = parseUploadIntentId(url.pathname);
