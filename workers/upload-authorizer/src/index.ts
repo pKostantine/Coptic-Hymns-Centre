@@ -139,7 +139,7 @@ const CONTENT_TYPE_PATTERN = /^(audio|video|image)\/[a-z0-9.+-]+$/i;
 function corsHeaders(env: Env): Headers {
   return new Headers({
     'access-control-allow-origin': env.CORS_ALLOWED_ORIGIN ?? '*',
-    'access-control-allow-methods': 'GET, HEAD, POST, PUT, OPTIONS',
+    'access-control-allow-methods': 'GET, HEAD, POST, PUT, DELETE, OPTIONS',
     'access-control-allow-headers': 'Authorization, Content-Type, Content-Length, Range',
     'access-control-expose-headers': 'Accept-Ranges, Content-Length, Content-Range, Content-Type, ETag',
     'access-control-max-age': '86400',
