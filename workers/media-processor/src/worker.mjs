@@ -1,7 +1,9 @@
 import { claimAndProcessOne, getConfig } from './processor.mjs';
 
-// How long to wait after draining the queue before asking for work again.
-const IDLE_POLL_MS = Number(process.env.MEDIA_POLL_INTERVAL_MS || 15000);
+// Keep the queue feeling immediate for creator uploads. One second is short
+// enough that a completed upload is normally claimed before the artist has
+// finished entering the rest of the submission metadata.
+const IDLE_POLL_MS = Number(process.env.MEDIA_POLL_INTERVAL_MS || 1000);
 // Backoff applied when the queue itself is unreachable (Supabase down, network
 // blip), so a broken dependency does not turn into a request flood.
 const MIN_ERROR_BACKOFF_MS = Number(process.env.MEDIA_ERROR_BACKOFF_MS || 5000);
