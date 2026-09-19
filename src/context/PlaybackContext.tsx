@@ -19,6 +19,8 @@ import {
   getFinishedTrackAction,
   getManualNextIndex,
   getManualPreviousIndex,
+  keepOnlyCurrentEntry,
+  moveQueueEntry,
   nextRepeatMode,
   restoreOriginalQueue,
   shuffleQueuePreservingCurrent,
@@ -48,7 +50,19 @@ export interface PlaybackContextValue {
   previous: () => void;
   seekToMs: (positionMs: number) => Promise<void>;
   selectQueueIndex: (index: number) => void;
+  /** Drag-to-reorder. The playing entry keeps playing wherever it lands. */
+  moveQueueItem: (fromIndex: number, toIndex: number) => void;
+  /** Empties the queue but keeps the current entry playing. */
+  clearUpcoming: () => void;
+  /** Stops playback and forgets the queue entirely. */
   clearQueue: () => void;
+  /**
+   * Rewrites entries in place (same keys, same order), e.g. to refresh stale
+   * metadata restored from a saved snapshot.
+   */
+  updateQueueEntries: (update: (entry: PlaybackQueueEntry) => PlaybackQueueEntry) => void;
+  /** True once any saved snapshot has been restored. */
+  hydrated: boolean;
   cycleRepeatMode: () => void;
   toggleShuffle: () => void;
 }
@@ -182,6 +196,27 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     void loadEntry(queue, index, true);
   }, [loadEntry, queue]);
 
+  const moveQueueItem = useCallback((fromIndex: number, toIndex: number) => {
+    const moved = moveQueueEntry(queue, currentIndex, fromIndex, toIndex);
+    setQueue(moved.queue);
+    setCurrentIndex(moved.currentIndex);
+    // Without shuffle the queue *is* the listening order, so a manual reorder
+    // must survive toggling shuffle on and off again.
+    if (!shuffleEnabled) setOriginalQueue(moved.queue);
+  }, [currentIndex, queue, shuffleEnabled]);
+
+  const clearUpcoming = useCallback(() => {
+    const kept = keepOnlyCurrentEntry(queue, currentIndex);
+    setQueue(kept.queue);
+    setOriginalQueue(kept.queue);
+    setCurrentIndex(kept.currentIndex);
+  }, [currentIndex, queue]);
+
+  const updateQueueEntries = useCallback((update: (entry: PlaybackQueueEntry) => PlaybackQueueEntry) => {
+    setQueue((entries) => entries.map(update));
+    setOriginalQueue((entries) => entries.map(update));
+  }, []);
+
   const clearQueue = useCallback(() => {
     sourceRequestId.current += 1;
     player.pause();
@@ -226,14 +261,24 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Media Session action handlers outlive renders, so they read the latest
+  // queue navigation through refs instead of capturing stale callbacks.
+  const nextRef = useRef<() => void>(() => undefined);
+  const previousRef = useRef<() => void>(() => undefined);
+
   useEffect(() => {
     const webGlobal = globalThis as unknown as {
-      navigator?: { mediaSession?: { metadata: unknown | null } };
+      navigator?: {
+        mediaSession?: {
+          metadata: unknown | null;
+          setActionHandler?: (action: string, handler: (() => void) | null) => void;
+        };
+      };
       MediaMetadata?: new (init: {
         title?: string;
         artist?: string;
         album?: string;
-        artwork?: { src: string }[];
+        artwork?: { src: string; type?: string }[];
       }) => unknown;
     };
 
@@ -266,8 +311,18 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         title: playable.title,
         artist: playable.artist ?? undefined,
         album: playable.albumTitle ?? undefined,
-        artwork: playable.artworkUri ? [{ src: playable.artworkUri }] : undefined,
+        artwork: playable.artworkUri ? [{ src: playable.artworkUri, type: 'image/jpeg' }] : undefined,
       });
+
+      // expo-audio maps Chrome's previous/next buttons to 10-second seeks.
+      // CHC is a queue player, so those buttons should change tracks.
+      const session = webGlobal.navigator.mediaSession;
+      try {
+        session.setActionHandler?.('nexttrack', () => nextRef.current());
+        session.setActionHandler?.('previoustrack', () => previousRef.current());
+      } catch {
+        // Older browsers reject unknown actions; the basic controls still work.
+      }
     }
   }, [currentItem, player]);
 
@@ -278,8 +333,18 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     void player.seekTo(requestedPosition / 1000);
   }, [player, status.isLoaded]);
 
+  // didJustFinish stays true until the *next* source reports its first status.
+  // Advancing changes currentIndex, which re-runs this effect while the stale
+  // flag is still set, so without an edge check one finished track would skip
+  // straight through the rest of the queue and stop on the last entry.
+  const finishHandled = useRef(false);
   useEffect(() => {
-    if (!status.didJustFinish || currentIndex < 0) return;
+    if (!status.didJustFinish) {
+      finishHandled.current = false;
+      return;
+    }
+    if (finishHandled.current || currentIndex < 0) return;
+    finishHandled.current = true;
     const action = getFinishedTrackAction(queue.length, currentIndex, repeatMode);
     if (action.type === 'replay') {
       void player.seekTo(0).then(() => player.play());
@@ -325,6 +390,11 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     void savePlaybackSnapshot(snapshot);
   }, [currentIndex, hydrated, originalQueue, persistenceBucket, queue, repeatMode, shuffleEnabled]);
 
+  useEffect(() => {
+    nextRef.current = next;
+    previousRef.current = previous;
+  }, [next, previous]);
+
   const value = useMemo<PlaybackContextValue>(() => ({
     queue,
     currentIndex,
@@ -344,10 +414,18 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     previous,
     seekToMs,
     selectQueueIndex,
+    moveQueueItem,
+    clearUpcoming,
     clearQueue,
+    updateQueueEntries,
+    hydrated,
     cycleRepeatMode,
     toggleShuffle,
   }), [
+    clearUpcoming,
+    hydrated,
+    moveQueueItem,
+    updateQueueEntries,
     clearQueue,
     currentIndex,
     currentItem,

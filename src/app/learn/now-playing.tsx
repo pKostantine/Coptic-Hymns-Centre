@@ -8,14 +8,10 @@ import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
+import SeekBar from '@/components/music/SeekBar';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-
-function formatTime(ms: number): string {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
-}
 
 export default function LearningNowPlayingScreen() {
   const router = useRouter();
@@ -57,7 +53,6 @@ export default function LearningNowPlayingScreen() {
     );
   }
 
-  const progress = durationMs > 0 ? Math.max(0, Math.min(1, currentTimeMs / durationMs)) : 0;
   const openCollection = () => {
     router.push(currentItem.kind === 'recording'
       ? '/learn/album/' + currentItem.containerId
@@ -87,12 +82,13 @@ export default function LearningNowPlayingScreen() {
             <Text numberOfLines={1} style={[styles.collection, isArabic && styles.arabic]}>{currentItem.containerTitle}</Text>
           </Pressable>
 
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-          </View>
-          <View style={styles.timeRow}>
-            <Text style={styles.time}>{formatTime(currentTimeMs)}</Text>
-            <Text style={styles.time}>{formatTime(durationMs)}</Text>
+          <View style={styles.seekBar}>
+            <SeekBar
+              positionMs={currentTimeMs}
+              durationMs={durationMs}
+              onSeek={(positionMs) => void seekToMs(positionMs)}
+              accentColor={COLORS.learning}
+            />
           </View>
 
           <View style={styles.controls}>
@@ -180,10 +176,7 @@ const styles = StyleSheet.create({
   title: { maxWidth: 680, color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 27, fontWeight: '700', textAlign: 'center', marginTop: SPACING.sm },
   cantor: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800', textAlign: 'center', marginTop: SPACING.sm },
   collection: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, textAlign: 'center', marginTop: 4 },
-  progressTrack: { width: '100%', maxWidth: 680, height: 4, overflow: 'hidden', borderRadius: 2, backgroundColor: COLORS.surfaceSoft, marginTop: SPACING.xl },
-  progressFill: { height: 4, backgroundColor: COLORS.learning },
-  timeRow: { width: '100%', maxWidth: 680, flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  time: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontVariant: ['tabular-nums'] },
+  seekBar: { width: '100%', maxWidth: 680, marginTop: SPACING.lg },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
   seekControl: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21 },
   seekText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },

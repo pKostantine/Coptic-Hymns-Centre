@@ -66,6 +66,39 @@ export function restoreOriginalQueue<T extends { key: string }>(
   return { queue, currentIndex: restoredIndex >= 0 ? restoredIndex : clampPlaybackIndex(queue.length, currentIndex) };
 }
 
+/**
+ * Moves one queue entry to a new position. The playing entry keeps playing, so
+ * the returned currentIndex follows it to wherever it ended up.
+ */
+export function moveQueueEntry<T>(
+  entries: T[],
+  currentIndex: number,
+  fromIndex: number,
+  toIndex: number,
+): { queue: T[]; currentIndex: number } {
+  const from = clampPlaybackIndex(entries.length, fromIndex);
+  const to = clampPlaybackIndex(entries.length, toIndex);
+  if (from < 0 || from === to) return { queue: [...entries], currentIndex };
+
+  const queue = [...entries];
+  const [moved] = queue.splice(from, 1);
+  queue.splice(to, 0, moved);
+
+  let nextCurrent = currentIndex;
+  if (currentIndex === from) nextCurrent = to;
+  else if (from < currentIndex && to >= currentIndex) nextCurrent = currentIndex - 1;
+  else if (from > currentIndex && to <= currentIndex) nextCurrent = currentIndex + 1;
+
+  return { queue, currentIndex: nextCurrent };
+}
+
+/** Drops everything except the entry that is playing now. */
+export function keepOnlyCurrentEntry<T>(entries: T[], currentIndex: number): { queue: T[]; currentIndex: number } {
+  const safeIndex = clampPlaybackIndex(entries.length, currentIndex);
+  if (safeIndex < 0 || safeIndex !== currentIndex) return { queue: [], currentIndex: -1 };
+  return { queue: [entries[safeIndex]], currentIndex: 0 };
+}
+
 export function choosePlaybackUri(
   localUri: string | null | undefined,
   remoteUri: string | null | undefined,

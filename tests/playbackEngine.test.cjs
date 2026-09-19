@@ -87,3 +87,25 @@ test('persisted snapshots are sanitized before restoration', () => {
   assert.equal(snapshot.shuffleEnabled, true);
   assert.equal(sanitizePlaybackSnapshot({ version: 99 }), null);
 });
+
+test('reordering the queue keeps the playing entry selected', () => {
+  const { moveQueueEntry } = loadHelpers();
+  const entries = ['a', 'b', 'c', 'd', 'e'];
+
+  // Moving the playing entry itself.
+  assert.deepEqual(moveQueueEntry(entries, 1, 1, 3), { queue: ['a', 'c', 'd', 'b', 'e'], currentIndex: 3 });
+  // Moving an earlier entry past the playing one shifts it back.
+  assert.deepEqual(moveQueueEntry(entries, 2, 0, 4), { queue: ['b', 'c', 'd', 'e', 'a'], currentIndex: 1 });
+  // Moving a later entry in front of the playing one shifts it forward.
+  assert.deepEqual(moveQueueEntry(entries, 2, 4, 0), { queue: ['e', 'a', 'b', 'c', 'd'], currentIndex: 3 });
+  // Moves that do not cross the playing entry leave it alone.
+  assert.deepEqual(moveQueueEntry(entries, 0, 3, 1), { queue: ['a', 'd', 'b', 'c', 'e'], currentIndex: 0 });
+  // Out-of-range targets clamp instead of corrupting the queue.
+  assert.deepEqual(moveQueueEntry(entries, 0, 1, 99), { queue: ['a', 'c', 'd', 'e', 'b'], currentIndex: 0 });
+});
+
+test('clearing the queue keeps only the playing entry', () => {
+  const { keepOnlyCurrentEntry } = loadHelpers();
+  assert.deepEqual(keepOnlyCurrentEntry(['a', 'b', 'c'], 1), { queue: ['b'], currentIndex: 0 });
+  assert.deepEqual(keepOnlyCurrentEntry(['a', 'b', 'c'], -1), { queue: [], currentIndex: -1 });
+});

@@ -9,15 +9,18 @@ export default function LearningArtwork({
   asset,
   size,
   rounded = false,
+  radius: cornerRadius,
   label,
 }: {
   asset?: LearningMediaAsset | null;
   size: number;
   rounded?: boolean;
+  /** Corner radius override for small thumbnails. */
+  radius?: number;
   label?: string;
 }) {
   const uri = learningService.resolveAsset(asset);
-  const radius = rounded ? size / 2 : RADII.md;
+  const radius = rounded ? size / 2 : cornerRadius ?? RADII.md;
 
   if (uri) {
     return (

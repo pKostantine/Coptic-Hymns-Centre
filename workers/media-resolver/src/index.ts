@@ -196,10 +196,13 @@ async function handleMediaRequest(request: Request, env: Env): Promise<Response>
     return new Response(null, { status: 304, headers });
   }
 
-  const contentRange = getContentRange(object);
+  // R2 reports a range covering the whole object even when the client never
+  // asked for one. Answering a plain GET with 206 breaks strict consumers such
+  // as Chrome's Media Session artwork loader, so only honour real Range requests.
+  const contentRange = request.headers.has('range') ? getContentRange(object) : null;
   const status = contentRange ? 206 : 200;
 
-  headers.set('content-length', String(getRangeContentLength(object)));
+  headers.set('content-length', String(contentRange ? getRangeContentLength(object) : object.size));
 
   if (contentRange) {
     headers.set('content-range', contentRange);

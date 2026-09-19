@@ -22,7 +22,13 @@ export type IconName =
   | 'open-in-full'
   | 'search-outline'
   | 'eye-outline'
-  | 'checkmark';
+  | 'checkmark'
+  | 'play'
+  | 'pause'
+  | 'play-skip-forward'
+  | 'play-skip-back'
+  | 'reorder'
+  | 'close';
 
 interface IconProps {
   name: IconName;
@@ -249,6 +255,60 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
           <Path d="M21 11V3h-8l3.29 3.29l-10 10L3 13v8h8l-3.29-3.29l10-10z" fill={color} />
+        </Svg>
+      );
+    case 'play':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M133 440a35.37 35.37 0 0 1-17.5-4.67c-12-6.8-19.46-20-19.46-34.33V111c0-14.37 7.46-27.53 19.46-34.33a35.13 35.13 0 0 1 35.77.45l247.85 148.36a36 36 0 0 1 0 61l-247.89 148.4A35.5 35.5 0 0 1 133 440z"
+            fill={color}
+          />
+        </Svg>
+      );
+    case 'pause':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Rect x={136} y={80} width={80} height={352} rx={22} fill={color} />
+          <Rect x={296} y={80} width={80} height={352} rx={22} fill={color} />
+        </Svg>
+      );
+    case 'play-skip-forward':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M96 111v290c0 17.44 17 28.52 31 20.16l247.9-148.37c12.12-7.25 12.12-26.33 0-33.58L127 90.84c-14-8.36-31 2.72-31 20.16z"
+            fill={color}
+          />
+          <Rect x={376} y={80} width={48} height={352} rx={24} fill={color} />
+        </Svg>
+      );
+    case 'play-skip-back':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M416 111v290c0 17.44-17 28.52-31 20.16L137.1 272.79c-12.12-7.25-12.12-26.33 0-33.58L385 90.84c14-8.36 31 2.72 31 20.16z"
+            fill={color}
+          />
+          <Rect x={88} y={80} width={48} height={352} rx={24} fill={color} />
+        </Svg>
+      );
+    case 'reorder':
+      // Six-dot grip, the conventional "drag me" affordance.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+          <Circle cx={9} cy={6} r={1.6} fill={color} />
+          <Circle cx={15} cy={6} r={1.6} fill={color} />
+          <Circle cx={9} cy={12} r={1.6} fill={color} />
+          <Circle cx={15} cy={12} r={1.6} fill={color} />
+          <Circle cx={9} cy={18} r={1.6} fill={color} />
+          <Circle cx={15} cy={18} r={1.6} fill={color} />
+        </Svg>
+      );
+    case 'close':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M368 368 144 144M368 144 144 368" fill="none" stroke={color} strokeWidth={40} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     default:

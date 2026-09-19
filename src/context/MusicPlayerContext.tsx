@@ -1,8 +1,8 @@
-import { ReactNode, useCallback, useMemo } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { PlaybackProvider, usePlayback } from '@/context/PlaybackContext';
 import { musicService } from '@/services/musicService';
-import type { MusicConsumerAsset, MusicConsumerTrack } from '@/types/musicConsumer';
+import type { MusicConsumerAsset, MusicConsumerRelease, MusicConsumerTrack } from '@/types/musicConsumer';
 import type { PlaybackQueueEntry, PlaybackRepeatMode } from '@/types/playback';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 
@@ -17,6 +17,8 @@ export interface MusicQueueItem {
 
 interface MusicPlayerContextValue {
   queue: MusicQueueItem[];
+  /** Stable per-entry keys, parallel to `queue`, for list rendering. */
+  queueKeys: string[];
   currentIndex: number;
   currentItem: MusicQueueItem | null;
   playing: boolean;
@@ -33,6 +35,8 @@ interface MusicPlayerContextValue {
   previous: () => void;
   seekToMs: (positionMs: number) => Promise<void>;
   selectQueueIndex: (index: number) => void;
+  moveQueueItem: (fromIndex: number, toIndex: number) => void;
+  clearUpcoming: () => void;
   clearQueue: () => void;
   cycleRepeatMode: () => void;
   toggleShuffle: () => void;
@@ -67,8 +71,64 @@ function toPlaybackEntry(item: MusicQueueItem, occurrence: number): PlaybackQueu
   };
 }
 
+/**
+ * A restored queue carries whatever track metadata was current when it was
+ * saved, so credits corrected since then would stay wrong until the listener
+ * rebuilt their queue. Once per launch, re-read each queued release and swap
+ * in the published track data, keeping every entry's key and position.
+ */
+function RestoredQueueRefresher() {
+  const { hydrated, queue, updateQueueEntries } = usePlayback();
+  const refreshed = useRef(false);
+
+  useEffect(() => {
+    if (!hydrated || refreshed.current) return;
+    refreshed.current = true;
+
+    const releaseIds = new Set<string>();
+    for (const entry of queue) {
+      if (!isMusicQueueItem(entry.payload)) continue;
+      const releaseId = entry.payload.releaseId ?? entry.payload.track.releaseId;
+      if (releaseId) releaseIds.add(releaseId);
+    }
+    if (!releaseIds.size) return;
+
+    void Promise.allSettled([...releaseIds].map((id) => musicService.getRelease(id)))
+      .then((results) => {
+        const releases = new Map<string, MusicConsumerRelease>();
+        for (const result of results) {
+          if (result.status === 'fulfilled') releases.set(result.value.id, result.value);
+        }
+        if (!releases.size) return;
+
+        updateQueueEntries((entry) => {
+          if (!isMusicQueueItem(entry.payload)) return entry;
+          const item = entry.payload;
+          const release = releases.get(item.releaseId ?? item.track.releaseId ?? '');
+          const track = release?.tracks.find((candidate) => candidate.id === item.track.id);
+          if (!release || !track) return entry;
+
+          const refreshedEntry = toPlaybackEntry({
+            ...item,
+            track,
+            releaseTitle: release.title,
+            coverAsset: release.coverAsset ?? item.coverAsset,
+          }, 0);
+          return { ...refreshedEntry, key: entry.key };
+        });
+      });
+  }, [hydrated, queue, updateQueueEntries]);
+
+  return null;
+}
+
 export function MusicPlayerProvider({ children }: { children: ReactNode }) {
-  return <PlaybackProvider>{children}</PlaybackProvider>;
+  return (
+    <PlaybackProvider>
+      <RestoredQueueRefresher />
+      {children}
+    </PlaybackProvider>
+  );
 }
 
 /**
@@ -78,10 +138,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 export function useMusicPlayer(): MusicPlayerContextValue {
   const playback = usePlayback();
 
-  const queue = useMemo(
-    () => playback.queue.map((entry) => entry.payload).filter(isMusicQueueItem),
+  const musicEntries = useMemo(
+    () => playback.queue.filter((entry) => isMusicQueueItem(entry.payload)),
     [playback.queue],
   );
+  const queue = useMemo(() => musicEntries.map((entry) => entry.payload as MusicQueueItem), [musicEntries]);
+  const queueKeys = useMemo(() => musicEntries.map((entry) => entry.key), [musicEntries]);
   const currentItem = playback.currentItem?.playable.kind === 'music_track'
     && isMusicQueueItem(playback.currentItem.payload)
     ? playback.currentItem.payload
@@ -97,6 +159,7 @@ export function useMusicPlayer(): MusicPlayerContextValue {
 
   return {
     queue,
+    queueKeys,
     currentIndex: currentItem ? playback.currentIndex : -1,
     currentItem,
     playing: currentItem ? playback.playing : false,
@@ -113,6 +176,8 @@ export function useMusicPlayer(): MusicPlayerContextValue {
     previous: playback.previous,
     seekToMs: playback.seekToMs,
     selectQueueIndex: playback.selectQueueIndex,
+    moveQueueItem: playback.moveQueueItem,
+    clearUpcoming: playback.clearUpcoming,
     clearQueue: playback.clearQueue,
     cycleRepeatMode: playback.cycleRepeatMode,
     toggleShuffle: playback.toggleShuffle,
