@@ -2,6 +2,9 @@ type MediaType = 'audio' | 'video' | 'image';
 
 interface Env {
   CHC_SUBMISSIONS: R2Bucket;
+  CHC_MUSIC: R2Bucket;
+  CHC_LEARNING: R2Bucket;
+  CHC_IMAGES: R2Bucket;
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
   MAX_UPLOAD_BYTES?: string;
@@ -98,6 +101,28 @@ interface AdminPreviewItemRow {
   content_type: string;
   content_length: number;
   original_filename: string;
+}
+
+interface AdminDeleteObject {
+  bucket: string;
+  path: string;
+}
+
+interface AdminDeletePrepareRow {
+  job_id: string;
+  upload_intent_id?: string | null;
+  media_asset_id?: string | null;
+  related_job_count: number;
+  objects: AdminDeleteObject[];
+}
+
+interface AdminDeleteFinalizeRow {
+  job_id: string;
+  deleted: boolean;
+  deleted_job_count: number;
+  deleted_submission_item_count: number;
+  deleted_media_asset_id?: string | null;
+  deleted_upload_intent_id?: string | null;
 }
 
 interface SupabaseErrorBody {
@@ -709,6 +734,91 @@ async function handleAdminPreview(request: Request, env: Env, itemId: string): P
   return new Response(object.body, { status: contentRange ? 206 : 200, headers });
 }
 
+function parseAdminProcessingDeleteJobId(pathname: string): string | null {
+  const match = pathname.match(/^\/admin\/processing-jobs\/([0-9a-f-]+)\/file$/i);
+  const jobId = match?.[1];
+  return jobId && UUID_PATTERN.test(jobId) ? jobId : null;
+}
+
+function isValidDeleteObjectPath(path: string): boolean {
+  return path.length > 0
+    && path.length <= 1024
+    && !path.startsWith('/')
+    && !path.includes('..')
+    && !path.includes('\\');
+}
+
+function bucketForAdminDelete(env: Env, bucketName: string): R2Bucket {
+  switch (bucketName) {
+    case 'chc-submissions':
+      return env.CHC_SUBMISSIONS;
+    case 'chc-music':
+      return env.CHC_MUSIC;
+    case 'chc-learning':
+      return env.CHC_LEARNING;
+    case 'chc-images':
+      return env.CHC_IMAGES;
+    default:
+      throw new HttpError(409, 'unsupported_delete_bucket', `Cannot permanently delete objects from bucket ${bucketName}.`);
+  }
+}
+
+async function handleAdminProcessingFileDelete(
+  request: Request,
+  env: Env,
+  jobId: string,
+): Promise<Response> {
+  const bearerToken = requireBearerToken(request);
+  const preparedRows = await callSupabaseRpc<AdminDeletePrepareRow>(
+    env,
+    bearerToken,
+    'prepare_admin_processing_file_deletion',
+    { p_job_id: jobId },
+  );
+
+  const prepared = preparedRows[0];
+  if (!prepared) {
+    throw new HttpError(404, 'processing_job_not_found', 'Processing job not found.');
+  }
+
+  const objects = Array.isArray(prepared.objects) ? prepared.objects : [];
+  const deletedObjects: AdminDeleteObject[] = [];
+  for (const object of objects) {
+    const bucketName = typeof object?.bucket === 'string' ? object.bucket.trim() : '';
+    const objectPath = typeof object?.path === 'string' ? object.path.trim() : '';
+
+    if (!bucketName || !isValidDeleteObjectPath(objectPath)) {
+      throw new HttpError(409, 'invalid_delete_manifest', 'The processing job contains an invalid storage object path.');
+    }
+
+    await bucketForAdminDelete(env, bucketName).delete(objectPath);
+    deletedObjects.push({ bucket: bucketName, path: objectPath });
+  }
+
+  const finalizedRows = await callSupabaseRpc<AdminDeleteFinalizeRow>(
+    env,
+    bearerToken,
+    'finalize_admin_processing_file_deletion',
+    { p_job_id: jobId },
+  );
+  const finalized = finalizedRows[0];
+
+  if (!finalized?.deleted) {
+    throw new HttpError(409, 'delete_finalize_failed', 'The storage objects were deleted, but database cleanup could not be finalized.');
+  }
+
+  return json({
+    jobId,
+    deleted: true,
+    deletedObjectCount: deletedObjects.length,
+    deletedObjects,
+    deletedJobCount: Number(finalized.deleted_job_count || 0),
+    deletedSubmissionItemCount: Number(finalized.deleted_submission_item_count || 0),
+    deletedMediaAssetId: finalized.deleted_media_asset_id ?? null,
+    deletedUploadIntentId: finalized.deleted_upload_intent_id ?? null,
+  }, env);
+}
+
 function parseUploadIntentId(pathname: string): string | null {
   const match = pathname.match(/^\/uploads\/([0-9a-f-]+)$/i);
   const uploadIntentId = match?.[1];
@@ -774,6 +884,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return json({ error: 'method_not_allowed' }, env, { status: 405, headers: { allow: 'GET, HEAD, OPTIONS' } });
     }
     return handleAdminPreview(request, env, adminPreviewItemId);
+  }
+
+  const adminDeleteJobId = parseAdminProcessingDeleteJobId(url.pathname);
+  if (adminDeleteJobId) {
+    if (request.method !== 'DELETE') {
+      return json({ error: 'method_not_allowed' }, env, { status: 405, headers: { allow: 'DELETE, OPTIONS' } });
+    }
+    return handleAdminProcessingFileDelete(request, env, adminDeleteJobId);
   }
 
   const uploadIntentId = parseUploadIntentId(url.pathname);
