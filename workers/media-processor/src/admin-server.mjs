@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { purgeUnusedStorage } from './storage-gc.mjs';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DELETE_ROUTE = /^\/admin\/processing-jobs\/([0-9a-f-]+)\/file$/i;
@@ -172,6 +173,31 @@ async function deleteProcessingFile(request, response, config, jobId) {
   });
 }
 
+async function deleteAllUnusedStorage(request, response, config) {
+  const bearerToken = requireBearerToken(request);
+  const authorization = await callUserRpc(
+    config,
+    bearerToken,
+    'authorize_admin_storage_gc',
+    {},
+  );
+
+  if (!authorization[0]?.authorized) {
+    throw new HttpError(403, 'admin_required', 'CHC admin access is required.');
+  }
+
+  const result = await purgeUnusedStorage(config, { dueOnly: false });
+  sendJson(response, result.errors.length ? 207 : 200, {
+    deleted: result.errors.length === 0,
+    deletedObjectCount: result.deletedObjectCount,
+    deletedBytes: result.deletedBytes,
+    databaseRowsRemoved: result.databaseRowsRemoved,
+    scannedCount: result.scannedCount,
+    candidateCount: result.candidateCount,
+    errors: result.errors,
+  });
+}
+
 async function handleRequest(request, response, config) {
   if (request.method === 'OPTIONS') {
     response.writeHead(204, corsHeaders());
@@ -184,6 +210,17 @@ async function handleRequest(request, response, config) {
 
   if (request.method === 'GET' && url.pathname === '/health') {
     sendJson(response, 200, { ok: true, service: 'chc-media-processor' });
+    return;
+  }
+
+  if (url.pathname === '/admin/storage/unused') {
+    if (request.method !== 'DELETE') {
+      response.writeHead(405, { ...corsHeaders(), allow: 'DELETE, OPTIONS' });
+      response.end();
+      return;
+    }
+
+    await deleteAllUnusedStorage(request, response, config);
     return;
   }
 
