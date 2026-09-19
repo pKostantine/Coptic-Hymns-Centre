@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
@@ -68,7 +69,7 @@ export default function LearningNowPlayingScreen() {
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{currentItem.title + ' — Learn & Study'}</title></Head>
       <LearningBackHeader title={isArabic ? 'المشغّل' : 'Now Playing'} isArabic={isArabic} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.player}>
           <LearningArtwork asset={currentItem.coverAsset} label={currentItem.containerTitle} size={270} />
           <Text style={[styles.kind, isArabic && styles.arabic]}>
@@ -163,7 +164,7 @@ export default function LearningNowPlayingScreen() {
             </Pressable>
           </View>
         )}
-      </ScrollView>
+      </NowPlayingAwareScrollView>
     </SafeAreaView>
   );
 }
