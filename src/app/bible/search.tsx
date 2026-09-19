@@ -2,13 +2,13 @@ import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,24 +16,24 @@ import AppHeader from '@/components/chc/ui/AppHeader';
 import Icon from '@/components/chc/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { getBibleBooks, type BibleBook } from '@/utils/bibleService';
 import {
-  BIBLE_SEARCH_LANGUAGE_LABELS,
-  BIBLE_SEARCH_LANGUAGES,
-  formatBibleReference,
-  parseBibleReference,
-  searchBible,
-  splitSnippet,
-  type BibleReference,
-  type BibleSearchLanguage,
-  type BibleSearchMode,
-  type BibleSearchResult,
-  type BibleSearchSort,
-  type BibleTestament,
+    BIBLE_SEARCH_LANGUAGE_LABELS,
+    BIBLE_SEARCH_LANGUAGES,
+    formatBibleReference,
+    parseBibleReference,
+    searchBible,
+    splitSnippet,
+    type BibleReference,
+    type BibleSearchLanguage,
+    type BibleSearchMode,
+    type BibleSearchResult,
+    type BibleSearchSort,
+    type BibleTestament,
 } from '@/utils/bibleSearch';
+import { getBibleBooks, type BibleBook } from '@/utils/bibleService';
 import { goBack } from '@/utils/navigation';
-import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import type { BibleVisibleLanguages } from '@/utils/preferencesStorage';
+import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 
 const PAGE_SIZE = 25;
 /** Long enough that typing a word does not fire a search per letter, short enough not to feel held up. */
