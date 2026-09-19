@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
+import { FlatList, Platform, Pressable, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView, NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
@@ -163,7 +164,7 @@ export default function BibleNestedList() {
           !books ? (
             <LoadingScreen />
           ) : (
-            <FlatList
+            <NowPlayingAwareFlatList
               style={styles.bookList}
               contentContainerStyle={styles.list}
               data={books}
@@ -187,7 +188,7 @@ export default function BibleNestedList() {
         ) : chapters.length === 1 ? (
           <LoadingScreen />
         ) : (
-          <ScrollView contentContainerStyle={styles.chapterContent}>
+          <NowPlayingAwareScrollView contentContainerStyle={styles.chapterContent}>
             {isPsalms ? (
               <View style={styles.psalmNumberingDeck}>
                 {PSALM_NUMBERING_OPTIONS.map((option) => {
@@ -266,7 +267,7 @@ export default function BibleNestedList() {
                 );
               })}
             </View>
-          </ScrollView>
+          </NowPlayingAwareScrollView>
         )}
       </View>
     </SafeAreaView>
