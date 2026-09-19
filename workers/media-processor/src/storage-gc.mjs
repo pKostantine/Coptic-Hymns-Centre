@@ -76,32 +76,32 @@ export async function purgeUnusedStorage(config, { dueOnly = true } = {}) {
     for (const candidate of candidates) {
       const key = `${candidate.bucket}/${candidate.path}`;
       try {
-        await deleteObject(config, candidate.bucket, candidate.path);
-
-        const completedRows = await callRpc(config, 'complete_storage_gc_candidate', {
+        const preparedRows = await callRpc(config, 'prepare_storage_gc_candidate', {
           p_worker_token: config.mediaWorkerToken,
           p_bucket: candidate.bucket,
           p_path: candidate.path,
         });
-        const completion = completedRows[0];
+        const prepared = preparedRows[0];
 
-        // A reference may have appeared after the scan but before deletion.
-        // The database function rechecks and reports deleted=false. This is
-        // deliberately treated as protected rather than a successful GC.
-        if (!completion?.deleted) {
+        if (!prepared?.authorized) {
           failedKeys.add(key);
-          errors.push({
-            bucket: candidate.bucket,
-            path: candidate.path,
-            error: 'Object became referenced again before GC finalized.',
-          });
           continue;
         }
+
+        // Database metadata is detached first so no new catalog/submission
+        // reference can race in while the physical object is being removed.
+        await deleteObject(config, candidate.bucket, candidate.path);
+
+        await callRpc(config, 'complete_storage_gc_candidate', {
+          p_worker_token: config.mediaWorkerToken,
+          p_bucket: candidate.bucket,
+          p_path: candidate.path,
+        });
 
         successThisPage += 1;
         deletedObjectCount += 1;
         deletedBytes += Number(candidate.file_size_bytes || 0);
-        databaseRowsRemoved += Number(completion.database_rows_removed || 0);
+        databaseRowsRemoved += Number(prepared.database_rows_removed || 0);
       } catch (error) {
         failedKeys.add(key);
         errors.push({
