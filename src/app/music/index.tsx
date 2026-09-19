@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
-import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -84,7 +83,6 @@ export default function MusicHomeScreen() {
         ) : null}
       </ScrollView>
 
-      <MusicMiniPlayer />
       <BottomTabBar active="music" />
     </SafeAreaView>
   );
