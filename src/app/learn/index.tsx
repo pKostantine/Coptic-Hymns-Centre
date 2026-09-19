@@ -2,9 +2,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import LearningArtwork from '@/components/learning/LearningArtwork';
@@ -51,7 +52,7 @@ export default function LearningHomeScreen() {
       />
       <LearningSectionNav active="home" />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <LinearGradient
           colors={[COLORS.learningDeep, COLORS.navyDark]}
           start={{ x: 0, y: 0 }}
@@ -133,14 +134,14 @@ export default function LearningHomeScreen() {
               isArabic={isArabic}
             />
             {home.cantors.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+              <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                 {home.cantors.map((cantor) => (
                   <Pressable key={cantor.id} style={styles.cantorCard} onPress={() => router.push('/learn/cantor/' + cantor.id)}>
                     <LearningArtwork asset={cantor.profileImageAsset} size={112} rounded label={cantor.displayName} />
                     <Text numberOfLines={2} style={[styles.cantorName, isArabic && styles.arabic]}>{cantor.displayName}</Text>
                   </Pressable>
                 ))}
-              </ScrollView>
+              </NowPlayingAwareScrollView>
             ) : <Empty text={isArabic ? 'لا يوجد معلّمون منشورون بعد.' : 'No published cantors yet.'} />}
 
             <SectionHeading
@@ -165,7 +166,7 @@ export default function LearningHomeScreen() {
             ) : <Empty text={isArabic ? 'لا توجد مواسم منشورة بعد.' : 'No published seasons yet.'} />}
           </>
         ) : null}
-      </ScrollView>
+      </NowPlayingAwareScrollView>
 
       <BottomTabBar active="learn" />
     </SafeAreaView>
