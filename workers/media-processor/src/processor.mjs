@@ -27,10 +27,13 @@ const IMAGE_SCALE_FILTER =
 // frames at once and get the Railway process SIGKILLed. Scale the source first,
 // and only allocate a white background at the already-capped delivery size.
 const IMAGE_ALPHA_FILTER_COMPLEX = [
-  `[0:v]${IMAGE_SCALE_FILTER}[fg]`,
-  'color=c=white:s=16x16[bg]',
-  '[bg][fg]scale2ref=w=main_w:h=main_h[bg][fg]',
-  '[bg][fg]overlay=format=auto:shortest=1,format=yuvj420p',
+  // Scale once, then split the *same-sized* frame. One copy becomes a solid
+  // white canvas and the other keeps the original alpha. This avoids the old
+  // scale2ref bug that shrank RGBA artwork/profile photos to the 16x16 seed
+  // background and produced an effectively white thumbnail.
+  `[0:v]${IMAGE_SCALE_FILTER},format=rgba,split=2[bg][fg]`,
+  '[bg]drawbox=color=white@1:t=fill[white]',
+  '[white][fg]overlay=format=auto:shortest=1,format=yuvj420p',
 ].join(';');
 
 function requireEnv(name) {
