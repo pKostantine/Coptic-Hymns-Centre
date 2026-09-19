@@ -244,6 +244,14 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
       ]}
     >
       <View style={[styles.row, active && styles.rowActive, lifted && styles.rowLiftedInner]}>
+        <View
+          accessibilityRole="adjustable"
+          accessibilityLabel={`Reorder ${item.track.title}`}
+          style={[styles.handle, Platform.OS === 'web' && styles.handleWeb]}
+          {...panResponder.panHandlers}
+        >
+          <Icon name="reorder" size={22} color={lifted ? COLORS.goldBright : COLORS.muted} />
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Play ${item.track.title}`}
@@ -259,14 +267,6 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
             </Text>
           </View>
         </Pressable>
-        <View
-          accessibilityRole="adjustable"
-          accessibilityLabel={`Reorder ${item.track.title}`}
-          style={[styles.handle, Platform.OS === 'web' && styles.handleWeb]}
-          {...panResponder.panHandlers}
-        >
-          <Icon name="reorder" size={22} color={lifted ? COLORS.goldBright : COLORS.muted} />
-        </View>
       </View>
     </Animated.View>
   );
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 10,
-    paddingLeft: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
   },
   rowActive: { backgroundColor: COLORS.goldSoft },
   rowLiftedInner: {
