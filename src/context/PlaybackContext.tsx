@@ -1,4 +1,5 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { Platform } from 'react-native';
 import {
   createContext,
   ReactNode,
@@ -226,10 +227,24 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const webGlobal = globalThis as unknown as {
+      navigator?: { mediaSession?: { metadata: unknown | null } };
+      MediaMetadata?: new (init: {
+        title?: string;
+        artist?: string;
+        album?: string;
+        artwork?: { src: string }[];
+      }) => unknown;
+    };
+
     if (!currentItem) {
       player.setActiveForLockScreen(false);
+      if (Platform.OS === 'web' && webGlobal.navigator?.mediaSession) {
+        webGlobal.navigator.mediaSession.metadata = null;
+      }
       return;
     }
+
     const playable = currentItem.playable;
     const metadata = {
       title: playable.title,
@@ -242,6 +257,18 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       showSeekForward: true,
     });
     player.updateLockScreenMetadata(metadata);
+
+    // expo-audio owns playback on web, but Chrome's global media controls use
+    // the Media Session API for the rich card. Set that metadata explicitly so
+    // CHC gets the same album-art treatment as YouTube and SoundCloud.
+    if (Platform.OS === 'web' && webGlobal.navigator?.mediaSession && webGlobal.MediaMetadata) {
+      webGlobal.navigator.mediaSession.metadata = new webGlobal.MediaMetadata({
+        title: playable.title,
+        artist: playable.artist ?? undefined,
+        album: playable.albumTitle ?? undefined,
+        artwork: playable.artworkUri ? [{ src: playable.artworkUri }] : undefined,
+      });
+    }
   }, [currentItem, player]);
 
   useEffect(() => {

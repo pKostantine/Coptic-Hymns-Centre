@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme'; import { downloadManager } from '@/services/downloadManager'; import type { OfflineDownloadProgress, OfflineDownloadRequest } from '@/types/offlineDownloads';
 type DownloadTheme = 'music' | 'learning'; export interface OfflineDownloadButtonProps { packageKey: string; request: OfflineDownloadRequest | (() => Promise<OfflineDownloadRequest>); theme: DownloadTheme; isArabic?: boolean; compact?: boolean; label?: string; style?: ViewStyle; }
 function percentage(progress: number): string { return `${Math.max(0, Math.min(100, Math.round(progress * 100)))}%`; }
-export default function OfflineDownloadButton({ packageKey, request, theme, isArabic = false, compact = false, label, style }: OfflineDownloadButtonProps) {
+export default function OfflineDownloadButton(props: OfflineDownloadButtonProps) {
+  if (Platform.OS === 'web') return null;
+  return <NativeOfflineDownloadButton {...props} />;
+}
+function NativeOfflineDownloadButton({ packageKey, request, theme, isArabic = false, compact = false, label, style }: OfflineDownloadButtonProps) {
   const revision = useSyncExternalStore(downloadManager.subscribe, downloadManager.getRevision, downloadManager.getRevision); const [progress, setProgress] = useState<OfflineDownloadProgress | null>(null); const [busy, setBusy] = useState(false); const [updateAvailable, setUpdateAvailable] = useState(false);
   const prepare = useCallback(async () => typeof request === 'function' ? request() : request, [request]);
   const refresh = useCallback(() => { let active = true; void downloadManager.getProgress(packageKey).then(async (value) => { if (!active) return; setProgress(value); if (value?.status === 'complete') { try { setUpdateAvailable(await downloadManager.checkForUpdate(await prepare())); } catch { setUpdateAvailable(false); } } else setUpdateAvailable(false); }); return () => { active = false; }; }, [packageKey, prepare]); useEffect(() => refresh(), [refresh, revision]);

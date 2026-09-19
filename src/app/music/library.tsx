@@ -8,7 +8,6 @@ import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
-import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -213,7 +212,6 @@ export default function MusicLibraryScreen() {
         ) : null}
       </ScrollView>
 
-      <MusicMiniPlayer />
       <BottomTabBar active="music" />
     </SafeAreaView>
   );

@@ -3,30 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import type { MusicConsumerTrack } from '@/types/musicConsumer';
-
-/**
- * Who a song is by. A song's main artist can differ from the release's, and
- * guests are credited per song, so both belong on the row rather than just the
- * primary name.
- */
-function formatTrackCredit(track: MusicConsumerTrack): string {
-  const main = track.artists.find((item) => item.role === 'primary')?.displayName
-    ?? track.artists[0]?.displayName
-    ?? '';
-
-  const featured = track.artists
-    .filter((item) => item.role === 'featured')
-    .map((item) => item.displayName)
-    .filter(Boolean);
-
-  if (!featured.length) return main;
-
-  const guests = featured.length === 1
-    ? featured[0]
-    : `${featured.slice(0, -1).join(', ')} & ${featured[featured.length - 1]}`;
-
-  return main ? `${main} feat. ${guests}` : `feat. ${guests}`;
-}
+import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 
 function formatDuration(durationMs: number | null): string {
   if (!durationMs || durationMs < 0) return '';
@@ -49,7 +26,7 @@ export default function MusicTrackRow({
   onPress: () => void;
   trailing?: ReactNode;
 }) {
-  const credit = formatTrackCredit(track);
+  const credit = formatMusicTrackPerformers(track);
 
   return (
     <Pressable style={[styles.row, active && styles.rowActive]} onPress={onPress}>
