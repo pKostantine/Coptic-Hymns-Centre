@@ -6,7 +6,6 @@ import {
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -14,11 +13,12 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Icon from '@/components/chc/ui/Icon';
+import Icon, { type IconName } from '@/components/chc/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicLyricsView from '@/components/music/MusicLyricsView';
 import MusicQueueList from '@/components/music/MusicQueueList';
 import SeekBar from '@/components/music/SeekBar';
+import PlayerSheet from '@/components/playback/PlayerSheet';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
@@ -100,12 +100,11 @@ export default function MusicNowPlayingScreen() {
   } = useMusicPlayer();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const [queueDragActive, setQueueDragActive] = useState(false);
   const [lyricsFullscreen, setLyricsFullscreen] = useState(false);
+  const [openSheet, setOpenSheet] = useState<'lyrics' | 'queue' | null>(null);
   const [lyricSets, setLyricSets] = useState<PublishedLyricSet[]>([]);
   const [selectedLyricSetId, setSelectedLyricSetId] = useState<string | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
-  const [showQueue, setShowQueue] = useState(false);
   const [liked, setLiked] = useState(false);
   const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
@@ -235,7 +234,9 @@ export default function MusicNowPlayingScreen() {
   const availableHeight = height - insets.top - insets.bottom - HEADER_HEIGHT - SPACING.lg * 2;
   const centerWidth = wide ? clamp(width * 0.3, 360, 460) : 0;
   const wideArtSize = clamp(Math.min(availableHeight - 350, centerWidth - 64), 160, 400);
-  const narrowArtSize = clamp(width - SPACING.xl * 2, 200, 340);
+  // Phones show the player full-height with the pull-up buttons pinned below,
+  // so the artwork takes whatever room the rest of the controls leave.
+  const narrowArtSize = clamp(Math.min(width - SPACING.lg * 2, availableHeight - 290), 140, 360);
 
   const lyricsProps = {
     lyricSets,
@@ -312,32 +313,47 @@ export default function MusicNowPlayingScreen() {
           <MusicQueueList {...queueProps} scrollable style={styles.sidePanel} />
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={styles.narrowContent}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={!queueDragActive}
-        >
-          {player}
+        <View style={styles.narrowBody}>
+          <View style={styles.narrowPlayer}>{player}</View>
 
-          <View style={styles.segmentRow}>
-            <Pressable style={[styles.segment, !showQueue && styles.segmentActive]} onPress={() => setShowQueue(false)}>
-              <Text style={[styles.segmentText, !showQueue && styles.segmentTextActive]}>{isArabic ? 'الكلمات' : 'Lyrics'}</Text>
-            </Pressable>
-            <Pressable style={[styles.segment, showQueue && styles.segmentActive]} onPress={() => setShowQueue(true)}>
-              <Text style={[styles.segmentText, showQueue && styles.segmentTextActive]}>{isArabic ? 'قائمة الانتظار' : 'Queue'}</Text>
-            </Pressable>
+          <View style={styles.pullUpRow}>
+            <PullUpButton
+              icon="book"
+              label={isArabic ? 'الكلمات' : 'Lyrics'}
+              onPress={() => setOpenSheet('lyrics')}
+            />
+            <PullUpButton
+              icon="list-outline"
+              label={isArabic ? 'قائمة الانتظار' : 'Queue'}
+              count={queue.length}
+              onPress={() => setOpenSheet('queue')}
+            />
           </View>
+        </View>
+      )}
 
-          {showQueue ? (
-            <MusicQueueList {...queueProps} onDragActiveChange={setQueueDragActive} />
-          ) : (
-            <View style={[styles.panel, styles.narrowLyricsPanel]}>
+      {!wide ? (
+        <>
+          <PlayerSheet
+            visible={openSheet === 'lyrics'}
+            onClose={() => setOpenSheet(null)}
+            accessibilityLabel={isArabic ? 'الكلمات' : 'Lyrics'}
+          >
+            <View style={styles.sheetContent}>
               {lyricsPanelHeader}
               <MusicLyricsView {...lyricsProps} />
             </View>
-          )}
-        </ScrollView>
-      )}
+          </PlayerSheet>
+
+          <PlayerSheet
+            visible={openSheet === 'queue'}
+            onClose={() => setOpenSheet(null)}
+            accessibilityLabel={isArabic ? 'قائمة الانتظار' : 'Queue'}
+          >
+            <MusicQueueList {...queueProps} scrollable style={styles.sheetQueue} />
+          </PlayerSheet>
+        </>
+      ) : null}
 
       {lyricsFullscreen ? (
         <View style={styles.fullscreen}>
@@ -376,6 +392,30 @@ export default function MusicNowPlayingScreen() {
         </View>
       ) : null}
     </SafeAreaView>
+  );
+}
+
+interface PullUpButtonProps {
+  icon: IconName;
+  label: string;
+  count?: number;
+  onPress: () => void;
+}
+
+/** Wide bottom button that pulls up the lyrics or the queue on phones. */
+function PullUpButton({ icon, label, count, onPress }: PullUpButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.pullUpButton, pressed && styles.pullUpButtonPressed]}
+    >
+      <Icon name={icon} size={19} color={COLORS.goldBright} />
+      <Text numberOfLines={1} style={styles.pullUpLabel}>{label}</Text>
+      {count != null ? <Text style={styles.pullUpCount}>{count}</Text> : null}
+      <Icon name="chevron-down" size={15} color={COLORS.muted} style={styles.pullUpChevron} />
+    </Pressable>
   );
 }
 
@@ -586,22 +626,30 @@ const styles = StyleSheet.create({
   },
   downloadText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
 
-  narrowContent: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.xl },
-  narrowLyricsPanel: { height: 480, marginTop: SPACING.lg },
-  segmentRow: {
+  narrowBody: { flex: 1, minHeight: 0, paddingHorizontal: SPACING.md, paddingBottom: SPACING.md },
+  narrowPlayer: { flex: 1, justifyContent: 'center' },
+  pullUpRow: { flexDirection: 'row', gap: SPACING.sm + 4 },
+  pullUpButton: {
+    flex: 1,
+    minWidth: 0,
+    height: 56,
     flexDirection: 'row',
-    alignSelf: 'center',
-    marginTop: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADII.pill,
-    padding: 4,
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    ...Platform.select({ web: { cursor: 'pointer' } as object, default: {} }),
   },
-  segment: { minWidth: 120, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill },
-  segmentActive: { backgroundColor: COLORS.gold },
-  segmentText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontWeight: '700', fontSize: 13 },
-  segmentTextActive: { color: COLORS.black },
+  pullUpButtonPressed: { opacity: 0.75, backgroundColor: 'rgba(255, 255, 255, 0.12)' },
+  pullUpLabel: { flex: 1, minWidth: 0, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  pullUpCount: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
+  // The shared chevron points down; these buttons open upwards.
+  pullUpChevron: { transform: [{ rotate: '180deg' }] },
+  sheetContent: { flex: 1, minHeight: 0 },
+  sheetQueue: { flex: 1, marginTop: 0, backgroundColor: 'transparent', borderWidth: 0, borderRadius: 0 },
 
   fullscreen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100, elevation: 100, backgroundColor: COLORS.black },
   fullscreenScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 8, 18, 0.78)' },
