@@ -136,6 +136,7 @@ export function buildDocumentHtml(
     copticRecitedPrayers = true,
     copticGospelRite = false,
     suppressAllSpeakerLabels = false,
+    bottomContentInset = 0,
   }: {
     copticFontDataUri: string;
     fontSize: number;
@@ -150,6 +151,8 @@ export function buildDocumentHtml(
     copticGospelRite?: boolean;
     /** Forces every verse's person-type indicator hidden, regardless of the normal per-document rules — the Agpeya's own top-level documents (see ServiceDocument.tsx). */
     suppressAllSpeakerLabels?: boolean;
+    /** Extra bottom clearance for app-level floating chrome, in CSS pixels. */
+    bottomContentInset?: number;
   },
 ) {
   const sectionTitleFontSize = Math.max(Math.round(fontSize * 0.5), 14);
@@ -234,7 +237,7 @@ export function buildDocumentHtml(
       }
       .document {
         box-sizing: border-box;
-        padding: ${SPACING.md}px 0 0;
+        padding: ${SPACING.md}px 0 ${Math.max(0, Math.round(bottomContentInset))}px;
         max-width: 100vw;
       }
       .section {
