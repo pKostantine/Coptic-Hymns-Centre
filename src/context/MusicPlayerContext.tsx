@@ -4,6 +4,7 @@ import { PlaybackProvider, usePlayback } from '@/context/PlaybackContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerAsset, MusicConsumerTrack } from '@/types/musicConsumer';
 import type { PlaybackQueueEntry, PlaybackRepeatMode } from '@/types/playback';
+import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 
 export interface MusicQueueItem {
   track: MusicConsumerTrack;
@@ -44,9 +45,7 @@ function isMusicQueueItem(value: unknown): value is MusicQueueItem {
 }
 
 function toPlaybackEntry(item: MusicQueueItem, occurrence: number): PlaybackQueueEntry<MusicQueueItem> {
-  const primaryArtist = item.track.artists.find((artist) => artist.role === 'primary')?.displayName
-    ?? item.track.artists[0]?.displayName
-    ?? 'Coptic Hymns Centre';
+  const performerLine = formatMusicTrackPerformers(item.track, 'Coptic Hymns Centre');
 
   return {
     key: `music:${item.track.id}:${occurrence}`,
@@ -55,7 +54,7 @@ function toPlaybackEntry(item: MusicQueueItem, occurrence: number): PlaybackQueu
       id: item.track.id,
       kind: 'music_track',
       title: item.track.title,
-      artist: primaryArtist,
+      artist: performerLine,
       albumTitle: item.releaseTitle ?? null,
       artworkUri: musicService.resolveAsset(item.coverAsset ?? null),
       durationMs: item.track.durationMs,
