@@ -15,6 +15,18 @@
     {
       "binding": "CHC_SUBMISSIONS",
       "bucket_name": "chc-submissions"
+    },
+    {
+      "binding": "CHC_MUSIC",
+      "bucket_name": "chc-music"
+    },
+    {
+      "binding": "CHC_LEARNING",
+      "bucket_name": "chc-learning"
+    },
+    {
+      "binding": "CHC_IMAGES",
+      "bucket_name": "chc-images"
     }
   ]
 }
