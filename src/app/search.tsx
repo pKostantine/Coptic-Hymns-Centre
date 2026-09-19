@@ -2,16 +2,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+  ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -256,7 +250,7 @@ export default function UnifiedSearchScreen() {
         </View>
       </View>
 
-      <ScrollView
+      <NowPlayingAwareScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -347,7 +341,7 @@ export default function UnifiedSearchScreen() {
             );
           })}
         </View> : null}
-      </ScrollView>
+      </NowPlayingAwareScrollView>
 
       <BottomTabBar active={scope === 'music' ? 'music' : scope === 'learning' ? 'learn' : null} />
     </SafeAreaView>
