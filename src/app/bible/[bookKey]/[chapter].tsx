@@ -10,6 +10,7 @@ import AppHeader from '@/components/chc/ui/AppHeader';
 import Icon from '@/components/chc/ui/Icon';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useBottomChrome } from '@/context/BottomChromeContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
     BibleBook,
@@ -154,6 +155,7 @@ export default function BibleChapterDocument() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { nowPlayingInset } = useBottomChrome();
   // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
   // get the same headerless, gesture-nav UI as the native app, same as
   // ServiceDocument.tsx/lectionary/index.tsx.
@@ -247,8 +249,9 @@ export default function BibleChapterDocument() {
       isSlideshow: preferences.slideshowMode,
       preface,
       initialVerse: targetVerse,
+      bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, nowPlayingInset]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
