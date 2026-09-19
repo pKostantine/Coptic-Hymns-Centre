@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
+import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import MusicArtwork from './MusicArtwork';
 
 export default function MusicMiniPlayer() {
@@ -12,9 +13,7 @@ export default function MusicMiniPlayer() {
   if (!currentItem) return null;
 
   const progress = durationMs > 0 ? Math.min(1, currentTimeMs / durationMs) : 0;
-  const artist = currentItem.track.artists.find((item) => item.role === 'primary')?.displayName
-    ?? currentItem.track.artists[0]?.displayName
-    ?? '';
+  const artist = formatMusicTrackPerformers(currentItem.track);
 
   return (
     <View style={styles.wrapper}>
