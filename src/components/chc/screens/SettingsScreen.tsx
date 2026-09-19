@@ -47,7 +47,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
       <Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.content)}</Text>
       <Pressable accessibilityLabel="Choose saint hymns" style={styles.contentRow} onPress={() => setSaintPickerOpen(true)}><Text style={[styles.contentRowLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.saintHymns)}</Text><Icon name="chevron-forward" size={18} color={COLORS.muted} /></Pressable>
       <ToggleRow label={labelText(SETTINGS_LABELS.inMonastery)} isArabic={isArabicChrome} active={preferences.inMonastery} onPress={toggleInMonastery} />
-      {!isHosted ? <Pressable accessibilityLabel={labelText(SETTINGS_LABELS.downloads)} style={styles.contentRow} onPress={() => router.push('/downloads')}><Text style={[styles.contentRowLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.downloads)}</Text><Icon name="chevron-forward" size={18} color={COLORS.muted} /></Pressable> : null}
+      {!isHosted && Platform.OS !== 'web' ? <Pressable accessibilityLabel={labelText(SETTINGS_LABELS.downloads)} style={styles.contentRow} onPress={() => router.push('/downloads')}><Text style={[styles.contentRowLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.downloads)}</Text><Icon name="chevron-forward" size={18} color={COLORS.muted} /></Pressable> : null}
     </View></ScrollView>
     <SaintHymnPicker visible={saintPickerOpen} onClose={() => setSaintPickerOpen(false)} isArabic={isArabicChrome} selected={chosenSaintHymns} onToggle={toggleSaintHymn} onClearSaint={clearSaintHymns} />
   </SafeAreaView>;
