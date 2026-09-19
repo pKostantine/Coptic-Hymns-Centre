@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningCollectionCard from '@/components/learning/LearningCollectionCard';
@@ -43,7 +44,7 @@ export default function LearningCantorScreen() {
       {!cantor && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {cantor ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <LearningArtwork asset={cantor.profileImageAsset} size={138} rounded label={cantor.displayName} />
             <Text style={[styles.name, isArabic && styles.arabic]}>{cantor.displayName}</Text>
@@ -89,7 +90,7 @@ export default function LearningCantorScreen() {
             ))}
             {!cantor.lessonSets.length ? <Empty text={isArabic ? 'لا توجد مجموعات دروس منشورة بعد.' : 'No published lesson sets yet.'} /> : null}
           </View>
-        </ScrollView>
+        </NowPlayingAwareScrollView>
       ) : null}
       <LearningMiniPlayer />
     </SafeAreaView>
