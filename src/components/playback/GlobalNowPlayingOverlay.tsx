@@ -48,6 +48,16 @@ export default function GlobalNowPlayingOverlay() {
   const isBookRoute = BOOK_PATH_PREFIXES.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`));
   const isExcludedRoute = EXCLUDED_PATHS.has(normalizedPath) || EXCLUDED_PATHS.has(pathname);
   const allowDisplay = Boolean(currentItem) && !isExcludedRoute && (!isBookRoute || preferences.displayNowPlayingBar);
+  const collapseAnimation = useRef(new Animated.Value(isCollapsed ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(collapseAnimation, {
+      toValue: isCollapsed ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [collapseAnimation, isCollapsed]);
 
   if (!allowDisplay) {
     return null;
@@ -90,16 +100,6 @@ export default function GlobalNowPlayingOverlay() {
   }
 
   const overlayBottom = 18 + insets.bottom;
-  const collapseAnimation = useRef(new Animated.Value(isCollapsed ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.timing(collapseAnimation, {
-      toValue: isCollapsed ? 1 : 0,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [collapseAnimation, isCollapsed]);
 
   const collapsedScale = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] });
   const collapsedOpacity = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.92] });
