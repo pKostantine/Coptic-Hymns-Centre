@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
@@ -81,7 +82,7 @@ export default function MusicReleaseScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Header onBack={() => router.back()} title={releaseType} isArabic={isArabic} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <MusicArtwork asset={release.coverAsset} size={220} label={release.title} />
           <View style={styles.meta}>
@@ -147,7 +148,7 @@ export default function MusicReleaseScreen() {
             );
           })}
         </View>
-      </ScrollView>
+      </NowPlayingAwareScrollView>
       <MusicMiniPlayer />
     </SafeAreaView>
   );

@@ -2,16 +2,10 @@ import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from 'react-native';
+    ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import Icon from '@/components/chc/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -364,7 +358,7 @@ export default function BibleSearchScreen() {
       ) : loading ? (
         <ActivityIndicator color={COLORS.gold} style={styles.loading} />
       ) : (
-        <FlatList
+        <NowPlayingAwareFlatList
           data={results}
           keyExtractor={(item) => `${item.bookKey}:${item.chapterNumber}:${item.verseNumber}`}
           style={styles.list}

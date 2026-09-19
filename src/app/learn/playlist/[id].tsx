@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
@@ -120,7 +121,7 @@ export default function LearningPlaylistScreen() {
       {!playlist && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {playlist ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <View style={styles.heroIcon}><Text style={styles.heroGlyph}>≡</Text></View>
             <Text style={[styles.eyebrow, isArabic && styles.arabic]}>
@@ -187,7 +188,7 @@ export default function LearningPlaylistScreen() {
               </View>
             ) : null}
           </View>
-        </ScrollView>
+        </NowPlayingAwareScrollView>
       ) : null}
       <LearningMiniPlayer />
     </SafeAreaView>

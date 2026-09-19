@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -39,7 +40,7 @@ export default function MusicArtistScreen() {
       {!artist ? (
         error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={COLORS.gold} style={styles.loader} />
       ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <MusicArtwork asset={artist.profileImageAsset} size={168} rounded label={artist.displayName} />
             <Text style={styles.name}>{artist.displayName}</Text>
@@ -59,7 +60,7 @@ export default function MusicArtistScreen() {
             ))}
           </View>
           {!artist.releases.length ? <Text style={styles.empty}>No published releases yet.</Text> : null}
-        </ScrollView>
+        </NowPlayingAwareScrollView>
       )}
 
       <MusicMiniPlayer />

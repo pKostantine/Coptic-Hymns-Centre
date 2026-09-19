@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
@@ -36,7 +37,7 @@ export default function LearningCantorsScreen() {
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{isArabic ? 'المعلّمون — تعلّم وادرس' : 'Cantors — Learn & Study'}</title></Head>
       <LearningBackHeader title={isArabic ? 'المعلّمون' : 'Cantors'} isArabic={isArabic} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.intro, isArabic && styles.arabic]}>
           {isArabic
             ? 'اختر معلّمًا لتصفح ألبوماته ودروسه المرتبة.'
@@ -56,7 +57,7 @@ export default function LearningCantorsScreen() {
             </Pressable>
           ))}
         </View>
-      </ScrollView>
+      </NowPlayingAwareScrollView>
       <LearningMiniPlayer />
     </SafeAreaView>
   );

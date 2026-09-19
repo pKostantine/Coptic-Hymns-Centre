@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
@@ -82,7 +83,7 @@ export default function MusicPlaylistScreen() {
       {error ? <View style={styles.center}><Text style={styles.error}>{error}</Text></View> : null}
 
       {playlist ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <MusicArtwork asset={playlist.coverAsset} size={184} label={playlist.name} />
             <View style={styles.heroText}>
@@ -142,7 +143,7 @@ export default function MusicPlaylistScreen() {
               <View style={styles.empty}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'هذه القائمة فارغة.' : 'This playlist is empty.'}</Text></View>
             )}
           </View>
-        </ScrollView>
+        </NowPlayingAwareScrollView>
       ) : null}
 
       <MusicMiniPlayer />

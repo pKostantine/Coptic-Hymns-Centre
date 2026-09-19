@@ -36,6 +36,8 @@ interface DocumentWebViewProps {
   collapsedSectionIds?: Record<string, boolean>;
   /** Section to scroll to the moment this WebView finishes its first load — e.g. wherever the user was reading in slideshow mode just before switching, or the last remembered position for a brand-new mount. Only consulted once, at mount; changing it on a later render has no effect (use the imperative scrollToSection handle for that). */
   initialSectionId?: string | null;
+  /** Extra scrollable space at the bottom for floating app chrome such as the global mini player. */
+  bottomContentInset?: number;
 }
 
 /**
@@ -59,6 +61,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       suppressAllSpeakerLabels = false,
       onAction,
       initialSectionId,
+      bottomContentInset = 0,
       collapsedSectionIds,
     },
     ref,
@@ -153,6 +156,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               copticRecitedPrayers,
               copticGospelRite,
               suppressAllSpeakerLabels,
+              bottomContentInset,
             })
           : null,
       [
@@ -168,6 +172,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         copticRecitedPrayers,
         copticGospelRite,
         suppressAllSpeakerLabels,
+        bottomContentInset,
       ],
     );
 

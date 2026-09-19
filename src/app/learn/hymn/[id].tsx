@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningCollectionCard from '@/components/learning/LearningCollectionCard';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
@@ -43,7 +44,7 @@ export default function LearningHymnScreen() {
       {!hymn && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {hymn ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{isArabic ? 'لحن' : 'HYMN'}</Text>
             <Text style={[styles.title, isArabic && styles.arabic]}>{hymn.title}</Text>
@@ -102,7 +103,7 @@ export default function LearningHymnScreen() {
               </View>
             </>
           ) : null}
-        </ScrollView>
+        </NowPlayingAwareScrollView>
       ) : null}
       <LearningMiniPlayer />
     </SafeAreaView>

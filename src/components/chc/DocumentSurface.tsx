@@ -5,6 +5,7 @@ import SlideshowContainer from './SlideshowContainer';
 import DocumentWebView, { DocumentAction, DocumentSection, DocumentWebViewHandle } from './DocumentWebView';
 import { withRememberedCollapse } from './documentHtml';
 import { CHC_SLIDESHOW_THEME, COLORS } from '../../constants/theme';
+import { useBottomChrome } from '../../context/BottomChromeContext';
 import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
 import { fontScaleToPx, ReadingPreferences } from '../../utils/preferencesStorage';
 
@@ -124,6 +125,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     ref,
   ) => {
     const { width: screenWidth } = useWindowDimensions();
+    const { nowPlayingInset } = useBottomChrome();
     const fontSize = Math.round(fontScaleToPx(preferences.fontScale) * fontScaleMultiplier);
     const effectiveSelectText = preferences.selectText && !preferences.slideshowMode;
     // section.id already includes hymn_key + item_order. Combining it with
@@ -323,6 +325,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         suppressAllSpeakerLabels={suppressAllSpeakerLabels}
         onAction={handleDocumentAction}
         initialSectionId={initialScrollSectionId}
+        bottomContentInset={nowPlayingInset}
       />
     );
   },

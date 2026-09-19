@@ -6,12 +6,17 @@ interface BottomChromeContextValue {
    * screen's bottom tab bar, or 0 when the focused screen has no tab bar.
    */
   tabBarInset: number;
+  /** Vertical content clearance required by the global now-playing overlay. */
+  nowPlayingInset: number;
   reportTabBar: (id: string, inset: number | null) => void;
+  reportNowPlayingInset: (inset: number) => void;
 }
 
 const BottomChromeContext = createContext<BottomChromeContextValue>({
   tabBarInset: 0,
+  nowPlayingInset: 0,
   reportTabBar: () => undefined,
+  reportNowPlayingInset: () => undefined,
 });
 
 /**
@@ -22,6 +27,7 @@ const BottomChromeContext = createContext<BottomChromeContextValue>({
  */
 export function BottomChromeProvider({ children }: { children: ReactNode }) {
   const [insets, setInsets] = useState<Record<string, number>>({});
+  const [nowPlayingInset, setNowPlayingInset] = useState(0);
 
   const reportTabBar = useCallback((id: string, inset: number | null) => {
     setInsets((current) => {
@@ -36,10 +42,17 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const reportNowPlayingInset = useCallback((inset: number) => {
+    const nextInset = Math.max(0, Math.round(inset));
+    setNowPlayingInset((current) => (current === nextInset ? current : nextInset));
+  }, []);
+
   const value = useMemo(() => ({
     tabBarInset: Math.max(0, ...Object.values(insets)),
+    nowPlayingInset,
     reportTabBar,
-  }), [insets, reportTabBar]);
+    reportNowPlayingInset,
+  }), [insets, nowPlayingInset, reportTabBar, reportNowPlayingInset]);
 
   return <BottomChromeContext.Provider value={value}>{children}</BottomChromeContext.Provider>;
 }

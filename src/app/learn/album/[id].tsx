@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
@@ -53,7 +54,7 @@ export default function LearningAlbumScreen() {
       {!album && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {album ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <LearningArtwork asset={album.coverAsset} size={210} label={album.title} />
             <View style={styles.heroInfo}>
@@ -126,7 +127,7 @@ export default function LearningAlbumScreen() {
             })}
             {!album.recordings.length ? <Text style={styles.empty}>{isArabic ? 'لا توجد تسجيلات منشورة.' : 'No published recordings.'}</Text> : null}
           </View>
-        </ScrollView>
+        </NowPlayingAwareScrollView>
       ) : null}
       <LearningMiniPlayer />
     </SafeAreaView>
