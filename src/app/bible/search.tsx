@@ -32,6 +32,7 @@ import {
   type BibleTestament,
 } from '@/utils/bibleSearch';
 import { goBack } from '@/utils/navigation';
+import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import type { BibleVisibleLanguages } from '@/utils/preferencesStorage';
 
 const PAGE_SIZE = 25;
@@ -100,6 +101,7 @@ const LANGUAGE_PREFERENCE_KEYS: Record<BibleSearchLanguage, keyof BibleVisibleLa
 
 export default function BibleSearchScreen() {
   const router = useRouter();
+  const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
   const label = (entry: { english: string; arabic: string }) => (isArabic ? entry.arabic : entry.english);
@@ -253,6 +255,8 @@ export default function BibleSearchScreen() {
         canGoBack
         onBack={() => goBack(router, '/bible')}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
+        rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+        onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
       />
 
       <View style={styles.searchRow}>

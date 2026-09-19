@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
+import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { useIsMobileWeb } from '../../../utils/useIsMobileWeb';
 import Icon, { IconName } from './Icon';
 
@@ -18,6 +19,7 @@ interface AppHeaderProps {
   onRightPress?: () => void;
   rightAccessibilityLabel?: string;
   visibleLanguages?: { english: boolean; arabic: boolean };
+  showBrowserFullscreen?: boolean;
 }
 
 /** CHC web header, with room for the safe area in edge-to-edge browsers. */
@@ -32,8 +34,10 @@ export default function AppHeader({
   onRightPress,
   rightAccessibilityLabel = 'Open settings',
   visibleLanguages,
+  showBrowserFullscreen = true,
 }: AppHeaderProps) {
   const { preferences } = useReadingPreferences();
+  const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const titleParts = typeof title === 'string' ? { english: title, arabic: '' } : title;
   // Headers show whichever single language the user has selected app-wide —
   // never both at once — unless a caller explicitly overrides this. Falls
@@ -43,7 +47,11 @@ export default function AppHeader({
   const wantsArabic = visibleLanguages ? visibleLanguages.arabic && !visibleLanguages.english : preferences.appLanguage === 'ar';
   const showArabic = wantsArabic && Boolean(titleParts.arabic);
   const showEnglish = !showArabic;
-  const hasRightLeadingAction = Boolean(rightLeadingIcon && onRightLeadingPress);
+  const defaultRightLeadingIcon = showBrowserFullscreen && shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined;
+  const defaultRightLeadingPress = showBrowserFullscreen && shouldShowFullscreen ? toggleFullscreen : undefined;
+  const effectiveRightLeadingIcon = rightLeadingIcon ?? defaultRightLeadingIcon;
+  const effectiveRightLeadingPress = rightLeadingIcon ? onRightLeadingPress : defaultRightLeadingPress;
+  const hasRightLeadingAction = Boolean(effectiveRightLeadingIcon && effectiveRightLeadingPress);
   const hasRightAction = Boolean(rightIcon && onRightPress);
   const isMobileWeb = useIsMobileWeb();
   const insets = useSafeAreaInsets();
@@ -100,9 +108,9 @@ export default function AppHeader({
               <Pressable
                 accessibilityLabel={rightLeadingAccessibilityLabel}
                 style={iconButtonStyle}
-                onPress={onRightLeadingPress}
+                onPress={effectiveRightLeadingPress}
               >
-                <Icon name={rightLeadingIcon as IconName} size={iconSize} color={COLORS.gold} />
+                <Icon name={effectiveRightLeadingIcon as IconName} size={iconSize} color={COLORS.gold} />
               </Pressable>
             ) : null}
             {hasRightAction ? (

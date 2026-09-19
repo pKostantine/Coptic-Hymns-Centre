@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   lyricSetTabText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
   lyricSetTabTextActive: { color: COLORS.goldBright },
   lyricCard: { padding: SPACING.lg, borderRadius: RADII.lg, backgroundColor: COLORS.navyDark, borderWidth: 1, borderColor: COLORS.border },
-  rtlCard: { direction: 'rtl' },
+  rtlCard: { writingDirection: 'rtl' },
   lyricLine: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 22, lineHeight: 31, fontWeight: '600', paddingVertical: SPACING.sm, opacity: 0.62 },
   lyricLineActive: { color: COLORS.white, opacity: 1, fontSize: 25 },
   arabicLyric: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
