@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
@@ -94,7 +95,7 @@ export default function MusicLibraryScreen() {
       />
       <MusicSectionNav active="library" />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {loading ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -210,7 +211,7 @@ export default function MusicLibraryScreen() {
             )}
           </>
         ) : null}
-      </ScrollView>
+      </NowPlayingAwareScrollView>
 
       <BottomTabBar active="music" />
     </SafeAreaView>
