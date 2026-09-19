@@ -10,7 +10,7 @@ const IDLE_POLL_MS = Number(process.env.MEDIA_POLL_INTERVAL_MS || 1000);
 // blip), so a broken dependency does not turn into a request flood.
 const MIN_ERROR_BACKOFF_MS = Number(process.env.MEDIA_ERROR_BACKOFF_MS || 5000);
 const MAX_ERROR_BACKOFF_MS = Number(process.env.MEDIA_MAX_ERROR_BACKOFF_MS || 300000);
-const STORAGE_GC_INTERVAL_MS = Number(process.env.STORAGE_GC_INTERVAL_MS || 60 * 60 * 1000);
+const STORAGE_GC_INTERVAL_MS = Number(process.env.STORAGE_GC_INTERVAL_MS || 15 * 60 * 1000);
 
 let shuttingDown = false;
 let wakeUp = null;
