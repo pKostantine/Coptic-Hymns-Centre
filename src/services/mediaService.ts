@@ -8,14 +8,10 @@ const PUBLIC_BUCKET_ROUTES: Record<PublicMediaBucket, string> = {
   'chc-images': 'images',
 };
 
+const DEFAULT_MEDIA_BASE_URL = 'https://chc-media-resolver.hrmpdd8d6c.workers.dev';
+
 function getMediaBaseUrl(): string {
-  const baseUrl = process.env.EXPO_PUBLIC_CHC_MEDIA_BASE_URL?.replace(/\/+$/, '');
-
-  if (!baseUrl) {
-    throw new Error('Missing EXPO_PUBLIC_CHC_MEDIA_BASE_URL for CHC media resolution.');
-  }
-
-  return baseUrl;
+  return (process.env.EXPO_PUBLIC_CHC_MEDIA_BASE_URL || DEFAULT_MEDIA_BASE_URL).replace(/\/+$/, '');
 }
 
 function isPublicMediaBucket(bucket: string): bucket is PublicMediaBucket {
