@@ -166,6 +166,8 @@ as $function$
 declare
   base_payload jsonb;
   account_id uuid;
+  submission_id uuid;
+  submission_status media.publication_status;
   entry jsonb;
   track_id uuid;
   position integer := 0;
@@ -186,6 +188,33 @@ begin
 
   if not (select private.can_edit_creator_account(account_id)) then
     raise exception 'Not authorized for this release' using errcode = '42501';
+  end if;
+
+  select nullif(release.metadata ->> 'submissionId', '')::uuid
+  into submission_id
+  from music.releases release
+  where release.id = p_release_id;
+
+  if submission_id is not null then
+    select submission.status
+    into submission_status
+    from media.submissions submission
+    where submission.id = submission_id
+    for update;
+
+    if submission_status is not null
+       and submission_status not in (
+         'draft'::media.publication_status,
+         'uploading'::media.publication_status,
+         'ready_to_submit'::media.publication_status,
+         'changes_requested'::media.publication_status
+       ) then
+      update media.submissions submission
+      set status = 'ready_to_submit'::media.publication_status,
+          updated_by = auth.uid(),
+          updated_at = now()
+      where submission.id = submission_id;
+    end if;
   end if;
 
   base_payload := public.update_creator_release(
@@ -498,5 +527,5 @@ begin
 end;
 $function$;
 
-revoke all on function public.get_media_worker_image_context(text, uuid) from public, anon, authenticated;
-grant execute on function public.get_media_worker_image_context(text, uuid) to service_role;
+revoke all on function public.get_media_worker_image_context(text, uuid) from public, authenticated;
+grant execute on function public.get_media_worker_image_context(text, uuid) to anon, service_role;
