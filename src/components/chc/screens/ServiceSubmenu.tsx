@@ -3,6 +3,7 @@ import Head from 'expo-router/head';
 import { FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '../ui/AppHeader';
 import HymnCard from '../ui/HymnCard';
 import { COLORS, SPACING } from '../../../constants/theme';
@@ -41,7 +42,7 @@ export default function ServiceSubmenu({ basePath, title, arabic, services, back
         <title>{`CHC ${title}`}</title>
       </Head>
       <AppHeader title={{ english: title, arabic }} canGoBack onBack={() => goBack(router, backHref)} visibleLanguages={{ english: showEnglish, arabic: showArabic }} />
-      <FlatList
+      <NowPlayingAwareFlatList
         contentContainerStyle={styles.listContent}
         data={services}
         keyExtractor={(item) => item.id}
