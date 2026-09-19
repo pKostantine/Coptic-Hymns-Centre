@@ -96,7 +96,7 @@ export default function MiniPlayerCard({
               style={({ pressed }) => [styles.iconButton, pressed && styles.pressedButton]}
               onPress={onHide}
             >
-              <Icon name="chevron-down" size={18} color={COLORS.white} style={{ transform: [{ rotate: '180deg' }] }} />
+              <Icon name="chevron-down" size={18} color={COLORS.white} />
             </Pressable>
           ) : null}
         </View>

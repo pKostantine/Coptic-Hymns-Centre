@@ -1,6 +1,6 @@
 import { usePathname, useRouter } from 'expo-router';
-import { type ReactNode, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Icon from '@/components/chc/ui/Icon';
@@ -17,7 +17,6 @@ const EXCLUDED_PATHS = new Set([
   '/calendar',
   '/season-selector',
   '/settings',
-  '/app-settings',
   '/downloads',
   '/music/now-playing',
   '/learn/now-playing',
@@ -46,9 +45,6 @@ export default function GlobalNowPlayingOverlay() {
 
   const currentItem = music.currentItem ?? learning.currentItem;
   const normalizedPath = pathname.replace(/\?.*$/, '');
-  const hasBottomTabBar = ['/', '/music', '/learn', '/search', '/app-settings'].includes(normalizedPath)
-    || normalizedPath.startsWith('/music/')
-    || normalizedPath.startsWith('/learn/');
   const isBookRoute = BOOK_PATH_PREFIXES.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`));
   const isExcludedRoute = EXCLUDED_PATHS.has(normalizedPath) || EXCLUDED_PATHS.has(pathname);
   const allowDisplay = Boolean(currentItem) && !isExcludedRoute && (!isBookRoute || preferences.displayNowPlayingBar);
@@ -93,23 +89,62 @@ export default function GlobalNowPlayingOverlay() {
     );
   }
 
-  const overlayBottom = hasBottomTabBar ? 88 + insets.bottom : 18 + insets.bottom;
+  const overlayBottom = 18 + insets.bottom;
+  const collapseAnimation = useRef(new Animated.Value(isCollapsed ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(collapseAnimation, {
+      toValue: isCollapsed ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [collapseAnimation, isCollapsed]);
+
+  const collapsedScale = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] });
+  const collapsedOpacity = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.92] });
+  const cardTranslate = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, 20] });
+  const cardOpacity = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
 
   if (isCollapsed) {
     return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Show now playing"
-        onPress={() => setIsCollapsed(false)}
-        style={[styles.collapsedButton, { bottom: overlayBottom }]}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          right: 18,
+          bottom: overlayBottom,
+          opacity: collapsedOpacity,
+          transform: [{ scale: collapsedScale }],
+          zIndex: 40,
+          elevation: 40,
+        }}
       >
-        <Icon name="chevron-down" size={18} color={COLORS.white} style={{ transform: [{ rotate: '180deg' }] }} />
-      </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Show now playing"
+          onPress={() => setIsCollapsed(false)}
+          style={styles.collapsedButton}
+        >
+          <Icon name="chevron-down" size={18} color={COLORS.white} style={{ transform: [{ rotate: '180deg' }] }} />
+        </Pressable>
+      </Animated.View>
     );
   }
 
   return (
-    <View pointerEvents="box-none" style={[styles.container, { bottom: overlayBottom }]}>
+    <Animated.View
+      pointerEvents="box-none"
+      style={{
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        bottom: overlayBottom,
+        zIndex: 40,
+        elevation: 40,
+        opacity: cardOpacity,
+        transform: [{ translateY: cardTranslate }],
+      }}
+    >
       <MiniPlayerCard
         artwork={artwork}
         title={title}
@@ -126,7 +161,7 @@ export default function GlobalNowPlayingOverlay() {
         onHide={() => setIsCollapsed(true)}
         nextLabel={isMusic ? 'Next track' : 'Next lesson'}
       />
-    </View>
+    </Animated.View>
   );
 }
 
