@@ -8,7 +8,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import LearningArtwork from '@/components/learning/LearningArtwork';
-import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -168,7 +167,6 @@ export default function LearningHomeScreen() {
         ) : null}
       </ScrollView>
 
-      <LearningMiniPlayer />
       <BottomTabBar active="learn" />
     </SafeAreaView>
   );
