@@ -1,4 +1,5 @@
 import { claimAndProcessOne, getConfig } from './processor.mjs';
+import { startAdminServer } from './admin-server.mjs';
 
 // Keep the queue feeling immediate for creator uploads. One second is short
 // enough that a completed upload is normally claimed before the artist has
@@ -11,6 +12,7 @@ const MAX_ERROR_BACKOFF_MS = Number(process.env.MEDIA_MAX_ERROR_BACKOFF_MS || 30
 
 let shuttingDown = false;
 let wakeUp = null;
+let adminServer = null;
 
 function log(payload) {
   console.log(JSON.stringify({ at: new Date().toISOString(), ...payload }));
@@ -40,6 +42,7 @@ function requestShutdown(signal) {
 
   shuttingDown = true;
   log({ status: 'shutdown_requested', signal });
+  adminServer?.close();
   wakeUp?.();
 }
 
@@ -50,6 +53,8 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 async function main() {
   const config = getConfig();
   let consecutiveQueueErrors = 0;
+
+  adminServer = startAdminServer(config, { onLog: log });
 
   log({
     status: 'worker_started',
