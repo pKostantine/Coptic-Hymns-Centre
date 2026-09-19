@@ -3,6 +3,7 @@ import Head from 'expo-router/head';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING } from '@/constants/theme';
@@ -38,7 +39,7 @@ export default function BibleTestamentList() {
         onRightPress={() => router.push('/bible/search')}
         rightAccessibilityLabel="Search the Bible"
       />
-      <ScrollView contentContainerStyle={styles.list}>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.list}>
         {TESTAMENTS.map((testament) => (
           <HymnCard
             key={testament.key}
@@ -54,7 +55,7 @@ export default function BibleTestamentList() {
             }
           />
         ))}
-      </ScrollView>
+      </NowPlayingAwareScrollView>
     </SafeAreaView>
   );
 }
