@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MusicArtwork from '@/components/music/MusicArtwork';
@@ -10,6 +10,7 @@ import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { PublishedLyricSet } from '@/types/musicConsumer';
+import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 
 function formatTime(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -154,9 +155,7 @@ export default function MusicNowPlayingScreen() {
     );
   }
 
-  const primaryArtist = currentItem.track.artists.find((artist) => artist.role === 'primary')?.displayName
-    ?? currentItem.track.artists[0]?.displayName
-    ?? 'Coptic Hymns Centre';
+  const performerLine = formatMusicTrackPerformers(currentItem.track, 'Coptic Hymns Centre');
   const progress = durationMs > 0 ? Math.min(1, currentTimeMs / durationMs) : 0;
 
   return (
@@ -166,7 +165,7 @@ export default function MusicNowPlayingScreen() {
         <View style={styles.playerHero}>
           <MusicArtwork asset={currentItem.coverAsset} size={260} label={currentItem.releaseTitle ?? currentItem.track.title} />
           <Text numberOfLines={2} style={styles.trackTitle}>{currentItem.track.title}</Text>
-          <Text numberOfLines={1} style={styles.artist}>{primaryArtist}</Text>
+          <Text numberOfLines={1} style={styles.artist}>{performerLine}</Text>
           {currentItem.releaseTitle ? <Text numberOfLines={1} style={styles.release}>{currentItem.releaseTitle}</Text> : null}
 
           <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress * 100}%` }]} /></View>
@@ -189,9 +188,11 @@ export default function MusicNowPlayingScreen() {
             <Pressable disabled={likeBusy} style={[styles.trackAction, liked && styles.trackActionActive]} onPress={() => void toggleLike()}>
               <Text style={[styles.trackActionText, liked && styles.trackActionTextActive]}>{liked ? '♥' : '♡'} {isArabic ? 'إعجاب' : 'Like'}</Text>
             </Pressable>
-            <Pressable style={styles.trackAction} onPress={showDownloadAction}>
-              <Text style={styles.trackActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
-            </Pressable>
+            {Platform.OS !== 'web' ? (
+              <Pressable style={styles.trackAction} onPress={showDownloadAction}>
+                <Text style={styles.trackActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
@@ -207,7 +208,7 @@ export default function MusicNowPlayingScreen() {
                 <Text style={[styles.queueIndex, index === currentIndex && styles.gold]}>{index + 1}</Text>
                 <View style={styles.queueInfo}>
                   <Text numberOfLines={1} style={[styles.queueTitle, index === currentIndex && styles.gold]}>{item.track.title}</Text>
-                  <Text numberOfLines={1} style={styles.queueArtist}>{item.track.artists[0]?.displayName ?? item.releaseTitle ?? ''}</Text>
+                  <Text numberOfLines={1} style={styles.queueArtist}>{formatMusicTrackPerformers(item.track, item.releaseTitle ?? '')}</Text>
                 </View>
                 {index === currentIndex ? <Text style={styles.nowBadge}>{playing ? 'PLAYING' : 'PAUSED'}</Text> : null}
               </Pressable>
