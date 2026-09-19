@@ -2,6 +2,8 @@ import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import LearningMiniPlayer from '../../learning/LearningMiniPlayer';
+import MusicMiniPlayer from '../../music/MusicMiniPlayer';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
@@ -27,7 +29,10 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   const iconSize = isCompactLandscape ? 22 : 27;
 
   return (
-    <View style={[styles.bar, Platform.OS === 'web' && { paddingBottom: insets.bottom }]}>
+    <View style={styles.shell}>
+      <MusicMiniPlayer />
+      <LearningMiniPlayer />
+      <View style={[styles.bar, Platform.OS === 'web' && { paddingBottom: insets.bottom }]}>
       <Pressable accessibilityLabel={labels.books} style={tabStyle} onPress={() => router.replace('/')}>
         {active === 'books' ? <View style={styles.activeIndicator} /> : null}
         <Icon name="library-outline" size={iconSize} color={active === 'books' ? COLORS.gold : COLORS.muted} />
@@ -51,11 +56,13 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
         <Icon name="settings-outline" size={iconSize} color={active === 'settings' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'settings' && styles.tabLabelActive]}>{labels.settings}</Text>
       </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  shell: { backgroundColor: COLORS.navy },
   bar: {
     backgroundColor: COLORS.navy,
     borderTopColor: COLORS.border,
