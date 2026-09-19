@@ -32,7 +32,8 @@ export type IconName =
   | 'shuffle'
   | 'repeat'
   | 'heart'
-  | 'heart-outline';
+  | 'heart-outline'
+  | 'musical-notes';
 
 interface IconProps {
   name: IconName;
@@ -313,6 +314,17 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="M368 368 144 144M368 144 144 368" fill="none" stroke={color} strokeWidth={40} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'musical-notes':
+      // Beamed pair of quavers: the Music tab's mark.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+          <Path d="M8.9 4.6 20.5 2.6v3L8.9 7.6z" fill={color} />
+          <Rect x={8.9} y={4.6} width={1.7} height={13} fill={color} />
+          <Rect x={18.8} y={2.6} width={1.7} height={13} fill={color} />
+          <Circle cx={6.6} cy={17.6} r={3.3} fill={color} />
+          <Circle cx={16.5} cy={15.6} r={3.3} fill={color} />
         </Svg>
       );
     case 'shuffle':

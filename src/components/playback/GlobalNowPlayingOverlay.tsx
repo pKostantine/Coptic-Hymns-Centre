@@ -55,6 +55,29 @@ export default function GlobalNowPlayingOverlay() {
   const allowDisplay = Boolean(currentItem) && !isExcludedRoute && (!isBookRoute || preferences.displayNowPlayingBar);
   const [collapseAnimation] = useState(() => new Animated.Value(isCollapsed ? 1 : 0));
 
+  // The bar is anchored to the bottom of the page and lifted above the tab bar
+  // when the focused screen has one. Animating the lift (rather than jumping
+  // `bottom`) keeps it smooth when navigating between screens with and without
+  // a tab bar, and a transform can run on the native driver.
+  const targetLift = tabBarInset > 0 ? Math.max(0, tabBarInset - insets.bottom) : 0;
+  const [liftAnimation] = useState(() => new Animated.Value(targetLift));
+
+  useEffect(() => {
+    const animation = Animated.timing(liftAnimation, {
+      toValue: targetLift,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      // Moving between two screens that both have a tab bar briefly reports no
+      // tab bar at all, because the outgoing bar unregisters before the
+      // incoming one has measured itself. Holding the drop back for a moment
+      // keeps the bar still through that hand-off; rising is immediate.
+      delay: targetLift === 0 ? 140 : 0,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [liftAnimation, targetLift]);
+
   useEffect(() => {
     Animated.timing(collapseAnimation, {
       toValue: isCollapsed ? 1 : 0,
@@ -104,7 +127,8 @@ export default function GlobalNowPlayingOverlay() {
     );
   }
 
-  const overlayBottom = (tabBarInset > 0 ? tabBarInset : insets.bottom) + FLOATING_GAP;
+  const overlayBottom = insets.bottom + FLOATING_GAP;
+  const lift = Animated.multiply(liftAnimation, -1);
 
   const collapsedScale = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] });
   const collapsedOpacity = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.92] });
@@ -119,7 +143,7 @@ export default function GlobalNowPlayingOverlay() {
           right: 18,
           bottom: overlayBottom,
           opacity: collapsedOpacity,
-          transform: [{ scale: collapsedScale }],
+          transform: [{ translateY: lift }, { scale: collapsedScale }],
           zIndex: 40,
           elevation: 40,
         }}
@@ -147,7 +171,7 @@ export default function GlobalNowPlayingOverlay() {
         zIndex: 40,
         elevation: 40,
         opacity: cardOpacity,
-        transform: [{ translateY: cardTranslate }],
+        transform: [{ translateY: Animated.add(lift, cardTranslate) }],
       }}
     >
       <MiniPlayerCard

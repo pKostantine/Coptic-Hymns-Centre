@@ -100,6 +100,12 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const restorePositionMs = useRef<number | null>(null);
 
   const currentItem = currentIndex >= 0 && currentIndex < queue.length ? queue[currentIndex] : null;
+  // expo-audio only reports `playing` once the clock has advanced and enough
+  // data is buffered, so right after playback starts it briefly reports false
+  // again — which made the play/pause button flicker play → pause → play on a
+  // cold load. The player's own `paused` flag is right from the first frame,
+  // so it covers that start-up window.
+  const playing = Boolean(status.playing) || (currentItem != null && !player.paused);
   const currentTimeMs = Math.max(0, Math.round((status.currentTime ?? 0) * 1000));
   const durationMs = Math.max(0, Math.round((status.duration ?? 0) * 1000));
 
@@ -160,9 +166,11 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
   const togglePlayback = useCallback(() => {
     if (!currentItem) return;
-    if (status.playing) player.pause();
+    // `playing` rather than the raw status: during the start-up window the
+    // status still says false, and pressing pause then would restart playback.
+    if (playing) player.pause();
     else player.play();
-  }, [currentItem, player, status.playing]);
+  }, [currentItem, player, playing]);
 
   const seekToMs = useCallback(async (positionMs: number) => {
     const knownDurationMs = Math.max(durationMs, currentItem?.playable.durationMs ?? 0);
@@ -399,7 +407,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     queue,
     currentIndex,
     currentItem,
-    playing: Boolean(status.playing),
+    playing,
     buffering: Boolean(status.isBuffering),
     loadingSource,
     currentTimeMs,
@@ -444,7 +452,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     selectQueueIndex,
     shuffleEnabled,
     status.isBuffering,
-    status.playing,
+    playing,
     togglePlayback,
     toggleShuffle,
   ]);

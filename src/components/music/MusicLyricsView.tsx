@@ -52,7 +52,6 @@ export default function MusicLyricsView({
   const viewportHeight = useRef(0);
   const fullscreen = variant === 'fullscreen';
   const selectedSet = lyricSets.find((set) => set.id === selectedSetId) ?? null;
-  const rtl = selectedSet?.locale === 'ar';
 
   useEffect(() => {
     lineOffsets.current.clear();
@@ -99,7 +98,7 @@ export default function MusicLyricsView({
         {loading && !selectedSet ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
 
         {selectedSet ? (
-          <View style={rtl ? styles.rtl : undefined}>
+          <View>
             {selectedSet.lines.map((line) => {
               const active = line.id === activeLineId;
               return (
@@ -115,6 +114,9 @@ export default function MusicLyricsView({
                       styles.lineText,
                       fullscreen && styles.lineTextFullscreen,
                       selectedSet.locale === 'ar' && styles.arabic,
+                      // Full screen centres every language; the panel keeps
+                      // Arabic aligned to its own reading edge.
+                      selectedSet.locale === 'ar' && !fullscreen && styles.arabicPanel,
                       selectedSet.locale === 'cop' && styles.coptic,
                       active && styles.lineTextActive,
                       active && fullscreen && styles.lineTextActiveFullscreen,
@@ -159,13 +161,13 @@ const styles = StyleSheet.create({
   // the reading position.
   contentFullscreen: { paddingHorizontal: SPACING.lg, paddingTop: 80, paddingBottom: 240, maxWidth: 1000, width: '100%', alignSelf: 'center' },
   loader: { marginTop: SPACING.xl },
-  rtl: { direction: 'rtl' } as ViewStyle,
   line: { paddingVertical: 7, borderRadius: 8 },
   lineText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 20, lineHeight: 30, fontWeight: '600', opacity: 0.55 },
   lineTextFullscreen: { fontSize: 40, lineHeight: 56, textAlign: 'center', opacity: 0.38 },
   lineTextActive: { color: COLORS.white, opacity: 1 },
   lineTextActiveFullscreen: { fontSize: 46, lineHeight: 62 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabicPanel: { textAlign: 'right' },
   coptic: { fontFamily: TYPOGRAPHY.coptic },
   empty: { alignItems: 'center', paddingVertical: SPACING.xl, paddingHorizontal: SPACING.md },
   emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700' },

@@ -49,6 +49,11 @@ function AppStack() {
       <Stack.Screen name="learn" options={{ animation: 'none' }} />
       <Stack.Screen name="search" options={{ animation: 'none' }} />
       <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
+
+      {/* The now-playing screens are pulled up over everything else, so they
+          rise from the bottom and drop back down when minimised. */}
+      <Stack.Screen name="music/now-playing" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="learn/now-playing" options={{ animation: 'slide_from_bottom' }} />
     </Stack>
   );
 }

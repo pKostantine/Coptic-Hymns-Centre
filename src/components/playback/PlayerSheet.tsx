@@ -12,8 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import RoundIconButton from '@/components/playback/RoundIconButton';
-import { COLORS, SPACING } from '@/constants/theme';
+import { COLORS } from '@/constants/theme';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 // How far down you have to drag before the sheet closes instead of settling.
@@ -31,8 +30,8 @@ interface PlayerSheetProps {
 
 /**
  * The pull-up panel that holds lyrics or the queue on phones, where there is
- * no room for side-by-side columns. Drag the handle down or tap the backdrop
- * to dismiss.
+ * no room for side-by-side columns. Swipe down anywhere that is not scrolling
+ * content, or tap the backdrop, to dismiss.
  */
 export default function PlayerSheet({
   visible,
@@ -69,9 +68,13 @@ export default function PlayerSheet({
     return () => animation.stop();
   }, [dragY, mounted, progress, visible]);
 
+  // Attached to the sheet as a whole rather than just the handle. Inner scroll
+  // views claim vertical gestures that start on them, so this responds on the
+  // handle, the headers and any padding, and never fights the lists.
   const [panResponder] = useState(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_event, gesture: PanResponderGestureState) => Math.abs(gesture.dy) > 4,
+    onMoveShouldSetPanResponder: (_event, gesture: PanResponderGestureState) => (
+      gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx)
+    ),
     onPanResponderTerminationRequest: () => false,
     onPanResponderMove: (_event, gesture: PanResponderGestureState) => {
       dragY.setValue(Math.max(0, gesture.dy));
@@ -109,16 +112,10 @@ export default function PlayerSheet({
           styles.sheet,
           { height: sheetHeight, paddingBottom: insets.bottom, transform: [{ translateY }] },
         ]}
+        {...panResponder.panHandlers}
       >
-        <View style={styles.grabBar} {...panResponder.panHandlers}>
+        <View style={styles.grabBar}>
           <View style={styles.grabber} />
-          <RoundIconButton
-            icon="chevron-down"
-            accessibilityLabel="Close panel"
-            onPress={onClose}
-            size={36}
-            style={styles.closeButton}
-          />
         </View>
         <View style={styles.body}>{children}</View>
       </Animated.View>
@@ -151,8 +148,7 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  grabBar: { height: 40, alignItems: 'center', justifyContent: 'center' },
+  grabBar: { height: 32, alignItems: 'center', justifyContent: 'center' },
   grabber: { width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.28)' },
-  closeButton: { position: 'absolute', right: SPACING.sm + 2 },
   body: { flex: 1, minHeight: 0 },
 });

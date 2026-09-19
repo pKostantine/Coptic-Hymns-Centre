@@ -62,7 +62,7 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
 
       <Pressable accessibilityLabel={labels.music} style={tabStyle} onPress={() => router.replace('/music')}>
         {active === 'music' ? <View style={styles.activeIndicator} /> : null}
-        <Text style={[styles.musicGlyph, { fontSize: iconSize + 2 }, active === 'music' && styles.musicGlyphActive]}>♪</Text>
+        <Icon name="musical-notes" size={iconSize} color={active === 'music' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'music' && styles.tabLabelActive]}>{labels.music}</Text>
       </Pressable>
 
@@ -135,14 +135,4 @@ const styles = StyleSheet.create({
   tabLabelLearning: {
     color: COLORS.learningBright,
   },
-  musicGlyph: {
-    width: 30,
-    height: 30,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    color: COLORS.muted,
-    fontWeight: '800',
-    lineHeight: 30,
-  },
-  musicGlyphActive: { color: COLORS.gold },
 });

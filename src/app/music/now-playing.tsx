@@ -4,6 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
+  PanResponder,
+  PanResponderGestureState,
   Platform,
   Pressable,
   StyleSheet,
@@ -20,6 +24,7 @@ import MusicQueueList from '@/components/music/MusicQueueList';
 import SeekBar from '@/components/music/SeekBar';
 import PlayerSheet from '@/components/playback/PlayerSheet';
 import RoundIconButton from '@/components/playback/RoundIconButton';
+import { useOverlayTransition } from '@/components/playback/useOverlayTransition';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -31,6 +36,10 @@ import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 const WIDE_MIN_WIDTH = 1024;
 const WIDE_MIN_HEIGHT = 560;
 const HEADER_HEIGHT = 64;
+// Swipe distance (or flick speed) that dismisses the player.
+const DISMISS_DISTANCE = 130;
+const DISMISS_VELOCITY = 0.75;
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -102,6 +111,10 @@ export default function MusicNowPlayingScreen() {
   const insets = useSafeAreaInsets();
   const [lyricsFullscreen, setLyricsFullscreen] = useState(false);
   const [openSheet, setOpenSheet] = useState<'lyrics' | 'queue' | null>(null);
+  const [dismissDrag] = useState(() => new Animated.Value(0));
+  const dismiss = useRef({ close: () => undefined as void, height: 0 });
+  const exitFullscreen = useRef(() => undefined as void);
+  const fullscreenTransition = useOverlayTransition(lyricsFullscreen);
   const [lyricSets, setLyricSets] = useState<PublishedLyricSet[]>([]);
   const [selectedLyricSetId, setSelectedLyricSetId] = useState<string | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
@@ -110,6 +123,53 @@ export default function MusicNowPlayingScreen() {
   const [likeBusy, setLikeBusy] = useState(false);
 
   useBrowserFullscreen(lyricsFullscreen, () => setLyricsFullscreen(false));
+
+  useEffect(() => {
+    dismiss.current = { close: () => router.back(), height };
+    exitFullscreen.current = () => setLyricsFullscreen(false);
+  }, [height, router]);
+
+  // Swiping down on the full-screen lyrics header drops back to the player.
+  // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
+  const [fullscreenDismissResponder] = useState(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture: PanResponderGestureState) => (
+      gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.5
+    ),
+    onPanResponderRelease: (_event, gesture: PanResponderGestureState) => {
+      if (gesture.dy > DISMISS_DISTANCE || gesture.vy > DISMISS_VELOCITY) exitFullscreen.current();
+    },
+  }));
+
+  // Pull the whole player down to put it away, the way a sheet behaves. The
+  // gesture only starts on a clear downward drag, so the seek bar, the queue
+  // and horizontal swipes keep working.
+  // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
+  const [dismissResponder] = useState(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture: PanResponderGestureState) => (
+      gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.5
+    ),
+    onPanResponderMove: (_event, gesture: PanResponderGestureState) => {
+      dismissDrag.setValue(Math.max(0, gesture.dy));
+    },
+    onPanResponderRelease: (_event, gesture: PanResponderGestureState) => {
+      if (gesture.dy > DISMISS_DISTANCE || gesture.vy > DISMISS_VELOCITY) {
+        Animated.timing(dismissDrag, {
+          toValue: dismiss.current.height,
+          duration: 200,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }).start(() => {
+          dismissDrag.setValue(0);
+          dismiss.current.close();
+        });
+        return;
+      }
+      Animated.spring(dismissDrag, { toValue: 0, useNativeDriver: USE_NATIVE_DRIVER, bounciness: 4 }).start();
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(dismissDrag, { toValue: 0, useNativeDriver: USE_NATIVE_DRIVER, bounciness: 4 }).start();
+    },
+  }));
 
   useEffect(() => {
     if (!currentItem) {
@@ -299,38 +359,43 @@ export default function MusicNowPlayingScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      {header}
+      <Animated.View
+        style={[styles.dismissLayer, { transform: [{ translateY: dismissDrag }] }]}
+        {...(wide ? {} : dismissResponder.panHandlers)}
+      >
+        {header}
 
-      {wide ? (
-        <View style={styles.wideBody}>
-          <View style={[styles.panel, styles.sidePanel]}>
-            {lyricsPanelHeader}
-            <MusicLyricsView {...lyricsProps} />
+        {wide ? (
+          <View style={styles.wideBody}>
+            <View style={[styles.panel, styles.sidePanel]}>
+              {lyricsPanelHeader}
+              <MusicLyricsView {...lyricsProps} />
+            </View>
+            <View style={[styles.panel, styles.playerPanel, { width: centerWidth }]}>
+              {player}
+            </View>
+            <MusicQueueList {...queueProps} scrollable style={styles.sidePanel} />
           </View>
-          <View style={[styles.panel, styles.playerPanel, { width: centerWidth }]}>
-            {player}
-          </View>
-          <MusicQueueList {...queueProps} scrollable style={styles.sidePanel} />
-        </View>
-      ) : (
-        <View style={styles.narrowBody}>
-          <View style={styles.narrowPlayer}>{player}</View>
+        ) : (
+          <View style={styles.narrowBody}>
+            <View style={styles.narrowPlayer}>{player}</View>
 
-          <View style={styles.pullUpRow}>
-            <PullUpButton
-              icon="book"
-              label={isArabic ? 'الكلمات' : 'Lyrics'}
-              onPress={() => setOpenSheet('lyrics')}
-            />
-            <PullUpButton
-              icon="list-outline"
-              label={isArabic ? 'قائمة الانتظار' : 'Queue'}
-              count={queue.length}
-              onPress={() => setOpenSheet('queue')}
-            />
+            <View style={styles.pullUpRow}>
+              <PullUpButton
+                icon="book"
+                label={isArabic ? 'الكلمات' : 'Lyrics'}
+                onPress={() => setOpenSheet('lyrics')}
+              />
+              <PullUpButton
+                icon="list-outline"
+                label={isArabic ? 'قائمة الانتظار' : 'Queue'}
+                count={queue.length}
+                onPress={() => setOpenSheet('queue')}
+              />
+            </View>
           </View>
-        </View>
-      )}
+        )}
+      </Animated.View>
 
       {!wide ? (
         <>
@@ -355,14 +420,27 @@ export default function MusicNowPlayingScreen() {
         </>
       ) : null}
 
-      {lyricsFullscreen ? (
-        <View style={styles.fullscreen}>
+      {fullscreenTransition.mounted ? (
+        <Animated.View
+          style={[
+            styles.fullscreen,
+            {
+              opacity: fullscreenTransition.progress,
+              transform: [
+                { scale: fullscreenTransition.progress.interpolate({ inputRange: [0, 1], outputRange: [1.03, 1] }) },
+              ],
+            },
+          ]}
+        >
           {artworkUri ? (
             <Image source={{ uri: artworkUri }} blurRadius={60} contentFit="cover" style={StyleSheet.absoluteFill} />
           ) : null}
           <View style={styles.fullscreenScrim} />
 
-          <View style={[styles.fullscreenTop, { paddingTop: insets.top + SPACING.md }]}>
+          <View
+            style={[styles.fullscreenTop, { paddingTop: insets.top + SPACING.md }]}
+            {...fullscreenDismissResponder.panHandlers}
+          >
             <MusicArtwork asset={currentItem.coverAsset} size={52} radius={8} label={currentItem.releaseTitle ?? currentItem.track.title} />
             <View style={styles.fullscreenTrack}>
               <Text numberOfLines={1} style={styles.fullscreenTitle}>{currentItem.track.title}</Text>
@@ -389,7 +467,7 @@ export default function MusicNowPlayingScreen() {
               large
             />
           </View>
-        </View>
+        </Animated.View>
       ) : null}
     </SafeAreaView>
   );
@@ -548,6 +626,7 @@ function PlayerCard({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
+  dismissLayer: { flex: 1, minHeight: 0 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 
   header: {
