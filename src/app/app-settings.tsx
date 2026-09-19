@@ -1,7 +1,8 @@
 import Head from 'expo-router/head';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -36,7 +37,7 @@ export default function AppSettingsScreen() {
         title={{ english: 'App Settings', arabic: 'إعدادات التطبيق' }}
         visibleLanguages={{ english: !showArabicChrome, arabic: showArabicChrome }}
       />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>
           <View style={styles.groupLabelRow}>
             <Text style={styles.groupLabel}>App Language</Text>
@@ -64,7 +65,7 @@ export default function AppSettingsScreen() {
             })}
           </View>
         </View>
-      </ScrollView>
+      </NowPlayingAwareScrollView>
       <BottomTabBar active="settings" />
     </SafeAreaView>
   );
