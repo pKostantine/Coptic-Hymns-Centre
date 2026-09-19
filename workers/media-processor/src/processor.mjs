@@ -42,12 +42,23 @@ function requireEnv(name) {
 }
 
 export function getConfig() {
+  const r2Driver = process.env.R2_DRIVER || 'wrangler';
+
+  // Validate storage access before the worker ever claims a job. A missing R2
+  // credential is an infrastructure problem, not a media-file failure; letting
+  // the worker claim jobs first would burn their retry attempts one by one.
+  if (r2Driver === 's3') {
+    requireEnv('R2_ACCOUNT_ID');
+    requireEnv('R2_ACCESS_KEY_ID');
+    requireEnv('R2_SECRET_ACCESS_KEY');
+  }
+
   return {
     supabaseUrl: requireEnv('SUPABASE_URL').replace(/\/+$/, ''),
     supabasePublishableKey: requireEnv('SUPABASE_PUBLISHABLE_KEY'),
     mediaWorkerToken: requireEnv('MEDIA_WORKER_TOKEN'),
     mediaWorkerId: process.env.MEDIA_WORKER_ID || `media-processor-${process.pid}`,
-    r2Driver: process.env.R2_DRIVER || 'wrangler',
+    r2Driver,
     workDir: process.env.MEDIA_WORK_DIR || tmpdir(),
   };
 }
