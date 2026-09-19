@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
@@ -81,7 +82,7 @@ export default function LearningLessonScreen() {
       {!data && !error && !linkIncomplete ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {linkIncomplete || error ? <Text style={styles.error}>{linkIncomplete ? 'This lesson link is incomplete.' : error}</Text> : null}
       {data ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {data.lesson.mediaType === 'video' ? (
             <LearningVideoPlayer uri={videoUri} />
           ) : (
@@ -119,7 +120,7 @@ export default function LearningLessonScreen() {
           <View style={styles.progressCard}>
             <LearningProgressControl hymnId={data.lessonSet.hymn.id} locale={locale} isArabic={isArabic} />
           </View>
-        </ScrollView>
+        </NowPlayingAwareScrollView>
       ) : null}
       <LearningMiniPlayer />
     </SafeAreaView>
