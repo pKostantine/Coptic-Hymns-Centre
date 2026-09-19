@@ -14,14 +14,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
-import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
-import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
 import type { MusicConsumerTrack } from '@/types/musicConsumer';
+import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import type {
   UnifiedSearchKind,
   UnifiedSearchResult,
@@ -60,7 +59,7 @@ function resultSubtitle(result: UnifiedSearchResult): string | null {
     return result.metadata.primaryArtist?.displayName ?? result.subtitle;
   }
   if (result.kind === 'music_track') {
-    const artists = result.metadata.artists.map((artist) => artist.displayName).join(', ');
+    const artists = formatMusicTrackPerformers({ artists: result.metadata.artists });
     return [artists, result.metadata.releaseTitle].filter(Boolean).join(' · ') || result.subtitle;
   }
   if (result.kind === 'learning_album') return result.metadata.cantorName;
@@ -350,8 +349,6 @@ export default function UnifiedSearchScreen() {
         </View> : null}
       </ScrollView>
 
-      <MusicMiniPlayer />
-      <LearningMiniPlayer />
       <BottomTabBar active={scope === 'music' ? 'music' : scope === 'learning' ? 'learn' : null} />
     </SafeAreaView>
   );
