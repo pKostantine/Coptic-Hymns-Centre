@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 const AUDIO_OUTPUT_MIME_TYPE = 'audio/mp4';
 const AUDIO_BITRATE = '256k';
@@ -68,7 +68,7 @@ export function getConfig() {
   };
 }
 
-async function callRpc(config, name, payload) {
+export async function callRpc(config, name, payload) {
   const headers = {
     apikey: config.supabasePublishableKey,
     'accept-profile': 'public',
@@ -136,7 +136,7 @@ function getWranglerCommand() {
     : { command: 'npx', prefix: ['wrangler'] };
 }
 
-function getS3Client() {
+export function getS3Client() {
   const accountId = requireEnv('R2_ACCOUNT_ID');
 
   return new S3Client({
@@ -214,7 +214,7 @@ async function uploadObject(config, bucket, key, sourcePath, contentType) {
   ]);
 }
 
-async function deleteObject(config, bucket, key) {
+export async function deleteObject(config, bucket, key) {
   if (config.r2Driver === 's3') {
     const client = getS3Client();
     await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
@@ -230,6 +230,41 @@ async function deleteObject(config, bucket, key) {
     `${bucket}/${key}`,
     '--remote',
   ]);
+}
+
+export async function listStorageObjects(config, bucket) {
+  if (config.r2Driver !== 's3') {
+    // The production Railway worker uses the S3-compatible R2 API. Local
+    // Wrangler mode intentionally skips full-bucket inventory rather than
+    // making a destructive GC pass with an incomplete view of storage.
+    return [];
+  }
+
+  const client = getS3Client();
+  const objects = [];
+  let continuationToken;
+
+  do {
+    const page = await client.send(new ListObjectsV2Command({
+      Bucket: bucket,
+      ContinuationToken: continuationToken,
+      MaxKeys: 1000,
+    }));
+
+    for (const object of page.Contents || []) {
+      if (!object.Key) continue;
+      objects.push({
+        bucket,
+        path: object.Key,
+        file_size_bytes: Number(object.Size || 0),
+        last_modified_at: object.LastModified?.toISOString?.() ?? null,
+      });
+    }
+
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return objects;
 }
 
 async function sha256File(filePath) {
