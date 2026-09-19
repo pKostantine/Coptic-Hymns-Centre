@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 const AUDIO_OUTPUT_MIME_TYPE = 'audio/mp4';
 const AUDIO_BITRATE = '256k';
@@ -211,6 +211,24 @@ async function uploadObject(config, bucket, key, sourcePath, contentType) {
     contentType,
     '--cache-control',
     'public, max-age=31536000, immutable',
+  ]);
+}
+
+async function deleteObject(config, bucket, key) {
+  if (config.r2Driver === 's3') {
+    const client = getS3Client();
+    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    return;
+  }
+
+  const wrangler = getWranglerCommand();
+  await spawnChecked(wrangler.command, [
+    ...wrangler.prefix,
+    'r2',
+    'object',
+    'delete',
+    `${bucket}/${key}`,
+    '--remote',
   ]);
 }
 
@@ -546,14 +564,24 @@ async function runJob(config, job) {
       result.mimeType,
     );
 
-    const completedRows = await callRpc(config, 'complete_media_processing_job', {
-      p_worker_token: config.mediaWorkerToken,
-      p_job_id: job.job_id,
-      p_output_mime_type: result.mimeType,
-      p_output_size_bytes: outputStat.size,
-      p_output_checksum_sha256: outputChecksum,
-      p_probe: result.probe,
-    });
+    let completedRows;
+    try {
+      completedRows = await callRpc(config, 'complete_media_processing_job', {
+        p_worker_token: config.mediaWorkerToken,
+        p_job_id: job.job_id,
+        p_output_mime_type: result.mimeType,
+        p_output_size_bytes: outputStat.size,
+        p_output_checksum_sha256: outputChecksum,
+        p_probe: result.probe,
+      });
+    } catch (error) {
+      // If an admin permanently deletes a file while a worker is finishing it,
+      // completion is rejected because the job has been cancelled/deleted.
+      // Remove the just-uploaded delivery object so the race cannot leave an
+      // orphaned R2 file behind.
+      await deleteObject(config, job.output_bucket, job.output_path).catch(() => undefined);
+      throw error;
+    }
 
     return {
       status: 'completed',
