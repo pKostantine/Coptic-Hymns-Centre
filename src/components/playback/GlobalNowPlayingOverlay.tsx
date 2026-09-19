@@ -42,11 +42,12 @@ export default function GlobalNowPlayingOverlay() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { tabBarInset } = useBottomChrome();
+  const { tabBarInset, reportNowPlayingInset } = useBottomChrome();
   const { preferences } = useReadingPreferences();
   const music = useMusicPlayer();
   const learning = useLearningPlayer();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [expandedHeight, setExpandedHeight] = useState(60);
 
   const currentItem = music.currentItem ?? learning.currentItem;
   const normalizedPath = pathname.replace(/\?.*$/, '');
@@ -86,6 +87,29 @@ export default function GlobalNowPlayingOverlay() {
       useNativeDriver: true,
     }).start();
   }, [collapseAnimation, isCollapsed]);
+
+  useEffect(() => {
+    if (!allowDisplay) {
+      reportNowPlayingInset(0);
+      return;
+    }
+
+    // Top-level tab screens already stop scrolling at the tab bar's top edge,
+    // so only the floating card itself + its gap needs reserving there. On a
+    // nested screen with no tab bar, include the device bottom safe area too.
+    const safeAreaClearance = tabBarInset > 0 ? 0 : insets.bottom;
+    const visibleHeight = isCollapsed ? 42 : expandedHeight;
+    reportNowPlayingInset(visibleHeight + FLOATING_GAP + safeAreaClearance);
+
+    return () => reportNowPlayingInset(0);
+  }, [
+    allowDisplay,
+    expandedHeight,
+    insets.bottom,
+    isCollapsed,
+    reportNowPlayingInset,
+    tabBarInset,
+  ]);
 
   if (!allowDisplay) {
     return null;
@@ -163,6 +187,10 @@ export default function GlobalNowPlayingOverlay() {
   return (
     <Animated.View
       pointerEvents="box-none"
+      onLayout={(event) => {
+        const height = Math.max(0, Math.round(event.nativeEvent.layout.height));
+        if (height > 0) setExpandedHeight(height);
+      }}
       style={{
         position: 'absolute',
         left: 12,
