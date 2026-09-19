@@ -6,14 +6,19 @@ import {
   PanResponderGestureState,
   Platform,
   Pressable,
+  ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
   View,
+  ViewStyle,
 } from 'react-native';
 
 import Icon from '@/components/chc/ui/Icon';
+import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import type { MusicQueueItem } from '@/context/MusicPlayerContext';
+import type { PlaybackRepeatMode } from '@/types/playback';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import MusicArtwork from './MusicArtwork';
 
@@ -30,8 +35,18 @@ interface MusicQueueListProps {
   onSelect: (index: number) => void;
   onMove: (fromIndex: number, toIndex: number) => void;
   onClear: () => void;
-  /** Lets the parent lock its ScrollView while a row is being dragged. */
-  onDragActiveChange: (active: boolean) => void;
+  shuffleEnabled: boolean;
+  repeatMode: PlaybackRepeatMode;
+  onToggleShuffle: () => void;
+  onCycleRepeat: () => void;
+  /**
+   * `true` gives the list its own scroll area (desktop side panel). Otherwise
+   * the rows sit inline and the page scrolls; use onDragActiveChange to lock
+   * the page while a row is being dragged.
+   */
+  scrollable?: boolean;
+  onDragActiveChange?: (active: boolean) => void;
+  style?: StyleProp<ViewStyle>;
 }
 
 interface DragHandlers {
@@ -58,7 +73,13 @@ export default function MusicQueueList({
   onSelect,
   onMove,
   onClear,
+  shuffleEnabled,
+  repeatMode,
+  onToggleShuffle,
+  onCycleRepeat,
+  scrollable = false,
   onDragActiveChange,
+  style,
 }: MusicQueueListProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const count = queue.length;
@@ -82,58 +103,89 @@ export default function MusicQueueList({
     handlers.current = {
       start: (index) => {
         setDrag({ from: index, dy: 0 });
-        onDragActiveChange(true);
+        onDragActiveChange?.(true);
       },
       move: (dy) => setDrag((current) => (current ? { ...current, dy } : current)),
       end: () => {
         if (drag && target >= 0 && target !== drag.from) onMove(drag.from, target);
         setDrag(null);
-        onDragActiveChange(false);
+        onDragActiveChange?.(false);
       },
     };
   });
 
-  const upNext = count - Math.max(0, currentIndex) - 1;
+  const upNext = Math.max(0, count - Math.max(0, currentIndex) - 1);
+  const repeatLabel = repeatMode === 'one' ? 'Repeat one' : repeatMode === 'all' ? 'Repeat all' : 'Repeat off';
+
+  const rows = (
+    <View style={[styles.list, { height: count * ROW_HEIGHT }, Platform.OS === 'web' && styles.noSelect]}>
+      {queue.map((item, index) => (
+        <QueueRow
+          key={queueKeys[index] ?? `${item.track.id}-${index}`}
+          index={index}
+          item={item}
+          active={index === currentIndex}
+          playing={playing}
+          offset={offsetFor(index)}
+          lifted={drag?.from === index}
+          dragging={drag != null}
+          handlers={handlers}
+          onSelect={onSelect}
+        />
+      ))}
+    </View>
+  );
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, scrollable && styles.cardScrollable, style]}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerTop}>
           <Text style={[styles.headerTitle, isArabic && styles.arabic]}>{isArabic ? 'قائمة الانتظار' : 'Queue'}</Text>
-          <Text style={[styles.headerMeta, isArabic && styles.arabic]}>
-            {isArabic
-              ? `${Math.max(0, upNext)} التالي`
-              : `${Math.max(0, upNext)} up next · ${count} ${count === 1 ? 'track' : 'tracks'}`}
-          </Text>
+          <View style={styles.modeButtons}>
+            <RoundIconButton
+              icon="shuffle"
+              accessibilityLabel={shuffleEnabled ? 'Shuffle on' : 'Shuffle off'}
+              active={shuffleEnabled}
+              onPress={onToggleShuffle}
+              size={46}
+            />
+            <RoundIconButton
+              icon="repeat"
+              accessibilityLabel={repeatLabel}
+              active={repeatMode !== 'off'}
+              badge={repeatMode === 'one' ? '1' : undefined}
+              onPress={onCycleRepeat}
+              size={46}
+            />
+          </View>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isArabic ? 'مسح قائمة الانتظار' : 'Clear queue'}
-          disabled={count <= 1}
-          onPress={onClear}
-          style={({ pressed }) => [styles.clearButton, count <= 1 && styles.clearButtonDisabled, pressed && styles.pressed]}
-        >
-          <Icon name="close" size={14} color={count <= 1 ? COLORS.muted : COLORS.goldBright} />
-          <Text style={[styles.clearText, count <= 1 && styles.clearTextDisabled]}>{isArabic ? 'مسح' : 'Clear queue'}</Text>
-        </Pressable>
+        <View style={styles.headerBottom}>
+          <Text style={[styles.headerMeta, isArabic && styles.arabic]}>
+            {isArabic ? `${upNext} التالي` : `${upNext} up next · ${count} ${count === 1 ? 'track' : 'tracks'}`}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isArabic ? 'مسح قائمة الانتظار' : 'Clear queue'}
+            disabled={count <= 1}
+            onPress={onClear}
+            style={({ pressed }) => [styles.clearButton, count <= 1 && styles.clearButtonDisabled, pressed && styles.pressed]}
+          >
+            <Icon name="close" size={12} color={count <= 1 ? COLORS.muted : COLORS.goldBright} />
+            <Text style={[styles.clearText, count <= 1 && styles.clearTextDisabled]}>{isArabic ? 'مسح' : 'Clear queue'}</Text>
+          </Pressable>
+        </View>
       </View>
 
-      <View style={[styles.list, { height: count * ROW_HEIGHT }, Platform.OS === 'web' && styles.noSelect]}>
-        {queue.map((item, index) => (
-          <QueueRow
-            key={queueKeys[index] ?? `${item.track.id}-${index}`}
-            index={index}
-            item={item}
-            active={index === currentIndex}
-            playing={playing}
-            offset={offsetFor(index)}
-            lifted={drag?.from === index}
-            dragging={drag != null}
-            handlers={handlers}
-            onSelect={onSelect}
-          />
-        ))}
-      </View>
+      {scrollable ? (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          scrollEnabled={drag == null}
+          nestedScrollEnabled
+        >
+          {rows}
+        </ScrollView>
+      ) : rows}
     </View>
   );
 }
@@ -229,23 +281,29 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     paddingBottom: SPACING.xs,
   },
+  cardScrollable: { marginTop: 0, flex: 1, minHeight: 0, overflow: 'hidden' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: SPACING.xs,
   },
-  headerTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700' },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACING.sm },
+  modeButtons: { flexDirection: 'row', gap: 10 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: SPACING.sm },
+  headerTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
   headerMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   clearButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    minHeight: 32,
-    paddingHorizontal: 12,
+    minHeight: 28,
+    paddingHorizontal: 10,
     borderRadius: RADII.pill,
     borderWidth: 1,
     borderColor: COLORS.goldLine,

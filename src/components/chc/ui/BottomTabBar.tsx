@@ -1,8 +1,10 @@
-import { useRouter } from 'expo-router';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useId, useRef } from 'react';
+import { Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { useBottomChrome } from '../../../context/BottomChromeContext';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import Icon from './Icon';
@@ -26,8 +28,31 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   const tabStyle = [styles.tab, isCompactLandscape && styles.tabLandscape];
   const iconSize = isCompactLandscape ? 22 : 27;
 
+  // Tell floating UI (the now-playing bar) where this bar's top edge is, so it
+  // can sit just above it. Only while focused: screens lower in a stack keep
+  // their tab bar mounted underneath the screen being shown.
+  const { reportTabBar } = useBottomChrome();
+  const reportId = useId();
+  const shellRef = useRef<View>(null);
+  const focused = useRef(false);
+  const measure = useCallback(() => {
+    shellRef.current?.measureInWindow((_x, y) => {
+      if (!focused.current) return;
+      reportTabBar(reportId, Math.max(0, Dimensions.get('window').height - y));
+    });
+  }, [reportId, reportTabBar]);
+
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    measure();
+    return () => {
+      focused.current = false;
+      reportTabBar(reportId, null);
+    };
+  }, [measure, reportId, reportTabBar]));
+
   return (
-    <View style={styles.shell}>
+    <View ref={shellRef} style={styles.shell} onLayout={measure}>
       <View style={[styles.bar, Platform.OS === 'web' && { paddingBottom: insets.bottom }]}>
       <Pressable accessibilityLabel={labels.books} style={tabStyle} onPress={() => router.replace('/')}>
         {active === 'books' ? <View style={styles.activeIndicator} /> : null}

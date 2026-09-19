@@ -28,7 +28,11 @@ export type IconName =
   | 'play-skip-forward'
   | 'play-skip-back'
   | 'reorder'
-  | 'close';
+  | 'close'
+  | 'shuffle'
+  | 'repeat'
+  | 'heart'
+  | 'heart-outline';
 
 interface IconProps {
   name: IconName;
@@ -309,6 +313,33 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="M368 368 144 144M368 144 144 368" fill="none" stroke={color} strokeWidth={40} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'shuffle':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="m400 304 48 48-48 48M400 112l48 48-48 48M64 352h85.19a80 80 0 0 0 66.56-35.62L256 256" fill="none" stroke={color} strokeWidth={40} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M64 160h85.19a80 80 0 0 1 66.56 35.62l80.5 120.76A80 80 0 0 0 362.81 352H416M416 160h-53.19a80 80 0 0 0-66.56 35.62L288 208" fill="none" stroke={color} strokeWidth={40} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'repeat':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="m320 120 48 48-48 48" fill="none" stroke={color} strokeWidth={40} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M352 168H144a80.24 80.24 0 0 0-80 80v16M192 392l-48-48 48-48" fill="none" stroke={color} strokeWidth={40} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M160 344h208a80.24 80.24 0 0 0 80-80v-16" fill="none" stroke={color} strokeWidth={40} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'heart':
+    case 'heart-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M256 448a32 32 0 0 1-18-5.57c-78.59-53.35-112.62-89.93-131.39-112.8-40-48.75-59.15-98.8-58.61-153C48.63 114.52 98.46 64 159.08 64c44.08 0 74.61 24.83 92.39 45.51a6 6 0 0 0 9.06 0C278.31 88.81 308.84 64 352.92 64c60.62 0 110.45 50.52 111.08 112.64.54 54.21-18.63 104.26-58.61 153-18.77 22.87-52.8 59.45-131.39 112.8a32 32 0 0 1-18 5.56z"
+            fill={name === 'heart' ? color : 'none'}
+            stroke={color}
+            strokeWidth={name === 'heart' ? 0 : 36}
+          />
         </Svg>
       );
     default:

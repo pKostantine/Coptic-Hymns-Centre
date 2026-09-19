@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import { COLORS } from '@/constants/theme';
+import { BottomChromeProvider } from '@/context/BottomChromeContext';
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -77,8 +78,10 @@ export default function RootLayout() {
         <CalendarProvider>
           <MusicPlayerProvider>
             <StatusBar style="light" />
-            <AppStack />
-            <GlobalNowPlayingOverlay />
+            <BottomChromeProvider>
+              <AppStack />
+              <GlobalNowPlayingOverlay />
+            </BottomChromeProvider>
           </MusicPlayerProvider>
         </CalendarProvider>
       </ReadingPreferencesProvider>

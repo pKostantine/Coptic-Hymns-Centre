@@ -110,13 +110,10 @@ export default function MiniPlayerCard({
 }
 
 const styles = StyleSheet.create({
-  // The card itself should float above the content beneath it, not sit on top
-  // of a black strip; the dark navy card is the visual surface.
+  // The card floats on its own; GlobalNowPlayingOverlay owns the spacing so the
+  // gap above the tab bar or page edge is exactly the same everywhere.
   outer: {
     backgroundColor: 'transparent',
-    paddingHorizontal: 10,
-    paddingTop: 6,
-    paddingBottom: 8,
   },
   card: {
     width: '100%',

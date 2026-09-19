@@ -1,5 +1,5 @@
 import { usePathname, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,11 +7,15 @@ import Icon from '@/components/chc/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import { COLORS } from '@/constants/theme';
+import { useBottomChrome } from '@/context/BottomChromeContext';
 import { useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import MiniPlayerCard from './MiniPlayerCard';
+
+// Same small gap whether the bar floats over a tab bar or the page edge.
+const FLOATING_GAP = 10;
 
 const EXCLUDED_PATHS = new Set([
   '/calendar',
@@ -38,6 +42,7 @@ export default function GlobalNowPlayingOverlay() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { tabBarInset } = useBottomChrome();
   const { preferences } = useReadingPreferences();
   const music = useMusicPlayer();
   const learning = useLearningPlayer();
@@ -48,7 +53,7 @@ export default function GlobalNowPlayingOverlay() {
   const isBookRoute = BOOK_PATH_PREFIXES.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`));
   const isExcludedRoute = EXCLUDED_PATHS.has(normalizedPath) || EXCLUDED_PATHS.has(pathname);
   const allowDisplay = Boolean(currentItem) && !isExcludedRoute && (!isBookRoute || preferences.displayNowPlayingBar);
-  const collapseAnimation = useRef(new Animated.Value(isCollapsed ? 1 : 0)).current;
+  const [collapseAnimation] = useState(() => new Animated.Value(isCollapsed ? 1 : 0));
 
   useEffect(() => {
     Animated.timing(collapseAnimation, {
@@ -99,7 +104,7 @@ export default function GlobalNowPlayingOverlay() {
     );
   }
 
-  const overlayBottom = 18 + insets.bottom;
+  const overlayBottom = (tabBarInset > 0 ? tabBarInset : insets.bottom) + FLOATING_GAP;
 
   const collapsedScale = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] });
   const collapsedOpacity = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.92] });
