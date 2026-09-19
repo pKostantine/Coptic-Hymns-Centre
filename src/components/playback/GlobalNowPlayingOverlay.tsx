@@ -1,6 +1,6 @@
 import { usePathname, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Icon from '@/components/chc/ui/Icon';
