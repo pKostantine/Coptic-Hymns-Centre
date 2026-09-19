@@ -193,8 +193,8 @@ do $patch_overview$
 declare
   definition text;
   patched text;
-  needle text := E"        where submission.status = 'published'::media.publication_status";
-  replacement text := E"        where submission.status = 'published'::media.publication_status
+  needle text := $needle$        where submission.status = 'published'::media.publication_status$needle$;
+  replacement text := $replacement$        where submission.status = 'published'::media.publication_status
           and (
             (
               submission.submission_type = 'music_release'::media.submission_type
@@ -217,7 +217,7 @@ declare
                 where lesson_set.submission_id = submission.id
               )
             )
-          )";
+          )$replacement$;
 begin
   select pg_get_functiondef(p.oid)
   into definition
@@ -230,7 +230,9 @@ begin
     raise exception 'get_admin_publication_overview not found';
   end if;
 
-  if position('catalog_item_deleted_by_admin' in definition) > 0 then
+  if position('where release.metadata ->> ''submissionId'' = submission.id::text' in definition) > 0
+     and position('where album.submission_id = submission.id' in definition) > 0
+     and position('where lesson_set.submission_id = submission.id' in definition) > 0 then
     return;
   end if;
 
@@ -238,14 +240,6 @@ begin
   if patched = definition then
     raise exception 'Could not patch published overview filtering';
   end if;
-
-  -- Marker comment inside the function body so this patch is idempotent.
-  patched := replace(
-    patched,
-    'begin',
-    E'begin\n  -- catalog_item_deleted_by_admin: omit published history rows whose catalog was deleted.',
-    1
-  );
 
   execute patched;
 end;
