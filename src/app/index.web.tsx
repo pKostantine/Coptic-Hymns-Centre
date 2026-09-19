@@ -3,6 +3,7 @@ import Head from 'expo-router/head';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import CategoryCard from '@/components/chc/ui/CategoryCard';
@@ -114,7 +115,7 @@ export default function MainMenuWeb() {
         </Pressable>
       ) : null}
 
-      <FlatList
+      <NowPlayingAwareFlatList
         /* FlatList can't switch column count on an existing instance, so the
            count doubles as its key and a rotation remounts the list. */
         key={columns}
