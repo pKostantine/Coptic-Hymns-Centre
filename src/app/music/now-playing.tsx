@@ -255,7 +255,7 @@ export default function MusicNowPlayingScreen() {
             ) : null}
 
             {selectedSet ? (
-              <View style={[styles.lyricCard, selectedSet.locale === 'ar' && styles.rtlCard]}>
+              <View style={[styles.lyricCard, selectedSet.locale === 'ar' ? styles.rtlCard : undefined]}>
                 {selectedSet.lines.map((line) => {
                   const active = line.id === activeLineId;
                   return (

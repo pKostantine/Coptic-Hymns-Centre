@@ -2,8 +2,6 @@ import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import LearningMiniPlayer from '../../learning/LearningMiniPlayer';
-import MusicMiniPlayer from '../../music/MusicMiniPlayer';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
@@ -30,8 +28,6 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
 
   return (
     <View style={styles.shell}>
-      <MusicMiniPlayer />
-      <LearningMiniPlayer />
       <View style={[styles.bar, Platform.OS === 'web' && { paddingBottom: insets.bottom }]}>
       <Pressable accessibilityLabel={labels.books} style={tabStyle} onPress={() => router.replace('/')}>
         {active === 'books' ? <View style={styles.activeIndicator} /> : null}

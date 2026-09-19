@@ -27,6 +27,7 @@ interface ReadingPreferencesContextValue {
   toggleSlideshowMode: () => void;
   toggleDisplayComments: () => void;
   toggleDisplaySilentPrayers: () => void;
+  toggleDisplayNowPlayingBar: () => void;
   toggleBishopPresent: () => void;
   toggleCopticGospelRite: () => void;
   setAppLanguage: (language: AppLanguage) => void;
@@ -133,6 +134,10 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     setPreferences((prev) => ({ ...prev, displaySilentPrayers: !prev.displaySilentPrayers }));
   }, []);
 
+  const toggleDisplayNowPlayingBar = useCallback(() => {
+    setPreferences((prev) => ({ ...prev, displayNowPlayingBar: !prev.displayNowPlayingBar }));
+  }, []);
+
   const toggleBishopPresent = useCallback(() => {
     setPreferences((prev) => ({ ...prev, bishopPresent: !prev.bishopPresent }));
   }, []);
@@ -188,6 +193,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleSlideshowMode,
       toggleDisplayComments,
       toggleDisplaySilentPrayers,
+      toggleDisplayNowPlayingBar,
       toggleBishopPresent,
       toggleCopticGospelRite,
       setAppLanguage,
@@ -210,6 +216,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleSlideshowMode,
       toggleDisplayComments,
       toggleDisplaySilentPrayers,
+      toggleDisplayNowPlayingBar,
       toggleBishopPresent,
       toggleCopticGospelRite,
       setAppLanguage,

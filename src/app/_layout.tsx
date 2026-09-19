@@ -10,6 +10,7 @@ import { COLORS } from '@/constants/theme';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
+import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import type { OrientationMode } from '@/utils/preferencesStorage';
 
 SplashScreen.preventAutoHideAsync();
@@ -77,6 +78,7 @@ export default function RootLayout() {
           <MusicPlayerProvider>
             <StatusBar style="light" />
             <AppStack />
+            <GlobalNowPlayingOverlay />
           </MusicPlayerProvider>
         </CalendarProvider>
       </ReadingPreferencesProvider>

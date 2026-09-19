@@ -16,6 +16,7 @@ interface MiniPlayerCardProps {
   onOpen: () => void;
   onTogglePlayback: () => void;
   onNext: () => void;
+  onHide?: () => void;
   nextLabel: string;
 }
 
@@ -35,6 +36,7 @@ export default function MiniPlayerCard({
   onOpen,
   onTogglePlayback,
   onNext,
+  onHide,
   nextLabel,
 }: MiniPlayerCardProps) {
   const clamped = Math.max(0, Math.min(1, progress));
@@ -42,6 +44,17 @@ export default function MiniPlayerCard({
   return (
     <View style={styles.outer}>
       <View style={styles.card}>
+        {onHide ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Hide now playing: ${title}`}
+            hitSlop={8}
+            style={({ pressed }) => [styles.hideButton, pressed && styles.pressedButton]}
+            onPress={onHide}
+          >
+            <Icon name="close" size={14} color={COLORS.white} />
+          </Pressable>
+        ) : null}
         <View style={styles.row}>
           <Pressable
             accessibilityRole="button"
@@ -96,10 +109,10 @@ export default function MiniPlayerCard({
 }
 
 const styles = StyleSheet.create({
-  // Page-coloured gutter so the card reads as floating above the tab bar
-  // rather than as one more stripe of it.
+  // The card itself should float above the content beneath it, not sit on top
+  // of a black strip; the dark navy card is the visual surface.
   outer: {
-    backgroundColor: COLORS.black,
+    backgroundColor: 'transparent',
     paddingHorizontal: 10,
     paddingTop: 6,
     paddingBottom: 8,
@@ -123,6 +136,18 @@ const styles = StyleSheet.create({
         elevation: 8,
       },
     }),
+  },
+  hideButton: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    zIndex: 1,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 20, 28, 0.6)',
   },
   row: {
     minHeight: 60,

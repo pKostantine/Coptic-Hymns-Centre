@@ -33,6 +33,7 @@ export interface ReadingPreferences {
   slideshowMode: boolean;
   displayComments: boolean;
   displaySilentPrayers: boolean;
+  displayNowPlayingBar: boolean;
   bishopPresent: boolean;
   copticGospelRite: boolean;
   /**
@@ -78,6 +79,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   slideshowMode: false,
   displayComments: false,
   displaySilentPrayers: false,
+  displayNowPlayingBar: true,
   bishopPresent: false,
   copticGospelRite: false,
   appLanguage: 'en',
