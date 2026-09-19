@@ -1,5 +1,6 @@
 import { claimAndProcessOne, getConfig } from './processor.mjs';
 import { startAdminServer } from './admin-server.mjs';
+import { purgeUnusedStorage } from './storage-gc.mjs';
 
 // Keep the queue feeling immediate for creator uploads. One second is short
 // enough that a completed upload is normally claimed before the artist has
@@ -9,10 +10,13 @@ const IDLE_POLL_MS = Number(process.env.MEDIA_POLL_INTERVAL_MS || 1000);
 // blip), so a broken dependency does not turn into a request flood.
 const MIN_ERROR_BACKOFF_MS = Number(process.env.MEDIA_ERROR_BACKOFF_MS || 5000);
 const MAX_ERROR_BACKOFF_MS = Number(process.env.MEDIA_MAX_ERROR_BACKOFF_MS || 300000);
+const STORAGE_GC_INTERVAL_MS = Number(process.env.STORAGE_GC_INTERVAL_MS || 60 * 60 * 1000);
 
 let shuttingDown = false;
 let wakeUp = null;
 let adminServer = null;
+let storageGcTimer = null;
+let storageGcRunning = false;
 
 function log(payload) {
   console.log(JSON.stringify({ at: new Date().toISOString(), ...payload }));
@@ -43,6 +47,7 @@ function requestShutdown(signal) {
   shuttingDown = true;
   log({ status: 'shutdown_requested', signal });
   adminServer?.close();
+  if (storageGcTimer) clearInterval(storageGcTimer);
   wakeUp?.();
 }
 
@@ -50,17 +55,49 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => requestShutdown(signal));
 }
 
+async function runAutomaticStorageGc(config) {
+  if (storageGcRunning || shuttingDown) return;
+  storageGcRunning = true;
+  try {
+    const result = await purgeUnusedStorage(config, { dueOnly: true });
+    log({
+      status: result.skipped ? 'storage_gc_skipped' : 'storage_gc_complete',
+      scannedCount: result.scannedCount,
+      candidateCount: result.candidateCount,
+      dueCount: result.dueCount,
+      deletedObjectCount: result.deletedObjectCount,
+      deletedBytes: result.deletedBytes,
+      databaseRowsRemoved: result.databaseRowsRemoved,
+      errorCount: result.errors.length,
+      errors: result.errors.slice(0, 20),
+    });
+  } catch (error) {
+    log({
+      status: 'storage_gc_error',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    storageGcRunning = false;
+  }
+}
+
 async function main() {
   const config = getConfig();
   let consecutiveQueueErrors = 0;
 
   adminServer = startAdminServer(config, { onLog: log });
+  // The first inventory establishes each currently-unused object's own grace
+  // period. Hourly scans then remove objects individually once they have
+  // remained unused for three full days.
+  void runAutomaticStorageGc(config);
+  storageGcTimer = setInterval(() => void runAutomaticStorageGc(config), STORAGE_GC_INTERVAL_MS);
 
   log({
     status: 'worker_started',
     workerId: config.mediaWorkerId,
     r2Driver: config.r2Driver,
     idlePollMs: IDLE_POLL_MS,
+    storageGcIntervalMs: STORAGE_GC_INTERVAL_MS,
   });
 
   while (!shuttingDown) {
