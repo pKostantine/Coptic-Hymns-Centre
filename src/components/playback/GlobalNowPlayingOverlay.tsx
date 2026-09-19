@@ -1,14 +1,14 @@
-import { useRouter, usePathname } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
+import { type ReactNode, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type ReactNode, useState } from 'react';
 
-import MusicArtwork from '@/components/music/MusicArtwork';
-import LearningArtwork from '@/components/learning/LearningArtwork';
 import Icon from '@/components/chc/ui/Icon';
+import LearningArtwork from '@/components/learning/LearningArtwork';
+import MusicArtwork from '@/components/music/MusicArtwork';
 import { COLORS } from '@/constants/theme';
-import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useLearningPlayer } from '@/context/LearningPlayerContext';
+import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import MiniPlayerCard from './MiniPlayerCard';
@@ -19,6 +19,8 @@ const EXCLUDED_PATHS = new Set([
   '/settings',
   '/app-settings',
   '/downloads',
+  '/music/now-playing',
+  '/learn/now-playing',
 ]);
 
 const BOOK_PATH_PREFIXES = [
@@ -43,8 +45,12 @@ export default function GlobalNowPlayingOverlay() {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const currentItem = music.currentItem ?? learning.currentItem;
-  const isBookRoute = BOOK_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-  const isExcludedRoute = EXCLUDED_PATHS.has(pathname) || EXCLUDED_PATHS.has(pathname.replace(/\?.*$/, ''));
+  const normalizedPath = pathname.replace(/\?.*$/, '');
+  const hasBottomTabBar = ['/', '/music', '/learn', '/search', '/app-settings'].includes(normalizedPath)
+    || normalizedPath.startsWith('/music/')
+    || normalizedPath.startsWith('/learn/');
+  const isBookRoute = BOOK_PATH_PREFIXES.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`));
+  const isExcludedRoute = EXCLUDED_PATHS.has(normalizedPath) || EXCLUDED_PATHS.has(pathname);
   const allowDisplay = Boolean(currentItem) && !isExcludedRoute && (!isBookRoute || preferences.displayNowPlayingBar);
 
   if (!allowDisplay) {
@@ -87,13 +93,15 @@ export default function GlobalNowPlayingOverlay() {
     );
   }
 
+  const overlayBottom = hasBottomTabBar ? 88 + insets.bottom : 18 + insets.bottom;
+
   if (isCollapsed) {
     return (
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Show now playing"
         onPress={() => setIsCollapsed(false)}
-        style={[styles.collapsedButton, { bottom: 88 + insets.bottom }]}
+        style={[styles.collapsedButton, { bottom: overlayBottom }]}
       >
         <Icon name="chevron-down" size={18} color={COLORS.white} style={{ transform: [{ rotate: '180deg' }] }} />
       </Pressable>
@@ -101,7 +109,7 @@ export default function GlobalNowPlayingOverlay() {
   }
 
   return (
-    <View pointerEvents="box-none" style={[styles.container, { bottom: 88 + insets.bottom }]}>
+    <View pointerEvents="box-none" style={[styles.container, { bottom: overlayBottom }]}>
       <MiniPlayerCard
         artwork={artwork}
         title={title}

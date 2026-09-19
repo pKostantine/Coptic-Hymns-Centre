@@ -44,17 +44,6 @@ export default function MiniPlayerCard({
   return (
     <View style={styles.outer}>
       <View style={styles.card}>
-        {onHide ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Hide now playing: ${title}`}
-            hitSlop={8}
-            style={({ pressed }) => [styles.hideButton, pressed && styles.pressedButton]}
-            onPress={onHide}
-          >
-            <Icon name="close" size={14} color={COLORS.white} />
-          </Pressable>
-        ) : null}
         <View style={styles.row}>
           <Pressable
             accessibilityRole="button"
@@ -98,6 +87,18 @@ export default function MiniPlayerCard({
           >
             <Icon name="play-skip-forward" size={18} color={COLORS.white} />
           </Pressable>
+
+          {onHide ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Hide now playing"
+              hitSlop={6}
+              style={({ pressed }) => [styles.iconButton, pressed && styles.pressedButton]}
+              onPress={onHide}
+            >
+              <Icon name="chevron-down" size={18} color={COLORS.white} style={{ transform: [{ rotate: '180deg' }] }} />
+            </Pressable>
+          ) : null}
         </View>
 
         <View pointerEvents="none" style={styles.progressTrack}>
@@ -136,18 +137,6 @@ const styles = StyleSheet.create({
         elevation: 8,
       },
     }),
-  },
-  hideButton: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
-    zIndex: 1,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(15, 20, 28, 0.6)',
   },
   row: {
     minHeight: 60,

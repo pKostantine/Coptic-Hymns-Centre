@@ -1,16 +1,16 @@
-import { useEffect } from 'react';
-import { View } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { useFonts as useLocalFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts as useLocalFonts } from 'expo-font';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import { COLORS } from '@/constants/theme';
-import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
-import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
+import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import type { OrientationMode } from '@/utils/preferencesStorage';
 
 SplashScreen.preventAutoHideAsync();

@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
+import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,8 +11,8 @@ import SaintHymnPicker from '@/components/chc/ui/SaintHymnPicker';
 import ToggleRow from '@/components/chc/ui/ToggleRow';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { OrientationMode, VisibleLanguages } from '@/utils/preferencesStorage';
 import { goBack } from '@/utils/navigation';
+import { OrientationMode, VisibleLanguages } from '@/utils/preferencesStorage';
 import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
 const LANGUAGE_OPTIONS: { key: keyof VisibleLanguages; label: string; arabic: string }[] = [

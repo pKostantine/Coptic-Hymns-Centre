@@ -2,16 +2,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { loadBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
 import {
-  AppLanguage,
-  BibleVisibleLanguages,
-  DEFAULT_READING_PREFERENCES,
-  loadReadingPreferences,
-  MAX_FONT_SCALE,
-  MIN_FONT_SCALE,
-  OrientationMode,
-  ReadingPreferences,
-  saveReadingPreferences,
-  VisibleLanguages,
+    AppLanguage,
+    BibleVisibleLanguages,
+    DEFAULT_READING_PREFERENCES,
+    loadReadingPreferences,
+    MAX_FONT_SCALE,
+    MIN_FONT_SCALE,
+    OrientationMode,
+    ReadingPreferences,
+    saveReadingPreferences,
+    VisibleLanguages,
 } from '../utils/preferencesStorage';
 
 interface ReadingPreferencesContextValue {
