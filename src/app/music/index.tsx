@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
@@ -39,7 +40,7 @@ export default function MusicHomeScreen() {
       />
       <MusicSectionNav active="home" />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <Text style={[styles.heroEyebrow, isArabic && styles.arabic]}>COPTIC HYMNS CENTRE</Text>
           <Text style={[styles.heroTitle, isArabic && styles.arabic]}>{isArabic ? 'استمع. صلِّ. احفظ.' : 'Listen. Pray. Remember.'}</Text>
@@ -55,7 +56,7 @@ export default function MusicHomeScreen() {
           <>
             <SectionHeading title={isArabic ? 'أحدث الإصدارات' : 'Latest Releases'} />
             {data.latestReleases.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+              <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                 {data.latestReleases.map((release) => (
                   <Pressable key={release.id} style={styles.releaseCard} onPress={() => router.push(`/music/release/${release.id}`)}>
                     <MusicArtwork asset={release.coverAsset} size={154} label={release.title} />
@@ -65,23 +66,23 @@ export default function MusicHomeScreen() {
                     </Text>
                   </Pressable>
                 ))}
-              </ScrollView>
+              </NowPlayingAwareScrollView>
             ) : <EmptyState text={isArabic ? 'لا توجد إصدارات منشورة بعد.' : 'No published releases yet.'} />}
 
             <SectionHeading title={isArabic ? 'الفنانون' : 'Artists'} />
             {data.artists.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+              <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                 {data.artists.map((artist) => (
                   <Pressable key={artist.id} style={styles.artistCard} onPress={() => router.push(`/music/artist/${artist.id}`)}>
                     <MusicArtwork asset={artist.profileImageAsset} size={116} rounded label={artist.displayName} />
                     <Text numberOfLines={1} style={[styles.artistName, isArabic && styles.arabic]}>{artist.displayName}</Text>
                   </Pressable>
                 ))}
-              </ScrollView>
+              </NowPlayingAwareScrollView>
             ) : <EmptyState text={isArabic ? 'لا يوجد فنانون منشورون بعد.' : 'No published artists yet.'} />}
           </>
         ) : null}
-      </ScrollView>
+      </NowPlayingAwareScrollView>
 
       <BottomTabBar active="music" />
     </SafeAreaView>
