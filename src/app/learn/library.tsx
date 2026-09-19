@@ -2,18 +2,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+  ActivityIndicator, Alert, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -103,7 +95,7 @@ export default function LearningLibraryScreen() {
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{isArabic ? 'تعلّمي — كوبتك هيمنز سنتر' : 'My Learning — Coptic Hymns Centre'}</title></Head>
       <LearningBackHeader title={isArabic ? 'تعلّمي' : 'My Learning'} isArabic={isArabic} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <Text style={[styles.eyebrow, isArabic && styles.arabic]}>CHC LEARN & STUDY</Text>
           <Text style={[styles.heroTitle, isArabic && styles.arabic]}>{isArabic ? 'مسار تعلّمك' : 'Your learning path'}</Text>
@@ -209,7 +201,7 @@ export default function LearningLibraryScreen() {
             </Text>
           ) : null}
         </View>
-      </ScrollView>
+      </NowPlayingAwareScrollView>
       <LearningMiniPlayer />
     </SafeAreaView>
   );
