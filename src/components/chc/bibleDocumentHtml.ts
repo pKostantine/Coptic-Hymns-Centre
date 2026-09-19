@@ -46,6 +46,7 @@ export function buildBibleChapterHtml({
   isSlideshow = false,
   preface = null,
   initialVerse = null,
+  bottomContentInset = 0,
 }: {
   verses: BibleDisplayVerse[];
   languageKeys: BibleLanguageKey[];
@@ -54,6 +55,8 @@ export function buildBibleChapterHtml({
   selectText?: boolean;
   isSlideshow?: boolean;
   preface?: BiblePreface | null;
+  /** Extra bottom clearance for app-level floating chrome, in CSS pixels. */
+  bottomContentInset?: number;
   /** Verse to land on when the chapter opens (a search hit or a deep link), instead of the top. */
   initialVerse?: string | number | null;
 }) {
@@ -164,7 +167,7 @@ export function buildBibleChapterHtml({
       .chapter {
         box-sizing: border-box;
         min-height: 100vh;
-        padding: 14px 14px calc(28px + env(safe-area-inset-bottom));
+        padding: 14px 14px calc(28px + env(safe-area-inset-bottom) + ${Math.max(0, Math.round(bottomContentInset))}px);
       }
       .verse-row {
         box-sizing: border-box;
