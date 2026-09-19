@@ -18,17 +18,19 @@ const IMAGE_OUTPUT_MIME_TYPE = 'image/jpeg';
 const IMAGE_MAX_EDGE = 3000;
 const IMAGE_QUALITY = '3';
 
-// Flatten any alpha onto white, force square pixels, cap the longer edge, and
-// encode a delivery JPEG. scale2ref sizes the white backdrop from the source,
-// and the two setsar=1 calls stop the backdrop and the -2 rounding from leaving
-// a non-square sample aspect ratio behind.
-const IMAGE_FILTER_COMPLEX = [
-  'color=c=white[bg]',
-  '[bg][0:v]scale2ref[bg][fg]',
-  `[bg][fg]overlay=format=auto:shortest=1,setsar=1,`
-    + `scale=w='if(gt(iw,ih),min(${IMAGE_MAX_EDGE},iw),-2)':`
-    + `h='if(gt(iw,ih),-2,min(${IMAGE_MAX_EDGE},ih))':flags=lanczos,`
-    + 'setsar=1,format=yuvj420p',
+const IMAGE_SCALE_FILTER =
+  `scale=w='if(gt(iw,ih),min(${IMAGE_MAX_EDGE},iw),-2)':`
+  + `h='if(gt(iw,ih),-2,min(${IMAGE_MAX_EDGE},ih))':flags=lanczos,setsar=1`;
+
+// The old image pipeline created a full-resolution white frame *before*
+// downscaling. Large PNG cover art could therefore hold two enormous decoded
+// frames at once and get the Railway process SIGKILLed. Scale the source first,
+// and only allocate a white background at the already-capped delivery size.
+const IMAGE_ALPHA_FILTER_COMPLEX = [
+  `[0:v]${IMAGE_SCALE_FILTER}[fg]`,
+  'color=c=white:s=16x16[bg]',
+  '[bg][fg]scale2ref=w=main_w:h=main_h[bg][fg]',
+  '[bg][fg]overlay=format=auto:shortest=1,format=yuvj420p',
 ].join(';');
 
 function requireEnv(name) {
@@ -373,16 +375,23 @@ async function transcodeToMp4(inputPath, outputPath) {
   ]);
 }
 
-async function renderDeliveryJpeg(inputPath, outputPath) {
+async function renderDeliveryJpeg(inputPath, outputPath, hasAlpha) {
+  const filterArgs = hasAlpha
+    ? ['-filter_complex', IMAGE_ALPHA_FILTER_COMPLEX]
+    : ['-vf', `${IMAGE_SCALE_FILTER},format=yuvj420p`];
+
   await spawnChecked(ffmpegPath, [
     '-y',
     '-hide_banner',
     '-loglevel',
     'error',
+    // Keep still-image decoding/filtering memory predictable on the 1 GB
+    // Railway worker. Audio/video encodes retain their normal threading.
+    '-threads',
+    '1',
     '-i',
     inputPath,
-    '-filter_complex',
-    IMAGE_FILTER_COMPLEX,
+    ...filterArgs,
     '-frames:v',
     '1',
     '-q:v',
@@ -470,7 +479,10 @@ export async function handleImageDelivery(inputPath, jobDir) {
   const inputProbe = await probeMedia(inputPath);
 
   assertImageInput(inputProbe);
-  await renderDeliveryJpeg(inputPath, outputPath);
+  const inputImage = inputProbe.streams?.find((stream) => stream.codec_type === 'video');
+  const pixelFormat = String(inputImage?.pix_fmt || '').toLowerCase();
+  const hasAlpha = pixelFormat.includes('a') || pixelFormat === 'pal8';
+  await renderDeliveryJpeg(inputPath, outputPath, hasAlpha);
 
   const outputProbe = await probeMedia(outputPath);
   assertJpegOutput(outputProbe);
