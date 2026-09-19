@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../CHC-Artists"
+		},
+		{
+			"path": "../CHC-Admin"
 		}
 	],
 	"settings": {}
