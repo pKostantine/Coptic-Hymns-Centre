@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -140,7 +141,7 @@ export default function BookmarksScreen() {
           <Text style={styles.emptyText}>No bookmarks yet.</Text>
         </View>
       ) : (
-        <FlatList
+        <NowPlayingAwareFlatList
           contentContainerStyle={styles.listContent}
           data={entries}
           keyExtractor={(item) => item.id}
