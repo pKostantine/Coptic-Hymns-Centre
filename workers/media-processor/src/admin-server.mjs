@@ -205,9 +205,12 @@ async function handleRequest(request, response, config) {
 }
 
 export function startAdminServer(config, { onLog } = {}) {
-  const port = Number(process.env.PORT || 3000);
+  // The Railway service domain is explicitly routed to container port 3000.
+  // Do not use Railway's injected PORT here; that value can differ from the
+  // service-domain target and would make the public admin endpoint unreachable.
+  const port = Number(process.env.ADMIN_API_PORT || 3000);
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`Invalid PORT ${process.env.PORT}`);
+    throw new Error(`Invalid ADMIN_API_PORT ${process.env.ADMIN_API_PORT}`);
   }
 
   const server = http.createServer((request, response) => {
