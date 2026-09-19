@@ -95,9 +95,7 @@ function snapshot<T>(entityType: OfflineEntitySnapshot['entityType'], entityId: 
 }
 
 function primaryArtist(track: MusicConsumerTrack): string {
-  return track.artists.find((artist) => artist.role === 'primary')?.displayName
-    ?? track.artists[0]?.displayName
-    ?? 'Coptic Hymns Centre';
+  return formatMusicTrackPerformers(track, 'Coptic Hymns Centre');
 }
 
 function musicTrackResources(
