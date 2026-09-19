@@ -48,6 +48,7 @@ Optional:
 - `MEDIA_ERROR_BACKOFF_MS` / `MEDIA_MAX_ERROR_BACKOFF_MS` — backoff when Supabase is unreachable, default `5000` / `300000`
 - `MEDIA_WORK_DIR` — scratch directory, default the OS temp dir
 - `MEDIA_KEEP_WORK_DIR=1` — keep the per-job scratch directory for debugging
+- `STORAGE_GC_INTERVAL_MS` — physical R2 inventory interval, default 15 minutes
 
 ## Commands
 
@@ -75,3 +76,17 @@ A job failure never stops the worker. The failure is reported to
 is visible in review rather than leaving the submission stuck in `processing`.
 
 `SIGINT` / `SIGTERM` finish the job in flight and then exit.
+
+
+## Unused storage garbage collection
+
+The production worker inventories `chc-submissions`, `chc-music`,
+`chc-learning`, and `chc-images`. Each physical object that has no active
+submission, catalog, profile, playlist, lesson, or processing reference gets
+its own unused timestamp. If it remains unused for three full days, the worker
+removes the R2 object and its orphaned media metadata. If the object becomes
+referenced again during the grace period, its unused clock is discarded.
+
+CHC Admin can explicitly bypass the three-day grace period from the Processing
+screen with **Delete all unused files**. That action performs a fresh inventory
+and deletes only objects that are still unreferenced at deletion time.
