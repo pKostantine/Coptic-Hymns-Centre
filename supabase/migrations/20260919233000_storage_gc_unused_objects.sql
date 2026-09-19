@@ -259,13 +259,13 @@ begin
 end;
 $function$;
 
-create or replace function public.complete_storage_gc_candidate(
+create or replace function public.prepare_storage_gc_candidate(
   p_worker_token text,
   p_bucket text,
   p_path text
 )
 returns table (
-  deleted boolean,
+  authorized boolean,
   database_rows_removed integer
 )
 language plpgsql
@@ -275,11 +275,18 @@ as $function$
 declare
   removed integer := 0;
   affected integer := 0;
+  asset_ids uuid[];
+  upload_ids uuid[];
 begin
   if not private.verify_media_worker_token(p_worker_token) then
     raise exception 'Invalid media worker token' using errcode = '28000';
   end if;
 
+  -- Last database-side reference check happens before the physical R2 delete.
+  -- Once the unused metadata rows below are removed, application code can no
+  -- longer create a new reference to this object while R2 deletion is in
+  -- flight. If R2 deletion itself fails, the next inventory sees the orphan
+  -- again and gives it a fresh grace period.
   if private.storage_object_is_referenced(p_bucket, p_path) then
     delete from media.storage_gc_candidates candidate
     where candidate.bucket = p_bucket and candidate.path = p_path;
@@ -287,31 +294,95 @@ begin
     return;
   end if;
 
+  select coalesce(array_agg(distinct asset.id), '{}'::uuid[])
+  into asset_ids
+  from media.media_assets asset
+  where (
+      (asset.bucket = p_bucket and asset.path = p_path)
+      or exists (
+        select 1
+        from media.media_asset_versions version
+        where version.media_asset_id = asset.id
+          and version.bucket = p_bucket
+          and version.path = p_path
+      )
+    )
+    and not private.storage_asset_is_referenced(asset.id);
+
+  select coalesce(array_agg(distinct upload.id), '{}'::uuid[])
+  into upload_ids
+  from media.upload_intents upload
+  where upload.bucket = p_bucket
+    and upload.path = p_path
+    and not private.storage_upload_intent_is_referenced(upload.id);
+
+  -- Completed/cancelled jobs are historical processing bookkeeping, not a
+  -- reason to retain otherwise unused bytes. Remove only jobs whose underlying
+  -- asset/upload has already been proven unreferenced above.
+  delete from media.media_processing_jobs job
+  where job.status in (
+      'completed'::media.processing_job_status,
+      'cancelled'::media.processing_job_status
+    )
+    and (
+      job.media_asset_id = any(asset_ids)
+      or job.upload_intent_id = any(upload_ids)
+      or job.media_asset_version_id in (
+        select version.id
+        from media.media_asset_versions version
+        where version.media_asset_id = any(asset_ids)
+      )
+      or (job.input_bucket = p_bucket and job.input_path = p_path)
+      or (job.output_bucket = p_bucket and job.output_path = p_path)
+    );
+  get diagnostics affected = row_count;
+  removed := removed + affected;
+
+  -- Play history is analytics history, not an active media reference.
+  update music.play_history history
+  set media_asset_id = null
+  where history.media_asset_id = any(asset_ids);
+  get diagnostics affected = row_count;
+  removed := removed + affected;
+
   delete from media.media_asset_versions version
-  where version.bucket = p_bucket
-    and version.path = p_path
-    and not private.storage_asset_is_referenced(version.media_asset_id);
+  where version.media_asset_id = any(asset_ids);
   get diagnostics affected = row_count;
   removed := removed + affected;
 
   delete from media.media_assets asset
-  where asset.bucket = p_bucket
-    and asset.path = p_path
-    and not private.storage_asset_is_referenced(asset.id);
+  where asset.id = any(asset_ids);
   get diagnostics affected = row_count;
   removed := removed + affected;
 
   delete from media.upload_intents upload
-  where upload.bucket = p_bucket
-    and upload.path = p_path
-    and not private.storage_upload_intent_is_referenced(upload.id);
+  where upload.id = any(upload_ids);
   get diagnostics affected = row_count;
   removed := removed + affected;
+
+  return query select true, removed;
+end;
+$function$;
+
+create or replace function public.complete_storage_gc_candidate(
+  p_worker_token text,
+  p_bucket text,
+  p_path text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  if not private.verify_media_worker_token(p_worker_token) then
+    raise exception 'Invalid media worker token' using errcode = '28000';
+  end if;
 
   delete from media.storage_gc_candidates candidate
   where candidate.bucket = p_bucket and candidate.path = p_path;
 
-  return query select true, removed;
+  return true;
 end;
 $function$;
 
@@ -361,9 +432,11 @@ $function$;
 
 revoke all on function public.sync_storage_gc_candidates(text, jsonb) from public, anon, authenticated;
 revoke all on function public.get_storage_gc_candidates(text, boolean, integer) from public, anon, authenticated;
+revoke all on function public.prepare_storage_gc_candidate(text, text, text) from public, anon, authenticated;
 revoke all on function public.complete_storage_gc_candidate(text, text, text) from public, anon, authenticated;
 grant execute on function public.sync_storage_gc_candidates(text, jsonb) to anon, authenticated;
 grant execute on function public.get_storage_gc_candidates(text, boolean, integer) to anon, authenticated;
+grant execute on function public.prepare_storage_gc_candidate(text, text, text) to anon, authenticated;
 grant execute on function public.complete_storage_gc_candidate(text, text, text) to anon, authenticated;
 
 revoke all on function public.authorize_admin_storage_gc() from public, anon;
