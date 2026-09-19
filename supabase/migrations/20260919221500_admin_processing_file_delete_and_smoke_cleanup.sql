@@ -197,7 +197,7 @@ revoke all on function public.finalize_admin_processing_file_deletion(uuid) from
 grant execute on function public.prepare_admin_processing_file_deletion(uuid) to authenticated;
 grant execute on function public.finalize_admin_processing_file_deletion(uuid) to authenticated;
 
--- Purge the database/catalog side of the old Phase 2-6 smoke-test fixtures.
+-- Purge the database/catalog side of the old Phase 2-10 smoke-test fixtures.
 -- The exact R2 object keys are intentionally retained in Git history so the
 -- object-store cleanup can be audited separately from application data.
 do $cleanup$
@@ -210,6 +210,11 @@ declare
   phase3_upload uuid := 'b414ff43-67ae-49d1-8b75-21e714f83a64';
   phase4_upload uuid := '85712f4f-0873-4cd8-b80f-bf5aad1a85c8';
   phase2_asset uuid := '1dde0683-faae-4312-9700-910d543a3216';
+  phase10_album uuid := 'b7bd63c0-8c91-4c5e-bbc3-086c615e8adf';
+  phase10_lesson_set uuid := 'd4dbbd74-71ef-4aec-93df-5bf4518c80d6';
+  phase10_cantor uuid := 'a3ac4bc2-8904-479a-aa15-e991f4389371';
+  phase10_season uuid := 'cad849ff-bf8f-46bd-a783-3b2d46ef1a80';
+  phase10_hymn uuid := 'f1ee3383-8dac-43c4-b76c-383008ea612c';
   asset_ids uuid[];
 begin
   select coalesce(array_agg(distinct id), '{}'::uuid[])
@@ -218,6 +223,14 @@ begin
   where id = phase2_asset
      or metadata ->> 'sourceUploadIntentId' in (phase3_upload::text, phase4_upload::text, phase5_upload::text)
      or id = (select track.media_asset_id from music.tracks track where track.id = phase6_track);
+
+  -- Phase 10 reused the Phase 5/6 media asset. Remove its child catalog first
+  -- so the asset can be deleted without leaving Learn & Study references.
+  delete from learning.albums album where album.id = phase10_album;
+  delete from learning.lesson_sets lesson_set where lesson_set.id = phase10_lesson_set;
+  delete from learning.cantors cantor where cantor.id = phase10_cantor;
+  delete from learning.seasons season where season.id = phase10_season;
+  delete from learning.hymns hymn where hymn.id = phase10_hymn;
 
   delete from music.releases release where release.id = phase6_release;
   delete from music.tracks track where track.id = phase6_track;
@@ -238,5 +251,9 @@ begin
 
   delete from media.media_assets asset where asset.id = any(asset_ids);
   delete from media.upload_intents upload where upload.id in (phase3_upload, phase4_upload, phase5_upload);
+
+  -- Search documents are denormalized and do not FK-cascade with catalog rows.
+  delete from media.search_documents document
+  where lower(to_jsonb(document)::text) like '%smoke%';
 end;
 $cleanup$;
