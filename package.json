@@ -63,7 +63,7 @@
     "test:lyrics": "node --test tests/synchronizedLyrics.test.cjs",
     "test:playback": "node --test tests/playbackEngine.test.cjs",
     "build": "expo export -p web",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler pages deploy dist --project-name coptic-hymns-centre"
   },
   "private": true
 }
