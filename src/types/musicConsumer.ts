@@ -51,6 +51,10 @@ export interface MusicConsumerRelease extends MusicConsumerReleaseSummary {
   tracks: MusicConsumerTrack[];
 }
 
+export interface MusicConsumerTrackDetail extends MusicConsumerTrack {
+  release: MusicConsumerReleaseSummary | null;
+}
+
 export interface MusicConsumerArtist extends MusicConsumerArtistSummary {
   releases: MusicConsumerReleaseSummary[];
 }
