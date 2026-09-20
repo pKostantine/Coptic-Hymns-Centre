@@ -24,7 +24,7 @@ const ORIENTATION_OPTIONS: { key: OrientationMode; label: string; arabic: string
   { key: 'portrait', label: 'Portrait', arabic: 'عمودي' }, { key: 'auto', label: 'Auto Rotate', arabic: 'تدوير تلقائي' },
 ];
 const SETTINGS_LABELS = {
-  settings: { english: 'Settings', arabic: 'الإعدادات' }, languages: { english: 'Languages', arabic: 'اللغات' }, orientation: { english: 'Orientation', arabic: 'الاتجاه' },
+  settings: { english: 'Book Settings', arabic: 'إعدادات الكتب' }, languages: { english: 'Languages', arabic: 'اللغات' }, orientation: { english: 'Orientation', arabic: 'الاتجاه' },
   display: { english: 'Display', arabic: 'العرض' }, slideshowMode: { english: 'Slideshow Mode', arabic: 'وضع العرض التقديمي' }, selectText: { english: 'Select Text', arabic: 'تحديد النص' },
   displayComments: { english: 'Display Comments', arabic: 'عرض التعليقات' }, displaySilentPrayers: { english: 'Display Silent Prayers', arabic: 'عرض الصلوات السرية' }, displayNowPlayingBar: { english: 'Display Now Playing Bar', arabic: 'عرض شريط التشغيل الحالي' },
   content: { english: 'Content', arabic: 'المحتوى' }, saintHymns: { english: 'Saint Hymns', arabic: 'ألحان القديسين' }, inMonastery: { english: 'In Monastery', arabic: 'في الدير' },
@@ -32,12 +32,12 @@ const SETTINGS_LABELS = {
 };
 interface SettingsScreenProps { onClose?: () => void; }
 export default function SettingsScreen({ onClose }: SettingsScreenProps) {
-  const router = useRouter(); const isHosted = Boolean(onClose); const closeScreen = () => (onClose ? onClose() : goBack(router, '/'));
+  const router = useRouter(); const isHosted = Boolean(onClose); const closeScreen = () => (onClose ? onClose() : goBack(router, '/books'));
   const { preferences, toggleLanguage, setFontScale, setFontScaleValue, setOrientationMode, toggleSelectText, toggleSlideshowMode, toggleDisplayComments, toggleDisplaySilentPrayers, toggleDisplayNowPlayingBar, toggleSaintHymn, clearSaintHymns, toggleInMonastery } = useReadingPreferences();
   const [saintPickerOpen, setSaintPickerOpen] = useState(false); const chosenSaintHymns = preferences.selectedSaintHymns || []; const isArabicChrome = preferences.appLanguage === 'ar';
   const labelText = (label: { english?: string; label?: string; arabic: string }) => isArabicChrome ? label.arabic : label.english || label.label || ''; const localizedTextStyle = isArabicChrome && styles.arabicText;
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safeArea, DISABLED_TEXT_SELECTION_STYLE]}>
-    {isHosted ? null : <Head><title>CHC Settings</title></Head>}
+    {isHosted ? null : <Head><title>CHC Book Settings</title></Head>}
     <AppHeader title={SETTINGS_LABELS.settings} canGoBack onBack={closeScreen} visibleLanguages={{ english: !isArabicChrome, arabic: isArabicChrome }} />
     <ScrollView contentContainerStyle={styles.scrollContent}><View style={styles.container}>
       <Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.languages)}</Text><View style={styles.languageList}>{LANGUAGE_OPTIONS.map((item) => <ToggleRow key={item.key} label={labelText(item)} isArabic={isArabicChrome} active={preferences.visibleLanguages[item.key]} onPress={() => toggleLanguage(item.key)} />)}</View>
