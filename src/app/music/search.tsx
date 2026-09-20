@@ -1,5 +1,5 @@
-import { Redirect } from 'expo-router';
+import SectionSearchScreen from '@/components/search/SectionSearchScreen';
 
-export default function LegacyMusicSearchRoute() {
-  return <Redirect href="/search?scope=music" />;
+export default function MusicSearchRoute() {
+  return <SectionSearchScreen section="music" />;
 }
