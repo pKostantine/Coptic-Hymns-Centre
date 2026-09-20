@@ -71,13 +71,16 @@ export default function HomeScreen() {
   }, []);
 
   // Home is always live. Books can be pinned to another calendar date without
-  // changing anything here.
-  const liveDate = useMemo(() => localDateAtUtcMidnight(now), [now]);
+  // changing anything here. Keep the date object stable within a day so the
+  // home cards do not re-query every minute just because the live clock ticks.
+  const liveIso = isoDate(localDateAtUtcMidnight(now));
+  const liveDate = useMemo(() => new Date(`${liveIso}T00:00:00Z`), [liveIso]);
   const livePeriod = now.getHours() >= 17 ? 'evening' as const : 'morning' as const;
   const sunday = useMemo(
     () => sundayForHome(liveDate, livePeriod),
     [liveDate, livePeriod],
   );
+  const sundayIso = isoDate(sunday.date);
   const synaxToday = liveDate;
   const synaxTomorrow = useMemo(() => addUtcDays(liveDate, 1), [liveDate]);
 
@@ -97,7 +100,7 @@ export default function HomeScreen() {
       .catch(() => { if (active) setSundayMessage(null); })
       .finally(() => { if (active) setSundayLoading(false); });
     return () => { active = false; };
-  }, [sunday.date]);
+  }, [sundayIso]);
 
   useEffect(() => {
     let active = true;
