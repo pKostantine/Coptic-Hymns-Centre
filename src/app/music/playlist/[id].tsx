@@ -17,6 +17,7 @@ import {
   musicTrackDownloadRequest,
 } from '@/services/offlineDownloadRequests';
 import type { MusicPlaylistPayload, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
+import { goBack } from '@/utils/navigation';
 
 export default function MusicPlaylistScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -29,12 +30,25 @@ export default function MusicPlaylistScreen() {
   const [playlist, setPlaylist] = useState<MusicPlaylistPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
 
   const queue = useMemo(() => (playlist?.tracks ?? []).map((track) => ({ track, releaseId: track.releaseId, coverAsset: playlist?.coverAsset })), [playlist]);
   const downloadRequest = useMemo(
     () => playlist ? musicPlaylistDownloadRequest(playlist, locale) : null,
     [locale, playlist],
   );
+
+  useEffect(() => {
+    let active = true;
+    musicService.getLibrary(locale)
+      .then((library) => {
+        if (active) setLikedTrackIds(new Set(library.likedTracks.map((track) => track.id)));
+      })
+      .catch(() => {
+        if (active) setLikedTrackIds(new Set());
+      });
+    return () => { active = false; };
+  }, [locale]);
 
   useEffect(() => {
     if (!playlistId) return;
@@ -61,6 +75,20 @@ export default function MusicPlaylistScreen() {
     );
   };
 
+  const toggleTrackLike = async (trackId: string) => {
+    const liked = likedTrackIds.has(trackId);
+    try {
+      await musicService.setLiked(trackId, !liked);
+      setLikedTrackIds((current) => {
+        const next = new Set(current);
+        if (liked) next.delete(trackId); else next.add(trackId);
+        return next;
+      });
+    } catch (cause) {
+      Alert.alert(isArabic ? 'الأغاني المعجبة' : 'Liked Songs', cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
+    }
+  };
+
   const removeTrack = async (trackId: string) => {
     if (!playlistId) return;
     try {
@@ -74,7 +102,7 @@ export default function MusicPlaylistScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <View style={styles.header}>
-        <Pressable accessibilityLabel="Back" onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
+        <Pressable accessibilityLabel="Back" onPress={() => goBack(router, '/music')} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
         <Text numberOfLines={1} style={[styles.headerTitle, isArabic && styles.arabic]}>{isArabic ? 'قائمة التشغيل' : 'Playlist'}</Text>
         <View style={styles.headerSpacer} />
       </View>
@@ -119,6 +147,9 @@ export default function MusicPlaylistScreen() {
                       index={index}
                       active={currentItem?.track.id === track.id}
                       onPress={() => playQueue(queue, index)}
+                      showLikeButton
+                      liked={likedTrackIds.has(track.id)}
+                      onToggleLike={() => void toggleTrackLike(track.id)}
                       trailing={(
                         <MusicDownloadButton
                           packageKey={trackRequest.packageKey}
