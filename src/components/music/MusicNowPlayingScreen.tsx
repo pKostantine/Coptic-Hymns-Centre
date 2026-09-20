@@ -639,19 +639,25 @@ interface TransportControlsProps {
   onTogglePlayback: () => void;
   onNext: () => void;
   large?: boolean;
+  dense?: boolean;
 }
 
-function TransportControls({ playing, buffering, onPrevious, onTogglePlayback, onNext, large = false }: TransportControlsProps) {
-  const playSize = large ? 76 : 60;
-  const skipIcon = large ? 30 : 24;
+function TransportControls({ playing, buffering, onPrevious, onTogglePlayback, onNext, large = false, dense = false }: TransportControlsProps) {
+  const playSize = large ? 76 : dense ? 50 : 60;
+  const skipIcon = large ? 30 : dense ? 21 : 24;
+  const sideSize = dense ? 40 : 52;
 
   return (
-    <View style={styles.controls}>
+    <View style={[styles.controls, dense && styles.controlsDense]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Previous track"
         onPress={onPrevious}
-        style={({ pressed }) => [styles.sideControl, pressed && styles.pressedControl]}
+        style={({ pressed }) => [
+          styles.sideControl,
+          { width: sideSize, height: sideSize, borderRadius: sideSize / 2 },
+          pressed && styles.pressedControl,
+        ]}
       >
         <Icon name="play-skip-back" size={skipIcon} color={COLORS.white} />
       </Pressable>
@@ -681,7 +687,11 @@ function TransportControls({ playing, buffering, onPrevious, onTogglePlayback, o
         accessibilityRole="button"
         accessibilityLabel="Next track"
         onPress={onNext}
-        style={({ pressed }) => [styles.sideControl, pressed && styles.pressedControl]}
+        style={({ pressed }) => [
+          styles.sideControl,
+          { width: sideSize, height: sideSize, borderRadius: sideSize / 2 },
+          pressed && styles.pressedControl,
+        ]}
       >
         <Icon name="play-skip-forward" size={skipIcon} color={COLORS.white} />
       </Pressable>
@@ -768,7 +778,7 @@ function PlayerCard({
 
       {horizontal ? (
         <View style={styles.horizontalControlStrip}>
-          <TransportControls {...transport} />
+          <TransportControls {...transport} dense />
           <View style={[styles.playerActions, styles.playerActionsHorizontal]}>
             <RoundIconButton
               icon={liked ? 'heart' : 'heart-outline'}
@@ -784,11 +794,7 @@ function PlayerCard({
               onPress={onShare}
               size={38}
             />
-            {onDownload ? (
-              <Pressable style={[styles.secondaryAction, styles.secondaryActionHorizontal]} onPress={onDownload}>
-                <Text style={styles.secondaryActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
-              </Pressable>
-            ) : null}
+
           </View>
         </View>
       ) : (
@@ -917,6 +923,7 @@ const styles = StyleSheet.create({
   seekBarCompact: { marginTop: 10 },
   seekBarHorizontal: { marginTop: 6 },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xl, marginTop: SPACING.xs },
+  controlsDense: { gap: 10, marginTop: 0 },
   playButton: { backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   playNudge: { marginLeft: 4 },
   sideControl: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
@@ -942,7 +949,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
   },
-  secondaryActionHorizontal: { minHeight: 34, paddingHorizontal: 10 },
   secondaryActionText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
 
   narrowBody: { flex: 1, minHeight: 0, paddingHorizontal: SPACING.md, paddingBottom: SPACING.md },
