@@ -27,7 +27,7 @@ export async function shareLink({ title, text, url }: ShareLinkOptions): Promise
     try {
       await Share.share(
         Platform.OS === 'ios'
-          ? { title, message: text?.trim() || title, url }
+          ? { title, url }
           : { title, message },
       );
       return 'shared';
@@ -46,7 +46,10 @@ export async function shareLink({ title, text, url }: ShareLinkOptions): Promise
 
   if (navigator?.share) {
     try {
-      await navigator.share({ title, text: text?.trim() || undefined, url });
+      // On iOS/Safari, sharing the URL as the primary item lets
+      // LinkPresentation fetch the dedicated rich-preview page instead of
+      // treating the share as a block of text with an incidental URL.
+      await navigator.share({ title, url });
       return 'shared';
     } catch (error) {
       if (isAbortError(error)) return 'cancelled';
