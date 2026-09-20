@@ -1,6 +1,6 @@
 import { usePathname, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { Alert, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MusicNowPlayingScreen from '@/app/music/now-playing';
@@ -12,6 +12,7 @@ import { useBottomChrome } from '@/context/BottomChromeContext';
 import { useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { musicService } from '@/services/musicService';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import MiniPlayerCard from './MiniPlayerCard';
 
@@ -43,7 +44,6 @@ export default function GlobalNowPlayingOverlay() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
   const { tabBarInset, reportNowPlayingInset } = useBottomChrome();
   const { preferences } = useReadingPreferences();
   const music = useMusicPlayer();
@@ -51,7 +51,9 @@ export default function GlobalNowPlayingOverlay() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedHeight, setExpandedHeight] = useState(60);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const isPhoneLayout = Platform.OS !== 'web' || width < 760;
+  const [miniLiked, setMiniLiked] = useState(false);
+  const [miniLikeBusy, setMiniLikeBusy] = useState(false);
+  const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
 
   const currentItem = music.currentItem ?? learning.currentItem;
   const normalizedPath = pathname.replace(/\?.*$/, '');
@@ -115,11 +117,37 @@ export default function GlobalNowPlayingOverlay() {
     tabBarInset,
   ]);
 
+  const isMusic = Boolean(music.currentItem);
+
+  useEffect(() => {
+    const trackId = music.currentItem?.track.id;
+    if (!trackId) {
+      setMiniLiked(false);
+      setLibraryAuthenticated(false);
+      return;
+    }
+
+    let active = true;
+    musicService.getLibrary(preferences.appLanguage === 'ar' ? 'ar' : 'en')
+      .then((library) => {
+        if (!active) return;
+        setLibraryAuthenticated(library.authenticated);
+        setMiniLiked(library.likedTracks.some((track) => track.id === trackId));
+      })
+      .catch(() => {
+        if (!active) return;
+        setLibraryAuthenticated(false);
+        setMiniLiked(false);
+      });
+
+    return () => { active = false; };
+  }, [isPopupOpen, music.currentItem?.track.id, preferences.appLanguage]);
+
   if (!allowDisplay) {
     return null;
   }
 
-  if (isPopupOpen && isPhoneLayout) {
+  if (isPopupOpen && isMusic) {
     return (
       <MusicNowPlayingScreen
         embedded
@@ -128,34 +156,25 @@ export default function GlobalNowPlayingOverlay() {
     );
   }
 
-  const isMusic = Boolean(music.currentItem);
   const onOpen = isMusic
-    ? () => {
-        if (isPhoneLayout) {
-          setIsPopupOpen(true);
-          return;
-        }
-        router.push('/music/now-playing');
-      }
-    : () => {
-        if (isPhoneLayout) {
-          setIsPopupOpen(true);
-          return;
-        }
-        router.push('/learn/now-playing');
-      };
+    ? () => setIsPopupOpen(true)
+    : () => router.push('/learn/now-playing');
   const onTogglePlayback = isMusic ? music.togglePlayback : learning.togglePlayback;
   const onNext = isMusic ? music.next : learning.next;
   const accentColor = isMusic ? COLORS.gold : COLORS.learning;
 
   let title = 'Now playing';
+  let titleSuffix: string | null = null;
   let subtitle = 'Coptic Hymns Centre';
   let artwork: ReactNode = null;
 
   if (isMusic && music.currentItem) {
     const item = music.currentItem;
     title = item.track.title;
-    subtitle = formatMusicTrackPerformers(item.track) || item.releaseTitle || 'Coptic Hymns Centre';
+    titleSuffix = item.releaseType === 'album' || item.releaseType === 'ep'
+      ? item.releaseTitle ?? null
+      : null;
+    subtitle = formatMusicTrackPerformers(item.track) || 'Coptic Hymns Centre';
     artwork = (
       <MusicArtwork
         asset={item.coverAsset ?? null}
@@ -232,7 +251,35 @@ export default function GlobalNowPlayingOverlay() {
       <MiniPlayerCard
         artwork={artwork}
         title={title}
+        titleSuffix={titleSuffix}
         subtitle={subtitle}
+        liked={isMusic ? miniLiked : undefined}
+        likeBusy={isMusic ? miniLikeBusy : undefined}
+        onToggleLike={isMusic && music.currentItem ? async () => {
+          if (miniLikeBusy) return;
+          if (!libraryAuthenticated) {
+            Alert.alert(
+              preferences.appLanguage === 'ar' ? 'الأغاني المعجبة' : 'Liked Songs',
+              preferences.appLanguage === 'ar'
+                ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'
+                : 'Sign in to your CHC account to save Liked Songs.',
+            );
+            return;
+          }
+          setMiniLikeBusy(true);
+          try {
+            const nextLiked = !miniLiked;
+            await musicService.setLiked(music.currentItem.track.id, nextLiked);
+            setMiniLiked(nextLiked);
+          } catch (cause) {
+            Alert.alert(
+              preferences.appLanguage === 'ar' ? 'الأغاني المعجبة' : 'Liked Songs',
+              cause instanceof Error ? cause.message : 'Unable to update Liked Songs.',
+            );
+          } finally {
+            setMiniLikeBusy(false);
+          }
+        } : undefined}
         playing={isMusic ? music.playing : learning.playing}
         buffering={isMusic ? music.buffering : learning.buffering}
         progress={isMusic
