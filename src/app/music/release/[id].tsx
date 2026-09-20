@@ -214,7 +214,7 @@ export default function MusicReleaseScreen() {
                 <Text style={styles.actionButtonText}>{isArabic ? 'إعجاب' : 'Like'}</Text>
               </Pressable>
               <Pressable style={styles.actionButton} onPress={() => void handleShareRelease()}>
-                <Text style={styles.shareGlyph}>↗</Text>
+                <Icon name="share-outline" size={19} color={COLORS.goldBright} />
                 <Text style={styles.actionButtonText}>{isArabic ? 'مشاركة' : 'Share'}</Text>
               </Pressable>
               {downloadRequest ? (
@@ -346,7 +346,6 @@ const styles = StyleSheet.create({
   playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800' },
   actionButton: { minHeight: 46, paddingHorizontal: SPACING.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.surface },
   actionButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
-  shareGlyph: { color: COLORS.goldBright, fontSize: 20, lineHeight: 20 },
   disabledButton: { opacity: 0.45 },
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   trackListDesktop: { width: '94%', maxWidth: 1120, alignSelf: 'center', marginHorizontal: 0 },
