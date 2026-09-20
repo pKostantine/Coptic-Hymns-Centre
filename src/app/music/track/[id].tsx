@@ -208,7 +208,7 @@ export default function MusicTrackDetailScreen() {
 
   const shareTrack = async () => {
     if (!track) return;
-    const url = publicUrl(`/music/track/${track.id}?share=2`);
+    const url = publicUrl(`/music/track/${track.id}?share=3`);
     await shareLink({
       title: track.title,
       text: track.release?.title ? `${track.title} — ${track.release.title}` : track.title,
