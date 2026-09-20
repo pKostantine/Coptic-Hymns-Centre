@@ -31,7 +31,7 @@ export default function BibleTestamentList() {
       <AppHeader
         title={{ english: 'Bible', arabic: 'الكتاب المقدس' }}
         canGoBack
-        onBack={() => goBack(router, '/')}
+        onBack={() => goBack(router, '/books')}
         visibleLanguages={{ english: showEnglish, arabic: showArabic }}
         rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
         onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
