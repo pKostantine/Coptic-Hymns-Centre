@@ -31,8 +31,9 @@ export async function searchUnifiedMedia(
         p_limit: limit,
       });
 
-  if (error) throw new Error('Search CHC: ' + error.message);
-  if (!data) throw new Error('Search CHC: no data returned.');
+  const label = scope === 'music' ? 'Search Music' : scope === 'learning' ? 'Search Learn & Study' : 'Search CHC';
+  if (error) throw new Error(label + ': ' + error.message);
+  if (!data) throw new Error(label + ': no data returned.');
   return data as unknown as UnifiedSearchPayload;
 }
 
