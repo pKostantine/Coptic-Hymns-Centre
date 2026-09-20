@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { forwardRef, type ReactElement } from 'react';
 import {
   FlatList,
   type FlatListProps,
@@ -33,15 +33,18 @@ function contentStyleWithInset(
  * above screen content, so these add exactly the currently reported player
  * clearance to the page's existing bottom padding.
  */
-export function NowPlayingAwareScrollView(props: ScrollViewProps) {
-  const { nowPlayingInset } = useBottomChrome();
-  return (
-    <ScrollView
-      {...props}
-      contentContainerStyle={contentStyleWithInset(props.contentContainerStyle, nowPlayingInset)}
-    />
-  );
-}
+export const NowPlayingAwareScrollView = forwardRef<ScrollView, ScrollViewProps>(
+  function NowPlayingAwareScrollView(props, ref) {
+    const { nowPlayingInset } = useBottomChrome();
+    return (
+      <ScrollView
+        ref={ref}
+        {...props}
+        contentContainerStyle={contentStyleWithInset(props.contentContainerStyle, nowPlayingInset)}
+      />
+    );
+  },
+);
 
 export function NowPlayingAwareFlatList<ItemT>(
   props: FlatListProps<ItemT>,
