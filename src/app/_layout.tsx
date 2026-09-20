@@ -50,6 +50,7 @@ function AppStack() {
       <Stack.Screen name="learn" options={{ animation: 'none' }} />
       <Stack.Screen name="search" options={{ animation: 'none' }} />
       <Stack.Screen name="settings" options={{ animation: 'none' }} />
+      <Stack.Screen name="synaxarium" options={{ animation: 'default' }} />
       <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
 
       {/* The now-playing views are floating overlays that sit on top of the
