@@ -33,6 +33,7 @@ export type IconName =
   | 'repeat'
   | 'heart'
   | 'heart-outline'
+  | 'share-outline'
   | 'musical-notes';
 
 interface IconProps {
@@ -352,6 +353,14 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
             stroke={color}
             strokeWidth={name === 'heart' ? 0 : 36}
           />
+        </Svg>
+      );
+    case 'share-outline':
+      // Apple-style share glyph: arrow out of an open square.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M336 192h56a40 40 0 0 1 40 40v184a40 40 0 0 1-40 40H120a40 40 0 0 1-40-40V232a40 40 0 0 1 40-40h56" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M256 336V64M160 160l96-96 96 96" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     default:
