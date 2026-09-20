@@ -31,6 +31,8 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerAsset, PublishedLyricSet } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
+import { goBack } from '@/utils/navigation';
+import { shareLink } from '@/utils/shareLink';
 
 // Lyrics | player | queue side by side once there is room for all three.
 const WIDE_MIN_WIDTH = 1024;
@@ -134,7 +136,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       onClose();
       return;
     }
-    router.back();
+    goBack(router, '/music');
   };
 
   useEffect(() => {
@@ -298,6 +300,9 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   }
 
   const performerLine = formatMusicTrackPerformers(currentItem.track, 'Coptic Hymns Centre');
+  const isCollectionTrack = currentItem.releaseType === 'album' || currentItem.releaseType === 'ep';
+  const albumLine = isCollectionTrack ? currentItem.releaseTitle ?? null : null;
+  const classifierLine = [currentItem.recordingType, currentItem.musicType].filter(Boolean).join(' • ');
   const effectiveDurationMs = durationMs || currentItem.track.durationMs || 0;
   const artworkUri = musicService.resolveAsset(currentItem.coverAsset ?? null);
   const wide = width >= WIDE_MIN_WIDTH && height >= WIDE_MIN_HEIGHT;
@@ -309,7 +314,9 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   const wideArtSize = clamp(Math.min(availableHeight - 350, centerWidth - 64), 160, 400);
   // Phones show the player full-height with the pull-up buttons pinned below,
   // so the artwork takes whatever room the rest of the controls leave.
-  const narrowArtSize = clamp(Math.min(width - SPACING.lg * 2, availableHeight - 290), 140, 360);
+  const narrowArtSize = width < 460
+    ? clamp(Math.min(width - 80, availableHeight * 0.3), 110, 210)
+    : clamp(Math.min(width - SPACING.lg * 2, availableHeight - 330), 150, 320);
 
   const lyricsProps = {
     lyricSets,
@@ -348,6 +355,20 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   );
 
   const isPhoneLayout = !wide && width < 460;
+
+  const handleShareTrack = async () => {
+    const deepLink = currentItem.releaseId
+      ? `https://coptichymnscentre.com/music/release/${currentItem.releaseId}?track=${currentItem.track.id}`
+      : 'https://coptichymnscentre.com/music';
+    await shareLink({
+      title: currentItem.track.title,
+      text: albumLine
+        ? `${currentItem.track.title} — ${albumLine}`
+        : `${currentItem.track.title} — ${performerLine}`,
+      url: deepLink,
+    });
+  };
+
   const player = (
     <PlayerCard
       compact={isPhoneLayout}
@@ -355,7 +376,9 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       coverAsset={currentItem.coverAsset}
       artLabel={currentItem.releaseTitle ?? currentItem.track.title}
       title={currentItem.track.title}
+      albumTitle={albumLine}
       performers={performerLine}
+      classifiers={classifierLine}
       positionMs={currentTimeMs}
       durationMs={effectiveDurationMs}
       playing={playing}
@@ -368,6 +391,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       onTogglePlayback={togglePlayback}
       onNext={next}
       onToggleLike={() => void toggleLike()}
+      onShare={() => void handleShareTrack()}
       onDownload={Platform.OS !== 'web' ? showDownloadAction : undefined}
     />
   );
@@ -376,7 +400,6 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
 
   return (
     <SafeAreaView edges={['left', 'right']} style={rootStyle}>
-      {embedded ? <Pressable accessibilityLabel="Close now playing overlay" onPress={closePlayer} style={styles.overlayBackdrop} /> : null}
       <Animated.View
         style={[styles.dismissLayer, { transform: [{ translateY: dismissDrag }] }]}
         {...(wide ? {} : dismissResponder.panHandlers)}
@@ -525,8 +548,8 @@ interface TransportControlsProps {
 }
 
 function TransportControls({ playing, buffering, onPrevious, onTogglePlayback, onNext, large = false }: TransportControlsProps) {
-  const playSize = large ? 76 : 68;
-  const skipIcon = large ? 30 : 26;
+  const playSize = large ? 76 : 60;
+  const skipIcon = large ? 30 : 24;
 
   return (
     <View style={styles.controls}>
@@ -578,7 +601,9 @@ interface PlayerCardProps extends Omit<TransportControlsProps, 'large'> {
   coverAsset?: MusicConsumerAsset | null;
   artLabel: string;
   title: string;
+  albumTitle?: string | null;
   performers: string;
+  classifiers?: string | null;
   positionMs: number;
   durationMs: number;
   liked: boolean;
@@ -586,6 +611,7 @@ interface PlayerCardProps extends Omit<TransportControlsProps, 'large'> {
   isArabic: boolean;
   onSeek: (positionMs: number) => void;
   onToggleLike: () => void;
+  onShare: () => void;
   onDownload?: () => void;
 }
 
@@ -595,7 +621,9 @@ function PlayerCard({
   coverAsset,
   artLabel,
   title,
+  albumTitle,
   performers,
+  classifiers,
   positionMs,
   durationMs,
   liked,
@@ -603,6 +631,7 @@ function PlayerCard({
   isArabic,
   onSeek,
   onToggleLike,
+  onShare,
   onDownload,
   ...transport
 }: PlayerCardProps) {
@@ -617,16 +646,10 @@ function PlayerCard({
       <View style={[styles.titleRow, { maxWidth: contentWidth }, compact && styles.titleRowCompact]}>
         <View style={styles.titleText}>
           <Text numberOfLines={2} style={[styles.trackTitle, compact && styles.trackTitleCompact]}>{title}</Text>
+          {albumTitle ? <Text numberOfLines={1} style={[styles.albumTitle, compact && styles.albumTitleCompact]}>{albumTitle}</Text> : null}
           <Text numberOfLines={1} style={[styles.artist, compact && styles.artistCompact]}>{performers}</Text>
+          {classifiers ? <Text numberOfLines={1} style={[styles.classifiers, compact && styles.classifiersCompact]}>{classifiers}</Text> : null}
         </View>
-        <RoundIconButton
-          icon={liked ? 'heart' : 'heart-outline'}
-          accessibilityLabel={liked ? (isArabic ? 'إزالة الإعجاب' : 'Unlike') : (isArabic ? 'إعجاب' : 'Like')}
-          active={liked}
-          disabled={likeBusy}
-          onPress={onToggleLike}
-          size={42}
-        />
       </View>
 
       <View style={[styles.seekBar, { maxWidth: contentWidth }, compact && styles.seekBarCompact]}>
@@ -635,11 +658,24 @@ function PlayerCard({
 
       <TransportControls {...transport} large={!compact} />
 
-      {onDownload ? (
-        <Pressable style={styles.downloadAction} onPress={onDownload}>
-          <Text style={styles.downloadText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
+      <View style={[styles.playerActions, compact && styles.playerActionsCompact]}>
+        <RoundIconButton
+          icon={liked ? 'heart' : 'heart-outline'}
+          accessibilityLabel={liked ? (isArabic ? 'إزالة الإعجاب' : 'Unlike') : (isArabic ? 'إعجاب' : 'Like')}
+          active={liked}
+          disabled={likeBusy}
+          onPress={onToggleLike}
+          size={compact ? 38 : 42}
+        />
+        <Pressable style={styles.secondaryAction} onPress={onShare}>
+          <Text style={styles.secondaryActionText}>↗ {isArabic ? 'مشاركة' : 'Share'}</Text>
         </Pressable>
-      ) : null}
+        {onDownload ? (
+          <Pressable style={styles.secondaryAction} onPress={onDownload}>
+            <Text style={styles.secondaryActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -654,9 +690,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 90,
     elevation: 90,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: COLORS.black,
   },
-  overlayBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.28)' },
   dismissLayer: { flex: 1, minHeight: 0 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 
@@ -719,9 +754,13 @@ const styles = StyleSheet.create({
   titleRowCompact: { marginTop: 12, gap: 8 },
   titleText: { flex: 1, minWidth: 0 },
   trackTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, lineHeight: 30, fontWeight: '700' },
-  trackTitleCompact: { fontSize: 20, lineHeight: 26 },
+  trackTitleCompact: { fontSize: 18, lineHeight: 23 },
+  albumTitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600', marginTop: 5 },
+  albumTitleCompact: { fontSize: 12, marginTop: 3 },
   artist: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', marginTop: 4 },
   artistCompact: { fontSize: 12, marginTop: 3 },
+  classifiers: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 4 },
+  classifiersCompact: { fontSize: 11, marginTop: 2 },
   seekBar: { width: '100%', marginTop: SPACING.md },
   seekBarCompact: { marginTop: 10 },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xl, marginTop: SPACING.xs },
@@ -729,7 +768,9 @@ const styles = StyleSheet.create({
   playNudge: { marginLeft: 4 },
   sideControl: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   pressedControl: { opacity: 0.7, transform: [{ scale: 0.94 }] },
-  downloadAction: {
+  playerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: SPACING.sm, marginTop: SPACING.sm },
+  playerActionsCompact: { marginTop: 6, gap: 6 },
+  secondaryAction: {
     minHeight: 36,
     justifyContent: 'center',
     paddingHorizontal: SPACING.md,
@@ -737,9 +778,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
-    marginTop: SPACING.md,
   },
-  downloadText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
+  secondaryActionText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
 
   narrowBody: { flex: 1, minHeight: 0, paddingHorizontal: SPACING.md, paddingBottom: SPACING.md },
   narrowPlayer: { flex: 1, justifyContent: 'center' },
@@ -747,7 +787,7 @@ const styles = StyleSheet.create({
   pullUpButton: {
     flex: 1,
     minWidth: 0,
-    height: 56,
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
