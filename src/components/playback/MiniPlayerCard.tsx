@@ -7,7 +7,11 @@ import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 interface MiniPlayerCardProps {
   artwork: ReactNode;
   title: string;
+  titleSuffix?: string | null;
   subtitle: string;
+  liked?: boolean;
+  likeBusy?: boolean;
+  onToggleLike?: () => void;
   playing: boolean;
   buffering: boolean;
   /** 0–1 */
@@ -28,7 +32,11 @@ interface MiniPlayerCardProps {
 export default function MiniPlayerCard({
   artwork,
   title,
+  titleSuffix,
   subtitle,
+  liked = false,
+  likeBusy = false,
+  onToggleLike,
   playing,
   buffering,
   progress,
@@ -53,10 +61,26 @@ export default function MiniPlayerCard({
           >
             {artwork}
             <View style={styles.textWrap}>
-              <Text numberOfLines={1} style={styles.title}>{title}</Text>
+              <Text numberOfLines={1} style={styles.title}>
+                {title}
+                {titleSuffix ? <Text style={styles.titleSuffix}> — {titleSuffix}</Text> : null}
+              </Text>
               {subtitle ? <Text numberOfLines={1} style={styles.subtitle}>{subtitle}</Text> : null}
             </View>
           </Pressable>
+
+          {onToggleLike ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={liked ? 'Unlike track' : 'Like track'}
+              disabled={likeBusy}
+              hitSlop={6}
+              style={({ pressed }) => [styles.iconButton, pressed && styles.pressedButton, likeBusy && styles.disabledButton]}
+              onPress={onToggleLike}
+            >
+              <Icon name={liked ? 'heart' : 'heart-outline'} size={19} color={liked ? accentColor : COLORS.white} />
+            </Pressable>
+          ) : null}
 
           <Pressable
             accessibilityRole="button"
@@ -148,11 +172,13 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.75 },
   textWrap: { flex: 1, minWidth: 0 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  titleSuffix: { color: 'rgba(201, 211, 220, 0.78)', fontWeight: '500' },
   subtitle: { color: 'rgba(201, 211, 220, 0.8)', fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
   playButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   playNudge: { marginLeft: 2 },
   iconButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   pressedButton: { opacity: 0.7, transform: [{ scale: 0.94 }] },
+  disabledButton: { opacity: 0.45 },
   progressTrack: {
     position: 'absolute',
     left: 12,
