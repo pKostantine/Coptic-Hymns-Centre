@@ -10,12 +10,12 @@ import Icon from '@/components/chc/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { homeService, type HomeSynaxariumEvent } from '@/services/homeService';
 import { getSundayMessageForDate } from '@/utils/readingsService';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerReleaseSummary } from '@/types/musicConsumer';
+import { localDateAtUtcMidnight } from '@/utils/dateUtils';
 
 function addUtcDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -59,18 +59,27 @@ function formatDate(date: Date, locale: string) {
 export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { rawDate, effectiveDate, liturgicalDayPeriod, isLive, goLive } = useCalendar();
   const { preferences } = useReadingPreferences();
+  const [now, setNow] = useState(() => new Date());
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
   const wide = width >= 760;
 
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Home is always live. Books can be pinned to another calendar date without
+  // changing anything here.
+  const liveDate = useMemo(() => localDateAtUtcMidnight(now), [now]);
+  const livePeriod = now.getHours() >= 17 ? 'evening' as const : 'morning' as const;
   const sunday = useMemo(
-    () => sundayForHome(rawDate, liturgicalDayPeriod),
-    [liturgicalDayPeriod, rawDate],
+    () => sundayForHome(liveDate, livePeriod),
+    [liveDate, livePeriod],
   );
-  const synaxToday = effectiveDate;
-  const synaxTomorrow = useMemo(() => addUtcDays(effectiveDate, 1), [effectiveDate]);
+  const synaxToday = liveDate;
+  const synaxTomorrow = useMemo(() => addUtcDays(liveDate, 1), [liveDate]);
 
   const [sundayMessage, setSundayMessage] = useState<string | null>(null);
   const [sundayLoading, setSundayLoading] = useState(true);
@@ -138,17 +147,6 @@ export default function HomeScreen() {
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
       />
 
-      {!isLive ? (
-        <Pressable style={styles.notLiveBanner} onPress={goLive}>
-          <Icon name="time-outline" size={16} color={COLORS.gold} />
-          <Text style={[styles.notLiveText, isArabic && styles.arabic]}>
-            {isArabic
-              ? 'أنت تعرض تاريخاً محدداً — اضغط للعودة إلى اليوم'
-              : 'Viewing a selected calendar date — tap to go live'}
-          </Text>
-        </Pressable>
-      ) : null}
-
       <NowPlayingAwareScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -197,6 +195,17 @@ export default function HomeScreen() {
                 {isArabic ? 'اليوم وغداً' : 'Today and tomorrow'}
               </Text>
             </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={isArabic ? 'بحث في السنكسار' : 'Search Synaxarium'}
+              onPress={() => router.push('/synaxarium')}
+              style={({ pressed }) => [styles.synaxSearchButton, pressed && styles.pressed]}
+            >
+              <Icon name="search-outline" size={17} color={COLORS.goldBright} />
+              <Text style={[styles.synaxSearchText, isArabic && styles.arabic]}>
+                {isArabic ? 'بحث' : 'Search'}
+              </Text>
+            </Pressable>
           </View>
 
           <View style={[styles.synaxColumns, wide && styles.synaxColumnsWide]}>
@@ -350,7 +359,8 @@ const styles = StyleSheet.create({
   releaseCard: { width: 144 },
   releaseTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800', marginTop: 8 },
   releaseArtist: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 3 },
-  notLiveBanner: { alignSelf: 'center', marginTop: SPACING.sm, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.goldSoft, paddingHorizontal: SPACING.md, paddingVertical: 7 },
-  notLiveText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
+  synaxSearchButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 11, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.goldSoft },
+  synaxSearchText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
+  pressed: { opacity: 0.68, transform: [{ scale: 0.97 }] },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });
