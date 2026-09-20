@@ -27,11 +27,14 @@ export default function MusicArtistScreen() {
   const [followBusy, setFollowBusy] = useState(false);
   const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
   const [shareArtwork, setShareArtwork] = useState<MusicConsumerAsset | null>(null);
+  const [shareArtworkLoaded, setShareArtworkLoaded] = useState(false);
 
   useEffect(() => {
     if (!artistId) return;
     let active = true;
     setError(null);
+    setShareArtwork(null);
+    setShareArtworkLoaded(false);
     Promise.all([
       musicService.getArtist(artistId, locale),
       musicService.getArtistFollowed(artistId),
@@ -50,13 +53,14 @@ export default function MusicArtistScreen() {
   }, [artistId, locale]);
 
   useEffect(() => {
-    if (!artist || artist.profileImageAsset || shareArtwork) return;
+    if (!artist || artist.profileImageAsset || shareArtworkLoaded) return;
     let active = true;
     musicService.getArtistSearchArt(artist.id)
       .then((asset) => { if (active) setShareArtwork(asset); })
-      .catch(() => { if (active) setShareArtwork(null); });
+      .catch(() => { if (active) setShareArtwork(null); })
+      .finally(() => { if (active) setShareArtworkLoaded(true); });
     return () => { active = false; };
-  }, [artist, shareArtwork]);
+  }, [artist, shareArtworkLoaded]);
 
   const toggleFollow = async () => {
     if (!artist || followBusy) return;
