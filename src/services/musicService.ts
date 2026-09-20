@@ -144,6 +144,19 @@ export async function getReleaseLiked(releaseId: string): Promise<boolean> {
   return assertRpcData(data as boolean | null, error, 'Load release like');
 }
 
+export async function getArtistFollowed(artistId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('get_artist_followed', { p_artist_id: artistId });
+  return assertRpcData(data as boolean | null, error, 'Load artist follow');
+}
+
+export async function setArtistFollowed(artistId: string, followed: boolean): Promise<boolean> {
+  const { data, error } = await supabase.rpc('set_artist_followed', {
+    p_artist_id: artistId,
+    p_followed: followed,
+  });
+  return assertRpcData(data as boolean | null, error, followed ? 'Follow artist' : 'Unfollow artist');
+}
+
 export async function setReleaseLiked(releaseId: string, liked: boolean): Promise<boolean> {
   const { data, error } = await supabase.rpc('set_release_liked', { p_release_id: releaseId, p_liked: liked });
   return assertRpcData(data as boolean | null, error, liked ? 'Like release' : 'Unlike release');
@@ -206,6 +219,8 @@ export const musicService = {
   setLiked: setTrackLiked,
   getReleaseLiked,
   setReleaseLiked,
+  getArtistFollowed,
+  setArtistFollowed,
   createPlaylist: createMusicPlaylist,
   addToPlaylist: addTrackToMusicPlaylist,
   removeFromPlaylist: removeTrackFromMusicPlaylist,
