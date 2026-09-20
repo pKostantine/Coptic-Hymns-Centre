@@ -68,11 +68,12 @@ export default function SeekBar({
   const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frameRef = useRef<number | null>(null);
   const pendingRatioRef = useRef<number | null>(null);
-  const latest = useRef({ durationMs, onSeek });
+  const thumbSize = dense ? 12 : 16;
+  const latest = useRef({ durationMs, onSeek, thumbSize });
 
   useEffect(() => {
-    latest.current = { durationMs, onSeek };
-  }, [durationMs, onSeek]);
+    latest.current = { durationMs, onSeek, thumbSize };
+  }, [durationMs, onSeek, thumbSize]);
 
   useEffect(() => {
     optimisticSeekRef.current = optimisticSeekMs;
@@ -111,14 +112,16 @@ export default function SeekBar({
 
   const ratioFromGrant = (event: GestureResponderEvent) => {
     const width = widthRef.current;
+    const halfThumb = latest.current.thumbSize / 2;
+    const travel = Math.max(1, width - latest.current.thumbSize);
     if (width <= 0) return 0;
-    return clamp01(event.nativeEvent.locationX / width);
+    return clamp01((event.nativeEvent.locationX - halfThumb) / travel);
   };
 
   const ratioFromDrag = (gesture: PanResponderGestureState) => {
-    const width = widthRef.current;
-    if (width <= 0) return startRatioRef.current;
-    return clamp01(startRatioRef.current + gesture.dx / width);
+    const travel = Math.max(1, widthRef.current - latest.current.thumbSize);
+    if (widthRef.current <= 0) return startRatioRef.current;
+    return clamp01(startRatioRef.current + gesture.dx / travel);
   };
 
   const commitSeek = (ratio: number) => {
@@ -197,7 +200,6 @@ export default function SeekBar({
     ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) }
     : {};
 
-  const thumbSize = dense ? 12 : 16;
   // Keep the thumb centre inside the actual bar at both ends rather than
   // rendering half of it outside the track.
   const thumbTravel = Math.max(0, layoutWidth - thumbSize);
@@ -236,7 +238,14 @@ export default function SeekBar({
         {...hoverProps}
         {...panResponder.panHandlers}
       >
-        <View pointerEvents="none" style={[styles.track, active && styles.trackActive]}>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.track,
+            { marginHorizontal: thumbSize / 2 },
+            active && styles.trackActive,
+          ]}
+        >
           <View style={[styles.fill, { width: `${ratio * 100}%`, backgroundColor: accentColor }]} />
         </View>
         <View
