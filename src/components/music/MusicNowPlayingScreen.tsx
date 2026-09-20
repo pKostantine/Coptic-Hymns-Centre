@@ -116,6 +116,10 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   } = useMusicPlayer();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  // A phone in landscape needs a genuinely different composition. Treat the
+  // short side as the limiting dimension instead of laying out the portrait
+  // player vertically and letting its controls collide.
+  const isLandscapePhone = width > height && height <= 600 && width < 1100;
   const [lyricsFullscreen, setLyricsFullscreen] = useState(false);
   const [openSheet, setOpenSheet] = useState<'lyrics' | 'queue' | null>(null);
   const [dismissDrag] = useState(() => new Animated.Value(0));
@@ -281,13 +285,22 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   };
 
   const header = (
-    <View style={styles.header}>
-      <RoundIconButton icon="chevron-down" accessibilityLabel="Close now playing" onPress={closePlayer} />
+    <View style={[styles.header, isLandscapePhone && styles.headerLandscape]}>
+      <RoundIconButton
+        icon="chevron-down"
+        accessibilityLabel="Close now playing"
+        onPress={closePlayer}
+        size={isLandscapePhone ? 38 : 44}
+      />
       <View style={styles.headerCenter}>
-        <Text style={styles.headerEyebrow}>{isArabic ? 'قيد التشغيل' : 'NOW PLAYING'}</Text>
-        {currentItem?.releaseTitle ? <Text numberOfLines={1} style={styles.headerTitle}>{currentItem.releaseTitle}</Text> : null}
+        {!isLandscapePhone ? <Text style={styles.headerEyebrow}>{isArabic ? 'قيد التشغيل' : 'NOW PLAYING'}</Text> : null}
+        {currentItem?.releaseTitle ? (
+          <Text numberOfLines={1} style={[styles.headerTitle, isLandscapePhone && styles.headerTitleLandscape]}>
+            {currentItem.releaseTitle}
+          </Text>
+        ) : null}
       </View>
-      <View style={styles.headerSpacer} />
+      <View style={[styles.headerSpacer, isLandscapePhone && styles.headerSpacerLandscape]} />
     </View>
   );
 
@@ -322,6 +335,11 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   const narrowArtSize = width < 460
     ? clamp(Math.min(width - 80, availableHeight * 0.3), 110, 210)
     : clamp(Math.min(width - SPACING.lg * 2, availableHeight - 330), 150, 320);
+  const landscapeArtSize = clamp(
+    Math.min(height - insets.top - insets.bottom - 92, width * 0.28),
+    120,
+    210,
+  );
 
   const lyricsProps = {
     lyricSets,
@@ -350,18 +368,18 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   };
 
   const lyricsPanelHeader = (
-    <View style={styles.panelHeader}>
-      <Text style={[styles.panelTitle, isArabic && styles.arabic]}>{isArabic ? 'الكلمات' : 'Lyrics'}</Text>
+    <View style={[styles.panelHeader, isLandscapePhone && styles.panelHeaderLandscape]}>
+      <Text style={[styles.panelTitle, isLandscapePhone && styles.panelTitleLandscape, isArabic && styles.arabic]}>{isArabic ? 'الكلمات' : 'Lyrics'}</Text>
       <RoundIconButton
         icon="open-in-full"
         accessibilityLabel="Full screen lyrics"
         onPress={() => setLyricsFullscreen(true)}
-        size={46}
+        size={isLandscapePhone ? 40 : 46}
       />
     </View>
   );
 
-  const isPhoneLayout = !wide && width < 460;
+  const isPhoneLayout = !wide && !isLandscapePhone && width < 460;
 
   const handleShareTrack = async () => {
     const deepLink = currentItem.releaseId
@@ -403,6 +421,64 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     />
   );
 
+  const landscapePlayer = (
+    <View style={styles.landscapeBody}>
+      <View style={styles.landscapeArtworkColumn}>
+        <View style={styles.artShadow}>
+          <MusicArtwork
+            asset={currentItem.coverAsset}
+            size={landscapeArtSize}
+            radius={14}
+            label={currentItem.releaseTitle ?? currentItem.track.title}
+          />
+        </View>
+      </View>
+      <View style={styles.landscapeControlsColumn}>
+        <PlayerCard
+          compact
+          horizontal
+          showArtwork={false}
+          artSize={landscapeArtSize}
+          coverAsset={currentItem.coverAsset}
+          artLabel={currentItem.releaseTitle ?? currentItem.track.title}
+          title={currentItem.track.title}
+          albumTitle={albumLine}
+          performers={performerLine}
+          classifiers={classifierLine}
+          positionMs={currentTimeMs}
+          durationMs={effectiveDurationMs}
+          playing={playing}
+          buffering={buffering}
+          liked={likedTrackIds.has(currentItem.track.id)}
+          likeBusy={likeBusy}
+          isArabic={isArabic}
+          onSeek={(positionMs) => void seekToMs(positionMs)}
+          onPrevious={previous}
+          onTogglePlayback={togglePlayback}
+          onNext={next}
+          onToggleLike={() => void toggleTrackLike(currentItem.track.id)}
+          onShare={() => void handleShareTrack()}
+          onDownload={Platform.OS !== 'web' ? showDownloadAction : undefined}
+        />
+        <View style={[styles.pullUpRow, styles.pullUpRowLandscape]}>
+          <PullUpButton
+            icon="book"
+            label={isArabic ? 'الكلمات' : 'Lyrics'}
+            onPress={() => setOpenSheet('lyrics')}
+            compact
+          />
+          <PullUpButton
+            icon="list-outline"
+            label={isArabic ? 'قائمة الانتظار' : 'Queue'}
+            count={queue.length}
+            onPress={() => setOpenSheet('queue')}
+            compact
+          />
+        </View>
+      </View>
+    </View>
+  );
+
   const rootStyle = embedded ? [styles.safeArea, styles.embeddedSafeArea] : styles.safeArea;
 
   return (
@@ -424,6 +500,8 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
             </View>
             <MusicQueueList {...queueProps} scrollable style={styles.sidePanel} />
           </View>
+        ) : isLandscapePhone ? (
+          landscapePlayer
         ) : (
           <View style={styles.narrowBody}>
             <View style={styles.narrowPlayer}>{player}</View>
@@ -526,19 +604,20 @@ interface PullUpButtonProps {
   label: string;
   count?: number;
   onPress: () => void;
+  compact?: boolean;
 }
 
 /** Wide bottom button that pulls up the lyrics or the queue on phones. */
-function PullUpButton({ icon, label, count, onPress }: PullUpButtonProps) {
+function PullUpButton({ icon, label, count, onPress, compact = false }: PullUpButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => [styles.pullUpButton, pressed && styles.pullUpButtonPressed]}
+      style={({ pressed }) => [styles.pullUpButton, compact && styles.pullUpButtonCompact, pressed && styles.pullUpButtonPressed]}
     >
-      <Icon name={icon} size={19} color={COLORS.goldBright} />
-      <Text numberOfLines={1} style={styles.pullUpLabel}>{label}</Text>
+      <Icon name={icon} size={compact ? 17 : 19} color={COLORS.goldBright} />
+      <Text numberOfLines={1} style={[styles.pullUpLabel, compact && styles.pullUpLabelCompact]}>{label}</Text>
       {count != null ? <Text style={styles.pullUpCount}>{count}</Text> : null}
       <Icon name="chevron-down" size={15} color={COLORS.muted} style={styles.pullUpChevron} />
     </Pressable>
@@ -604,6 +683,8 @@ function TransportControls({ playing, buffering, onPrevious, onTogglePlayback, o
 
 interface PlayerCardProps extends Omit<TransportControlsProps, 'large'> {
   compact?: boolean;
+  horizontal?: boolean;
+  showArtwork?: boolean;
   artSize: number;
   coverAsset?: MusicConsumerAsset | null;
   artLabel: string;
@@ -624,6 +705,8 @@ interface PlayerCardProps extends Omit<TransportControlsProps, 'large'> {
 
 function PlayerCard({
   compact = false,
+  horizontal = false,
+  showArtwork = true,
   artSize,
   coverAsset,
   artLabel,
@@ -642,13 +725,15 @@ function PlayerCard({
   onDownload,
   ...transport
 }: PlayerCardProps) {
-  const contentWidth = Math.max(artSize, 320);
+  const contentWidth = horizontal ? 620 : Math.max(artSize, 320);
 
   return (
-    <View style={[styles.playerCard, compact && styles.playerCardCompact]}>
-      <View style={[styles.artShadow, compact && styles.artShadowCompact]}>
-        <MusicArtwork asset={coverAsset} size={artSize} radius={compact ? 12 : 16} label={artLabel} />
-      </View>
+    <View style={[styles.playerCard, compact && styles.playerCardCompact, horizontal && styles.playerCardHorizontal]}>
+      {showArtwork ? (
+        <View style={[styles.artShadow, compact && styles.artShadowCompact]}>
+          <MusicArtwork asset={coverAsset} size={artSize} radius={compact ? 12 : 16} label={artLabel} />
+        </View>
+      ) : null}
 
       <View style={[styles.titleRow, { maxWidth: contentWidth }, compact && styles.titleRowCompact]}>
         <View style={styles.titleText}>
@@ -711,10 +796,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
   },
+  headerLandscape: { height: 46, paddingHorizontal: 10 },
   headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: SPACING.sm },
   headerEyebrow: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
-  headerTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700', marginTop: 2 },
+  headerTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700', marginTop: 2, textAlign: 'center' },
+  headerTitleLandscape: { fontSize: 13, marginTop: 0 },
   headerSpacer: { width: 44 },
+  headerSpacerLandscape: { width: 38 },
 
   wideBody: {
     flex: 1,
@@ -749,10 +837,13 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: SPACING.sm,
   },
+  panelHeaderLandscape: { paddingTop: 8, paddingBottom: 6 },
   panelTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
+  panelTitleLandscape: { fontSize: 18 },
 
   playerCard: { alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg },
   playerCardCompact: { paddingHorizontal: 14, paddingVertical: 12 },
+  playerCardHorizontal: { width: '100%', flex: 1, justifyContent: 'center', paddingHorizontal: 0, paddingVertical: 2 },
   artShadow: {
     borderRadius: 16,
     ...Platform.select({
@@ -762,14 +853,14 @@ const styles = StyleSheet.create({
   },
   titleRow: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
   titleRowCompact: { marginTop: 12, gap: 8 },
-  titleText: { flex: 1, minWidth: 0 },
-  trackTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, lineHeight: 30, fontWeight: '700' },
+  titleText: { flex: 1, minWidth: 0, width: '100%', alignItems: 'center' },
+  trackTitle: { width: '100%', color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, lineHeight: 30, fontWeight: '700', textAlign: 'center' },
   trackTitleCompact: { fontSize: 18, lineHeight: 23 },
-  albumTitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600', marginTop: 5 },
+  albumTitle: { width: '100%', color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600', marginTop: 5, textAlign: 'center' },
   albumTitleCompact: { fontSize: 12, marginTop: 3 },
-  artist: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', marginTop: 4 },
+  artist: { width: '100%', color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', marginTop: 4, textAlign: 'center' },
   artistCompact: { fontSize: 12, marginTop: 3 },
-  classifiers: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 4 },
+  classifiers: { width: '100%', color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 4, textAlign: 'center' },
   classifiersCompact: { fontSize: 11, marginTop: 2 },
   seekBar: { width: '100%', marginTop: SPACING.md },
   seekBarCompact: { marginTop: 10 },
@@ -793,7 +884,29 @@ const styles = StyleSheet.create({
 
   narrowBody: { flex: 1, minHeight: 0, paddingHorizontal: SPACING.md, paddingBottom: SPACING.md },
   narrowPlayer: { flex: 1, justifyContent: 'center' },
+  landscapeBody: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+  },
+  landscapeArtworkColumn: {
+    width: '31%',
+    minWidth: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  landscapeControlsColumn: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
   pullUpRow: { flexDirection: 'row', gap: SPACING.sm + 4 },
+  pullUpRowLandscape: { marginTop: 2, alignSelf: 'stretch' },
   pullUpButton: {
     flex: 1,
     minWidth: 0,
@@ -808,8 +921,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
     ...Platform.select({ web: { cursor: 'pointer' } as object, default: {} }),
   },
+  pullUpButtonCompact: { height: 38, borderRadius: 12, paddingHorizontal: 10, gap: 7 },
   pullUpButtonPressed: { opacity: 0.75, backgroundColor: 'rgba(255, 255, 255, 0.12)' },
   pullUpLabel: { flex: 1, minWidth: 0, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  pullUpLabelCompact: { fontSize: 12 },
   pullUpCount: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
   // The shared chevron points down; these buttons open upwards.
   pullUpChevron: { transform: [{ rotate: '180deg' }] },
