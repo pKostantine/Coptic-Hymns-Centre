@@ -13,7 +13,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerArtist, MusicConsumerAsset } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
-import { publicUrl } from '@/utils/publicUrl';
+import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
 export default function MusicArtistScreen() {
@@ -90,16 +90,18 @@ export default function MusicArtistScreen() {
     }
   };
 
+  const shareImageAsset = artist?.profileImageAsset ?? shareArtwork;
+
   const shareArtist = async () => {
     if (!artist) return;
     await shareLink({
       title: artist.displayName,
       text: artist.biography || artist.displayName,
-      url: publicUrl(`/share/music/artist/${artist.id}?v=4`),
+      url: publicShareUrl(`/share/music/artist/${artist.id}`, shareImageAsset?.id),
     });
   };
 
-  const shareImageUrl = musicService.resolveAsset(artist?.profileImageAsset ?? shareArtwork);
+  const shareImageUrl = musicService.resolveAsset(shareImageAsset);
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>

@@ -20,7 +20,7 @@ import {
 } from '@/services/offlineDownloadRequests';
 import type { MusicConsumerRelease, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
-import { publicUrl } from '@/utils/publicUrl';
+import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
 export default function MusicReleaseScreen() {
@@ -104,7 +104,7 @@ export default function MusicReleaseScreen() {
 
   const handleShareRelease = async () => {
     if (!release) return;
-    const deepLink = publicUrl(`/share/music/release/${release.id}?v=4`);
+    const deepLink = publicShareUrl(`/share/music/release/${release.id}`, release.coverAsset?.id);
     await shareLink({
       title: release.title,
       text: release.primaryArtist?.displayName

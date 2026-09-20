@@ -62,7 +62,9 @@
     "test:conditions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/serviceConditionDates.test.cjs",
     "test:lyrics": "node --test tests/synchronizedLyrics.test.cjs",
     "test:playback": "node --test tests/playbackEngine.test.cjs",
+    "test:share": "node --test tests/shareWorker.test.mjs",
     "build": "expo export -p web",
+    "postbuild": "node scripts/verify-cloudflare-share-worker.mjs",
     "deploy": "npm run build && wrangler pages deploy dist --project-name coptic-hymns-centre"
   },
   "private": true
