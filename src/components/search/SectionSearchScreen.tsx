@@ -170,13 +170,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     let active = true;
     void Promise.all(missing.map(async (result) => {
       try {
-        const artist = await musicService.getArtist(result.entityId, locale);
-        return [
-          result.entityId,
-          artist.profileImageAsset
-            ?? artist.releases.find((release) => release.coverAsset)?.coverAsset
-            ?? null,
-        ] as const;
+        return [result.entityId, await musicService.getArtistSearchArt(result.entityId)] as const;
       } catch {
         return [result.entityId, null] as const;
       }
@@ -186,7 +180,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     });
 
     return () => { active = false; };
-  }, [artistFallbackArt, locale, music, results]);
+  }, [artistFallbackArt, music, results]);
 
   const grouped = useMemo(() => {
     const groups = music ? MUSIC_GROUPS : LEARNING_GROUPS;
@@ -617,7 +611,7 @@ const styles = StyleSheet.create({
   learningActive: { backgroundColor: COLORS.learningSoft },
   artwork: { width: 56, height: 56 },
   resultInfo: { flex: 1, minWidth: 0 },
-  resultTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '750' as '700' },
+  resultTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
   trackIdentity: { fontFamily: TYPOGRAPHY.body, fontSize: 15, lineHeight: 20 },
   trackTitle: { color: COLORS.white, fontWeight: '800' },
   trackAlbum: { color: COLORS.muted, fontWeight: '400' },
