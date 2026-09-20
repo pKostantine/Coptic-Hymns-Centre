@@ -25,7 +25,7 @@ function encodeObjectPath(path) {
     .join('/');
 }
 
-function targetPathFromSegments(segments) {
+function targetFromSegments(segments) {
   if (!Array.isArray(segments) || segments.length < 3) return null;
 
   const [section, kind, id] = segments;
@@ -35,7 +35,15 @@ function targetPathFromSegments(segments) {
   );
 
   if (!valid || !/^[0-9a-fA-F-]{36}$/.test(id)) return null;
-  return '/' + section + '/' + kind + '/' + id;
+
+  const ogType = section === 'music'
+    ? (kind === 'track' ? 'music.song' : kind === 'release' ? 'music.album' : 'profile')
+    : (kind === 'cantor' ? 'profile' : 'website');
+
+  return {
+    path: '/' + section + '/' + kind + '/' + id,
+    ogType,
+  };
 }
 
 async function loadPreview(pathname) {
@@ -83,7 +91,7 @@ function sameOriginProxy(origin, asset) {
   return origin + '/__share-image?' + params.toString();
 }
 
-function htmlResponse({ title, description, targetUrl, canonicalUrl, previewUrl, primaryImage, proxyImage, mimeType }) {
+function htmlResponse({ title, description, targetUrl, canonicalUrl, previewUrl, primaryImage, proxyImage, mimeType, ogType }) {
   const fullTitle = title.includes('Coptic Hymns Centre')
     ? title
     : title + ' — Coptic Hymns Centre';
@@ -115,7 +123,7 @@ function htmlResponse({ title, description, targetUrl, canonicalUrl, previewUrl,
     + '<link rel="icon" href="' + safePrimary + '" />\n'
     + '<link rel="apple-touch-icon" href="' + safePrimary + '" />\n'
     + '<meta property="og:site_name" content="Coptic Hymns Centre" />\n'
-    + '<meta property="og:type" content="website" />\n'
+    + '<meta property="og:type" content="' + escapeHtml(ogType || 'website') + '" />\n'
     + '<meta property="og:title" content="' + safeTitle + '" />\n'
     + '<meta property="og:description" content="' + safeDescription + '" />\n'
     + '<meta property="og:url" content="' + safePreview + '" />\n'
@@ -142,19 +150,19 @@ function htmlResponse({ title, description, targetUrl, canonicalUrl, previewUrl,
 }
 
 export async function onRequest(context) {
-  const targetPath = targetPathFromSegments(context.params.path);
-  if (!targetPath) return new Response('Not found', { status: 404 });
+  const target = targetFromSegments(context.params.path);
+  if (!target) return new Response('Not found', { status: 404 });
 
   let preview;
   try {
-    preview = await loadPreview(targetPath);
+    preview = await loadPreview(target.path);
   } catch {
     return new Response('Unable to load share preview', { status: 502 });
   }
 
   const url = new URL(context.request.url);
   const origin = url.origin;
-  const targetUrl = origin + targetPath;
+  const targetUrl = origin + target.path;
   const canonicalUrl = targetUrl;
   // Keep the Open Graph identity on the dedicated share URL itself. This
   // prevents link-preview caches from collapsing it back onto the old SPA URL
@@ -176,6 +184,7 @@ export async function onRequest(context) {
     primaryImage,
     proxyImage: directImage,
     mimeType: preview?.imageAsset?.mimeType || null,
+    ogType: target.ogType,
   });
 
   return new Response(context.request.method === 'HEAD' ? null : html, {
