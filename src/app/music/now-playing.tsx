@@ -125,7 +125,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   const [lyricSets, setLyricSets] = useState<PublishedLyricSet[]>([]);
   const [selectedLyricSetId, setSelectedLyricSetId] = useState<string | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
-  const [liked, setLiked] = useState(false);
+  const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
   const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
 
@@ -222,12 +222,12 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       .then((library) => {
         if (!active) return;
         setLibraryAuthenticated(library.authenticated);
-        setLiked(library.likedTracks.some((track) => track.id === currentItem.track.id));
+        setLikedTrackIds(new Set(library.likedTracks.map((track) => track.id)));
       })
       .catch(() => {
         if (active) {
           setLibraryAuthenticated(false);
-          setLiked(false);
+          setLikedTrackIds(new Set());
         }
       });
     return () => { active = false; };
@@ -245,8 +245,8 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     return active?.id ?? null;
   }, [currentTimeMs, selectedSet]);
 
-  const toggleLike = async () => {
-    if (!currentItem || likeBusy) return;
+  const toggleTrackLike = async (trackId: string) => {
+    if (likeBusy) return;
     if (!libraryAuthenticated) {
       Alert.alert(
         isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
@@ -256,9 +256,14 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     }
     setLikeBusy(true);
     try {
-      const nextLiked = !liked;
-      await musicService.setLiked(currentItem.track.id, nextLiked);
-      setLiked(nextLiked);
+      const wasLiked = likedTrackIds.has(trackId);
+      const nextLiked = !wasLiked;
+      await musicService.setLiked(trackId, nextLiked);
+      setLikedTrackIds((current) => {
+        const nextSet = new Set(current);
+        if (nextLiked) nextSet.add(trackId); else nextSet.delete(trackId);
+        return nextSet;
+      });
     } catch (cause) {
       Alert.alert(isArabic ? 'الأغاني المعجبة' : 'Liked Songs', cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
     } finally {
@@ -340,6 +345,8 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     repeatMode,
     onToggleShuffle: toggleShuffle,
     onCycleRepeat: cycleRepeatMode,
+    likedTrackIds,
+    onToggleLike: (trackId: string) => void toggleTrackLike(trackId),
   };
 
   const lyricsPanelHeader = (
@@ -383,14 +390,14 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       durationMs={effectiveDurationMs}
       playing={playing}
       buffering={buffering}
-      liked={liked}
+      liked={likedTrackIds.has(currentItem.track.id)}
       likeBusy={likeBusy}
       isArabic={isArabic}
       onSeek={(positionMs) => void seekToMs(positionMs)}
       onPrevious={previous}
       onTogglePlayback={togglePlayback}
       onNext={next}
-      onToggleLike={() => void toggleLike()}
+      onToggleLike={() => void toggleTrackLike(currentItem.track.id)}
       onShare={() => void handleShareTrack()}
       onDownload={Platform.OS !== 'web' ? showDownloadAction : undefined}
     />
