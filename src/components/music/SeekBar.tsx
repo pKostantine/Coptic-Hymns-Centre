@@ -147,7 +147,22 @@ export default function SeekBar({
       seekTimeoutRef.current = null;
     }, SEEK_ACK_TIMEOUT_MS);
 
-    void latest.current.onSeek(targetMs);
+    try {
+      const result = latest.current.onSeek(targetMs);
+      if (result && typeof (result as Promise<void>).catch === 'function') {
+        void (result as Promise<void>).catch(() => {
+          if (optimisticSeekRef.current === targetMs) {
+            optimisticSeekRef.current = null;
+            setOptimisticSeekMs(null);
+          }
+        });
+      }
+    } catch {
+      if (optimisticSeekRef.current === targetMs) {
+        optimisticSeekRef.current = null;
+        setOptimisticSeekMs(null);
+      }
+    }
   };
 
   // Created once. All changing inputs are read from refs so a rerender never
