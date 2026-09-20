@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   lineTextActiveFullscreen: { fontSize: 42, lineHeight: 58 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicPanel: { textAlign: 'right' },
-  coptic: { fontFamily: TYPOGRAPHY.coptic },
+  coptic: { fontFamily: TYPOGRAPHY.musicCoptic },
   empty: { alignItems: 'center', paddingVertical: SPACING.xl, paddingHorizontal: SPACING.md },
   emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700' },
   emptyTitleFullscreen: { fontSize: 28 },
