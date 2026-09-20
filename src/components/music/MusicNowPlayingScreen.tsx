@@ -420,7 +420,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   ) : null;
 
   const handleShareTrack = async () => {
-    const deepLink = publicUrl(`/music/track/${currentItem.track.id}?share=3`);
+    const deepLink = publicUrl(`/share/music/track/${currentItem.track.id}?v=4`);
     await shareLink({
       title: currentItem.track.title,
       text: albumLine
