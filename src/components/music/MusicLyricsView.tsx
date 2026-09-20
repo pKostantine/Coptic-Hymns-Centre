@@ -22,6 +22,11 @@ export function lyricSetLabel(set: PublishedLyricSet): string {
   return base;
 }
 
+export function lyricSetShortLabel(set: PublishedLyricSet): string {
+  const localeNames: Record<string, string> = { en: 'ENG', ar: 'ARA', cop: 'COP', fr: 'FRE' };
+  return localeNames[set.locale] ?? set.locale.slice(0, 3).toUpperCase();
+}
+
 interface MusicLyricsViewProps {
   lyricSets: PublishedLyricSet[];
   selectedSetId: string | null;
@@ -33,6 +38,8 @@ interface MusicLyricsViewProps {
   variant?: 'panel' | 'fullscreen';
   /** Force the denser phone treatment, including when landscape width is large. */
   forceCompact?: boolean;
+  /** Lets the parent provide a more space-efficient selector. */
+  hideTabs?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -49,6 +56,7 @@ export default function MusicLyricsView({
   onSeekLine,
   variant = 'panel',
   forceCompact = false,
+  hideTabs = false,
   style,
 }: MusicLyricsViewProps) {
   const { width } = useWindowDimensions();
@@ -74,7 +82,7 @@ export default function MusicLyricsView({
 
   return (
     <View style={[styles.root, style]}>
-      {lyricSets.length > 1 ? (
+      {lyricSets.length > 1 && !hideTabs ? (
         <View style={[
           styles.tabs,
           fullscreen && styles.tabsFullscreen,
