@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: SPACING.xl },
   hero: { alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg },
   heroDesktop: {
-    width: 'calc(100% - 48px)' as unknown as number,
+    width: '94%',
     maxWidth: 1120,
     alignSelf: 'center',
     flexDirection: 'row',
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   shareGlyph: { color: COLORS.goldBright, fontSize: 20, lineHeight: 20 },
   disabledButton: { opacity: 0.45 },
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  trackListDesktop: { width: 'calc(100% - 48px)' as unknown as number, maxWidth: 1120, alignSelf: 'center', marginHorizontal: 0 },
+  trackListDesktop: { width: '94%', maxWidth: 1120, alignSelf: 'center', marginHorizontal: 0 },
   loader: { marginTop: SPACING.xl },
   errorBoundary: { flex: 1, padding: SPACING.xl, alignItems: 'center', justifyContent: 'center', gap: SPACING.md },
   errorBoundaryTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', textAlign: 'center' },
