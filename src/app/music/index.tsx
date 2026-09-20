@@ -62,7 +62,8 @@ export default function MusicHomeScreen() {
                     <MusicArtwork asset={release.coverAsset} size={154} label={release.title} />
                     <Text numberOfLines={1} style={[styles.cardTitle, isArabic && styles.arabic]}>{release.title}</Text>
                     <Text numberOfLines={1} style={[styles.cardSubtitle, isArabic && styles.arabic]}>
-                      {release.primaryArtist?.displayName ?? release.releaseType.toUpperCase()}
+                      {release.primaryArtist?.displayName
+  ?? (release.releaseType === 'album' ? 'Album' : release.releaseType === 'ep' ? 'EP' : 'Single')}
                     </Text>
                   </Pressable>
                 ))}
