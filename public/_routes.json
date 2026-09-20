@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "include": [
+    "/music/artist/*",
+    "/music/release/*",
+    "/music/track/*",
+    "/learn/cantor/*",
+    "/learn/album/*",
+    "/learn/lesson/*",
+    "/__share-image"
+  ],
+  "exclude": []
+}
