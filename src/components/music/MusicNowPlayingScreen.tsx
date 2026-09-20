@@ -674,9 +674,12 @@ function PlayerCard({
           onPress={onToggleLike}
           size={compact ? 38 : 42}
         />
-        <Pressable style={styles.secondaryAction} onPress={onShare}>
-          <Text style={styles.secondaryActionText}>↗ {isArabic ? 'مشاركة' : 'Share'}</Text>
-        </Pressable>
+        <RoundIconButton
+          icon="share-outline"
+          accessibilityLabel={isArabic ? 'مشاركة' : 'Share'}
+          onPress={onShare}
+          size={compact ? 38 : 42}
+        />
         {onDownload ? (
           <Pressable style={styles.secondaryAction} onPress={onDownload}>
             <Text style={styles.secondaryActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
