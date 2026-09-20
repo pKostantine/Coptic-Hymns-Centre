@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { goBack } from '@/utils/navigation';
 
 export default function LearningBackHeader({
   title,
@@ -13,7 +14,7 @@ export default function LearningBackHeader({
   const router = useRouter();
   return (
     <View style={styles.header}>
-      <Pressable accessibilityLabel="Back" onPress={() => router.back()} style={styles.backButton}>
+      <Pressable accessibilityLabel="Back" onPress={() => goBack(router, '/learn')} style={styles.backButton}>
         <Text style={styles.backText}>‹</Text>
       </Pressable>
       <Text numberOfLines={1} style={[styles.title, isArabic && styles.arabic]}>{title}</Text>
