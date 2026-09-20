@@ -19,7 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import Icon, { type IconName } from '@/components/chc/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
-import MusicLyricsView from '@/components/music/MusicLyricsView';
+import MusicLyricsView, { lyricSetShortLabel } from '@/components/music/MusicLyricsView';
 import MusicQueueList from '@/components/music/MusicQueueList';
 import SeekBar from '@/components/music/SeekBar';
 import PlayerSheet from '@/components/playback/PlayerSheet';
@@ -339,7 +339,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   // Phones show the player full-height with the pull-up buttons pinned below,
   // so the artwork takes whatever room the rest of the controls leave.
   const narrowArtSize = width < 460
-    ? clamp(Math.min(width - 80, availableHeight * 0.3), 110, 210)
+    ? clamp(Math.min(width - 64, availableHeight * 0.35), 120, 245)
     : clamp(Math.min(width - SPACING.lg * 2, availableHeight - 330), 150, 320);
   const landscapeArtSize = clamp(
     Math.min(height - insets.top - insets.bottom - 92, width * 0.28),
@@ -388,6 +388,35 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   );
 
   const isPhoneLayout = !wide && !isLandscapePhone && width < 460;
+
+  const fullscreenLanguageSelector = lyricSets.length > 1 ? (
+    <View style={styles.fullscreenLanguageSelector}>
+      {lyricSets.map((set) => {
+        const selected = set.id === selectedLyricSetId;
+        return (
+          <Pressable
+            key={set.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            accessibilityLabel={`Lyrics language: ${lyricSetShortLabel(set)}`}
+            onPress={() => setSelectedLyricSetId(set.id)}
+            style={({ pressed }) => [
+              styles.fullscreenLanguageButton,
+              selected && styles.fullscreenLanguageButtonActive,
+              pressed && styles.pressedControl,
+            ]}
+          >
+            <Text style={[
+              styles.fullscreenLanguageText,
+              selected && styles.fullscreenLanguageTextActive,
+            ]}>
+              {lyricSetShortLabel(set)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  ) : null;
 
   const handleShareTrack = async () => {
     const deepLink = currentItem.releaseId
@@ -572,34 +601,96 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
           <View style={styles.fullscreenScrim} />
 
           <View
-            style={[styles.fullscreenTop, { paddingTop: insets.top + SPACING.md }]}
+            style={[
+              styles.fullscreenTop,
+              isLandscapePhone && styles.fullscreenTopLandscape,
+              {
+                paddingTop: isLandscapePhone ? Math.max(insets.top, 6) : insets.top + SPACING.md,
+                paddingLeft: Math.max(isLandscapePhone ? 12 : SPACING.lg, insets.left + 8),
+                paddingRight: Math.max(isLandscapePhone ? 12 : SPACING.lg, insets.right + 8),
+              },
+            ]}
             {...fullscreenDismissResponder.panHandlers}
           >
-            <MusicArtwork asset={currentItem.coverAsset} size={52} radius={8} label={currentItem.releaseTitle ?? currentItem.track.title} />
+            <MusicArtwork
+              asset={currentItem.coverAsset}
+              size={isLandscapePhone ? 38 : 52}
+              radius={8}
+              label={currentItem.releaseTitle ?? currentItem.track.title}
+            />
             <View style={styles.fullscreenTrack}>
-              <Text numberOfLines={1} style={styles.fullscreenTitle}>{currentItem.track.title}</Text>
-              <Text numberOfLines={1} style={styles.fullscreenArtist}>{performerLine}</Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.fullscreenTitle, isLandscapePhone && styles.fullscreenTitleLandscape]}
+              >
+                {currentItem.track.title}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.fullscreenArtist, isLandscapePhone && styles.fullscreenArtistLandscape]}
+              >
+                {performerLine}
+              </Text>
             </View>
+            {isLandscapePhone ? fullscreenLanguageSelector : null}
             <RoundIconButton
               icon="close-fullscreen"
               accessibilityLabel="Exit full screen lyrics"
               onPress={() => setLyricsFullscreen(false)}
-              size={48}
+              size={isLandscapePhone ? 40 : 48}
             />
           </View>
 
-          <MusicLyricsView {...lyricsProps} variant="fullscreen" />
+          <MusicLyricsView
+            {...lyricsProps}
+            variant="fullscreen"
+            hideTabs={isLandscapePhone}
+            style={isLandscapePhone ? styles.fullscreenLyricsLandscape : undefined}
+          />
 
-          <View style={[styles.fullscreenControls, { paddingBottom: insets.bottom + SPACING.lg }]}>
-            <SeekBar positionMs={currentTimeMs} durationMs={effectiveDurationMs} onSeek={(positionMs) => void seekToMs(positionMs)} />
-            <TransportControls
-              playing={playing}
-              buffering={buffering}
-              onPrevious={previous}
-              onTogglePlayback={togglePlayback}
-              onNext={next}
-              large
-            />
+          <View
+            style={[
+              styles.fullscreenControls,
+              isLandscapePhone && styles.fullscreenControlsLandscape,
+              {
+                paddingBottom: isLandscapePhone ? Math.max(insets.bottom, 6) : insets.bottom + SPACING.lg,
+                paddingLeft: Math.max(isLandscapePhone ? 12 : SPACING.lg, insets.left + 8),
+                paddingRight: Math.max(isLandscapePhone ? 12 : SPACING.lg, insets.right + 8),
+              },
+            ]}
+          >
+            {isLandscapePhone ? (
+              <>
+                <View style={styles.fullscreenSeekLandscape}>
+                  <SeekBar
+                    positionMs={currentTimeMs}
+                    durationMs={effectiveDurationMs}
+                    onSeek={(positionMs) => void seekToMs(positionMs)}
+                    dense
+                  />
+                </View>
+                <TransportControls
+                  playing={playing}
+                  buffering={buffering}
+                  onPrevious={previous}
+                  onTogglePlayback={togglePlayback}
+                  onNext={next}
+                  dense
+                />
+              </>
+            ) : (
+              <>
+                <SeekBar positionMs={currentTimeMs} durationMs={effectiveDurationMs} onSeek={(positionMs) => void seekToMs(positionMs)} />
+                <TransportControls
+                  playing={playing}
+                  buffering={buffering}
+                  onPrevious={previous}
+                  onTogglePlayback={togglePlayback}
+                  onNext={next}
+                  large
+                />
+              </>
+            )}
           </View>
         </Animated.View>
       ) : null}
@@ -643,9 +734,9 @@ interface TransportControlsProps {
 }
 
 function TransportControls({ playing, buffering, onPrevious, onTogglePlayback, onNext, large = false, dense = false }: TransportControlsProps) {
-  const playSize = large ? 76 : dense ? 50 : 60;
-  const skipIcon = large ? 30 : dense ? 21 : 24;
-  const sideSize = dense ? 40 : 52;
+  const playSize = large ? 76 : dense ? 50 : 66;
+  const skipIcon = large ? 30 : dense ? 21 : 25;
+  const sideSize = dense ? 40 : 54;
 
   return (
     <View style={[styles.controls, dense && styles.controlsDense]}>
@@ -743,7 +834,7 @@ function PlayerCard({
   onDownload,
   ...transport
 }: PlayerCardProps) {
-  const contentWidth = horizontal ? 620 : Math.max(artSize, 320);
+  const contentWidth = horizontal ? 620 : compact ? 440 : Math.max(artSize, 320);
 
   return (
     <View style={[styles.playerCard, compact && styles.playerCardCompact, horizontal && styles.playerCardHorizontal]}>
@@ -786,13 +877,13 @@ function PlayerCard({
               active={liked}
               disabled={likeBusy}
               onPress={onToggleLike}
-              size={38}
+              size={44}
             />
             <RoundIconButton
               icon="share-outline"
               accessibilityLabel={isArabic ? 'مشاركة' : 'Share'}
               onPress={onShare}
-              size={38}
+              size={44}
             />
 
           </View>
@@ -807,13 +898,13 @@ function PlayerCard({
               active={liked}
               disabled={likeBusy}
               onPress={onToggleLike}
-              size={compact ? 38 : 42}
+              size={compact ? 48 : 42}
             />
             <RoundIconButton
               icon="share-outline"
               accessibilityLabel={isArabic ? 'مشاركة' : 'Share'}
               onPress={onShare}
-              size={compact ? 38 : 42}
+              size={compact ? 48 : 42}
             />
             {onDownload ? (
               <Pressable style={styles.secondaryAction} onPress={onDownload}>
@@ -909,16 +1000,16 @@ const styles = StyleSheet.create({
   titleRowHorizontal: { marginTop: 0 },
   titleText: { flex: 1, minWidth: 0, width: '100%', alignItems: 'center' },
   trackTitle: { width: '100%', color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, lineHeight: 30, fontWeight: '700', textAlign: 'center' },
-  trackTitleCompact: { fontSize: 18, lineHeight: 23 },
-  trackTitleHorizontal: { fontSize: 17, lineHeight: 21 },
+  trackTitleCompact: { fontSize: 20, lineHeight: 25 },
+  trackTitleHorizontal: { fontSize: 19, lineHeight: 23 },
   albumTitle: { width: '100%', color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600', marginTop: 5, textAlign: 'center' },
-  albumTitleCompact: { fontSize: 12, marginTop: 3 },
+  albumTitleCompact: { fontSize: 13, marginTop: 4 },
   artist: { width: '100%', color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', marginTop: 4, textAlign: 'center' },
-  artistCompact: { fontSize: 12, marginTop: 3 },
+  artistCompact: { fontSize: 13, marginTop: 4 },
   classifiers: { width: '100%', color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 4, textAlign: 'center' },
-  classifiersCompact: { fontSize: 11, marginTop: 2 },
-  metaHorizontal: { fontSize: 11, marginTop: 2 },
-  classifiersHorizontal: { fontSize: 10, marginTop: 2 },
+  classifiersCompact: { fontSize: 12, marginTop: 3 },
+  metaHorizontal: { fontSize: 12, marginTop: 2 },
+  classifiersHorizontal: { fontSize: 11, marginTop: 2 },
   seekBar: { width: '100%', marginTop: SPACING.md },
   seekBarCompact: { marginTop: 10 },
   seekBarHorizontal: { marginTop: 6 },
@@ -929,7 +1020,7 @@ const styles = StyleSheet.create({
   sideControl: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   pressedControl: { opacity: 0.7, transform: [{ scale: 0.94 }] },
   playerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: SPACING.sm, marginTop: SPACING.sm },
-  playerActionsCompact: { marginTop: 6, gap: 6 },
+  playerActionsCompact: { marginTop: 10, gap: 10 },
   horizontalControlStrip: {
     width: '100%',
     maxWidth: 620,
@@ -1012,10 +1103,51 @@ const styles = StyleSheet.create({
     maxWidth: 1200,
     alignSelf: 'center',
   },
+  fullscreenTopLandscape: { gap: 10, paddingBottom: 6, maxWidth: undefined },
   fullscreenTrack: { flex: 1, minWidth: 0 },
   fullscreenTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700' },
+  fullscreenTitleLandscape: { fontSize: 15, lineHeight: 18 },
   fullscreenArtist: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700', marginTop: 2 },
+  fullscreenArtistLandscape: { fontSize: 11, marginTop: 1 },
+  fullscreenLanguageSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 0,
+  },
+  fullscreenLanguageButton: {
+    minWidth: 38,
+    height: 30,
+    paddingHorizontal: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADII.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  fullscreenLanguageButtonActive: {
+    borderColor: COLORS.gold,
+    backgroundColor: COLORS.gold,
+  },
+  fullscreenLanguageText: {
+    color: COLORS.muted,
+    fontFamily: TYPOGRAPHY.body,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  fullscreenLanguageTextActive: { color: COLORS.black },
+  fullscreenLyricsLandscape: { flex: 1, minHeight: 0 },
   fullscreenControls: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm },
+  fullscreenControlsLandscape: {
+    maxWidth: undefined,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingTop: 4,
+  },
+  fullscreenSeekLandscape: { flex: 1, minWidth: 0 },
 
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
   emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 25, fontWeight: '700' },
