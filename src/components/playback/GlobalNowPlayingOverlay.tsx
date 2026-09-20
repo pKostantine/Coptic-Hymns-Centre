@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Alert, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import MusicNowPlayingScreen from '@/app/music/now-playing';
+import MusicNowPlayingScreen from '@/components/music/MusicNowPlayingScreen';
 import Icon from '@/components/chc/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
