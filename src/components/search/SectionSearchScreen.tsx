@@ -320,7 +320,11 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
             placeholderTextColor="rgba(201,211,220,0.52)"
             returnKeyType="search"
             selectionColor={accent}
-            style={[styles.input, isArabic && styles.arabic]}
+            style={[
+              styles.input,
+              Platform.OS === 'web' && styles.inputWeb,
+              isArabic && styles.arabic,
+            ]}
             value={query}
           />
           {query && Platform.OS !== 'ios' ? (
@@ -584,7 +588,14 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontFamily: TYPOGRAPHY.body,
     fontSize: 16,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
   },
+  inputWeb: {
+    outlineStyle: 'none',
+    outlineWidth: 0,
+    boxShadow: 'none',
+  } as any,
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   clearButton: {
     width: 26,
