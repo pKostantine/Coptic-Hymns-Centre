@@ -57,7 +57,7 @@ interface CalendarScreenProps {
 export default function CalendarScreen({ onClose, onOpenSeasonSelector }: CalendarScreenProps) {
   const router = useRouter();
   const isHosted = Boolean(onClose);
-  const closeScreen = () => (onClose ? onClose() : goBack(router, '/'));
+  const closeScreen = () => (onClose ? onClose() : goBack(router, '/books'));
   const openSeasonSelector = () => (onOpenSeasonSelector ? onOpenSeasonSelector() : router.push('/season-selector'));
   const safeAreaInsets = useSafeAreaInsets();
   const { rawDate, effectiveDate, isLive, selectDate, goLive, liturgicalDayPeriod, setLiturgicalDayPeriod } = useCalendar();
