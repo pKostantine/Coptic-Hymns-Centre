@@ -3,18 +3,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer, type MusicQueueItem } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import {
-  musicReleaseDownloadRequest,
-  musicTrackDownloadRequest,
+    musicReleaseDownloadRequest,
+    musicTrackDownloadRequest,
 } from '@/services/offlineDownloadRequests';
 import type { MusicConsumerRelease, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 

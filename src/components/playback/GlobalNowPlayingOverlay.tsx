@@ -3,10 +3,10 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import MusicNowPlayingScreen from '@/app/music/now-playing';
 import Icon from '@/components/chc/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
-import MusicNowPlayingScreen from '@/app/music/now-playing';
 import { COLORS } from '@/constants/theme';
 import { useBottomChrome } from '@/context/BottomChromeContext';
 import { useLearningPlayer } from '@/context/LearningPlayerContext';

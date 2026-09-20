@@ -1,14 +1,14 @@
 import { useEffect, useRef } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleProp,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-  ViewStyle,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    StyleProp,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
+    ViewStyle,
 } from 'react-native';
 
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';

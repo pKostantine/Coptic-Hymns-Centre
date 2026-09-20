@@ -2,18 +2,18 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Easing,
-  PanResponder,
-  PanResponderGestureState,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Easing,
+    PanResponder,
+    PanResponderGestureState,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
