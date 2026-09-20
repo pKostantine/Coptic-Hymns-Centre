@@ -24,7 +24,7 @@ import { musicService } from '@/services/musicService';
 import type { MusicConsumerTrackDetail, PublishedTrackLyricsPayload, PublishedLyricSet } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import { goBack } from '@/utils/navigation';
-import { publicUrl } from '@/utils/publicUrl';
+import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
 function formatDuration(durationMs: number | null): string | null {
@@ -208,7 +208,7 @@ export default function MusicTrackDetailScreen() {
 
   const shareTrack = async () => {
     if (!track) return;
-    const url = publicUrl(`/share/music/track/${track.id}?v=4`);
+    const url = publicShareUrl(`/share/music/track/${track.id}`, track.release?.coverAsset?.id);
     await shareLink({
       title: track.title,
       text: track.release?.title ? `${track.title} — ${track.release.title}` : track.title,
