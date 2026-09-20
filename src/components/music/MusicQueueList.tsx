@@ -39,6 +39,8 @@ interface MusicQueueListProps {
   repeatMode: PlaybackRepeatMode;
   onToggleShuffle: () => void;
   onCycleRepeat: () => void;
+  likedTrackIds?: ReadonlySet<string>;
+  onToggleLike?: (trackId: string) => void;
   /**
    * `true` gives the list its own scroll area (desktop side panel). Otherwise
    * the rows sit inline and the page scrolls; use onDragActiveChange to lock
@@ -77,6 +79,8 @@ export default function MusicQueueList({
   repeatMode,
   onToggleShuffle,
   onCycleRepeat,
+  likedTrackIds,
+  onToggleLike,
   scrollable = false,
   onDragActiveChange,
   style,
@@ -131,6 +135,8 @@ export default function MusicQueueList({
           dragging={drag != null}
           handlers={handlers}
           onSelect={onSelect}
+          liked={likedTrackIds?.has(item.track.id) ?? false}
+          onToggleLike={onToggleLike}
         />
       ))}
     </View>
@@ -200,9 +206,11 @@ interface QueueRowProps {
   dragging: boolean;
   handlers: MutableRefObject<DragHandlers>;
   onSelect: (index: number) => void;
+  liked: boolean;
+  onToggleLike?: (trackId: string) => void;
 }
 
-function QueueRow({ index, item, active, playing, offset, lifted, dragging, handlers, onSelect }: QueueRowProps) {
+function QueueRow({ index, item, active, playing, offset, lifted, dragging, handlers, onSelect, liked, onToggleLike }: QueueRowProps) {
   const [translateY] = useState(() => new Animated.Value(0));
   const indexRef = useRef(index);
   useEffect(() => {
@@ -267,6 +275,17 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
             </Text>
           </View>
         </Pressable>
+        {onToggleLike ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={liked ? `Unlike ${item.track.title}` : `Like ${item.track.title}`}
+            disabled={dragging}
+            onPress={() => onToggleLike(item.track.id)}
+            style={({ pressed }) => [styles.likeButton, pressed && styles.pressed]}
+          >
+            <Icon name={liked ? 'heart' : 'heart-outline'} size={17} color={liked ? COLORS.goldBright : COLORS.muted} />
+          </Pressable>
+        ) : null}
       </View>
     </Animated.View>
   );
@@ -338,6 +357,7 @@ const styles = StyleSheet.create({
   rowTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   rowTitleActive: { color: COLORS.goldBright },
   rowArtist: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
+  likeButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   handle: { width: 48, height: '100%', alignItems: 'center', justifyContent: 'center' },
   handleWeb: { cursor: 'grab', touchAction: 'none' } as object,
   pressed: { opacity: 0.7 },
