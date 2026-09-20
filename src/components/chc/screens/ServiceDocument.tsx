@@ -648,7 +648,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             bookmarked={bookmarked}
             onToggleBookmark={() => toggleBookmark(bookmarkId)}
             onOpenCalendar={() => navigateAway('/calendar')}
-            onOpenSettings={() => navigateAway('/settings')}
+            onOpenSettings={() => navigateAway('/book-settings')}
             bishopPresent={preferences.bishopPresent}
             onToggleBishopPresent={toggleBishopPresent}
             displaySilentPrayers={preferences.displaySilentPrayers}
