@@ -25,7 +25,11 @@ export async function shareLink({ title, text, url }: ShareLinkOptions): Promise
 
   if (Platform.OS !== 'web') {
     try {
-      await Share.share({ title, message, url });
+      await Share.share(
+        Platform.OS === 'ios'
+          ? { title, message: text?.trim() || title, url }
+          : { title, message },
+      );
       return 'shared';
     } catch (error) {
       if (isAbortError(error)) return 'cancelled';
