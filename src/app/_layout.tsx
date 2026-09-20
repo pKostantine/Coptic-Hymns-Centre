@@ -60,6 +60,7 @@ export default function RootLayout() {
   // Matches the old app's App.js exactly: only the bundled Coptic font is
   // loaded via expo-font. Georgia/Arial/System are OS fonts, not bundled.
   const [copticLoaded] = useLocalFonts({
+    'CopticCHC-Regular': require('../../assets/fonts/CopticCHC-Regular-V3.ttf'),
     Athanasius: require('../../assets/fonts/Athanasius.ttf'),
   });
 
