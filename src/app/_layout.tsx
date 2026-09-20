@@ -57,8 +57,8 @@ function AppStack() {
 }
 
 export default function RootLayout() {
-  // Matches the old app's App.js exactly: only the bundled Coptic font is
-  // loaded via expo-font. Georgia/Arial/System are OS fonts, not bundled.
+  // Keep the two Coptic fonts deliberately separate: Books/readers use the
+  // CHC custom face, while Music synchronized lyrics use Athanasius.
   const [copticLoaded] = useLocalFonts({
     'CopticCHC-Regular': require('../../assets/fonts/CopticCHC-Regular-V3.ttf'),
     Athanasius: require('../../assets/fonts/Athanasius.ttf'),
