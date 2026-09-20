@@ -31,6 +31,8 @@ interface MusicLyricsViewProps {
   onSeekLine: (startMs: number) => void;
   /** `fullscreen` uses large centred type for reading from a distance. */
   variant?: 'panel' | 'fullscreen';
+  /** Force the denser phone treatment, including when landscape width is large. */
+  forceCompact?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -46,6 +48,7 @@ export default function MusicLyricsView({
   loading,
   onSeekLine,
   variant = 'panel',
+  forceCompact = false,
   style,
 }: MusicLyricsViewProps) {
   const { width } = useWindowDimensions();
@@ -53,7 +56,7 @@ export default function MusicLyricsView({
   const lineOffsets = useRef(new Map<string, number>());
   const viewportHeight = useRef(0);
   const fullscreen = variant === 'fullscreen';
-  const compact = width < 420 || (fullscreen && width < 520);
+  const compact = forceCompact || width < 420 || (fullscreen && width < 520);
   const selectedSet = lyricSets.find((set) => set.id === selectedSetId) ?? null;
 
   useEffect(() => {
