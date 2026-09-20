@@ -95,7 +95,7 @@ export default function MusicArtistScreen() {
     await shareLink({
       title: artist.displayName,
       text: artist.biography || artist.displayName,
-      url: publicUrl(`/music/artist/${artist.id}?share=3`),
+      url: publicUrl(`/share/music/artist/${artist.id}?v=4`),
     });
   };
 
