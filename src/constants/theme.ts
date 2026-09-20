@@ -131,7 +131,8 @@ export const MOTION = {
 export const TYPOGRAPHY = {
   title: 'Georgia',
   body: 'System',
-  coptic: 'Athanasius',
+  coptic: 'CopticCHC-Regular',
+  musicCoptic: 'Athanasius',
   arabic: 'Arial',
 } as const;
 
