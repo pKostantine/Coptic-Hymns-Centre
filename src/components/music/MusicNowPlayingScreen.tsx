@@ -422,7 +422,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   );
 
   const landscapePlayer = (
-    <View style={styles.landscapeBody}>
+    <View style={[styles.landscapeBody, { paddingBottom: Math.max(8, insets.bottom + 4) }]}>
       <View style={styles.landscapeArtworkColumn}>
         <View style={styles.artShadow}>
           <MusicArtwork
@@ -735,42 +735,80 @@ function PlayerCard({
         </View>
       ) : null}
 
-      <View style={[styles.titleRow, { maxWidth: contentWidth }, compact && styles.titleRowCompact]}>
+      <View style={[
+        styles.titleRow,
+        { maxWidth: contentWidth },
+        compact && styles.titleRowCompact,
+        horizontal && styles.titleRowHorizontal,
+      ]}>
         <View style={styles.titleText}>
-          <Text numberOfLines={2} style={[styles.trackTitle, compact && styles.trackTitleCompact]}>{title}</Text>
-          {albumTitle ? <Text numberOfLines={1} style={[styles.albumTitle, compact && styles.albumTitleCompact]}>{albumTitle}</Text> : null}
-          <Text numberOfLines={1} style={[styles.artist, compact && styles.artistCompact]}>{performers}</Text>
-          {classifiers ? <Text numberOfLines={1} style={[styles.classifiers, compact && styles.classifiersCompact]}>{classifiers}</Text> : null}
+          <Text numberOfLines={horizontal ? 1 : 2} style={[styles.trackTitle, compact && styles.trackTitleCompact, horizontal && styles.trackTitleHorizontal]}>{title}</Text>
+          {albumTitle ? <Text numberOfLines={1} style={[styles.albumTitle, compact && styles.albumTitleCompact, horizontal && styles.metaHorizontal]}>{albumTitle}</Text> : null}
+          <Text numberOfLines={1} style={[styles.artist, compact && styles.artistCompact, horizontal && styles.metaHorizontal]}>{performers}</Text>
+          {classifiers ? <Text numberOfLines={1} style={[styles.classifiers, compact && styles.classifiersCompact, horizontal && styles.classifiersHorizontal]}>{classifiers}</Text> : null}
         </View>
       </View>
 
-      <View style={[styles.seekBar, { maxWidth: contentWidth }, compact && styles.seekBarCompact]}>
+      <View style={[
+        styles.seekBar,
+        { maxWidth: contentWidth },
+        compact && styles.seekBarCompact,
+        horizontal && styles.seekBarHorizontal,
+      ]}>
         <SeekBar positionMs={positionMs} durationMs={durationMs} onSeek={onSeek} />
       </View>
 
-      <TransportControls {...transport} large={!compact} />
-
-      <View style={[styles.playerActions, compact && styles.playerActionsCompact]}>
-        <RoundIconButton
-          icon={liked ? 'heart' : 'heart-outline'}
-          accessibilityLabel={liked ? (isArabic ? 'إزالة الإعجاب' : 'Unlike') : (isArabic ? 'إعجاب' : 'Like')}
-          active={liked}
-          disabled={likeBusy}
-          onPress={onToggleLike}
-          size={compact ? 38 : 42}
-        />
-        <RoundIconButton
-          icon="share-outline"
-          accessibilityLabel={isArabic ? 'مشاركة' : 'Share'}
-          onPress={onShare}
-          size={compact ? 38 : 42}
-        />
-        {onDownload ? (
-          <Pressable style={styles.secondaryAction} onPress={onDownload}>
-            <Text style={styles.secondaryActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      {horizontal ? (
+        <View style={styles.horizontalControlStrip}>
+          <TransportControls {...transport} />
+          <View style={[styles.playerActions, styles.playerActionsHorizontal]}>
+            <RoundIconButton
+              icon={liked ? 'heart' : 'heart-outline'}
+              accessibilityLabel={liked ? (isArabic ? 'إزالة الإعجاب' : 'Unlike') : (isArabic ? 'إعجاب' : 'Like')}
+              active={liked}
+              disabled={likeBusy}
+              onPress={onToggleLike}
+              size={38}
+            />
+            <RoundIconButton
+              icon="share-outline"
+              accessibilityLabel={isArabic ? 'مشاركة' : 'Share'}
+              onPress={onShare}
+              size={38}
+            />
+            {onDownload ? (
+              <Pressable style={[styles.secondaryAction, styles.secondaryActionHorizontal]} onPress={onDownload}>
+                <Text style={styles.secondaryActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      ) : (
+        <>
+          <TransportControls {...transport} large={!compact} />
+          <View style={[styles.playerActions, compact && styles.playerActionsCompact]}>
+            <RoundIconButton
+              icon={liked ? 'heart' : 'heart-outline'}
+              accessibilityLabel={liked ? (isArabic ? 'إزالة الإعجاب' : 'Unlike') : (isArabic ? 'إعجاب' : 'Like')}
+              active={liked}
+              disabled={likeBusy}
+              onPress={onToggleLike}
+              size={compact ? 38 : 42}
+            />
+            <RoundIconButton
+              icon="share-outline"
+              accessibilityLabel={isArabic ? 'مشاركة' : 'Share'}
+              onPress={onShare}
+              size={compact ? 38 : 42}
+            />
+            {onDownload ? (
+              <Pressable style={styles.secondaryAction} onPress={onDownload}>
+                <Text style={styles.secondaryActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -853,17 +891,22 @@ const styles = StyleSheet.create({
   },
   titleRow: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
   titleRowCompact: { marginTop: 12, gap: 8 },
+  titleRowHorizontal: { marginTop: 0 },
   titleText: { flex: 1, minWidth: 0, width: '100%', alignItems: 'center' },
   trackTitle: { width: '100%', color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, lineHeight: 30, fontWeight: '700', textAlign: 'center' },
   trackTitleCompact: { fontSize: 18, lineHeight: 23 },
+  trackTitleHorizontal: { fontSize: 17, lineHeight: 21 },
   albumTitle: { width: '100%', color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600', marginTop: 5, textAlign: 'center' },
   albumTitleCompact: { fontSize: 12, marginTop: 3 },
   artist: { width: '100%', color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', marginTop: 4, textAlign: 'center' },
   artistCompact: { fontSize: 12, marginTop: 3 },
   classifiers: { width: '100%', color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 4, textAlign: 'center' },
   classifiersCompact: { fontSize: 11, marginTop: 2 },
+  metaHorizontal: { fontSize: 11, marginTop: 2 },
+  classifiersHorizontal: { fontSize: 10, marginTop: 2 },
   seekBar: { width: '100%', marginTop: SPACING.md },
   seekBarCompact: { marginTop: 10 },
+  seekBarHorizontal: { marginTop: 6 },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xl, marginTop: SPACING.xs },
   playButton: { backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   playNudge: { marginLeft: 4 },
@@ -871,6 +914,16 @@ const styles = StyleSheet.create({
   pressedControl: { opacity: 0.7, transform: [{ scale: 0.94 }] },
   playerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: SPACING.sm, marginTop: SPACING.sm },
   playerActionsCompact: { marginTop: 6, gap: 6 },
+  horizontalControlStrip: {
+    width: '100%',
+    maxWidth: 620,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 2,
+  },
+  playerActionsHorizontal: { marginTop: 0, flexWrap: 'nowrap', gap: 6 },
   secondaryAction: {
     minHeight: 36,
     justifyContent: 'center',
@@ -880,6 +933,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
   },
+  secondaryActionHorizontal: { minHeight: 34, paddingHorizontal: 10 },
   secondaryActionText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
 
   narrowBody: { flex: 1, minHeight: 0, paddingHorizontal: SPACING.md, paddingBottom: SPACING.md },
