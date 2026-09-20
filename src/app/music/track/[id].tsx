@@ -187,7 +187,7 @@ export default function MusicTrackDetailScreen() {
   const artSize = desktop ? 310 : Math.min(280, Math.max(210, width - 96));
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <Head><title>{track.title}</title></Head>
       <Header onBack={() => goBack(router, '/music')} />
 
