@@ -466,7 +466,7 @@ export default function BibleChapterDocument() {
                     style={styles.selectorIconButton}
                     onPress={() => {
                       setIsSelectorOpen(false);
-                      router.push('/settings');
+                      router.push('/book-settings');
                     }}
                   >
                     <Icon name="settings-outline" size={25} color={COLORS.gold} />
