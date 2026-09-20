@@ -20,6 +20,7 @@ import {
 } from '@/services/offlineDownloadRequests';
 import type { MusicConsumerRelease, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
+import { publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
 export default function MusicReleaseScreen() {
@@ -103,7 +104,7 @@ export default function MusicReleaseScreen() {
 
   const handleShareRelease = async () => {
     if (!release) return;
-    const deepLink = `https://coptichymnscentre.com/music/release/${release.id}`;
+    const deepLink = publicUrl(`/music/release/${release.id}?share=1`);
     await shareLink({
       title: release.title,
       text: release.primaryArtist?.displayName
@@ -188,7 +189,7 @@ export default function MusicReleaseScreen() {
         description={release.primaryArtist?.displayName
           ? `${release.title} — ${release.primaryArtist.displayName}`
           : release.description}
-        canonicalUrl={`https://coptichymnscentre.com/music/release/${release.id}`}
+        canonicalUrl={publicUrl(`/music/release/${release.id}`)}
         imageUrl={musicService.resolveAsset(release.coverAsset ?? null)}
         type="music.album"
       />
