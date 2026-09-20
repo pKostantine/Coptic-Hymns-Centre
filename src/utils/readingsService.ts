@@ -142,9 +142,10 @@ export interface ReadingRule {
   reading_type: string;
   reading_code: string;
   reading_reference: string;
+  sunday_message: string | null;
 }
 
-const READING_RULE_FIELDS = 'reading_rule_id, cycle_type, priority, service, reading_type, reading_code, reading_reference';
+const READING_RULE_FIELDS = 'reading_rule_id, cycle_type, priority, service, reading_type, reading_code, reading_reference, sunday_message';
 
 async function queryReadingRules(filters: Record<string, string | number>): Promise<ReadingRule[]> {
   let query = supabase.schema('calendar').from('reading_rules').select(READING_RULE_FIELDS);
@@ -784,6 +785,24 @@ async function getGospelRiteSections(date: Date, serviceFlag: 'Vespers' | 'Matin
   // serviceFlag or React (Slideshow's keys) and the WebView's
   // data-section-id both end up with duplicates across the 3 calls.
   return authoredSections.map((section) => ({ ...section, id: `${serviceFlag}-${section.id}` }));
+}
+
+// ─── Home-page Sunday message ────────────────────────────────────────────────
+
+/**
+ * Resolves the same winning katameros tier used by the Books Lectionary and
+ * reads the home-page message from that Sunday's Liturgy Gospel row only.
+ * This deliberately shares resolveReadingRules(), so fixed feasts, Great Lent,
+ * Holy 50 Days, annual Sundays, and the Mesore/Nesi edge case cannot drift
+ * from what the user actually sees in the Lectionary.
+ */
+export async function getSundayMessageForDate(date: Date): Promise<string | null> {
+  const isoDate = toIsoDateString(date);
+  const activeFlags = await getActiveFlags(isoDate);
+  const rules = await resolveReadingRules(isoDate, activeFlags);
+  const gospel = rules.find((rule) => rule.service === 'Liturgy' && rule.reading_type === 'Gospel');
+  const message = gospel?.sunday_message?.trim();
+  return message || null;
 }
 
 // ─── Orchestrator ───────────────────────────────────────────────────────────
