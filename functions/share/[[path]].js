@@ -83,13 +83,14 @@ function sameOriginProxy(origin, asset) {
   return origin + '/__share-image?' + params.toString();
 }
 
-function htmlResponse({ title, description, targetUrl, canonicalUrl, primaryImage, proxyImage, mimeType }) {
+function htmlResponse({ title, description, targetUrl, canonicalUrl, previewUrl, primaryImage, proxyImage, mimeType }) {
   const fullTitle = title.includes('Coptic Hymns Centre')
     ? title
     : title + ' — Coptic Hymns Centre';
   const safeTitle = escapeHtml(fullTitle);
   const safeDescription = escapeHtml(description || 'Coptic Hymns Centre');
   const safeCanonical = escapeHtml(canonicalUrl);
+  const safePreview = escapeHtml(previewUrl);
   const safeTarget = escapeHtml(targetUrl);
   const safePrimary = escapeHtml(primaryImage);
   const safeProxy = proxyImage ? escapeHtml(proxyImage) : null;
@@ -117,7 +118,7 @@ function htmlResponse({ title, description, targetUrl, canonicalUrl, primaryImag
     + '<meta property="og:type" content="website" />\n'
     + '<meta property="og:title" content="' + safeTitle + '" />\n'
     + '<meta property="og:description" content="' + safeDescription + '" />\n'
-    + '<meta property="og:url" content="' + safeCanonical + '" />\n'
+    + '<meta property="og:url" content="' + safePreview + '" />\n'
     + '<meta property="og:image" content="' + safePrimary + '" />\n'
     + '<meta property="og:image:url" content="' + safePrimary + '" />\n'
     + '<meta property="og:image:secure_url" content="' + safePrimary + '" />\n'
@@ -155,6 +156,10 @@ export async function onRequest(context) {
   const origin = url.origin;
   const targetUrl = origin + targetPath;
   const canonicalUrl = targetUrl;
+  // Keep the Open Graph identity on the dedicated share URL itself. This
+  // prevents link-preview caches from collapsing it back onto the old SPA URL
+  // whose generic CHC icon may already be cached.
+  const previewUrl = origin + url.pathname + url.search;
   const directImage = resolveDirectImage(preview?.imageAsset);
   const proxyImage = sameOriginProxy(origin, preview?.imageAsset);
   const primaryImage = directImage || proxyImage || origin + '/apple-touch-icon.png';
@@ -164,6 +169,7 @@ export async function onRequest(context) {
     description: preview?.description || 'Coptic Hymns Centre',
     targetUrl,
     canonicalUrl,
+    previewUrl,
     primaryImage,
     proxyImage,
     mimeType: preview?.imageAsset?.mimeType || null,
