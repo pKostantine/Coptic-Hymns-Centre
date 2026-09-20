@@ -3,7 +3,7 @@ import { Buffer } from 'node:buffer';
 import { afterEach, test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 
-const workerSource = await readFile(new URL('../public/_worker.js', import.meta.url), 'utf8');
+const workerSource = await readFile(new URL('../workers/web-app/src/index.js', import.meta.url), 'utf8');
 const workerModule = await import(
   'data:text/javascript;base64,' + Buffer.from(workerSource).toString('base64')
 );
