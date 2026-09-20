@@ -1,5 +1,4 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,14 +12,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon from '@/components/chc/ui/Icon';
+import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicLyricsView from '@/components/music/MusicLyricsView';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
-import type { MusicConsumerTrackDetail } from '@/types/musicConsumer';
+import type { MusicConsumerTrackDetail, PublishedTrackLyricsPayload, PublishedLyricSet } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import { goBack } from '@/utils/navigation';
 import { shareLink } from '@/utils/shareLink';
@@ -49,6 +50,9 @@ export default function MusicTrackDetailScreen() {
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
+  const [lyrics, setLyrics] = useState<PublishedTrackLyricsPayload | null>(null);
+  const [lyricsLoading, setLyricsLoading] = useState(true);
+  const [selectedLyricSetId, setSelectedLyricSetId] = useState<string | null>(null);
   const player = useMusicPlayer();
 
   useEffect(() => {
@@ -86,6 +90,35 @@ export default function MusicTrackDetailScreen() {
     return () => { active = false; };
   }, [locale, trackId]);
 
+  useEffect(() => {
+    if (!trackId) return;
+    let active = true;
+    setLyricsLoading(true);
+    musicService.getLyrics(trackId)
+      .then((payload) => {
+        if (!active) return;
+        setLyrics(payload);
+        const preferred = [...payload.lyricSets].sort((a, b) => {
+          const order: Record<string, number> = { en: 0, fr: 1, cop: 2, ar: 3 };
+          return (order[a.locale] ?? 99) - (order[b.locale] ?? 99);
+        })[0] ?? null;
+        setSelectedLyricSetId((current) => (
+          current && payload.lyricSets.some((set) => set.id === current)
+            ? current
+            : preferred?.id ?? null
+        ));
+      })
+      .catch(() => {
+        if (!active) return;
+        setLyrics({ trackId, lyricSets: [] });
+        setSelectedLyricSetId(null);
+      })
+      .finally(() => {
+        if (active) setLyricsLoading(false);
+      });
+    return () => { active = false; };
+  }, [trackId]);
+
   const queueItem = useMemo<MusicQueueItem | null>(() => {
     if (!track) return null;
     return {
@@ -111,6 +144,23 @@ export default function MusicTrackDetailScreen() {
 
   const isCurrent = Boolean(track && player.currentItem?.track.id === track.id);
   const isPlaying = isCurrent && player.playing;
+  const lyricSets = useMemo<PublishedLyricSet[]>(() => {
+    const order: Record<string, number> = { en: 0, fr: 1, cop: 2, ar: 3 };
+    return [...(lyrics?.lyricSets ?? [])].sort((a, b) => (
+      (order[a.locale] ?? 99) - (order[b.locale] ?? 99)
+    ));
+  }, [lyrics]);
+  const selectedLyricSet = lyricSets.find((set) => set.id === selectedLyricSetId) ?? null;
+  const activeLineId = useMemo(() => {
+    if (!isCurrent || !selectedLyricSet) return null;
+    const timed = selectedLyricSet.lines.filter((line) => line.startMs != null);
+    let active: string | null = null;
+    for (const line of timed) {
+      if ((line.startMs ?? 0) <= player.currentTimeMs) active = line.id;
+      else break;
+    }
+    return active;
+  }, [isCurrent, player.currentTimeMs, selectedLyricSet]);
 
   const togglePlayback = () => {
     if (!queueItem) return;
@@ -143,6 +193,16 @@ export default function MusicTrackDetailScreen() {
     } finally {
       setLikeBusy(false);
     }
+  };
+
+  const seekLyricLine = (startMs: number) => {
+    if (!queueItem) return;
+    if (isCurrent) {
+      void player.seekToMs(startMs);
+      return;
+    }
+    player.playItem(queueItem);
+    setTimeout(() => { void player.seekToMs(startMs); }, 100);
   };
 
   const shareTrack = async () => {
@@ -188,7 +248,13 @@ export default function MusicTrackDetailScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <Head><title>{track.title}</title></Head>
+      <ShareMetadata
+        title={track.title}
+        description={track.release?.title ? `${track.title} — ${track.release.title}` : performers}
+        canonicalUrl={`https://coptichymnscentre.com/music/track/${track.id}`}
+        imageUrl={musicService.resolveAsset(track.release?.coverAsset ?? null)}
+        type="music.song"
+      />
       <Header onBack={() => goBack(router, '/music')} />
 
       <NowPlayingAwareScrollView
@@ -293,6 +359,21 @@ export default function MusicTrackDetailScreen() {
             </Pressable>
           ))}
         </View>
+
+        <View style={styles.lyricsCard}>
+          <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الكلمات' : 'Lyrics'}</Text>
+          <View style={[styles.lyricsViewport, desktop && styles.lyricsViewportDesktop]}>
+            <MusicLyricsView
+              lyricSets={lyricSets}
+              selectedSetId={selectedLyricSetId}
+              onSelectSet={setSelectedLyricSetId}
+              activeLineId={activeLineId}
+              loading={lyricsLoading}
+              onSeekLine={seekLyricLine}
+              forceCompact={!desktop}
+            />
+          </View>
+        </View>
       </NowPlayingAwareScrollView>
     </SafeAreaView>
   );
@@ -341,6 +422,9 @@ const styles = StyleSheet.create({
   albumCardTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800', marginTop: 4 },
   albumCardMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
   creditsCard: { maxWidth: 760, width: '100%', alignSelf: 'center', marginTop: 18, overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  lyricsCard: { maxWidth: 760, width: '100%', alignSelf: 'center', marginTop: 18, overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  lyricsViewport: { height: 390, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border, paddingTop: 10 },
+  lyricsViewportDesktop: { height: 470 },
   sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '800', paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8 },
   artistRow: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
   artistText: { flex: 1, minWidth: 0 },
