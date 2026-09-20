@@ -76,6 +76,14 @@ export async function getMusicTrack(trackId: string, locale = 'en'): Promise<Mus
   return assertRpcData(data as MusicConsumerTrackDetail | null, error, 'Load track');
 }
 
+export async function getMusicArtistSearchArt(artistId: string): Promise<MusicConsumerAsset | null> {
+  const { data, error } = await supabase.rpc('get_music_artist_search_art', {
+    p_artist_id: artistId,
+  });
+  if (error) throw new Error('Load artist search artwork: ' + error.message);
+  return data as MusicConsumerAsset | null;
+}
+
 export async function searchMusic(query: string, locale = 'en'): Promise<MusicSearchPayload> {
   const normalized = query.trim();
   if (!normalized) return { artists: [], releases: [], tracks: [] };
@@ -191,6 +199,7 @@ export const musicService = {
   getRelease: getMusicRelease,
   getArtist: getMusicArtist,
   getTrack: getMusicTrack,
+  getArtistSearchArt: getMusicArtistSearchArt,
   search: searchMusic,
   getLibrary: getMusicLibrary,
   getPlaylist: getMusicPlaylist,
