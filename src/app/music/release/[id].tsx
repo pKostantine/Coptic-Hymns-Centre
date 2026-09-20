@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, useWindowDimensi
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon from '@/components/chc/ui/Icon';
+import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
@@ -182,6 +183,15 @@ export default function MusicReleaseScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+      <ShareMetadata
+        title={release.title}
+        description={release.primaryArtist?.displayName
+          ? `${release.title} — ${release.primaryArtist.displayName}`
+          : release.description}
+        canonicalUrl={`https://coptichymnscentre.com/music/release/${release.id}`}
+        imageUrl={musicService.resolveAsset(release.coverAsset ?? null)}
+        type="music.album"
+      />
       <Header onBack={() => goBack(router, '/music')} title={releaseType} isArabic={isArabic} />
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, desktop && styles.heroDesktop]}>
