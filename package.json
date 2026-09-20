@@ -65,7 +65,7 @@
     "test:share": "node --test tests/shareWorker.test.mjs",
     "build": "expo export -p web",
     "postbuild": "node scripts/verify-cloudflare-share-worker.mjs",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name coptic-hymns-centre"
+    "deploy": "npm run build && wrangler deploy"
   },
   "private": true
 }
