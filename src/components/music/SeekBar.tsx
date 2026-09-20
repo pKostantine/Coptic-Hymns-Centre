@@ -3,6 +3,7 @@ import {
   GestureResponderEvent,
   LayoutChangeEvent,
   PanResponder,
+  PanResponderGestureState,
   Platform,
   StyleSheet,
   Text,
@@ -25,77 +26,213 @@ export function formatPlaybackTime(ms: number): string {
 interface SeekBarProps {
   positionMs: number;
   durationMs: number;
-  onSeek: (positionMs: number) => void;
+  onSeek: (positionMs: number) => void | Promise<void>;
   accentColor?: string;
+  /** Slightly denser treatment for short landscape/full-screen control rows. */
+  dense?: boolean;
 }
 
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const SEEK_ACK_TOLERANCE_MS = 1100;
+const SEEK_ACK_TIMEOUT_MS = 2500;
+
 /**
- * Tap or drag anywhere on the track to scrub. The thumb follows the finger
- * locally and the player only seeks on release, so dragging never stutters
- * the audio or fights the position updates coming back from the player.
+ * A scrubber designed to stay visually locked to the finger.
+ *
+ * Important implementation details:
+ * - Dragging is calculated from the touch's initial local X + PanResponder dx,
+ *   never page coordinates. This survives rotations, safe-area padding,
+ *   nested sheets and browser offsets without the thumb jumping.
+ * - Position updates from the audio engine are ignored while scrubbing.
+ * - After release, the requested position stays rendered optimistically until
+ *   expo-audio reports that it has reached the seek. That removes the
+ *   old "snap back, then jump forward" effect.
+ * - Move updates are coalesced to one render per animation frame.
  */
-export default function SeekBar({ positionMs, durationMs, onSeek, accentColor = COLORS.gold }: SeekBarProps) {
+export default function SeekBar({
+  positionMs,
+  durationMs,
+  onSeek,
+  accentColor = COLORS.gold,
+  dense = false,
+}: SeekBarProps) {
   const [scrubRatio, setScrubRatio] = useState<number | null>(null);
+  const [optimisticSeekMs, setOptimisticSeekMs] = useState<number | null>(null);
   const [hovered, setHovered] = useState(false);
-  const width = useRef(0);
-  // Page X of the bar's left edge, captured when the gesture starts. Move
-  // events are measured against it, because once the pointer leaves the bar
-  // locationX is relative to whatever element happens to be underneath.
-  const originPageX = useRef(0);
+  const [layoutWidth, setLayoutWidth] = useState(0);
+
+  const widthRef = useRef(0);
+  const startRatioRef = useRef(0);
+  const scrubRatioRef = useRef<number | null>(null);
+  const optimisticSeekRef = useRef<number | null>(null);
+  const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const pendingRatioRef = useRef<number | null>(null);
   const latest = useRef({ durationMs, onSeek });
+
   useEffect(() => {
     latest.current = { durationMs, onSeek };
   }, [durationMs, onSeek]);
 
-  // Created once: a PanResponder keeps its gesture state per instance, so
-  // rebuilding it mid-drag would reset the scrub. The handlers only run on
-  // gestures and read the latest props through refs.
-  // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
-  const [panResponder] = useState(() => {
-    const ratioAt = (pageX: number) => {
-      if (width.current <= 0) return 0;
-      return Math.max(0, Math.min(1, (pageX - originPageX.current) / width.current));
-    };
+  useEffect(() => {
+    optimisticSeekRef.current = optimisticSeekMs;
+  }, [optimisticSeekMs]);
 
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => latest.current.durationMs > 0,
-      onMoveShouldSetPanResponder: () => latest.current.durationMs > 0,
-      // Keep the gesture when the finger drifts vertically inside a ScrollView.
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (event: GestureResponderEvent) => {
-        originPageX.current = event.nativeEvent.pageX - event.nativeEvent.locationX;
-        setScrubRatio(ratioAt(event.nativeEvent.pageX));
-      },
-      onPanResponderMove: (event: GestureResponderEvent) => {
-        setScrubRatio(ratioAt(event.nativeEvent.pageX));
-      },
-      onPanResponderRelease: (event: GestureResponderEvent) => {
-        const ratio = ratioAt(event.nativeEvent.pageX);
-        latest.current.onSeek(ratio * latest.current.durationMs);
-        setScrubRatio(null);
-      },
-      onPanResponderTerminate: () => setScrubRatio(null),
+  useEffect(() => () => {
+    if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+    if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
+  }, []);
+
+  // Keep the requested seek on screen until the native/web audio clock catches
+  // up. Clearing it immediately is what caused the seeker to visibly snap back.
+  useEffect(() => {
+    const target = optimisticSeekRef.current;
+    if (target == null || scrubRatioRef.current != null) return;
+    if (Math.abs(positionMs - target) <= SEEK_ACK_TOLERANCE_MS) {
+      if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+      seekTimeoutRef.current = null;
+      optimisticSeekRef.current = null;
+      setOptimisticSeekMs(null);
+    }
+  }, [positionMs]);
+
+  const scheduleRatio = (ratio: number) => {
+    const next = clamp01(ratio);
+    scrubRatioRef.current = next;
+    pendingRatioRef.current = next;
+    if (frameRef.current != null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      const pending = pendingRatioRef.current;
+      pendingRatioRef.current = null;
+      if (pending != null) setScrubRatio(pending);
     });
-  });
+  };
+
+  const ratioFromGrant = (event: GestureResponderEvent) => {
+    const width = widthRef.current;
+    if (width <= 0) return 0;
+    return clamp01(event.nativeEvent.locationX / width);
+  };
+
+  const ratioFromDrag = (gesture: PanResponderGestureState) => {
+    const width = widthRef.current;
+    if (width <= 0) return startRatioRef.current;
+    return clamp01(startRatioRef.current + gesture.dx / width);
+  };
+
+  const commitSeek = (ratio: number) => {
+    const safeRatio = clamp01(ratio);
+    const targetMs = safeRatio * latest.current.durationMs;
+
+    // Flush the visual position synchronously before ending the drag.
+    if (frameRef.current != null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    pendingRatioRef.current = null;
+    scrubRatioRef.current = null;
+    setScrubRatio(null);
+
+    optimisticSeekRef.current = targetMs;
+    setOptimisticSeekMs(targetMs);
+
+    if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+    seekTimeoutRef.current = setTimeout(() => {
+      optimisticSeekRef.current = null;
+      setOptimisticSeekMs(null);
+      seekTimeoutRef.current = null;
+    }, SEEK_ACK_TIMEOUT_MS);
+
+    void latest.current.onSeek(targetMs);
+  };
+
+  // Created once. All changing inputs are read from refs so a rerender never
+  // tears down a gesture that is already in progress.
+  // eslint-disable-next-line react-hooks/refs -- refs are intentionally read in responder callbacks.
+  const [panResponder] = useState(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => latest.current.durationMs > 0 && widthRef.current > 0,
+    onMoveShouldSetPanResponder: () => latest.current.durationMs > 0 && widthRef.current > 0,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: (event: GestureResponderEvent) => {
+      const ratio = ratioFromGrant(event);
+      startRatioRef.current = ratio;
+      // Once the user touches the bar, their finger wins over any in-flight
+      // native seek acknowledgement.
+      if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+      seekTimeoutRef.current = null;
+      optimisticSeekRef.current = null;
+      setOptimisticSeekMs(null);
+      scheduleRatio(ratio);
+    },
+    onPanResponderMove: (_event: GestureResponderEvent, gesture: PanResponderGestureState) => {
+      scheduleRatio(ratioFromDrag(gesture));
+    },
+    onPanResponderRelease: (_event: GestureResponderEvent, gesture: PanResponderGestureState) => {
+      commitSeek(ratioFromDrag(gesture));
+    },
+    onPanResponderTerminate: () => {
+      if (frameRef.current != null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      pendingRatioRef.current = null;
+      scrubRatioRef.current = null;
+      setScrubRatio(null);
+    },
+  }));
 
   const scrubbing = scrubRatio != null;
-  const playedRatio = durationMs > 0 ? Math.max(0, Math.min(1, positionMs / durationMs)) : 0;
-  const ratio = scrubbing ? scrubRatio : playedRatio;
-  const displayMs = scrubbing ? scrubRatio * durationMs : positionMs;
-  const active = scrubbing || hovered;
+  const playedRatio = durationMs > 0 ? clamp01(positionMs / durationMs) : 0;
+  const optimisticRatio = durationMs > 0 && optimisticSeekMs != null
+    ? clamp01(optimisticSeekMs / durationMs)
+    : null;
+  const ratio = scrubRatio ?? optimisticRatio ?? playedRatio;
+  const displayMs = scrubRatio != null
+    ? scrubRatio * durationMs
+    : optimisticSeekMs ?? positionMs;
+  const active = scrubbing || hovered || optimisticSeekMs != null;
 
   const hoverProps = Platform.OS === 'web'
     ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) }
     : {};
+
+  const thumbSize = dense ? 12 : 16;
+  // Keep the thumb centre inside the actual bar at both ends rather than
+  // rendering half of it outside the track.
+  const thumbTravel = Math.max(0, layoutWidth - thumbSize);
+  const thumbLeft = thumbSize / 2 + thumbTravel * ratio;
 
   return (
     <View style={styles.wrapper}>
       <View
         accessibilityRole="adjustable"
         accessibilityLabel="Seek"
-        accessibilityValue={{ min: 0, max: Math.round(durationMs / 1000), now: Math.round(displayMs / 1000) }}
-        onLayout={(event: LayoutChangeEvent) => { width.current = event.nativeEvent.layout.width; }}
-        style={[styles.hitArea, Platform.OS === 'web' && styles.webCursor]}
+        accessibilityValue={{
+          min: 0,
+          max: Math.round(durationMs / 1000),
+          now: Math.round(displayMs / 1000),
+        }}
+        accessibilityActions={[
+          { name: 'increment', label: 'Forward 10 seconds' },
+          { name: 'decrement', label: 'Back 10 seconds' },
+        ]}
+        onAccessibilityAction={(event) => {
+          if (durationMs <= 0) return;
+          const delta = event.nativeEvent.actionName === 'increment' ? 10000 : -10000;
+          const target = Math.max(0, Math.min(durationMs, displayMs + delta));
+          commitSeek(target / durationMs);
+        }}
+        onLayout={(event: LayoutChangeEvent) => {
+          const nextWidth = event.nativeEvent.layout.width;
+          widthRef.current = nextWidth;
+          setLayoutWidth(nextWidth);
+        }}
+        style={[
+          styles.hitArea,
+          dense && styles.hitAreaDense,
+          Platform.OS === 'web' && styles.webCursor,
+        ]}
         {...hoverProps}
         {...panResponder.panHandlers}
       >
@@ -106,14 +243,24 @@ export default function SeekBar({ positionMs, durationMs, onSeek, accentColor = 
           pointerEvents="none"
           style={[
             styles.thumb,
-            { left: `${ratio * 100}%`, backgroundColor: accentColor },
+            dense && styles.thumbDense,
+            {
+              width: thumbSize,
+              height: thumbSize,
+              borderRadius: thumbSize / 2,
+              left: thumbLeft,
+              marginLeft: -thumbSize / 2,
+              backgroundColor: accentColor,
+            },
             active ? styles.thumbActive : styles.thumbIdle,
           ]}
         />
       </View>
-      <View pointerEvents="none" style={styles.timeRow}>
-        <Text style={[styles.time, scrubbing && { color: accentColor }]}>{formatPlaybackTime(displayMs)}</Text>
-        <Text style={styles.time}>
+      <View pointerEvents="none" style={[styles.timeRow, dense && styles.timeRowDense]}>
+        <Text style={[styles.time, dense && styles.timeDense, scrubbing && { color: accentColor }]}>
+          {formatPlaybackTime(displayMs)}
+        </Text>
+        <Text style={[styles.time, dense && styles.timeDense]}>
           {durationMs > 0 ? `-${formatPlaybackTime(Math.max(0, durationMs - displayMs))}` : '--:--'}
         </Text>
       </View>
@@ -121,31 +268,39 @@ export default function SeekBar({ positionMs, durationMs, onSeek, accentColor = 
   );
 }
 
-const THUMB = 14;
-
 const styles = StyleSheet.create({
   wrapper: { width: '100%' },
-  // Tall invisible hit area around a thin visible track.
-  hitArea: { height: 28, justifyContent: 'center' },
-  webCursor: { cursor: 'pointer' } as object,
-  track: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255, 255, 255, 0.14)', overflow: 'hidden' },
+  // A forgiving touch target around the thin visible bar is critical on phones.
+  hitArea: { height: 38, justifyContent: 'center' },
+  hitAreaDense: { height: 30 },
+  webCursor: { cursor: 'pointer', touchAction: 'none' } as object,
+  track: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    overflow: 'hidden',
+  },
   trackActive: { height: 6, borderRadius: 3 },
   fill: { height: '100%', borderRadius: 3 },
   thumb: {
     position: 'absolute',
-    top: (28 - THUMB) / 2,
-    width: THUMB,
-    height: THUMB,
-    marginLeft: -THUMB / 2,
-    borderRadius: THUMB / 2,
+    top: 11,
     shadowColor: COLORS.shadow,
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
+    shadowOpacity: 0.42,
+    shadowRadius: 5,
     shadowOffset: { width: 0, height: 1 },
-    elevation: 3,
+    elevation: 4,
   },
-  thumbIdle: { transform: [{ scale: 0.75 }] },
-  thumbActive: { transform: [{ scale: 1.15 }] },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  time: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontVariant: ['tabular-nums'] },
+  thumbDense: { top: 9 },
+  thumbIdle: { transform: [{ scale: 0.82 }] },
+  thumbActive: { transform: [{ scale: 1.12 }] },
+  timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -1 },
+  timeRowDense: { marginTop: -2 },
+  time: {
+    color: COLORS.muted,
+    fontFamily: TYPOGRAPHY.body,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+  },
+  timeDense: { fontSize: 10 },
 });
