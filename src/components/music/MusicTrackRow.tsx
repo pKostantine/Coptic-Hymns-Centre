@@ -19,6 +19,7 @@ export default function MusicTrackRow({
   index,
   active = false,
   onPress,
+  onTitlePress,
   trailing,
   showLikeButton = false,
   liked = false,
@@ -28,6 +29,8 @@ export default function MusicTrackRow({
   index: number;
   active?: boolean;
   onPress: () => void;
+  /** Opens the track detail page without changing playback. */
+  onTitlePress?: () => void;
   trailing?: ReactNode;
   showLikeButton?: boolean;
   liked?: boolean;
@@ -39,7 +42,21 @@ export default function MusicTrackRow({
     <Pressable style={[styles.row, active && styles.rowActive]} onPress={onPress}>
       <Text style={[styles.index, active && styles.activeText]}>{index + 1}</Text>
       <View style={styles.info}>
-        <Text numberOfLines={1} style={[styles.title, active && styles.activeText]}>{track.title}</Text>
+        {onTitlePress ? (
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${track.title}`}
+            onPress={(event) => {
+              event.stopPropagation();
+              onTitlePress();
+            }}
+            style={({ pressed }) => pressed && styles.titlePressed}
+          >
+            <Text numberOfLines={1} style={[styles.title, active && styles.activeText]}>{track.title}</Text>
+          </Pressable>
+        ) : (
+          <Text numberOfLines={1} style={[styles.title, active && styles.activeText]}>{track.title}</Text>
+        )}
         {credit || track.subtitle ? (
           <Text numberOfLines={1} style={styles.subtitle}>
             {[credit, track.subtitle].filter(Boolean).join(' • ')}
@@ -79,6 +96,7 @@ const styles = StyleSheet.create({
   index: { width: 24, textAlign: 'center', color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13 },
   info: { flex: 1, minWidth: 0 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
+  titlePressed: { opacity: 0.62 },
   subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
   duration: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontVariant: ['tabular-nums'] },
   likeButton: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)' },
