@@ -285,7 +285,13 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   };
 
   const header = (
-    <View style={[styles.header, isLandscapePhone && styles.headerLandscape]}>
+    <View
+      style={[
+        styles.header,
+        isLandscapePhone && styles.headerLandscape,
+        { height: (isLandscapePhone ? 46 : HEADER_HEIGHT) + insets.top, paddingTop: insets.top },
+      ]}
+    >
       <RoundIconButton
         icon="chevron-down"
         accessibilityLabel="Close now playing"
@@ -348,6 +354,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     activeLineId,
     loading: lyricsLoading,
     onSeekLine: (startMs: number) => void seekToMs(startMs),
+    forceCompact: isLandscapePhone,
   };
 
   const queueProps = {
@@ -365,6 +372,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     onCycleRepeat: cycleRepeatMode,
     likedTrackIds,
     onToggleLike: (trackId: string) => void toggleTrackLike(trackId),
+    compact: isLandscapePhone,
   };
 
   const lyricsPanelHeader = (
@@ -503,7 +511,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         ) : isLandscapePhone ? (
           landscapePlayer
         ) : (
-          <View style={styles.narrowBody}>
+          <View style={[styles.narrowBody, { paddingBottom: Math.max(SPACING.md, insets.bottom + SPACING.sm) }]}>
             <View style={styles.narrowPlayer}>{player}</View>
 
             <View style={styles.pullUpRow}>
@@ -889,6 +897,7 @@ const styles = StyleSheet.create({
       default: { shadowColor: COLORS.shadow, shadowOpacity: 0.55, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 12 },
     }),
   },
+  artShadowCompact: { borderRadius: 12 },
   titleRow: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
   titleRowCompact: { marginTop: 12, gap: 8 },
   titleRowHorizontal: { marginTop: 0 },
