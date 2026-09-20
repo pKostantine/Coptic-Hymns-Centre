@@ -1785,13 +1785,11 @@ function uppercaseFirstCopticChar(text) {
 // Readings (buildReadingVerses above) source Coptic text from bible.verses,
 // not hymn_texts -- same underlying data/case convention the standalone
 // Bible reader already normalizes (see lowercaseCopticCharacters in
-// bibleDocumentHtml.ts), which additionally restores the "Ⲋ" numeral-6 glyph
-// after the blanket lowercase pass since it has no true lowercase form. This
-// mirrors that Bible-reader normalization rather than reusing
-// lowercaseCoptic above, which is tuned for hymn_texts's own convention and
-// lacks the "Ⲋ" fix-up.
+// bibleDocumentHtml.ts). This mirrors that Bible-reader normalization rather
+// than reusing lowercaseCoptic above, which is tuned for hymn_texts's own
+// convention.
 function lowercaseBibleCoptic(text) {
-  return text.replace(COPTIC_CHAR_GLOBAL_PATTERN, (char) => COPTIC_TO_LOWER[char] ?? char.toLocaleLowerCase()).replace(/ⲋ/g, "Ⲋ");
+  return text.replace(COPTIC_CHAR_GLOBAL_PATTERN, (char) => COPTIC_TO_LOWER[char] ?? char.toLocaleLowerCase());
 }
 
 function applyCopticCaseToReadingVerses(verses) {

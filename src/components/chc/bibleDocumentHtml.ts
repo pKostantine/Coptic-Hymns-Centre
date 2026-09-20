@@ -992,9 +992,7 @@ function formatVerseText(text: string, language: BibleLanguageKey, isFirstCoptic
 }
 
 function lowercaseCopticCharacters(text: string): string {
-  return text
-    .replace(COPTIC_CHARACTER_GLOBAL_PATTERN, (ch) => COPTIC_TO_LOWER[ch] ?? ch.toLocaleLowerCase())
-    .replace(/ⲋ/g, 'Ⲋ');
+  return text.replace(COPTIC_CHARACTER_GLOBAL_PATTERN, (ch) => COPTIC_TO_LOWER[ch] ?? ch.toLocaleLowerCase());
 }
 
 function uppercaseFirstCopticCharacter(text: string): string {

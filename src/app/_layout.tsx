@@ -64,7 +64,7 @@ export default function RootLayout() {
   // CHC custom face, while Music synchronized lyrics use Athanasius.
   const [copticLoaded] = useLocalFonts({
     'CopticCHC-Regular': require('../../assets/fonts/CopticCHC-Regular-V3.ttf'),
-    Athanasius: require('../../assets/fonts/Athanasius.ttf'),
+    Athanasius: require('../../assets/fonts/CopticCHC-Athanasius-V1.0.ttf'),
   });
 
   const fontsReady = copticLoaded;

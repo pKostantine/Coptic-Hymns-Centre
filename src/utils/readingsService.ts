@@ -676,19 +676,16 @@ const READING_TYPE_LABELS: Record<string, { english: string; arabic: string }> =
 // A reading is treated like its own hymn for Coptic casing purposes: one
 // capitalized opening letter for the whole reading (its single Psalm
 // paragraph, or its first verse), not per individual verse. Mirrors
-// buildReadingVerses/applyCopticCaseToReadingVerses in hymnLibrary.js (the
-// same readings when spliced into Vespers/Matins/Liturgy) and
+// buildReadingVerses/applyCopticCaseToReadingVerses in hymnLibrary.js and
 // bibleDocumentHtml.ts's lowercaseCopticCharacters (the standalone Bible
-// reader) — all three read the same bible.verses data and case convention,
-// including restoring the "Ⲋ" numeral-6 glyph, which has no true lowercase
-// form, after the blanket lowercase pass.
+// reader) — all three read the same bible.verses data and case convention.
 const COPTIC_CHARACTER_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/u;
 const COPTIC_CHARACTER_GLOBAL_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/gu;
 const COPTIC_TO_LOWER: Record<string, string> = { Ⲭ: 'ⲭ', Ϭ: 'ϭ', Ϯ: 'ϯ' };
 const COPTIC_TO_UPPER: Record<string, string> = { ⲭ: 'Ⲭ', ϭ: 'Ϭ', ϯ: 'Ϯ' };
 
 function lowercaseBibleCoptic(text: string): string {
-  return text.replace(COPTIC_CHARACTER_GLOBAL_PATTERN, (ch) => COPTIC_TO_LOWER[ch] ?? ch.toLocaleLowerCase()).replace(/ⲋ/g, 'Ⲋ');
+  return text.replace(COPTIC_CHARACTER_GLOBAL_PATTERN, (ch) => COPTIC_TO_LOWER[ch] ?? ch.toLocaleLowerCase());
 }
 
 function uppercaseFirstBibleCopticCharacter(text: string): string {
