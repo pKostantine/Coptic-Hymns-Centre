@@ -104,7 +104,7 @@ export default function MusicReleaseScreen() {
 
   const handleShareRelease = async () => {
     if (!release) return;
-    const deepLink = publicUrl(`/music/release/${release.id}?share=1`);
+    const deepLink = publicUrl(`/music/release/${release.id}?share=2`);
     await shareLink({
       title: release.title,
       text: release.primaryArtist?.displayName
