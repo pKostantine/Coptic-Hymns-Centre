@@ -162,7 +162,10 @@ export async function onRequest(context) {
   const previewUrl = origin + url.pathname + url.search;
   const directImage = resolveDirectImage(preview?.imageAsset);
   const proxyImage = sameOriginProxy(origin, preview?.imageAsset);
-  const primaryImage = directImage || proxyImage || origin + '/apple-touch-icon.png';
+  // Prefer a same-origin JPEG/PNG response for Apple LinkPresentation and
+  // messaging crawlers. Keep the public media-resolver URL as a second image
+  // candidate in case a crawler does not follow the proxy query URL.
+  const primaryImage = proxyImage || directImage || origin + '/apple-touch-icon.png';
 
   const html = htmlResponse({
     title: preview?.title || 'Coptic Hymns Centre',
@@ -171,7 +174,7 @@ export async function onRequest(context) {
     canonicalUrl,
     previewUrl,
     primaryImage,
-    proxyImage,
+    proxyImage: directImage,
     mimeType: preview?.imageAsset?.mimeType || null,
   });
 
