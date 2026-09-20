@@ -12,7 +12,7 @@ import Icon from './Icon';
 interface BottomTabBarProps {
   /** Top-level CHC section. Switching tabs uses replace(), so the peer sections
    * never build a back-button stack on top of one another. */
-  active: 'books' | 'music' | 'learn' | 'settings' | null;
+  active: 'home' | 'books' | 'music' | 'learn' | 'settings' | null;
 }
 
 export default function BottomTabBar({ active }: BottomTabBarProps) {
@@ -22,8 +22,8 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   const isCompactLandscape = useIsCompactLandscape();
   const isArabic = preferences.appLanguage === 'ar';
   const labels = isArabic
-    ? { books: 'الكتب', music: 'الترانيم', learn: 'التعلّم', settings: 'الإعدادات' }
-    : { books: 'Books', music: 'Music', learn: 'Learn', settings: 'Settings' };
+    ? { home: 'الرئيسية', books: 'الكتب', music: 'الترانيم', learn: 'التعلّم', settings: 'الإعدادات' }
+    : { home: 'Home', books: 'Books', music: 'Music', learn: 'Learn', settings: 'Settings' };
   const labelStyle = [styles.tabLabel, isCompactLandscape && styles.tabLabelLandscape, isArabic && styles.tabLabelArabic];
   const tabStyle = [styles.tab, isCompactLandscape && styles.tabLandscape];
   const iconSize = isCompactLandscape ? 22 : 27;
@@ -54,7 +54,13 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   return (
     <View ref={shellRef} style={styles.shell} onLayout={measure}>
       <View style={[styles.bar, Platform.OS === 'web' && { paddingBottom: insets.bottom }]}>
-      <Pressable accessibilityLabel={labels.books} style={tabStyle} onPress={() => router.replace('/')}>
+      <Pressable accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
+        {active === 'home' ? <View style={styles.activeIndicator} /> : null}
+        <Icon name="home-outline" size={iconSize} color={active === 'home' ? COLORS.gold : COLORS.muted} />
+        <Text numberOfLines={1} style={[labelStyle, active === 'home' && styles.tabLabelActive]}>{labels.home}</Text>
+      </Pressable>
+
+      <Pressable accessibilityLabel={labels.books} style={tabStyle} onPress={() => router.replace('/books')}>
         {active === 'books' ? <View style={styles.activeIndicator} /> : null}
         <Icon name="library-outline" size={iconSize} color={active === 'books' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'books' && styles.tabLabelActive]}>{labels.books}</Text>
@@ -72,7 +78,7 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
         <Text numberOfLines={1} style={[labelStyle, active === 'learn' && styles.tabLabelLearning]}>{labels.learn}</Text>
       </Pressable>
 
-      <Pressable accessibilityLabel={labels.settings} style={tabStyle} onPress={() => router.replace('/app-settings')}>
+      <Pressable accessibilityLabel={labels.settings} style={tabStyle} onPress={() => router.replace('/settings')}>
         {active === 'settings' ? <View style={styles.activeIndicator} /> : null}
         <Icon name="settings-outline" size={iconSize} color={active === 'settings' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'settings' && styles.tabLabelActive]}>{labels.settings}</Text>
