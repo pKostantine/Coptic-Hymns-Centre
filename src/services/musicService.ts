@@ -122,6 +122,16 @@ export async function setTrackLiked(trackId: string, liked: boolean): Promise<bo
   return assertRpcData(data as boolean | null, error, liked ? 'Like track' : 'Unlike track');
 }
 
+export async function getReleaseLiked(releaseId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('get_release_liked', { p_release_id: releaseId });
+  return assertRpcData(data as boolean | null, error, 'Load release like');
+}
+
+export async function setReleaseLiked(releaseId: string, liked: boolean): Promise<boolean> {
+  const { data, error } = await supabase.rpc('set_release_liked', { p_release_id: releaseId, p_liked: liked });
+  return assertRpcData(data as boolean | null, error, liked ? 'Like release' : 'Unlike release');
+}
+
 export async function createMusicPlaylist(
   name: string,
   description?: string | null,
@@ -175,6 +185,8 @@ export const musicService = {
   getLibrary: getMusicLibrary,
   getPlaylist: getMusicPlaylist,
   setLiked: setTrackLiked,
+  getReleaseLiked,
+  setReleaseLiked,
   createPlaylist: createMusicPlaylist,
   addToPlaylist: addTrackToMusicPlaylist,
   removeFromPlaylist: removeTrackFromMusicPlaylist,
