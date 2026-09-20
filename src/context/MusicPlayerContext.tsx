@@ -10,6 +10,9 @@ export interface MusicQueueItem {
   track: MusicConsumerTrack;
   releaseId?: string | null;
   releaseTitle?: string | null;
+  releaseType?: MusicConsumerRelease['releaseType'] | null;
+  musicType?: string | null;
+  recordingType?: string | null;
   coverAsset?: MusicConsumerAsset | null;
   /** Phase 13 can attach a durable downloaded file URI here. */
   localUri?: string | null;
@@ -50,6 +53,10 @@ function isMusicQueueItem(value: unknown): value is MusicQueueItem {
 
 function toPlaybackEntry(item: MusicQueueItem, occurrence: number): PlaybackQueueEntry<MusicQueueItem> {
   const performerLine = formatMusicTrackPerformers(item.track, 'Coptic Hymns Centre');
+  const isCollectionTrack = item.releaseType === 'album' || item.releaseType === 'ep';
+  const deviceTitle = isCollectionTrack && item.releaseTitle
+    ? `${item.track.title} — ${item.releaseTitle}`
+    : item.track.title;
 
   return {
     key: `music:${item.track.id}:${occurrence}`,
@@ -57,7 +64,7 @@ function toPlaybackEntry(item: MusicQueueItem, occurrence: number): PlaybackQueu
     playable: {
       id: item.track.id,
       kind: 'music_track',
-      title: item.track.title,
+      title: deviceTitle,
       artist: performerLine,
       albumTitle: item.releaseTitle ?? null,
       artworkUri: musicService.resolveAsset(item.coverAsset ?? null),
@@ -77,19 +84,22 @@ function toPlaybackEntry(item: MusicQueueItem, occurrence: number): PlaybackQueu
  * rebuilt their queue. Once per launch, re-read each queued release and swap
  * in the published track data, keeping every entry's key and position.
  */
-function RestoredQueueRefresher() {
+function QueueReleaseMetadataRefresher() {
   const { hydrated, queue, updateQueueEntries } = usePlayback();
-  const refreshed = useRef(false);
+  const requestedReleaseIds = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!hydrated || refreshed.current) return;
-    refreshed.current = true;
+    if (!hydrated) return;
 
     const releaseIds = new Set<string>();
     for (const entry of queue) {
       if (!isMusicQueueItem(entry.payload)) continue;
-      const releaseId = entry.payload.releaseId ?? entry.payload.track.releaseId;
-      if (releaseId) releaseIds.add(releaseId);
+      const item = entry.payload;
+      const releaseId = item.releaseId ?? item.track.releaseId;
+      if (!releaseId || requestedReleaseIds.current.has(releaseId)) continue;
+      if (item.releaseType && item.musicType != null && item.recordingType != null) continue;
+      requestedReleaseIds.current.add(releaseId);
+      releaseIds.add(releaseId);
     }
     if (!releaseIds.size) return;
 
@@ -112,6 +122,9 @@ function RestoredQueueRefresher() {
             ...item,
             track,
             releaseTitle: release.title,
+            releaseType: release.releaseType,
+            musicType: release.musicType ?? null,
+            recordingType: release.recordingType ?? null,
             coverAsset: release.coverAsset ?? item.coverAsset,
           }, 0);
           return { ...refreshedEntry, key: entry.key };
@@ -125,7 +138,7 @@ function RestoredQueueRefresher() {
 export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   return (
     <PlaybackProvider>
-      <RestoredQueueRefresher />
+      <QueueReleaseMetadataRefresher />
       {children}
     </PlaybackProvider>
   );
