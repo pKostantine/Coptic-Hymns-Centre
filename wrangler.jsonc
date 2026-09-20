@@ -5,12 +5,14 @@
   // chc-media-resolver) are deployed separately from workers/.
   "name": "coptic-hymns-centre",
   "compatibility_date": "2026-09-16",
+  "main": "workers/share-preview.mjs",
   "workers_dev": true,
   "observability": {
     "enabled": true
   },
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     // expo-router owns the URL space, so /bible/genesis/1 and /lectionary/matins
     // are real routes with no file behind them. Without this they 404 on a
     // refresh or a shared link.
