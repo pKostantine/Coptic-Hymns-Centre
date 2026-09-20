@@ -32,6 +32,7 @@ import { musicService } from '@/services/musicService';
 import type { MusicConsumerAsset, PublishedLyricSet } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import { goBack } from '@/utils/navigation';
+import { publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
 // Lyrics | player | queue side by side once there is room for all three.
@@ -420,8 +421,8 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
 
   const handleShareTrack = async () => {
     const deepLink = currentItem.releaseId
-      ? `https://coptichymnscentre.com/music/release/${currentItem.releaseId}?track=${currentItem.track.id}`
-      : 'https://coptichymnscentre.com/music';
+      ? publicUrl(`/music/release/${currentItem.releaseId}?track=${currentItem.track.id}&share=1`)
+      : publicUrl('/music?share=1');
     await shareLink({
       title: currentItem.track.title,
       text: albumLine
