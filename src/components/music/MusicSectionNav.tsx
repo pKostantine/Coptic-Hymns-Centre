@@ -7,9 +7,9 @@ export type MusicSection = 'home' | 'search' | 'library';
 
 export default function MusicSectionNav({ active }: { active: MusicSection }) {
   const router = useRouter();
-  const items: { id: MusicSection; label: string; route: '/music' | '/search?scope=music' | '/music/library' }[] = [
+  const items: { id: MusicSection; label: string; route: '/music' | '/music/search' | '/music/library' }[] = [
     { id: 'home', label: 'Home', route: '/music' },
-    { id: 'search', label: 'Search', route: '/search?scope=music' },
+    { id: 'search', label: 'Search', route: '/music/search' },
     { id: 'library', label: 'Library', route: '/music/library' },
   ];
 
@@ -18,7 +18,7 @@ export default function MusicSectionNav({ active }: { active: MusicSection }) {
       {items.map((item) => (
         <Pressable
           key={item.id}
-          onPress={() => router.replace(item.route)}
+          onPress={() => item.id === 'search' ? router.push(item.route) : router.replace(item.route)}
           style={[styles.item, active === item.id && styles.itemActive]}
         >
           <Text style={[styles.label, active === item.id && styles.labelActive]}>{item.label}</Text>
