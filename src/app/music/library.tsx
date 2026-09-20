@@ -73,6 +73,18 @@ export default function MusicLibraryScreen() {
     playQueue(library.likedTracks.map((track) => ({ track, releaseId: track.releaseId })), startIndex);
   };
 
+  const unlikeTrack = async (trackId: string) => {
+    try {
+      await musicService.setLiked(trackId, false);
+      setLibrary((current) => current ? {
+        ...current,
+        likedTracks: current.likedTracks.filter((track) => track.id !== trackId),
+      } : current);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
+    }
+  };
+
   const prepareLikedDownload = async () => {
     if (!library) throw new Error('Music library is not loaded.');
     const lyrics = await Promise.all(library.likedTracks.map(async (track) => {
@@ -147,6 +159,9 @@ export default function MusicLibraryScreen() {
                       index={index}
                       active={currentItem?.track.id === track.id}
                       onPress={() => playLiked(index)}
+                      showLikeButton
+                      liked
+                      onToggleLike={() => void unlikeTrack(track.id)}
                       trailing={(
                         <MusicDownloadButton
                           packageKey={trackDownload.packageKey}
