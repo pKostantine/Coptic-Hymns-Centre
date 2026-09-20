@@ -13,6 +13,7 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { homeService, type HomeSynaxariumEvent } from '@/services/homeService';
+import { getSundayMessageForDate } from '@/utils/readingsService';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerReleaseSummary } from '@/types/musicConsumer';
 
@@ -82,7 +83,7 @@ export default function HomeScreen() {
   useEffect(() => {
     let active = true;
     setSundayLoading(true);
-    homeService.getSundayMessage(isoDate(sunday.date))
+    getSundayMessageForDate(sunday.date)
       .then((message) => { if (active) setSundayMessage(message); })
       .catch(() => { if (active) setSundayMessage(null); })
       .finally(() => { if (active) setSundayLoading(false); });
