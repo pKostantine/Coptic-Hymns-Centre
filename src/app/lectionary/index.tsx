@@ -8,7 +8,7 @@ export default function LectionarySubmenu() {
       title="Lectionary"
       arabic="القطمارس"
       services={SERVICES_BY_CATEGORY.lectionary}
-      backHref="/"
+      backHref="/books"
     />
   );
 }
