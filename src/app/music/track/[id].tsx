@@ -24,6 +24,7 @@ import { musicService } from '@/services/musicService';
 import type { MusicConsumerTrackDetail, PublishedTrackLyricsPayload, PublishedLyricSet } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import { goBack } from '@/utils/navigation';
+import { publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
 function formatDuration(durationMs: number | null): string | null {
@@ -207,7 +208,7 @@ export default function MusicTrackDetailScreen() {
 
   const shareTrack = async () => {
     if (!track) return;
-    const url = `https://coptichymnscentre.com/music/track/${track.id}`;
+    const url = publicUrl(`/music/track/${track.id}?share=1`);
     await shareLink({
       title: track.title,
       text: track.release?.title ? `${track.title} — ${track.release.title}` : track.title,
@@ -251,7 +252,7 @@ export default function MusicTrackDetailScreen() {
       <ShareMetadata
         title={track.title}
         description={track.release?.title ? `${track.title} — ${track.release.title}` : performers}
-        canonicalUrl={`https://coptichymnscentre.com/music/track/${track.id}`}
+        canonicalUrl={publicUrl(`/music/track/${track.id}`)}
         imageUrl={musicService.resolveAsset(track.release?.coverAsset ?? null)}
         type="music.song"
       />
