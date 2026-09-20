@@ -40,9 +40,18 @@ export default function PlayerSheet({
   heightRatio = 0.82,
   children,
 }: PlayerSheetProps) {
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const sheetHeight = Math.round(height * heightRatio);
+  const landscapePhone = width > height && height <= 600 && width < 1100;
+  // In landscape, a short sheet wastes most of the already-limited vertical
+  // space. Let it rise almost to the safe-area top, while leaving all content
+  // inset from the notch / Dynamic Island and rounded screen corners.
+  const effectiveRatio = landscapePhone ? 0.96 : heightRatio;
+  const topClearance = Math.max(insets.top, landscapePhone ? 6 : 10);
+  const sheetHeight = Math.min(
+    Math.round(height * effectiveRatio),
+    Math.max(0, height - topClearance),
+  );
   // Kept mounted for the closing animation, then unmounted so the sheet never
   // swallows touches meant for the player behind it.
   const [mounted, setMounted] = useState(visible);
@@ -110,7 +119,13 @@ export default function PlayerSheet({
         accessibilityLabel={accessibilityLabel}
         style={[
           styles.sheet,
-          { height: sheetHeight, paddingBottom: insets.bottom, transform: [{ translateY }] },
+          {
+            height: sheetHeight,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+            transform: [{ translateY }],
+          },
         ]}
         {...panResponder.panHandlers}
       >
