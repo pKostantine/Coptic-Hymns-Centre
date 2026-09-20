@@ -42,12 +42,14 @@ function AppStack() {
         orientation,
       }}
     >
-      {/* Books, Music, Learn & Study, and App Settings are peer sections,
-          not subpages, so switching between them never grows a back stack. */}
+      {/* Home, Books, Music, Learn & Study, and Settings are peer sections,
+          so switching between them never grows a back stack. */}
       <Stack.Screen name="index" options={{ animation: 'none' }} />
+      <Stack.Screen name="books" options={{ animation: 'none' }} />
       <Stack.Screen name="music" options={{ animation: 'none' }} />
       <Stack.Screen name="learn" options={{ animation: 'none' }} />
       <Stack.Screen name="search" options={{ animation: 'none' }} />
+      <Stack.Screen name="settings" options={{ animation: 'none' }} />
       <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
 
       {/* The now-playing views are floating overlays that sit on top of the
