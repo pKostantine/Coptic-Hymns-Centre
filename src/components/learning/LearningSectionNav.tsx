@@ -13,10 +13,10 @@ export default function LearningSectionNav({ active }: { active: LearningSection
   const items: {
     id: LearningSection;
     label: string;
-    route: '/learn' | '/search?scope=learning' | '/learn/library';
+    route: '/learn' | '/learn/search' | '/learn/library';
   }[] = [
     { id: 'home', label: isArabic ? 'الرئيسية' : 'Discover', route: '/learn' },
-    { id: 'search', label: isArabic ? 'بحث' : 'Search', route: '/search?scope=learning' },
+    { id: 'search', label: isArabic ? 'بحث' : 'Search', route: '/learn/search' },
     { id: 'library', label: isArabic ? 'تعلّمي' : 'My Learning', route: '/learn/library' },
   ];
 
@@ -25,7 +25,7 @@ export default function LearningSectionNav({ active }: { active: LearningSection
       {items.map((item) => (
         <Pressable
           key={item.id}
-          onPress={() => router.replace(item.route)}
+          onPress={() => item.id === 'search' ? router.push(item.route) : router.replace(item.route)}
           style={[styles.item, active === item.id && styles.itemActive]}
         >
           <Text style={[
