@@ -10,6 +10,7 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerArtist } from '@/types/musicConsumer';
+import { goBack } from '@/utils/navigation';
 
 export default function MusicArtistScreen() {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function MusicArtistScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
+        <Pressable onPress={() => goBack(router, '/music')} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
         <Text style={styles.headerTitle}>Artist</Text>
         <View style={styles.headerSpacer} />
       </View>
