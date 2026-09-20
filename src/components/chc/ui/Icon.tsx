@@ -5,6 +5,7 @@ export type IconName =
   | 'chevron-back'
   | 'chevron-forward'
   | 'chevron-down'
+  | 'home-outline'
   | 'bookmark'
   | 'bookmark-outline'
   | 'calendar-outline'
@@ -95,6 +96,13 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="m112 184 144 144 144-144" fill="none" stroke={color} strokeWidth={48} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'home-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M80 232 256 88l176 144v200a32 32 0 0 1-32 32H112a32 32 0 0 1-32-32Z" fill="none" stroke={color} strokeWidth={32} strokeLinejoin="round" />
+          <Path d="M208 464V320h96v144" fill="none" stroke={color} strokeWidth={32} strokeLinejoin="round" />
         </Svg>
       );
     case 'bookmark-outline':
