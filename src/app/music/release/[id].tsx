@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import Icon from '@/components/chc/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
@@ -13,21 +14,29 @@ import { useMusicPlayer, type MusicQueueItem } from '@/context/MusicPlayerContex
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import {
-    musicReleaseDownloadRequest,
-    musicTrackDownloadRequest,
+  musicReleaseDownloadRequest,
+  musicTrackDownloadRequest,
 } from '@/services/offlineDownloadRequests';
 import type { MusicConsumerRelease, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
+import { goBack } from '@/utils/navigation';
+import { shareLink } from '@/utils/shareLink';
 
 export default function MusicReleaseScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; track?: string }>();
+  const { width } = useWindowDimensions();
   const { preferences } = useReadingPreferences();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
   const releaseId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const linkedTrackId = Array.isArray(params.track) ? params.track[0] : params.track;
+  const desktop = width >= 900;
   const [release, setRelease] = useState<MusicConsumerRelease | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
+  const [releaseLiked, setReleaseLiked] = useState(false);
+  const [releaseLikeBusy, setReleaseLikeBusy] = useState(false);
+  const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
   const { currentItem, playQueue } = useMusicPlayer();
 
   useEffect(() => {
@@ -46,6 +55,9 @@ export default function MusicReleaseScreen() {
     track: { ...track, artists: Array.isArray(track.artists) ? track.artists : [] },
     releaseId: release?.id ?? null,
     releaseTitle: release?.title ?? null,
+    releaseType: release?.releaseType ?? null,
+    musicType: release?.musicType ?? null,
+    recordingType: release?.recordingType ?? null,
     coverAsset: release?.coverAsset ?? null,
   })), [release, tracks]);
   const downloadRequest = useMemo(
@@ -56,13 +68,21 @@ export default function MusicReleaseScreen() {
   useEffect(() => {
     if (!releaseId) return;
     let active = true;
-    musicService.getLibrary(locale)
-      .then((library) => {
+    Promise.all([
+      musicService.getLibrary(locale),
+      musicService.getReleaseLiked(releaseId),
+    ])
+      .then(([library, liked]) => {
         if (!active) return;
+        setLibraryAuthenticated(library.authenticated);
         setLikedTrackIds(new Set(library.likedTracks.map((track) => track.id)));
+        setReleaseLiked(liked);
       })
       .catch(() => {
-        if (active) setLikedTrackIds(new Set());
+        if (!active) return;
+        setLibraryAuthenticated(false);
+        setLikedTrackIds(new Set());
+        setReleaseLiked(false);
       });
     return () => { active = false; };
   }, [locale, releaseId]);
@@ -83,19 +103,49 @@ export default function MusicReleaseScreen() {
   const handleShareRelease = async () => {
     if (!release) return;
     const deepLink = `https://coptichymnscentre.com/music/release/${release.id}`;
-    const shareText = `${release.title}${release.primaryArtist?.displayName ? ` — ${release.primaryArtist.displayName}` : ''}\n${deepLink}`;
+    await shareLink({
+      title: release.title,
+      text: release.primaryArtist?.displayName
+        ? `${release.title} — ${release.primaryArtist.displayName}`
+        : release.title,
+      url: deepLink,
+    });
+  };
+
+  const handleToggleReleaseLike = async () => {
+    if (!release || releaseLikeBusy) return;
+    if (!libraryAuthenticated) {
+      Alert.alert(
+        isArabic ? 'الإصدارات المعجبة' : 'Liked Releases',
+        isArabic ? 'سجّل الدخول إلى حساب CHC لحفظ الإصدارات.' : 'Sign in to your CHC account to save liked releases.',
+      );
+      return;
+    }
+
+    setReleaseLikeBusy(true);
     try {
-      if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({ title: release.title, text: shareText, url: deepLink });
-        return;
-      }
-      await Share.share({ message: shareText, url: deepLink });
-    } catch {
-      // User cancelled or no share support.
+      const nextLiked = !releaseLiked;
+      await musicService.setReleaseLiked(release.id, nextLiked);
+      setReleaseLiked(nextLiked);
+    } catch (cause) {
+      Alert.alert(
+        isArabic ? 'الإصدارات المعجبة' : 'Liked Releases',
+        cause instanceof Error ? cause.message : 'Unable to update this release.',
+      );
+    } finally {
+      setReleaseLikeBusy(false);
     }
   };
 
-  const handleToggleLike = async (trackId: string) => {
+  const handleToggleTrackLike = async (trackId: string) => {
+    if (!libraryAuthenticated) {
+      Alert.alert(
+        isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
+        isArabic ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.' : 'Sign in to your CHC account to save Liked Songs.',
+      );
+      return;
+    }
+
     const liked = likedTrackIds.has(trackId);
     try {
       await musicService.setLiked(trackId, !liked);
@@ -112,7 +162,7 @@ export default function MusicReleaseScreen() {
   if (!release) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Header onBack={() => router.back()} title={isArabic ? 'الإصدار' : 'Release'} isArabic={isArabic} />
+        <Header onBack={() => goBack(router, '/music')} title={isArabic ? 'الإصدار' : 'Release'} isArabic={isArabic} />
         {error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={COLORS.gold} style={styles.loader} />}
       </SafeAreaView>
     );
@@ -122,39 +172,50 @@ export default function MusicReleaseScreen() {
   const releaseType = isArabic
     ? release.releaseType === 'album' ? 'ألبوم' : release.releaseType === 'ep' ? 'EP' : 'أغنية منفردة'
     : release.releaseType === 'album' ? 'Album' : release.releaseType === 'ep' ? 'EP' : 'Single';
-  const classifiers = [release.musicType, release.recordingType].filter(Boolean) as string[];
+  const releaseMeta = [
+    release.recordingType,
+    release.musicType,
+    releaseType,
+    release.releaseDate?.slice(0, 4),
+    isArabic ? `${tracks.length} ترنيمة` : `${tracks.length} track${tracks.length === 1 ? '' : 's'}`,
+  ].filter(Boolean).join(' • ');
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Header onBack={() => router.back()} title={releaseType} isArabic={isArabic} />
+      <Header onBack={() => goBack(router, '/music')} title={releaseType} isArabic={isArabic} />
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
-          <MusicArtwork asset={release.coverAsset} size={220} label={release.title} />
-          <View style={styles.meta}>
-            <Text style={[styles.title, isArabic && styles.arabic]}>{release.title}</Text>
-            {release.subtitle ? <Text style={[styles.subtitle, isArabic && styles.arabic]}>{release.subtitle}</Text> : null}
+        <View style={[styles.hero, desktop && styles.heroDesktop]}>
+          <View style={[styles.artBox, desktop && styles.artBoxDesktop]}>
+            <MusicArtwork asset={release.coverAsset} size={desktop ? 270 : 220} label={release.title} />
+          </View>
+
+          <View style={[styles.meta, desktop && styles.metaDesktop]}>
+            <Text style={[styles.title, desktop && styles.desktopText, isArabic && styles.arabic]}>{release.title}</Text>
+            {release.subtitle ? <Text style={[styles.subtitle, desktop && styles.desktopText, isArabic && styles.arabic]}>{release.subtitle}</Text> : null}
             <Pressable disabled={!release.primaryArtist?.id} onPress={() => release.primaryArtist?.id && router.push(`/music/artist/${release.primaryArtist.id}`)}>
-              <Text style={[styles.artist, isArabic && styles.arabic]}>{artistName}</Text>
+              <Text style={[styles.artist, desktop && styles.desktopText, isArabic && styles.arabic]}>{artistName}</Text>
             </Pressable>
-            <Text style={[styles.releaseMeta, isArabic && styles.arabic]}>
-              {[releaseType, release.releaseDate?.slice(0, 4), isArabic ? `${tracks.length} ترنيمة` : `${tracks.length} track${tracks.length === 1 ? '' : 's'}`].filter(Boolean).join(' • ')}
-            </Text>
-            {classifiers.length ? (
-              <View style={styles.classifierRow}>
-                {classifiers.map((label) => (
-                  <View key={label} style={styles.classifierChip}>
-                    <Text style={styles.classifierText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-            {release.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{release.description}</Text> : null}
-            <View style={styles.actions}>
+            <Text style={[styles.releaseMeta, desktop && styles.desktopText, isArabic && styles.arabic]}>{releaseMeta}</Text>
+            {release.description ? <Text style={[styles.description, desktop && styles.descriptionDesktop, isArabic && styles.arabic]}>{release.description}</Text> : null}
+
+            <View style={[styles.actions, desktop && styles.actionsDesktop]}>
               <Pressable style={styles.playAll} onPress={() => queue.length && playQueue(queue, 0)}>
-                <Text style={styles.playAllText}>▶  {isArabic ? 'تشغيل' : 'Play'}</Text>
+                <Icon name="play" size={16} color={COLORS.black} />
+                <Text style={styles.playAllText}>{isArabic ? 'تشغيل' : 'Play'}</Text>
               </Pressable>
-              <Pressable style={styles.shareButton} onPress={() => void handleShareRelease()}>
-                <Text style={styles.shareButtonText}>{isArabic ? 'مشاركة' : 'Share'}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={releaseLiked ? 'Unlike release' : 'Like release'}
+                disabled={releaseLikeBusy}
+                style={[styles.actionButton, releaseLikeBusy && styles.disabledButton]}
+                onPress={() => void handleToggleReleaseLike()}
+              >
+                <Icon name={releaseLiked ? 'heart' : 'heart-outline'} size={19} color={releaseLiked ? COLORS.goldBright : COLORS.white} />
+                <Text style={styles.actionButtonText}>{isArabic ? 'إعجاب' : 'Like'}</Text>
+              </Pressable>
+              <Pressable style={styles.actionButton} onPress={() => void handleShareRelease()}>
+                <Text style={styles.shareGlyph}>↗</Text>
+                <Text style={styles.actionButtonText}>{isArabic ? 'مشاركة' : 'Share'}</Text>
               </Pressable>
               {downloadRequest ? (
                 <MusicDownloadButton
@@ -167,7 +228,7 @@ export default function MusicReleaseScreen() {
           </View>
         </View>
 
-        <View style={styles.trackList}>
+        <View style={[styles.trackList, desktop && styles.trackListDesktop]}>
           {tracks.map((track, index) => {
             const trackRequest = musicTrackDownloadRequest({
               track,
@@ -180,11 +241,11 @@ export default function MusicReleaseScreen() {
                 key={track.id}
                 track={track}
                 index={index}
-                active={currentItem?.track.id === track.id}
+                active={currentItem?.track.id === track.id || (!currentItem && linkedTrackId === track.id)}
                 onPress={() => playQueue(queue, index)}
                 showLikeButton
                 liked={likedTrackIds.has(track.id)}
-                onToggleLike={() => void handleToggleLike(track.id)}
+                onToggleLike={() => void handleToggleTrackLike(track.id)}
                 trailing={(
                   <MusicDownloadButton
                     packageKey={trackRequest.packageKey}
@@ -253,21 +314,42 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 44 },
   content: { paddingBottom: SPACING.xl },
   hero: { alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg },
+  heroDesktop: {
+    width: 'calc(100% - 48px)' as unknown as number,
+    maxWidth: 1120,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    marginTop: SPACING.lg,
+    overflow: 'hidden',
+    borderRadius: RADII.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  artBox: { alignItems: 'center', justifyContent: 'center' },
+  artBoxDesktop: { padding: SPACING.lg, backgroundColor: '#0B1E33', borderRightWidth: 1, borderRightColor: COLORS.border },
   meta: { width: '100%', maxWidth: 680, alignItems: 'center', marginTop: SPACING.lg },
+  metaDesktop: { flex: 1, maxWidth: undefined, alignItems: 'flex-start', justifyContent: 'center', marginTop: 0, padding: SPACING.xl },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 28, fontWeight: '700', textAlign: 'center' },
   subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, textAlign: 'center', marginTop: SPACING.xs },
   artist: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700', marginTop: SPACING.sm, textAlign: 'center' },
-  releaseMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: SPACING.xs, textAlign: 'center' },
-  classifierRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: SPACING.xs, marginTop: SPACING.sm },
-  classifierChip: { paddingHorizontal: SPACING.sm, paddingVertical: 6, borderRadius: RADII.pill, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: COLORS.border },
-  classifierText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  releaseMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: SPACING.sm, textAlign: 'center' },
+  desktopText: { textAlign: 'left' },
   description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: SPACING.md },
+  descriptionDesktop: { textAlign: 'left', maxWidth: 680 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
-  playAll: { paddingHorizontal: SPACING.xl, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, backgroundColor: COLORS.gold },
+  actionsDesktop: { justifyContent: 'flex-start' },
+  playAll: { flexDirection: 'row', gap: 8, paddingHorizontal: SPACING.xl, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, backgroundColor: COLORS.gold },
   playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800' },
-  shareButton: { paddingHorizontal: SPACING.md, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.surface },
-  shareButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  actionButton: { minHeight: 46, paddingHorizontal: SPACING.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.surface },
+  actionButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  shareGlyph: { color: COLORS.goldBright, fontSize: 20, lineHeight: 20 },
+  disabledButton: { opacity: 0.45 },
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  trackListDesktop: { width: 'calc(100% - 48px)' as unknown as number, maxWidth: 1120, alignSelf: 'center', marginHorizontal: 0 },
   loader: { marginTop: SPACING.xl },
   errorBoundary: { flex: 1, padding: SPACING.xl, alignItems: 'center', justifyContent: 'center', gap: SPACING.md },
   errorBoundaryTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', textAlign: 'center' },
