@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+  ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -12,6 +12,7 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { musicService } from '@/services/musicService';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
 import type { MusicConsumerTrack } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
@@ -75,8 +76,26 @@ export default function UnifiedSearchScreen() {
   const [results, setResults] = useState<UnifiedSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
+  const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
   const musicPlayer = useMusicPlayer();
   const learningPlayer = useLearningPlayer();
+
+  useEffect(() => {
+    let active = true;
+    musicService.getLibrary(locale)
+      .then((library) => {
+        if (!active) return;
+        setLibraryAuthenticated(library.authenticated);
+        setLikedTrackIds(new Set(library.likedTracks.map((track) => track.id)));
+      })
+      .catch(() => {
+        if (!active) return;
+        setLibraryAuthenticated(false);
+        setLikedTrackIds(new Set());
+      });
+    return () => { active = false; };
+  }, [locale]);
 
   useEffect(() => {
     const value = query.trim();
@@ -118,6 +137,27 @@ export default function UnifiedSearchScreen() {
     setResults([]);
     setLoading(Boolean(value.trim()));
     setError(null);
+  };
+
+  const toggleTrackLike = async (trackId: string) => {
+    if (!libraryAuthenticated) {
+      Alert.alert(
+        isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
+        isArabic ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.' : 'Sign in to your CHC account to save Liked Songs.',
+      );
+      return;
+    }
+    const liked = likedTrackIds.has(trackId);
+    try {
+      await musicService.setLiked(trackId, !liked);
+      setLikedTrackIds((current) => {
+        const next = new Set(current);
+        if (liked) next.delete(trackId); else next.add(trackId);
+        return next;
+      });
+    } catch (cause) {
+      Alert.alert(isArabic ? 'الأغاني المعجبة' : 'Liked Songs', cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
+    }
   };
 
   const openResult = (result: UnifiedSearchResult) => {
@@ -332,6 +372,21 @@ export default function UnifiedSearchScreen() {
                     </Text>
                   ) : null}
                 </View>
+                {result.kind === 'music_track' ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={likedTrackIds.has(result.entityId) ? 'Unlike track' : 'Like track'}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      void toggleTrackLike(result.entityId);
+                    }}
+                    style={styles.likeButton}
+                  >
+                    <Text style={[styles.likeGlyph, likedTrackIds.has(result.entityId) && styles.likeGlyphActive]}>
+                      {likedTrackIds.has(result.entityId) ? '♥' : '♡'}
+                    </Text>
+                  </Pressable>
+                ) : null}
                 <Text style={[styles.actionGlyph, learning ? styles.learningGlyph : styles.musicGlyph]}>
                   {result.kind === 'music_track' || (result.kind === 'learning_lesson' && result.metadata.mediaType === 'audio')
                     ? (playing ? 'Ⅱ' : '▶')
@@ -392,6 +447,9 @@ const styles = StyleSheet.create({
   matchLocale: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 8, fontWeight: '900' },
   resultTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800' },
   resultSubtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  likeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.04)' },
+  likeGlyph: { color: COLORS.muted, fontSize: 20, lineHeight: 22 },
+  likeGlyphActive: { color: COLORS.goldBright },
   actionGlyph: { width: 28, textAlign: 'center', fontSize: 19, fontWeight: '900' },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });
