@@ -1,8 +1,5 @@
 import Head from 'expo-router/head';
 
-const SITE_ORIGIN = 'https://coptichymnscentre.com';
-const DEFAULT_IMAGE = SITE_ORIGIN + '/apple-touch-icon.png';
-
 export default function ShareMetadata({
   title,
   description,
@@ -20,7 +17,13 @@ export default function ShareMetadata({
     ? title
     : title + ' — Coptic Hymns Centre';
   const summary = description?.trim() || 'Coptic Hymns Centre';
-  const image = imageUrl || DEFAULT_IMAGE;
+  let fallbackImage = 'https://chc.pierrek.ca/apple-touch-icon.png';
+  try {
+    fallbackImage = new URL('/apple-touch-icon.png', canonicalUrl).toString();
+  } catch {
+    // Keep the deployed CHC fallback.
+  }
+  const image = imageUrl || fallbackImage;
 
   return (
     <Head>
@@ -33,6 +36,7 @@ export default function ShareMetadata({
       <meta property="og:description" content={summary} />
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:image" content={image} />
+      <meta property="og:image:secure_url" content={image} />
       <meta property="og:image:alt" content={title} />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={fullTitle} />
