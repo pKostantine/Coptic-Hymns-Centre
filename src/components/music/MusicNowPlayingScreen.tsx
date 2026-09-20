@@ -340,8 +340,8 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   // Phones show the player full-height with the pull-up buttons pinned below,
   // so the artwork takes whatever room the rest of the controls leave.
   const narrowArtSize = width < 460
-    ? clamp(Math.min(width - 64, availableHeight * 0.35), 120, 245)
-    : clamp(Math.min(width - SPACING.lg * 2, availableHeight - 330), 150, 320);
+    ? clamp(Math.min(width - 42, availableHeight * 0.48), 220, 340)
+    : clamp(Math.min(width - SPACING.lg * 2, availableHeight - 300), 180, 360);
   const landscapeArtSize = clamp(
     Math.min(height - insets.top - insets.bottom - 92, width * 0.28),
     120,
@@ -420,9 +420,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   ) : null;
 
   const handleShareTrack = async () => {
-    const deepLink = currentItem.releaseId
-      ? publicUrl(`/music/release/${currentItem.releaseId}?track=${currentItem.track.id}&share=1`)
-      : publicUrl('/music?share=1');
+    const deepLink = publicUrl(`/music/track/${currentItem.track.id}?share=2`);
     await shareLink({
       title: currentItem.track.title,
       text: albumLine
