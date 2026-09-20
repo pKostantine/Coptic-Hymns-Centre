@@ -99,9 +99,13 @@ export default {
       /<title>[^<]*<\/title>/i,
       '<title>' + escapeHtml(title.includes('Coptic Hymns Centre') ? title : title + ' — Coptic Hymns Centre') + '</title>',
     );
-    const transformed = withTitle.includes('</head>')
-      ? withTitle.replace('</head>', tags + '\n</head>')
-      : withTitle;
+    const shareBlock = /<!-- CHC_SHARE_META_START -->[\s\S]*?<!-- CHC_SHARE_META_END -->/i;
+    const markedTags = '<!-- CHC_SHARE_META_START -->\n' + tags + '\n<!-- CHC_SHARE_META_END -->';
+    const transformed = shareBlock.test(withTitle)
+      ? withTitle.replace(shareBlock, markedTags)
+      : withTitle.includes('</head>')
+        ? withTitle.replace('</head>', markedTags + '\n</head>')
+        : withTitle;
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
