@@ -35,18 +35,18 @@ interface SectionSearchScreenProps {
   section: SearchSection;
 }
 
-const MUSIC_GROUPS: { kind: UnifiedSearchKind; label: string }[] = [
-  { kind: 'music_artist', label: 'Artists' },
-  { kind: 'music_release', label: 'Albums & Releases' },
-  { kind: 'music_track', label: 'Tracks' },
+const MUSIC_GROUPS: { kind: UnifiedSearchKind; en: string; ar: string }[] = [
+  { kind: 'music_artist', en: 'Artists', ar: 'الفنانون' },
+  { kind: 'music_release', en: 'Albums & Releases', ar: 'الألبومات والإصدارات' },
+  { kind: 'music_track', en: 'Tracks', ar: 'الترانيم' },
 ];
 
-const LEARNING_GROUPS: { kind: UnifiedSearchKind; label: string }[] = [
-  { kind: 'learning_cantor', label: 'Cantors' },
-  { kind: 'learning_hymn', label: 'Hymns' },
-  { kind: 'learning_season', label: 'Seasons' },
-  { kind: 'learning_album', label: 'Albums' },
-  { kind: 'learning_lesson', label: 'Lessons' },
+const LEARNING_GROUPS: { kind: UnifiedSearchKind; en: string; ar: string }[] = [
+  { kind: 'learning_cantor', en: 'Cantors', ar: 'المعلمون' },
+  { kind: 'learning_hymn', en: 'Hymns', ar: 'الألحان' },
+  { kind: 'learning_season', en: 'Seasons', ar: 'المواسم' },
+  { kind: 'learning_album', en: 'Albums', ar: 'الألبومات' },
+  { kind: 'learning_lesson', en: 'Lessons', ar: 'الدروس' },
 ];
 
 function resultSubtitle(result: UnifiedSearchResult): string | null {
@@ -92,7 +92,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   const music = section === 'music';
   const accent = music ? COLORS.gold : COLORS.learning;
   const accentBright = music ? COLORS.goldBright : COLORS.learningBright;
-  const fallback = music ? '/music' : '/learn';
+  const fallback: '/music' | '/learn' = music ? '/music' : '/learn';
   const musicPlayer = useMusicPlayer();
   const learningPlayer = useLearningPlayer();
 
@@ -379,7 +379,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
         {!loading && grouped.map((group) => (
           <View key={group.kind} style={styles.group}>
             <Text style={[styles.groupTitle, { color: accentBright }, isArabic && styles.arabic]}>
-              {group.label}
+              {isArabic ? group.ar : group.en}
             </Text>
             <View style={styles.resultCard}>
               {group.results.map((result, index) => (
