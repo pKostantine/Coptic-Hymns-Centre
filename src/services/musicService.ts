@@ -4,6 +4,7 @@ import type {
   MusicConsumerArtist,
   MusicConsumerAsset,
   MusicConsumerRelease,
+  MusicConsumerTrackDetail,
   MusicHomePayload,
   MusicLibraryPayload,
   MusicPlaylistPayload,
@@ -65,6 +66,14 @@ export async function getMusicArtist(artistId: string, locale = 'en'): Promise<M
     p_locale: locale,
   });
   return assertRpcData(data as MusicConsumerArtist | null, error, 'Load artist');
+}
+
+export async function getMusicTrack(trackId: string, locale = 'en'): Promise<MusicConsumerTrackDetail> {
+  const { data, error } = await supabase.rpc('get_published_music_track_for_locale', {
+    p_track_id: trackId,
+    p_locale: locale,
+  });
+  return assertRpcData(data as MusicConsumerTrackDetail | null, error, 'Load track');
 }
 
 export async function searchMusic(query: string, locale = 'en'): Promise<MusicSearchPayload> {
@@ -181,6 +190,7 @@ export const musicService = {
   getHome: getMusicHome,
   getRelease: getMusicRelease,
   getArtist: getMusicArtist,
+  getTrack: getMusicTrack,
   search: searchMusic,
   getLibrary: getMusicLibrary,
   getPlaylist: getMusicPlaylist,
