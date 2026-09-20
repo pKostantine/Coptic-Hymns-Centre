@@ -24,6 +24,7 @@ import MusicArtwork from './MusicArtwork';
 
 // Rows are a fixed height so a drag distance maps directly onto a slot index.
 const ROW_HEIGHT = 64;
+const COMPACT_ROW_HEIGHT = 52;
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 interface MusicQueueListProps {
@@ -41,6 +42,7 @@ interface MusicQueueListProps {
   onCycleRepeat: () => void;
   likedTrackIds?: ReadonlySet<string>;
   onToggleLike?: (trackId: string) => void;
+  compact?: boolean;
   /**
    * `true` gives the list its own scroll area (desktop side panel). Otherwise
    * the rows sit inline and the page scrolls; use onDragActiveChange to lock
@@ -81,22 +83,24 @@ export default function MusicQueueList({
   onCycleRepeat,
   likedTrackIds,
   onToggleLike,
+  compact = false,
   scrollable = false,
   onDragActiveChange,
   style,
 }: MusicQueueListProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const count = queue.length;
-  const target = drag ? clamp(drag.from + Math.round(drag.dy / ROW_HEIGHT), 0, count - 1) : -1;
+  const rowHeight = compact ? COMPACT_ROW_HEIGHT : ROW_HEIGHT;
+  const target = drag ? clamp(drag.from + Math.round(drag.dy / rowHeight), 0, count - 1) : -1;
 
   const offsetFor = (index: number): number => {
     if (!drag) return 0;
     if (index === drag.from) {
       // Keep the lifted row inside the list instead of letting it fly off.
-      return clamp(drag.dy, -drag.from * ROW_HEIGHT, (count - 1 - drag.from) * ROW_HEIGHT);
+      return clamp(drag.dy, -drag.from * rowHeight, (count - 1 - drag.from) * rowHeight);
     }
-    if (drag.from < index && index <= target) return -ROW_HEIGHT;
-    if (target <= index && index < drag.from) return ROW_HEIGHT;
+    if (drag.from < index && index <= target) return -rowHeight;
+    if (target <= index && index < drag.from) return rowHeight;
     return 0;
   };
 
@@ -122,7 +126,7 @@ export default function MusicQueueList({
   const repeatLabel = repeatMode === 'one' ? 'Repeat one' : repeatMode === 'all' ? 'Repeat all' : 'Repeat off';
 
   const rows = (
-    <View style={[styles.list, { height: count * ROW_HEIGHT }, Platform.OS === 'web' && styles.noSelect]}>
+    <View style={[styles.list, { height: count * rowHeight }, Platform.OS === 'web' && styles.noSelect]}>
       {queue.map((item, index) => (
         <QueueRow
           key={queueKeys[index] ?? `${item.track.id}-${index}`}
@@ -137,6 +141,8 @@ export default function MusicQueueList({
           onSelect={onSelect}
           liked={likedTrackIds?.has(item.track.id) ?? false}
           onToggleLike={onToggleLike}
+          compact={compact}
+          rowHeight={rowHeight}
         />
       ))}
     </View>
@@ -144,16 +150,16 @@ export default function MusicQueueList({
 
   return (
     <View style={[styles.card, scrollable && styles.cardScrollable, style]}>
-      <View style={styles.header}>
+      <View style={[styles.header, compact && styles.headerCompact]}>
         <View style={styles.headerTop}>
-          <Text style={[styles.headerTitle, isArabic && styles.arabic]}>{isArabic ? 'قائمة الانتظار' : 'Queue'}</Text>
+          <Text style={[styles.headerTitle, compact && styles.headerTitleCompact, isArabic && styles.arabic]}>{isArabic ? 'قائمة الانتظار' : 'Queue'}</Text>
           <View style={styles.modeButtons}>
             <RoundIconButton
               icon="shuffle"
               accessibilityLabel={shuffleEnabled ? 'Shuffle on' : 'Shuffle off'}
               active={shuffleEnabled}
               onPress={onToggleShuffle}
-              size={46}
+              size={compact ? 38 : 46}
             />
             <RoundIconButton
               icon="repeat"
@@ -161,12 +167,12 @@ export default function MusicQueueList({
               active={repeatMode !== 'off'}
               badge={repeatMode === 'one' ? '1' : undefined}
               onPress={onCycleRepeat}
-              size={46}
+              size={compact ? 38 : 46}
             />
           </View>
         </View>
-        <View style={styles.headerBottom}>
-          <Text style={[styles.headerMeta, isArabic && styles.arabic]}>
+        <View style={[styles.headerBottom, compact && styles.headerBottomCompact]}>
+          <Text style={[styles.headerMeta, compact && styles.headerMetaCompact, isArabic && styles.arabic]}>
             {isArabic ? `${upNext} التالي` : `${upNext} up next · ${count} ${count === 1 ? 'track' : 'tracks'}`}
           </Text>
           <Pressable
@@ -208,9 +214,11 @@ interface QueueRowProps {
   onSelect: (index: number) => void;
   liked: boolean;
   onToggleLike?: (trackId: string) => void;
+  compact: boolean;
+  rowHeight: number;
 }
 
-function QueueRow({ index, item, active, playing, offset, lifted, dragging, handlers, onSelect, liked, onToggleLike }: QueueRowProps) {
+function QueueRow({ index, item, active, playing, offset, lifted, dragging, handlers, onSelect, liked, onToggleLike, compact, rowHeight }: QueueRowProps) {
   const [translateY] = useState(() => new Animated.Value(0));
   const indexRef = useRef(index);
   useEffect(() => {
@@ -247,7 +255,7 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
     <Animated.View
       style={[
         styles.rowShell,
-        { top: index * ROW_HEIGHT, transform: [{ translateY }] },
+        { top: index * rowHeight, height: rowHeight, transform: [{ translateY }] },
         lifted && styles.rowLifted,
       ]}
     >
@@ -255,10 +263,10 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
         <View
           accessibilityRole="adjustable"
           accessibilityLabel={`Reorder ${item.track.title}`}
-          style={[styles.handle, Platform.OS === 'web' && styles.handleWeb]}
+          style={[styles.handle, compact && styles.handleCompact, Platform.OS === 'web' && styles.handleWeb]}
           {...panResponder.panHandlers}
         >
-          <Icon name="reorder" size={22} color={lifted ? COLORS.goldBright : COLORS.muted} />
+          <Icon name="reorder" size={compact ? 18 : 22} color={lifted ? COLORS.goldBright : COLORS.muted} />
         </View>
         <Pressable
           accessibilityRole="button"
@@ -267,10 +275,10 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
           onPress={() => onSelect(index)}
           style={({ pressed }) => [styles.rowMain, pressed && styles.pressed]}
         >
-          <MusicArtwork asset={item.coverAsset} size={44} radius={6} label={item.releaseTitle ?? item.track.title} />
+          <MusicArtwork asset={item.coverAsset} size={compact ? 36 : 44} radius={6} label={item.releaseTitle ?? item.track.title} />
           <View style={styles.rowText}>
-            <Text numberOfLines={1} style={[styles.rowTitle, active && styles.rowTitleActive]}>{item.track.title}</Text>
-            <Text numberOfLines={1} style={styles.rowArtist}>
+            <Text numberOfLines={1} style={[styles.rowTitle, compact && styles.rowTitleCompact, active && styles.rowTitleActive]}>{item.track.title}</Text>
+            <Text numberOfLines={1} style={[styles.rowArtist, compact && styles.rowArtistCompact]}>
               {active ? (playing ? 'Now playing · ' : 'Paused · ') : ''}{performers}
             </Text>
           </View>
@@ -281,9 +289,9 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
             accessibilityLabel={liked ? `Unlike ${item.track.title}` : `Like ${item.track.title}`}
             disabled={dragging}
             onPress={() => onToggleLike(item.track.id)}
-            style={({ pressed }) => [styles.likeButton, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.likeButton, compact && styles.likeButtonCompact, pressed && styles.pressed]}
           >
-            <Icon name={liked ? 'heart' : 'heart-outline'} size={17} color={liked ? COLORS.goldBright : COLORS.muted} />
+            <Icon name={liked ? 'heart' : 'heart-outline'} size={compact ? 16 : 17} color={liked ? COLORS.goldBright : COLORS.muted} />
           </Pressable>
         ) : null}
       </View>
@@ -309,13 +317,17 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: SPACING.xs,
   },
+  headerCompact: { paddingTop: 8, paddingBottom: 6, marginBottom: 2 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACING.sm },
+  headerBottomCompact: { marginTop: 4 },
   modeButtons: { flexDirection: 'row', gap: 10 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: SPACING.sm },
   headerTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
+  headerTitleCompact: { fontSize: 18 },
   headerMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
+  headerMetaCompact: { fontSize: 11 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   clearButton: {
     flexDirection: 'row',
@@ -333,7 +345,7 @@ const styles = StyleSheet.create({
   clearTextDisabled: { color: COLORS.muted },
   list: { position: 'relative' },
   noSelect: { userSelect: 'none' } as object,
-  rowShell: { position: 'absolute', left: 0, right: 0, height: ROW_HEIGHT, paddingHorizontal: SPACING.xs },
+  rowShell: { position: 'absolute', left: 0, right: 0, paddingHorizontal: SPACING.xs },
   rowLifted: { zIndex: 10, elevation: 10 },
   row: {
     flex: 1,
@@ -355,10 +367,14 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, height: '100%' },
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  rowTitleCompact: { fontSize: 13 },
   rowTitleActive: { color: COLORS.goldBright },
   rowArtist: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
+  rowArtistCompact: { fontSize: 10, marginTop: 1 },
   likeButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  likeButtonCompact: { width: 32, height: 32, borderRadius: 16 },
   handle: { width: 48, height: '100%', alignItems: 'center', justifyContent: 'center' },
+  handleCompact: { width: 38 },
   handleWeb: { cursor: 'grab', touchAction: 'none' } as object,
   pressed: { opacity: 0.7 },
 });
