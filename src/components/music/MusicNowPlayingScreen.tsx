@@ -433,6 +433,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
 
   const player = (
     <PlayerCard
+      key={currentItem.track.id}
       compact={isPhoneLayout}
       artSize={wide ? wideArtSize : narrowArtSize}
       coverAsset={currentItem.coverAsset}
@@ -472,6 +473,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       </View>
       <View style={styles.landscapeControlsColumn}>
         <PlayerCard
+          key={currentItem.track.id}
           compact
           horizontal
           showArtwork={false}
@@ -663,6 +665,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
               <>
                 <View style={styles.fullscreenSeekLandscape}>
                   <SeekBar
+                    key={currentItem.track.id}
                     positionMs={currentTimeMs}
                     durationMs={effectiveDurationMs}
                     onSeek={(positionMs) => void seekToMs(positionMs)}
@@ -680,7 +683,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
               </>
             ) : (
               <>
-                <SeekBar positionMs={currentTimeMs} durationMs={effectiveDurationMs} onSeek={(positionMs) => void seekToMs(positionMs)} />
+                <SeekBar key={currentItem.track.id} positionMs={currentTimeMs} durationMs={effectiveDurationMs} onSeek={(positionMs) => void seekToMs(positionMs)} />
                 <TransportControls
                   playing={playing}
                   buffering={buffering}
