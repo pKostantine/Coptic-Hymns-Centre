@@ -66,7 +66,7 @@ function sameOriginImageUrl(origin, asset) {
   return origin + '/__share-image?' + params.toString();
 }
 
-async function proxyShareImage(requestUrl) {
+async function proxyShareImage(requestUrl, requestMethod) {
   const bucket = requestUrl.searchParams.get('bucket');
   const objectPath = requestUrl.searchParams.get('path');
   const route = PUBLIC_BUCKET_ROUTES[bucket];
@@ -93,7 +93,7 @@ async function proxyShareImage(requestUrl) {
   headers.set('Cache-Control', 'public, max-age=86400, s-maxage=604800, immutable');
   headers.set('Access-Control-Allow-Origin', '*');
 
-  return new Response(mediaResponse.body, {
+  return new Response(requestMethod === 'HEAD' ? null : mediaResponse.body, {
     status: 200,
     headers,
   });
@@ -135,7 +135,7 @@ export async function onRequest(context) {
   // Social crawlers are much more reliable when artwork is available from the
   // same host as the shared page, so proxy the published R2 image through CHC.
   if (requestUrl.pathname === '/__share-image') {
-    return proxyShareImage(requestUrl);
+    return proxyShareImage(requestUrl, context.request.method);
   }
 
   const response = await context.next();
