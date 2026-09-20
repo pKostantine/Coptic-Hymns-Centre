@@ -243,6 +243,7 @@ export default function MusicReleaseScreen() {
                 index={index}
                 active={currentItem?.track.id === track.id || (!currentItem && linkedTrackId === track.id)}
                 onPress={() => playQueue(queue, index)}
+                onTitlePress={() => router.push(`/music/track/${track.id}`)}
                 showLikeButton
                 liked={likedTrackIds.has(track.id)}
                 onToggleLike={() => void handleToggleTrackLike(track.id)}
