@@ -17,12 +17,19 @@ export async function searchUnifiedMedia(
   const value = query.trim();
   if (!value) return { ...EMPTY_RESULTS, scope };
 
-  const { data, error } = await supabase.rpc('search_media_catalog', {
-    p_query: value,
-    p_locale: locale,
-    p_scope: scope,
-    p_limit: limit,
-  });
+  const { data, error } = scope === 'all'
+    ? await supabase.rpc('search_media_catalog', {
+        p_query: value,
+        p_locale: locale,
+        p_scope: scope,
+        p_limit: limit,
+      })
+    : await supabase.rpc('search_section_catalog', {
+        p_query: value,
+        p_locale: locale,
+        p_section: scope,
+        p_limit: limit,
+      });
 
   if (error) throw new Error('Search CHC: ' + error.message);
   if (!data) throw new Error('Search CHC: no data returned.');
