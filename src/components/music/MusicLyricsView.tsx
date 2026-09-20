@@ -72,7 +72,12 @@ export default function MusicLyricsView({
   return (
     <View style={[styles.root, style]}>
       {lyricSets.length > 1 ? (
-        <View style={[styles.tabs, fullscreen && styles.tabsFullscreen, compact && styles.tabsCompact]}>
+        <View style={[
+          styles.tabs,
+          fullscreen && styles.tabsFullscreen,
+          compact && styles.tabsCompact,
+          fullscreen && compact && styles.tabsFullscreenCompact,
+        ]}>
           {lyricSets.map((set) => {
             const selected = set.id === selectedSetId;
             return (
@@ -93,7 +98,12 @@ export default function MusicLyricsView({
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={[styles.content, fullscreen && styles.contentFullscreen, compact && styles.contentCompact]}
+        contentContainerStyle={[
+          styles.content,
+          fullscreen && styles.contentFullscreen,
+          compact && styles.contentCompact,
+          fullscreen && compact && styles.contentFullscreenCompact,
+        ]}
         showsVerticalScrollIndicator={!fullscreen}
         nestedScrollEnabled
         onLayout={(event) => { viewportHeight.current = event.nativeEvent.layout.height; }}
@@ -117,6 +127,7 @@ export default function MusicLyricsView({
                       styles.lineText,
                       compact && styles.lineTextCompact,
                       fullscreen && styles.lineTextFullscreen,
+                      fullscreen && compact && styles.lineTextFullscreenCompact,
                       selectedSet.locale === 'ar' && styles.arabic,
                       // Full screen centres every language; the panel keeps
                       // Arabic aligned to its own reading edge.
@@ -124,6 +135,7 @@ export default function MusicLyricsView({
                       selectedSet.locale === 'cop' && styles.coptic,
                       active && styles.lineTextActive,
                       active && fullscreen && styles.lineTextActiveFullscreen,
+                      active && fullscreen && compact && styles.lineTextActiveFullscreenCompact,
                     ]}
                   >
                     {line.text}
@@ -156,6 +168,7 @@ const styles = StyleSheet.create({
   },
   tabsCompact: { marginHorizontal: 12 },
   tabsFullscreen: { alignSelf: 'center', minWidth: 360 },
+  tabsFullscreenCompact: { alignSelf: 'stretch', minWidth: 0 },
   tab: { flex: 1, minHeight: 34, paddingHorizontal: 10, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center' },
   tabCompact: { minHeight: 30, paddingHorizontal: 8 },
   tabActive: { backgroundColor: COLORS.gold },
@@ -168,13 +181,16 @@ const styles = StyleSheet.create({
   // Generous top/bottom space so the first and last lines can still scroll to
   // the reading position.
   contentFullscreen: { paddingHorizontal: SPACING.lg, paddingTop: 80, paddingBottom: 240, maxWidth: 1000, width: '100%', alignSelf: 'center' },
+  contentFullscreenCompact: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 140 },
   loader: { marginTop: SPACING.xl },
   line: { paddingVertical: 7, borderRadius: 8 },
   lineText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 20, lineHeight: 30, fontWeight: '600', opacity: 0.55 },
   lineTextCompact: { fontSize: 16, lineHeight: 24 },
   lineTextFullscreen: { fontSize: 40, lineHeight: 56, textAlign: 'center', opacity: 0.38 },
+  lineTextFullscreenCompact: { fontSize: 22, lineHeight: 31 },
   lineTextActive: { color: COLORS.white, opacity: 1 },
   lineTextActiveFullscreen: { fontSize: 42, lineHeight: 58 },
+  lineTextActiveFullscreenCompact: { fontSize: 24, lineHeight: 33 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicPanel: { textAlign: 'right' },
   coptic: { fontFamily: TYPOGRAPHY.musicCoptic },
