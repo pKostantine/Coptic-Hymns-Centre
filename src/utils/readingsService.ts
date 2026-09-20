@@ -1,11 +1,11 @@
-import { supabase } from './supabase';
-import { hydrateSupabaseServiceHymn } from './hymnLibrary';
-import { FIXED_FEASTS } from './fixedFeasts';
-import { NESI_MONTH, shouldUseNesiSundayReadings } from './readingCalendarRules';
-import { stripAlleluiaFromPsalmVerse } from './psalmReadingText';
-import { toIsoDate as toIsoDateString } from './dateUtils';
-import { formatVerses } from './verseFormatting';
 import type { DocumentSection } from '../components/chc/documentHtml';
+import { toIsoDate as toIsoDateString } from './dateUtils';
+import { FIXED_FEASTS } from './fixedFeasts';
+import { hydrateSupabaseServiceHymn } from './hymnLibrary';
+import { stripAlleluiaFromPsalmVerse } from './psalmReadingText';
+import { NESI_MONTH, shouldUseNesiSundayReadings } from './readingCalendarRules';
+import { supabase } from './supabase';
+import { formatVerses } from './verseFormatting';
 
 // calendar.reading_rules stores Psalm references (calendar book number 19)
 // in Septuagint (LXX) chapter/verse numbering, matching bible.verses directly.

@@ -1,10 +1,10 @@
 import { evaluateCondition, getContextFlags } from "./conditionEngine";
 import { toIsoDate as toIsoDateString } from "./dateUtils";
-import { formatVerses } from "./verseFormatting";
-import { loadReadingRuleRowsForDate } from "./readingCalendarRules";
 import { stripAlleluiaFromPsalmVerse } from "./psalmReadingText";
+import { loadReadingRuleRowsForDate } from "./readingCalendarRules";
 import { resolveBibleReadingReference } from "./readingReferenceResolver";
 import { supabase } from "./supabase";
+import { formatVerses } from "./verseFormatting";
 
 // ─── Subdocument sentinel → schema.table registry ────────────────────────────
 // Verified against live DB usage (see project memory project_subdocument_registry.md).
