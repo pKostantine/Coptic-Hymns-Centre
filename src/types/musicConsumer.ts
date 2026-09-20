@@ -20,6 +20,8 @@ export interface MusicConsumerReleaseSummary {
   subtitle: string | null;
   releaseType: MusicReleaseType;
   releaseDate: string | null;
+  musicType?: string | null;
+  recordingType?: string | null;
   primaryArtist?: Pick<MusicConsumerArtistSummary, 'id' | 'displayName'> | null;
   coverAsset?: MusicConsumerAsset | null;
 }

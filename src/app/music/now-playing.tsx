@@ -82,7 +82,12 @@ function useBrowserFullscreen(active: boolean, onExit: () => void) {
   }, [active]);
 }
 
-export default function MusicNowPlayingScreen() {
+interface MusicNowPlayingScreenProps {
+  embedded?: boolean;
+  onClose?: () => void;
+}
+
+export default function MusicNowPlayingScreen({ embedded = false, onClose }: MusicNowPlayingScreenProps = {}) {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
@@ -124,10 +129,18 @@ export default function MusicNowPlayingScreen() {
 
   useBrowserFullscreen(lyricsFullscreen, () => setLyricsFullscreen(false));
 
+  const closePlayer = () => {
+    if (embedded && onClose) {
+      onClose();
+      return;
+    }
+    router.back();
+  };
+
   useEffect(() => {
-    dismiss.current = { close: () => router.back(), height };
+    dismiss.current = { close: closePlayer, height };
     exitFullscreen.current = () => setLyricsFullscreen(false);
-  }, [height, router]);
+  }, [closePlayer, height]);
 
   // Swiping down on the full-screen lyrics header drops back to the player.
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
@@ -262,7 +275,7 @@ export default function MusicNowPlayingScreen() {
 
   const header = (
     <View style={styles.header}>
-      <RoundIconButton icon="chevron-down" accessibilityLabel="Close now playing" onPress={() => router.back()} />
+      <RoundIconButton icon="chevron-down" accessibilityLabel="Close now playing" onPress={closePlayer} />
       <View style={styles.headerCenter}>
         <Text style={styles.headerEyebrow}>{isArabic ? 'قيد التشغيل' : 'NOW PLAYING'}</Text>
         {currentItem?.releaseTitle ? <Text numberOfLines={1} style={styles.headerTitle}>{currentItem.releaseTitle}</Text> : null}
@@ -334,8 +347,10 @@ export default function MusicNowPlayingScreen() {
     </View>
   );
 
+  const isPhoneLayout = !wide && width < 460;
   const player = (
     <PlayerCard
+      compact={isPhoneLayout}
       artSize={wide ? wideArtSize : narrowArtSize}
       coverAsset={currentItem.coverAsset}
       artLabel={currentItem.releaseTitle ?? currentItem.track.title}
@@ -357,8 +372,11 @@ export default function MusicNowPlayingScreen() {
     />
   );
 
+  const rootStyle = embedded ? [styles.safeArea, styles.embeddedSafeArea] : styles.safeArea;
+
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['left', 'right']} style={rootStyle}>
+      {embedded ? <Pressable accessibilityLabel="Close now playing overlay" onPress={closePlayer} style={styles.overlayBackdrop} /> : null}
       <Animated.View
         style={[styles.dismissLayer, { transform: [{ translateY: dismissDrag }] }]}
         {...(wide ? {} : dismissResponder.panHandlers)}
@@ -555,6 +573,7 @@ function TransportControls({ playing, buffering, onPrevious, onTogglePlayback, o
 }
 
 interface PlayerCardProps extends Omit<TransportControlsProps, 'large'> {
+  compact?: boolean;
   artSize: number;
   coverAsset?: MusicConsumerAsset | null;
   artLabel: string;
@@ -571,6 +590,7 @@ interface PlayerCardProps extends Omit<TransportControlsProps, 'large'> {
 }
 
 function PlayerCard({
+  compact = false,
   artSize,
   coverAsset,
   artLabel,
@@ -589,15 +609,15 @@ function PlayerCard({
   const contentWidth = Math.max(artSize, 320);
 
   return (
-    <View style={styles.playerCard}>
-      <View style={styles.artShadow}>
-        <MusicArtwork asset={coverAsset} size={artSize} radius={16} label={artLabel} />
+    <View style={[styles.playerCard, compact && styles.playerCardCompact]}>
+      <View style={[styles.artShadow, compact && styles.artShadowCompact]}>
+        <MusicArtwork asset={coverAsset} size={artSize} radius={compact ? 12 : 16} label={artLabel} />
       </View>
 
-      <View style={[styles.titleRow, { maxWidth: contentWidth }]}>
+      <View style={[styles.titleRow, { maxWidth: contentWidth }, compact && styles.titleRowCompact]}>
         <View style={styles.titleText}>
-          <Text numberOfLines={2} style={styles.trackTitle}>{title}</Text>
-          <Text numberOfLines={1} style={styles.artist}>{performers}</Text>
+          <Text numberOfLines={2} style={[styles.trackTitle, compact && styles.trackTitleCompact]}>{title}</Text>
+          <Text numberOfLines={1} style={[styles.artist, compact && styles.artistCompact]}>{performers}</Text>
         </View>
         <RoundIconButton
           icon={liked ? 'heart' : 'heart-outline'}
@@ -609,11 +629,11 @@ function PlayerCard({
         />
       </View>
 
-      <View style={[styles.seekBar, { maxWidth: contentWidth }]}>
+      <View style={[styles.seekBar, { maxWidth: contentWidth }, compact && styles.seekBarCompact]}>
         <SeekBar positionMs={positionMs} durationMs={durationMs} onSeek={onSeek} />
       </View>
 
-      <TransportControls {...transport} />
+      <TransportControls {...transport} large={!compact} />
 
       {onDownload ? (
         <Pressable style={styles.downloadAction} onPress={onDownload}>
@@ -626,6 +646,17 @@ function PlayerCard({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
+  embeddedSafeArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 90,
+    elevation: 90,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  },
+  overlayBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.28)' },
   dismissLayer: { flex: 1, minHeight: 0 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 
@@ -676,6 +707,7 @@ const styles = StyleSheet.create({
   panelTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
 
   playerCard: { alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg },
+  playerCardCompact: { paddingHorizontal: 14, paddingVertical: 12 },
   artShadow: {
     borderRadius: 16,
     ...Platform.select({
@@ -684,10 +716,14 @@ const styles = StyleSheet.create({
     }),
   },
   titleRow: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
+  titleRowCompact: { marginTop: 12, gap: 8 },
   titleText: { flex: 1, minWidth: 0 },
   trackTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, lineHeight: 30, fontWeight: '700' },
+  trackTitleCompact: { fontSize: 20, lineHeight: 26 },
   artist: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', marginTop: 4 },
+  artistCompact: { fontSize: 12, marginTop: 3 },
   seekBar: { width: '100%', marginTop: SPACING.md },
+  seekBarCompact: { marginTop: 10 },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xl, marginTop: SPACING.xs },
   playButton: { backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   playNudge: { marginLeft: 4 },

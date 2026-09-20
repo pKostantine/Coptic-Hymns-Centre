@@ -6,6 +6,7 @@ import {
   StyleProp,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   ViewStyle,
 } from 'react-native';
@@ -47,10 +48,12 @@ export default function MusicLyricsView({
   variant = 'panel',
   style,
 }: MusicLyricsViewProps) {
+  const { width } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
   const lineOffsets = useRef(new Map<string, number>());
   const viewportHeight = useRef(0);
   const fullscreen = variant === 'fullscreen';
+  const compact = width < 420 || (fullscreen && width < 520);
   const selectedSet = lyricSets.find((set) => set.id === selectedSetId) ?? null;
 
   useEffect(() => {
@@ -69,7 +72,7 @@ export default function MusicLyricsView({
   return (
     <View style={[styles.root, style]}>
       {lyricSets.length > 1 ? (
-        <View style={[styles.tabs, fullscreen && styles.tabsFullscreen]}>
+        <View style={[styles.tabs, fullscreen && styles.tabsFullscreen, compact && styles.tabsCompact]}>
           {lyricSets.map((set) => {
             const selected = set.id === selectedSetId;
             return (
@@ -78,9 +81,9 @@ export default function MusicLyricsView({
                 accessibilityRole="tab"
                 accessibilityState={{ selected }}
                 onPress={() => onSelectSet(set.id)}
-                style={({ pressed }) => [styles.tab, selected && styles.tabActive, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.tab, compact && styles.tabCompact, selected && styles.tabActive, pressed && styles.pressed]}
               >
-                <Text numberOfLines={1} style={[styles.tabText, selected && styles.tabTextActive]}>{lyricSetLabel(set)}</Text>
+                <Text numberOfLines={1} style={[styles.tabText, compact && styles.tabTextCompact, selected && styles.tabTextActive]}>{lyricSetLabel(set)}</Text>
               </Pressable>
             );
           })}
@@ -90,7 +93,7 @@ export default function MusicLyricsView({
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={[styles.content, fullscreen && styles.contentFullscreen]}
+        contentContainerStyle={[styles.content, fullscreen && styles.contentFullscreen, compact && styles.contentCompact]}
         showsVerticalScrollIndicator={!fullscreen}
         nestedScrollEnabled
         onLayout={(event) => { viewportHeight.current = event.nativeEvent.layout.height; }}
@@ -112,6 +115,7 @@ export default function MusicLyricsView({
                   <Text
                     style={[
                       styles.lineText,
+                      compact && styles.lineTextCompact,
                       fullscreen && styles.lineTextFullscreen,
                       selectedSet.locale === 'ar' && styles.arabic,
                       // Full screen centres every language; the panel keeps
@@ -150,22 +154,27 @@ const styles = StyleSheet.create({
     borderRadius: RADII.pill,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
+  tabsCompact: { marginHorizontal: 12 },
   tabsFullscreen: { alignSelf: 'center', minWidth: 360 },
   tab: { flex: 1, minHeight: 34, paddingHorizontal: 10, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center' },
+  tabCompact: { minHeight: 30, paddingHorizontal: 8 },
   tabActive: { backgroundColor: COLORS.gold },
   tabText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
+  tabTextCompact: { fontSize: 11 },
   tabTextActive: { color: COLORS.black },
   scroll: { flex: 1 },
   content: { paddingHorizontal: SPACING.md + 4, paddingTop: SPACING.sm, paddingBottom: SPACING.xl },
+  contentCompact: { paddingHorizontal: 12, paddingTop: 8 },
   // Generous top/bottom space so the first and last lines can still scroll to
   // the reading position.
   contentFullscreen: { paddingHorizontal: SPACING.lg, paddingTop: 80, paddingBottom: 240, maxWidth: 1000, width: '100%', alignSelf: 'center' },
   loader: { marginTop: SPACING.xl },
   line: { paddingVertical: 7, borderRadius: 8 },
   lineText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 20, lineHeight: 30, fontWeight: '600', opacity: 0.55 },
+  lineTextCompact: { fontSize: 16, lineHeight: 24 },
   lineTextFullscreen: { fontSize: 40, lineHeight: 56, textAlign: 'center', opacity: 0.38 },
   lineTextActive: { color: COLORS.white, opacity: 1 },
-  lineTextActiveFullscreen: { fontSize: 46, lineHeight: 62 },
+  lineTextActiveFullscreen: { fontSize: 42, lineHeight: 58 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicPanel: { textAlign: 'right' },
   coptic: { fontFamily: TYPOGRAPHY.coptic },

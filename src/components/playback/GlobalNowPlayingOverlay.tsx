@@ -1,11 +1,12 @@
 import { usePathname, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet } from 'react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Icon from '@/components/chc/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicNowPlayingScreen from '@/app/music/now-playing';
 import { COLORS } from '@/constants/theme';
 import { useBottomChrome } from '@/context/BottomChromeContext';
 import { useLearningPlayer } from '@/context/LearningPlayerContext';
@@ -42,12 +43,15 @@ export default function GlobalNowPlayingOverlay() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { tabBarInset, reportNowPlayingInset } = useBottomChrome();
   const { preferences } = useReadingPreferences();
   const music = useMusicPlayer();
   const learning = useLearningPlayer();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedHeight, setExpandedHeight] = useState(60);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const isPhoneLayout = Platform.OS !== 'web' || width < 760;
 
   const currentItem = music.currentItem ?? learning.currentItem;
   const normalizedPath = pathname.replace(/\?.*$/, '');
@@ -115,8 +119,31 @@ export default function GlobalNowPlayingOverlay() {
     return null;
   }
 
+  if (isPopupOpen && isPhoneLayout) {
+    return (
+      <MusicNowPlayingScreen
+        embedded
+        onClose={() => setIsPopupOpen(false)}
+      />
+    );
+  }
+
   const isMusic = Boolean(music.currentItem);
-  const onOpen = isMusic ? () => router.push('/music/now-playing') : () => router.push('/learn/now-playing');
+  const onOpen = isMusic
+    ? () => {
+        if (isPhoneLayout) {
+          setIsPopupOpen(true);
+          return;
+        }
+        router.push('/music/now-playing');
+      }
+    : () => {
+        if (isPhoneLayout) {
+          setIsPopupOpen(true);
+          return;
+        }
+        router.push('/learn/now-playing');
+      };
   const onTogglePlayback = isMusic ? music.togglePlayback : learning.togglePlayback;
   const onNext = isMusic ? music.next : learning.next;
   const accentColor = isMusic ? COLORS.gold : COLORS.learning;

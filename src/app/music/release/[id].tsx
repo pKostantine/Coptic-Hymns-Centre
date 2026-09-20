@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -27,6 +27,7 @@ export default function MusicReleaseScreen() {
   const releaseId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [release, setRelease] = useState<MusicConsumerRelease | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
   const { currentItem, playQueue } = useMusicPlayer();
 
   useEffect(() => {
@@ -52,6 +53,20 @@ export default function MusicReleaseScreen() {
     [locale, release],
   );
 
+  useEffect(() => {
+    if (!releaseId) return;
+    let active = true;
+    musicService.getLibrary(locale)
+      .then((library) => {
+        if (!active) return;
+        setLikedTrackIds(new Set(library.likedTracks.map((track) => track.id)));
+      })
+      .catch(() => {
+        if (active) setLikedTrackIds(new Set());
+      });
+    return () => { active = false; };
+  }, [locale, releaseId]);
+
   const prepareReleaseDownload = async () => {
     if (!release) throw new Error('Release is not loaded.');
     const lyrics = await Promise.all(tracks.map(async (track) => {
@@ -63,6 +78,35 @@ export default function MusicReleaseScreen() {
       locale,
       Object.fromEntries(lyrics) as Record<string, PublishedTrackLyricsPayload | null>,
     );
+  };
+
+  const handleShareRelease = async () => {
+    if (!release) return;
+    const deepLink = `https://coptichymnscentre.com/music/release/${release.id}`;
+    const shareText = `${release.title}${release.primaryArtist?.displayName ? ` — ${release.primaryArtist.displayName}` : ''}\n${deepLink}`;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: release.title, text: shareText, url: deepLink });
+        return;
+      }
+      await Share.share({ message: shareText, url: deepLink });
+    } catch {
+      // User cancelled or no share support.
+    }
+  };
+
+  const handleToggleLike = async (trackId: string) => {
+    const liked = likedTrackIds.has(trackId);
+    try {
+      await musicService.setLiked(trackId, !liked);
+      setLikedTrackIds((current) => {
+        const next = new Set(current);
+        if (liked) next.delete(trackId); else next.add(trackId);
+        return next;
+      });
+    } catch (cause) {
+      Alert.alert(isArabic ? 'الأغاني المعجبة' : 'Liked Songs', cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
+    }
   };
 
   if (!release) {
@@ -78,6 +122,7 @@ export default function MusicReleaseScreen() {
   const releaseType = isArabic
     ? release.releaseType === 'album' ? 'ألبوم' : release.releaseType === 'ep' ? 'EP' : 'أغنية منفردة'
     : release.releaseType === 'album' ? 'Album' : release.releaseType === 'ep' ? 'EP' : 'Single';
+  const classifiers = [release.musicType, release.recordingType].filter(Boolean) as string[];
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -94,10 +139,22 @@ export default function MusicReleaseScreen() {
             <Text style={[styles.releaseMeta, isArabic && styles.arabic]}>
               {[releaseType, release.releaseDate?.slice(0, 4), isArabic ? `${tracks.length} ترنيمة` : `${tracks.length} track${tracks.length === 1 ? '' : 's'}`].filter(Boolean).join(' • ')}
             </Text>
+            {classifiers.length ? (
+              <View style={styles.classifierRow}>
+                {classifiers.map((label) => (
+                  <View key={label} style={styles.classifierChip}>
+                    <Text style={styles.classifierText}>{label}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             {release.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{release.description}</Text> : null}
             <View style={styles.actions}>
               <Pressable style={styles.playAll} onPress={() => queue.length && playQueue(queue, 0)}>
                 <Text style={styles.playAllText}>▶  {isArabic ? 'تشغيل' : 'Play'}</Text>
+              </Pressable>
+              <Pressable style={styles.shareButton} onPress={() => void handleShareRelease()}>
+                <Text style={styles.shareButtonText}>{isArabic ? 'مشاركة' : 'Share'}</Text>
               </Pressable>
               {downloadRequest ? (
                 <MusicDownloadButton
@@ -125,6 +182,9 @@ export default function MusicReleaseScreen() {
                 index={index}
                 active={currentItem?.track.id === track.id}
                 onPress={() => playQueue(queue, index)}
+                showLikeButton
+                liked={likedTrackIds.has(track.id)}
+                onToggleLike={() => void handleToggleLike(track.id)}
                 trailing={(
                   <MusicDownloadButton
                     packageKey={trackRequest.packageKey}
@@ -198,10 +258,15 @@ const styles = StyleSheet.create({
   subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, textAlign: 'center', marginTop: SPACING.xs },
   artist: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700', marginTop: SPACING.sm, textAlign: 'center' },
   releaseMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: SPACING.xs, textAlign: 'center' },
+  classifierRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: SPACING.xs, marginTop: SPACING.sm },
+  classifierChip: { paddingHorizontal: SPACING.sm, paddingVertical: 6, borderRadius: RADII.pill, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: COLORS.border },
+  classifierText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: SPACING.md },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
   playAll: { paddingHorizontal: SPACING.xl, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, backgroundColor: COLORS.gold },
   playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800' },
+  shareButton: { paddingHorizontal: SPACING.md, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.surface },
+  shareButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   loader: { marginTop: SPACING.xl },
   errorBoundary: { flex: 1, padding: SPACING.xl, alignItems: 'center', justifyContent: 'center', gap: SPACING.md },
