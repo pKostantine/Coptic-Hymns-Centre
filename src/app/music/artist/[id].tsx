@@ -13,6 +13,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerArtist, MusicConsumerAsset } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
+import { publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
 export default function MusicArtistScreen() {
@@ -94,7 +95,7 @@ export default function MusicArtistScreen() {
     await shareLink({
       title: artist.displayName,
       text: artist.biography || artist.displayName,
-      url: `https://coptichymnscentre.com/music/artist/${artist.id}`,
+      url: publicUrl(`/music/artist/${artist.id}?share=1`),
     });
   };
 
@@ -112,7 +113,7 @@ export default function MusicArtistScreen() {
         <ShareMetadata
           title={artist.displayName}
           description={artist.biography || 'Listen on Coptic Hymns Centre'}
-          canonicalUrl={`https://coptichymnscentre.com/music/artist/${artist.id}`}
+          canonicalUrl={publicUrl(`/music/artist/${artist.id}`)}
           imageUrl={shareImageUrl}
           type="profile"
         />
