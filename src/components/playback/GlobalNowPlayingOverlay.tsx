@@ -23,6 +23,7 @@ const EXCLUDED_PATHS = new Set([
   '/calendar',
   '/season-selector',
   '/settings',
+  '/book-settings',
   '/downloads',
   '/music/now-playing',
   '/learn/now-playing',
