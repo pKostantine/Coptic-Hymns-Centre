@@ -1,5 +1,5 @@
-import { Redirect } from 'expo-router';
+import SectionSearchScreen from '@/components/search/SectionSearchScreen';
 
-export default function LegacyLearningSearchRoute() {
-  return <Redirect href="/search?scope=learning" />;
+export default function LearningSearchRoute() {
+  return <SectionSearchScreen section="learning" />;
 }
