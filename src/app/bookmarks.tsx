@@ -135,7 +135,7 @@ export default function BookmarksScreen() {
       <Head>
         <title>CHC Bookmarks</title>
       </Head>
-      <AppHeader title="Bookmarks" canGoBack onBack={() => goBack(router, '/')} />
+      <AppHeader title="Bookmarks" canGoBack onBack={() => goBack(router, '/books')} />
       {entries.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No bookmarks yet.</Text>
