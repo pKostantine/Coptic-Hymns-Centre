@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 import { supabase } from '@/utils/supabase';
 
 export type NotificationPreferenceMap = Record<string, boolean>;
-export type NotificationSyncResult = 'registered' | 'permission_required' | 'signed_out' | 'unsupported';
+export type NotificationSyncResult = 'registered' | 'permission_required' | 'signed_out' | 'unsupported' | 'unconfigured';
 
 const APP_KEY = 'chc';
 const PROVIDER = 'expo';
@@ -92,8 +92,10 @@ export async function syncNativeNotificationDevice(options: {
   if (!granted) return 'permission_required';
 
   const id = projectId();
+  if (!id) return 'unconfigured';
+
   const token = await Notifications.getExpoPushTokenAsync({
-    ...(id ? { projectId: id } : {}),
+    projectId: id,
     ...(options.devicePushToken ? { devicePushToken: options.devicePushToken } : {}),
   });
 
