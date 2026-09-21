@@ -10,10 +10,20 @@ import { musicService } from '@/services/musicService';
 import type { MusicLibraryPlaylist } from '@/types/musicConsumer';
 import type { MusicPlaylistVisibility } from '@/types/mediaPlatform';
 
-export default function MusicPlaylistPicker({ trackId, compact = false, label = 'Add to playlist' }: {
+export default function MusicPlaylistPicker({
+  trackId,
+  compact = false,
+  label = 'Add to playlist',
+  menuRow = false,
+  round = false,
+  onOpen,
+}: {
   trackId: string;
   compact?: boolean;
   label?: string;
+  menuRow?: boolean;
+  round?: boolean;
+  onOpen?: () => void;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -36,6 +46,7 @@ export default function MusicPlaylistPicker({ trackId, compact = false, label = 
       return;
     }
     setVisible(true);
+    onOpen?.();
     setLoading(true);
     setError(null);
     try {
@@ -92,10 +103,10 @@ export default function MusicPlaylistPicker({ trackId, compact = false, label = 
       <Pressable
         accessibilityLabel={label}
         onPress={(event) => { event.stopPropagation(); void open(); }}
-        style={compact ? styles.compactTrigger : styles.trigger}
+        style={menuRow ? styles.menuTrigger : round ? styles.roundTrigger : compact ? styles.compactTrigger : styles.trigger}
       >
-        <Icon name="list-outline" size={compact ? 18 : 20} color={COLORS.goldBright} />
-        {!compact ? <Text style={styles.triggerText}>{label}</Text> : null}
+        <Icon name="playlist-add" size={compact || round ? 18 : 20} color={COLORS.goldBright} />
+        {menuRow || (!compact && !round) ? <Text style={[styles.triggerText, menuRow && styles.menuTriggerText]}>{label}</Text> : null}
       </Pressable>
 
       <Modal animationType="slide" transparent visible={visible} onRequestClose={() => setVisible(false)}>
@@ -161,6 +172,9 @@ const styles = StyleSheet.create({
   trigger: { alignItems: 'center', borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: SPACING.sm, justifyContent: 'center', minHeight: 42, paddingHorizontal: SPACING.md },
   triggerText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
   compactTrigger: { alignItems: 'center', borderRadius: 8, height: 34, justifyContent: 'center', width: 34 },
+  roundTrigger: { alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.08)' },
+  menuTrigger: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md, minHeight: 52, paddingHorizontal: SPACING.md, borderRadius: 10 },
+  menuTriggerText: { flex: 1, fontSize: 15 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { backgroundColor: 'rgba(0,0,0,0.7)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   sheet: { backgroundColor: COLORS.black, borderColor: COLORS.border, borderTopLeftRadius: 8, borderTopRightRadius: 8, borderTopWidth: 1, maxHeight: '88%', paddingBottom: SPACING.lg },

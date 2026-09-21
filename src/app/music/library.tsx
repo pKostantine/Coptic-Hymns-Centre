@@ -9,8 +9,8 @@ import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
-import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
+import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -254,7 +254,7 @@ export default function MusicLibraryScreen() {
                       onToggleLike={() => void unlikeTrack(track.id)}
                       trailing={(
                         <View style={styles.trackActions}>
-                          <MusicPlaylistPicker trackId={track.id} compact />
+                          <MusicTrackActionsMenu item={{ track, releaseId: track.releaseId }} isArabic={isArabic} />
                           <MusicDownloadButton
                             packageKey={trackDownload.packageKey}
                             request={async () => {

@@ -19,7 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import Icon, { type IconName } from '@/components/chc/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
-import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
+import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import MusicLyricsView, { lyricSetShortLabel } from '@/components/music/MusicLyricsView';
 import MusicQueueList from '@/components/music/MusicQueueList';
 import SeekBar from '@/components/music/SeekBar';
@@ -449,7 +449,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       playing={playing}
       buffering={buffering}
       liked={likedTrackIds.has(currentItem.track.id)}
-      trackId={currentItem.track.id}
+      item={currentItem}
       likeBusy={likeBusy}
       isArabic={isArabic}
       onSeek={(positionMs) => void seekToMs(positionMs)}
@@ -492,7 +492,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
           playing={playing}
           buffering={buffering}
           liked={likedTrackIds.has(currentItem.track.id)}
-          trackId={currentItem.track.id}
+          item={currentItem}
           likeBusy={likeBusy}
           isArabic={isArabic}
           onSeek={(positionMs) => void seekToMs(positionMs)}
@@ -811,7 +811,7 @@ interface PlayerCardProps extends Omit<TransportControlsProps, 'large'> {
   positionMs: number;
   durationMs: number;
   liked: boolean;
-  trackId: string;
+  item: import('@/context/MusicPlayerContext').MusicQueueItem;
   likeBusy: boolean;
   isArabic: boolean;
   onSeek: (positionMs: number) => void;
@@ -834,7 +834,7 @@ function PlayerCard({
   positionMs,
   durationMs,
   liked,
-  trackId,
+  item,
   likeBusy,
   isArabic,
   onSeek,
@@ -894,7 +894,7 @@ function PlayerCard({
               onPress={onShare}
               size={44}
             />
-            <MusicPlaylistPicker trackId={trackId} compact />
+            <MusicTrackActionsMenu item={item} isArabic={isArabic} size={44} />
           </View>
         </View>
       ) : (
@@ -915,7 +915,7 @@ function PlayerCard({
               onPress={onShare}
               size={compact ? 48 : 42}
             />
-            <MusicPlaylistPicker trackId={trackId} compact />
+            <MusicTrackActionsMenu item={item} isArabic={isArabic} size={44} />
             {onDownload ? (
               <Pressable style={styles.secondaryAction} onPress={onDownload}>
                 <Text style={styles.secondaryActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>

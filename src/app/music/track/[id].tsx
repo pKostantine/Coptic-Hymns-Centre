@@ -15,7 +15,7 @@ import Icon from '@/components/chc/ui/Icon';
 import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicLyricsView from '@/components/music/MusicLyricsView';
-import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
+import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -319,7 +319,7 @@ export default function MusicTrackDetailScreen() {
                 onPress={() => void shareTrack()}
                 size={46}
               />
-              <MusicPlaylistPicker trackId={track.id} />
+              <MusicTrackActionsMenu item={queueItem!} isArabic={isArabic} size={46} />
             </View>
           </View>
         </View>

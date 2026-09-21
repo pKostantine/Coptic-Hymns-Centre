@@ -1,17 +1,19 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import Icon from '@/components/chc/ui/Icon';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { pickAndUploadProfileAvatar, removeProfileAvatar } from '@/services/profileAvatarService';
 import type { AppLanguage } from '@/utils/preferencesStorage';
 
 const APP_LANGUAGE_OPTIONS: { key: AppLanguage; label: string; arabic: string }[] = [
@@ -222,34 +224,76 @@ function SignedOutAccount() {
 }
 
 function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
-  const router = useRouter();
   const auth = useAuth();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
   const user = auth.user!;
   const currentName = typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : '';
+  const customAvatarUrl = typeof user.user_metadata.chc_avatar_url === 'string' ? user.user_metadata.chc_avatar_url : null;
+  const providerAvatarUrl = typeof user.user_metadata.avatar_url === 'string' ? user.user_metadata.avatar_url : null;
+  const avatarUrl = customAvatarUrl || providerAvatarUrl;
   const [displayName, setDisplayName] = useState(currentName);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordEditor, setShowPasswordEditor] = useState(recoveryMode);
   const [busy, setBusy] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const provider = user.app_metadata.provider === 'google' ? 'Google' : 'Email';
-  const initials = (currentName || user.email || 'CHC').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+  const initials = (currentName || user.email || 'CHC')
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   const saveProfile = async () => {
-    if (!displayName.trim()) return;
+    const trimmed = displayName.trim();
+    if (!trimmed || busy) return;
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      await auth.updateDisplayName(displayName);
+      await auth.updateDisplayName(trimmed);
       setNotice('Your profile has been updated.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to update your profile.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const changePhoto = async () => {
+    if (avatarBusy) return;
+    setAvatarBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const nextUrl = await pickAndUploadProfileAvatar(user.id);
+      if (!nextUrl) return;
+      await auth.updateAvatarUrl(nextUrl);
+      setNotice('Your profile photo has been updated.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update your profile photo.');
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const clearPhoto = async () => {
+    if (avatarBusy) return;
+    setAvatarBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await auth.updateAvatarUrl(null);
+      await removeProfileAvatar(user.id);
+      setNotice('Your profile photo has been removed.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to remove your profile photo.');
+    } finally {
+      setAvatarBusy(false);
     }
   };
 
@@ -291,19 +335,37 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
 
   return (
     <>
-      <View style={styles.section}>
-        <View style={styles.identityRow}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
-          <View style={styles.identityText}>
+      <View style={[styles.section, styles.profileHero]}>
+        <View style={styles.profileHeader}>
+          <View style={styles.profileAvatar}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.profileAvatarImage} contentFit="cover" transition={150} />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
+          </View>
+
+          <View style={styles.profileIdentity}>
             <Text numberOfLines={1} style={styles.identityName}>{currentName || 'CHC listener'}</Text>
             <Text numberOfLines={1} style={styles.identityEmail}>{user.email}</Text>
-            <Text style={styles.identityMeta}>{provider} account{user.email_confirmed_at ? ' - verified' : ''}</Text>
+            <Text style={styles.identityMeta}>{provider} account{user.email_confirmed_at ? ' · Verified' : ''}</Text>
           </View>
         </View>
 
-        <View style={styles.shortcutRow}>
-          <AccountShortcut label="Music Library" icon="library-outline" onPress={() => router.push('/music/library')} />
-          <AccountShortcut label="Learning" icon="school-outline" onPress={() => router.push('/learn/library')} />
+        <View style={styles.profilePhotoActions}>
+          <Pressable
+            disabled={avatarBusy}
+            style={[styles.photoButton, avatarBusy && styles.disabled]}
+            onPress={() => void changePhoto()}
+          >
+            {avatarBusy ? <ActivityIndicator size="small" color={COLORS.goldBright} /> : <Icon name="person-circle-outline" size={18} color={COLORS.goldBright} />}
+            <Text style={styles.photoButtonText}>{avatarUrl ? 'Change photo' : 'Add photo'}</Text>
+          </Pressable>
+          {customAvatarUrl ? (
+            <Pressable disabled={avatarBusy} style={styles.removePhotoButton} onPress={() => void clearPhoto()}>
+              <Text style={styles.removePhotoText}>Remove</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -316,17 +378,29 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
       ) : null}
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الملف الشخصي والأمان' : 'Profile and security'}</Text>
+        <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الملف الشخصي' : 'Profile'}</Text>
+        <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
+          {isArabic ? 'عدّل الاسم الذي يظهر في حساب CHC الخاص بك.' : 'Choose the name that appears on your CHC account.'}
+        </Text>
         <Field label="Display name">
-          <TextInput value={displayName} onChangeText={setDisplayName} style={styles.input} placeholderTextColor={COLORS.muted} />
+          <TextInput value={displayName} onChangeText={setDisplayName} style={styles.input} placeholder="Your name" placeholderTextColor={COLORS.muted} />
         </Field>
         <Pressable disabled={busy || !displayName.trim()} style={[styles.secondaryButton, (busy || !displayName.trim()) && styles.disabled]} onPress={() => void saveProfile()}>
-          <Text style={styles.secondaryButtonText}>Save name</Text>
+          <Text style={styles.secondaryButtonText}>Save profile</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الأمان' : 'Security'}</Text>
+        <Text style={styles.accountDetailLabel}>Email</Text>
+        <Text selectable style={styles.accountDetailValue}>{user.email}</Text>
 
         {!recoveryMode ? (
           <Pressable style={styles.disclosureRow} onPress={() => setShowPasswordEditor((current) => !current)}>
-            <Text style={styles.disclosureText}>Change password</Text>
+            <View>
+              <Text style={styles.disclosureText}>Change password</Text>
+              <Text style={styles.disclosureDescription}>Set a new password for email sign-in.</Text>
+            </View>
             <Icon name={showPasswordEditor ? 'chevron-down' : 'chevron-forward'} size={18} color={COLORS.goldBright} />
           </Pressable>
         ) : null}
@@ -336,7 +410,9 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
 
         {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
         {notice ? <Text accessibilityRole="alert" style={styles.noticeText}>{notice}</Text> : null}
+      </View>
 
+      <View style={[styles.section, styles.signOutSection]}>
         <Pressable disabled={busy} style={styles.signOutButton} onPress={() => void signOut()}>
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
@@ -365,15 +441,6 @@ function PasswordEditor({ password, confirmation, onPasswordChange, onConfirmati
         <Text style={styles.primaryButtonText}>Update password</Text>
       </Pressable>
     </View>
-  );
-}
-
-function AccountShortcut({ label, icon, onPress }: { label: string; icon: 'library-outline' | 'school-outline'; onPress: () => void }) {
-  return (
-    <Pressable style={styles.shortcut} onPress={onPress}>
-      <Icon name={icon} size={22} color={COLORS.goldBright} />
-      <Text style={styles.shortcutText}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -413,7 +480,9 @@ function AppSettingsSection() {
         })}
       </View>
       <SettingsLink label="Book settings" description="Reading languages, text, slideshow, and display" onPress={() => router.push('/book-settings')} />
-      <SettingsLink label="Downloads and storage" description="Manage music and learning saved offline" onPress={() => router.push('/downloads')} />
+      {Platform.OS !== 'web' ? (
+        <SettingsLink label="Downloads and storage" description="Manage music and learning saved offline" onPress={() => router.push('/downloads')} />
+      ) : null}
     </View>
   );
 }
@@ -436,10 +505,25 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
+  profileHero: { borderColor: COLORS.goldLine, backgroundColor: COLORS.navy },
+  profileHeader: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md },
+  profileAvatar: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderColor: COLORS.goldLine, borderRadius: 44, borderWidth: 1, height: 88, justifyContent: 'center', overflow: 'hidden', width: 88 },
+  profileAvatarImage: { height: 88, width: 88 },
+  profileIdentity: { flex: 1, minWidth: 0 },
+  profilePhotoActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  photoButton: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderColor: COLORS.goldLine, borderRadius: RADII.pill, borderWidth: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 40, paddingHorizontal: SPACING.md },
+  photoButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
+  removePhotoButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: RADII.pill, borderWidth: 1, justifyContent: 'center', minHeight: 40, paddingHorizontal: SPACING.md },
+  removePhotoText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
+  accountDetailLabel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
+  accountDetailValue: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, marginTop: -8 },
+  disclosureDescription: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
+  signOutSection: { backgroundColor: 'transparent', borderWidth: 0, padding: 0 },
+
   scrollContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
   container: { alignSelf: 'center', gap: SPACING.lg, maxWidth: 760, width: '100%' },
   loader: { marginVertical: SPACING.xl },
-  section: { borderBottomColor: COLORS.border, borderBottomWidth: 1, gap: SPACING.md, paddingBottom: SPACING.lg },
+  section: { backgroundColor: COLORS.navyDark, borderColor: COLORS.border, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.md, padding: SPACING.lg },
   recoverySection: { borderColor: COLORS.goldLine, borderTopWidth: 1, paddingTop: SPACING.lg },
   sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700' },
   sectionBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, lineHeight: 22 },

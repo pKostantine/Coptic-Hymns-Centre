@@ -23,6 +23,7 @@ interface AuthContextValue {
   sendPasswordReset: (email: string) => Promise<void>;
   resendSignupConfirmation: (email: string) => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<void>;
+  updateAvatarUrl: (avatarUrl: string | null) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   clearRecoveryMode: () => void;
   signOut: () => Promise<void>;
@@ -181,6 +182,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
     authError(error, 'Unable to update your profile.');
   }, []);
 
+  const updateAvatarUrl = useCallback(async (avatarUrl: string | null) => {
+    const { error } = await supabase.auth.updateUser({
+      data: { chc_avatar_url: avatarUrl },
+    });
+    authError(error, 'Unable to update your profile photo.');
+  }, []);
+
   const updatePassword = useCallback(async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
     authError(error, 'Unable to update your password.');
@@ -203,6 +211,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     sendPasswordReset,
     resendSignupConfirmation,
     updateDisplayName,
+    updateAvatarUrl,
     updatePassword,
     clearRecoveryMode: () => setRecoveryMode(false),
     signOut,
@@ -217,6 +226,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     signOut,
     signUpWithEmail,
     updateDisplayName,
+    updateAvatarUrl,
     updatePassword,
   ]);
 

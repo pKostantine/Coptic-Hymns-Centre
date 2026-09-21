@@ -20,6 +20,7 @@ import {
   getManualNextIndex,
   getManualPreviousIndex,
   keepOnlyCurrentEntry,
+  insertQueueEntry,
   moveQueueEntry,
   nextRepeatMode,
   restoreOriginalQueue,
@@ -45,6 +46,8 @@ export interface PlaybackContextValue {
   playbackError: string | null;
   playQueue: (items: PlaybackQueueEntry[], startIndex?: number) => void;
   playItem: (item: PlaybackQueueEntry) => void;
+  addNext: (item: PlaybackQueueEntry) => void;
+  addToEnd: (item: PlaybackQueueEntry) => void;
   togglePlayback: () => void;
   next: () => void;
   previous: () => void;
@@ -163,6 +166,30 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     setQueue([item]);
     void loadEntry([item], 0, true);
   }, [loadEntry]);
+
+  const addNext = useCallback((item: PlaybackQueueEntry) => {
+    if (!queue.length || currentIndex < 0) {
+      playItem(item);
+      return;
+    }
+    const nextState = insertQueueEntry(queue, currentIndex, item, 'next');
+    setQueue(nextState.queue);
+    if (!shuffleEnabled) {
+      setOriginalQueue(nextState.queue);
+    } else {
+      const originalIndex = originalQueue.findIndex((entry) => entry.key === queue[currentIndex]?.key);
+      setOriginalQueue(insertQueueEntry(originalQueue, originalIndex, item, 'next').queue);
+    }
+  }, [currentIndex, originalQueue, playItem, queue, shuffleEnabled]);
+
+  const addToEnd = useCallback((item: PlaybackQueueEntry) => {
+    if (!queue.length || currentIndex < 0) {
+      playItem(item);
+      return;
+    }
+    setQueue(insertQueueEntry(queue, currentIndex, item, 'end').queue);
+    setOriginalQueue(insertQueueEntry(originalQueue, currentIndex, item, 'end').queue);
+  }, [currentIndex, originalQueue, playItem, queue]);
 
   const togglePlayback = useCallback(() => {
     if (!currentItem) return;
@@ -417,6 +444,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     playbackError,
     playQueue,
     playItem,
+    addNext,
+    addToEnd,
     togglePlayback,
     next,
     previous,
@@ -443,6 +472,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     loadingSource,
     next,
     playItem,
+    addNext,
+    addToEnd,
     playQueue,
     playbackError,
     previous,

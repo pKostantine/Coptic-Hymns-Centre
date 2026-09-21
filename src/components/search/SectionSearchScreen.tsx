@@ -17,6 +17,7 @@ import Icon from '@/components/chc/ui/Icon';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
@@ -408,6 +409,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
                         : false
                   }
                   liked={result.kind === 'music_track' && likedTrackIds.has(result.entityId)}
+                  isArabic={isArabic}
                   artistFallbackArt={artistFallbackArt[result.entityId] ?? null}
                   isLast={index === group.results.length - 1}
                   onPress={() => openResult(result)}
@@ -431,6 +433,7 @@ function SearchResultRow({
   active,
   playing,
   liked,
+  isArabic,
   artistFallbackArt,
   isLast,
   onPress,
@@ -442,6 +445,7 @@ function SearchResultRow({
   active: boolean;
   playing: boolean;
   liked: boolean;
+  isArabic: boolean;
   artistFallbackArt: MusicConsumerAsset | null;
   isLast: boolean;
   onPress: () => void;
@@ -536,6 +540,8 @@ function SearchResultRow({
           <Icon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? COLORS.goldBright : COLORS.muted} />
         </Pressable>
       ) : null}
+
+      {track ? <MusicTrackActionsMenu item={musicTrackItem(track)} isArabic={isArabic} size={36} /> : null}
 
       {playable ? (
         <View style={[styles.playAction, { backgroundColor: music ? COLORS.goldSoft : COLORS.learningSoft }]}>

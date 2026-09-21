@@ -18,6 +18,8 @@ export type IconName =
   | 'library-outline'
   | 'school-outline'
   | 'list-outline'
+  | 'playlist-add'
+  | 'ellipsis-horizontal'
   | 'sunny'
   | 'moon'
   | 'close-fullscreen'
@@ -245,6 +247,21 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
           <Circle cx={80} cy={144} r={16} fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
           <Circle cx={80} cy={256} r={16} fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
           <Circle cx={80} cy={368} r={16} fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'playlist-add':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M64 144h240M64 256h240M64 368h176" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" />
+          <Path d="M384 272v160M304 352h160" fill="none" stroke={color} strokeWidth={34} strokeLinecap="round" />
+        </Svg>
+      );
+    case 'ellipsis-horizontal':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Circle cx={112} cy={256} r={34} fill={color} />
+          <Circle cx={256} cy={256} r={34} fill={color} />
+          <Circle cx={400} cy={256} r={34} fill={color} />
         </Svg>
       );
     case 'sunny':

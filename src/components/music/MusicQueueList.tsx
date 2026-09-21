@@ -21,6 +21,7 @@ import type { MusicQueueItem } from '@/context/MusicPlayerContext';
 import type { PlaybackRepeatMode } from '@/types/playback';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import MusicArtwork from './MusicArtwork';
+import MusicTrackActionsMenu from './MusicTrackActionsMenu';
 
 // Rows are a fixed height so a drag distance maps directly onto a slot index.
 const ROW_HEIGHT = 64;
@@ -141,6 +142,7 @@ export default function MusicQueueList({
           onSelect={onSelect}
           liked={likedTrackIds?.has(item.track.id) ?? false}
           onToggleLike={onToggleLike}
+          isArabic={isArabic}
           compact={compact}
           rowHeight={rowHeight}
         />
@@ -214,11 +216,12 @@ interface QueueRowProps {
   onSelect: (index: number) => void;
   liked: boolean;
   onToggleLike?: (trackId: string) => void;
+  isArabic: boolean;
   compact: boolean;
   rowHeight: number;
 }
 
-function QueueRow({ index, item, active, playing, offset, lifted, dragging, handlers, onSelect, liked, onToggleLike, compact, rowHeight }: QueueRowProps) {
+function QueueRow({ index, item, active, playing, offset, lifted, dragging, handlers, onSelect, liked, onToggleLike, isArabic, compact, rowHeight }: QueueRowProps) {
   const [translateY] = useState(() => new Animated.Value(0));
   const indexRef = useRef(index);
   useEffect(() => {
@@ -294,6 +297,7 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
             <Icon name={liked ? 'heart' : 'heart-outline'} size={compact ? 16 : 17} color={liked ? COLORS.goldBright : COLORS.muted} />
           </Pressable>
         ) : null}
+        {!dragging ? <MusicTrackActionsMenu item={item} isArabic={isArabic} size={compact ? 32 : 36} /> : null}
       </View>
     </Animated.View>
   );
