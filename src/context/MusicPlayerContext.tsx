@@ -33,6 +33,8 @@ interface MusicPlayerContextValue {
   playbackError: string | null;
   playQueue: (items: MusicQueueItem[], startIndex?: number) => void;
   playItem: (item: MusicQueueItem) => void;
+  addNext: (item: MusicQueueItem) => void;
+  addToEnd: (item: MusicQueueItem) => void;
   togglePlayback: () => void;
   next: () => void;
   previous: () => void;
@@ -170,6 +172,20 @@ export function useMusicPlayer(): MusicPlayerContextValue {
     playback.playItem(toPlaybackEntry(item, 0));
   }, [playback.playItem]);
 
+  const queuedOccurrence = useRef(0);
+  const nextQueuedEntry = useCallback((item: MusicQueueItem) => {
+    queuedOccurrence.current += 1;
+    return toPlaybackEntry(item, Date.now() + queuedOccurrence.current);
+  }, []);
+
+  const addNext = useCallback((item: MusicQueueItem) => {
+    playback.addNext(nextQueuedEntry(item));
+  }, [nextQueuedEntry, playback.addNext]);
+
+  const addToEnd = useCallback((item: MusicQueueItem) => {
+    playback.addToEnd(nextQueuedEntry(item));
+  }, [nextQueuedEntry, playback.addToEnd]);
+
   return {
     queue,
     queueKeys,
@@ -184,6 +200,8 @@ export function useMusicPlayer(): MusicPlayerContextValue {
     playbackError: playback.playbackError,
     playQueue,
     playItem,
+    addNext,
+    addToEnd,
     togglePlayback: playback.togglePlayback,
     next: playback.next,
     previous: playback.previous,
