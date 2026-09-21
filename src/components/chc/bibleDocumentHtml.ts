@@ -285,7 +285,7 @@ export function buildBibleChapterHtml({
         height: 100vh;
         height: 100dvh;
         overflow: hidden;
-        padding: calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-top)) 18px calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-bottom));
+        padding: calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-top)) 14px calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-bottom));
         width: 100vw;
       }
       .slideshow-source {
@@ -298,7 +298,6 @@ export function buildBibleChapterHtml({
         visibility: hidden;
         width: 100vw;
       }
-      .slide-page .verse-row { border-bottom: 0; }
       .slide-page .cell { align-self: start; }
       .tap-zone {
         position: fixed;
