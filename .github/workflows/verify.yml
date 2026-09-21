@@ -47,6 +47,8 @@ jobs:
           src/services/musicService.ts
       - name: Lint Library and search routes
         run: npx eslint "src/app/music/library.tsx" src/components/search/SectionSearchScreen.tsx --rule "react-hooks/set-state-in-effect: off" --rule "react-hooks/exhaustive-deps: off"
+      - name: Share worker route tests
+        run: node --test tests/shareWorker.test.mjs
       - name: Playback tests
         run: npm run test:playback
       - name: Web export
