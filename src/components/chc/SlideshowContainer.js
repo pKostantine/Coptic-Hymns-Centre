@@ -1047,7 +1047,6 @@ const SlideItem = memo(function SlideItem({
         columnWidth={columnWidth}
         tableWidth={tableWidth}
         isRecitedPrayer={Boolean(item.isRecitedPrayer)}
-        isReading={Boolean(item.isReading)}
         forceWhiteText={Boolean(item.forceWhiteVerses || item.verse?.forceWhiteText)}
         colorIndex={item.colorIndex}
         suppressSpeakerLabel={Boolean(item.suppressSpeakerLabel)}
@@ -1185,7 +1184,6 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         // applies to both Recited and Silent Prayer content alike.
         isRecitedPrayer:
           verse.type === "recitedPrayer" || verse.type === "silentPrayer" || verse.type === "silentComment",
-        isReading: Boolean(section.isReading),
         forceWhiteVerses: Boolean(section.forceWhiteVerses),
         verseIndex: sectionIndex + verseIndex,
       })),
