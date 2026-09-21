@@ -373,7 +373,6 @@ export function buildDocumentHtml(
         font-family: Georgia, serif;
         font-size: ${openButtonFontSize}px;
         font-weight: 800;
-        line-height: ${openButtonLineHeight}px;
         min-height: ${DOCUMENT_CONTROL_GEOMETRY.subdocument.minHeight}px;
         justify-content: center;
         margin: 0 auto;
@@ -398,7 +397,6 @@ export function buildDocumentHtml(
         font-family: Georgia, serif;
         font-size: ${hyperlinkFontSize}px;
         font-weight: 800;
-        line-height: ${hyperlinkLineHeight}px;
         gap: ${DOCUMENT_CONTROL_GEOMETRY.hyperlink.gap}px;
         justify-content: center;
         margin: ${SPACING.md}px auto;
@@ -445,7 +443,6 @@ export function buildDocumentHtml(
         font-size: ${sectionTitleFontSize}px;
         font-weight: 700;
         gap: ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.gap}px;
-        line-height: ${sectionTitleLineHeight}px;
         padding: ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.paddingVertical}px ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.paddingHorizontal}px;
       }
       .gospel-rite-toggle.is-on {
