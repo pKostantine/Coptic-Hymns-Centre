@@ -161,6 +161,8 @@ export function buildDocumentHtml(
     sectionTitleLineHeight,
     openButtonFontSize,
     openButtonLineHeight,
+    hyperlinkFontSize,
+    hyperlinkLineHeight,
     copticFontSize,
     arabicFontSize,
     verseLineHeight,
@@ -371,6 +373,7 @@ export function buildDocumentHtml(
         font-family: Georgia, serif;
         font-size: ${openButtonFontSize}px;
         font-weight: 800;
+        line-height: ${openButtonLineHeight}px;
         min-height: ${DOCUMENT_CONTROL_GEOMETRY.subdocument.minHeight}px;
         justify-content: center;
         margin: 0 auto;
@@ -393,8 +396,9 @@ export function buildDocumentHtml(
         cursor: pointer;
         display: flex;
         font-family: Georgia, serif;
-        font-size: ${Math.max(Math.round(sectionTitleFontSize * 1.1), 16)}px;
+        font-size: ${hyperlinkFontSize}px;
         font-weight: 800;
+        line-height: ${hyperlinkLineHeight}px;
         gap: ${DOCUMENT_CONTROL_GEOMETRY.hyperlink.gap}px;
         justify-content: center;
         margin: ${SPACING.md}px auto;
