@@ -20,6 +20,7 @@ export default function MusicTrackRow({
   active = false,
   onPress,
   onTitlePress,
+  artwork,
   trailing,
   showLikeButton = false,
   liked = false,
@@ -31,6 +32,8 @@ export default function MusicTrackRow({
   onPress: () => void;
   /** Opens the track detail page without changing playback. */
   onTitlePress?: () => void;
+  /** Replaces the numeric position with cover artwork when provided. */
+  artwork?: ReactNode;
   trailing?: ReactNode;
   showLikeButton?: boolean;
   liked?: boolean;
@@ -40,7 +43,7 @@ export default function MusicTrackRow({
 
   return (
     <Pressable style={[styles.row, active && styles.rowActive]} onPress={onPress}>
-      <Text style={[styles.index, active && styles.activeText]}>{index + 1}</Text>
+      {artwork ?? <Text style={[styles.index, active && styles.activeText]}>{index + 1}</Text>}
       <View style={styles.info}>
         {onTitlePress ? (
           <Pressable

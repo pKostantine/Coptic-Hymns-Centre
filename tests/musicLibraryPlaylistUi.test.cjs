@@ -55,6 +55,20 @@ test('Library uses searchable folders and recent listening sections', () => {
   assert.match(migration, /'recentReleases'/);
 });
 
+test('liked tracks show and play with their release artwork', () => {
+  const folder = read('src/app/music/library/[section].tsx');
+  const row = read('src/components/music/MusicTrackRow.tsx');
+  const types = read('src/types/musicConsumer.ts');
+  const migration = read('supabase/migrations/20260921182311_liked_track_release_artwork.sql');
+
+  assert.match(types, /releaseCoverAsset\?: MusicConsumerAsset \| null/);
+  assert.match(row, /artwork\?: ReactNode/);
+  assert.match(folder, /artwork=\{<MusicArtwork asset=\{track\.releaseCoverAsset\}/);
+  assert.match(folder, /coverAsset: track\.releaseCoverAsset \?\? null/);
+  assert.match(migration, /'releaseCoverAsset'/);
+  assert.match(migration, /release_cover\.id = release_track\.cover_asset_id/);
+});
+
 test('artist artwork is circular and tab headers no longer carry the logo', () => {
   const folder = read('src/app/music/library/[section].tsx');
   const nativeHeader = read('src/components/chc/ui/AppHeader.tsx');
