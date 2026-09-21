@@ -16,7 +16,9 @@ import {
   getSlidePadding,
   getSlideRenderLayers,
   getSlideshowChromeMetrics,
+  getSlideshowLanguageFontSize,
   getSlideshowLanguageLineHeight,
+  estimateItemHeight,
   getVerseLineSegmentHeight,
   getVisibleVerseLanguages,
   hashSlideshowText,
@@ -93,19 +95,39 @@ test("responsive padding never creates a budget taller than the viewport", () =>
   });
 });
 
-test("maximum-size language metrics leave room for Arabic and Coptic marks", () => {
+test("slideshow typography uses the exact scroll-reader metrics at maximum size", () => {
   const item = verseItem();
+  assert.equal(getSlideshowLanguageFontSize("english", item, 78), 78);
+  assert.equal(getSlideshowLanguageFontSize("coptic", item, 78), 98);
+  assert.equal(getSlideshowLanguageFontSize("arabic", item, 78), 90);
   assert.equal(getSlideshowLanguageLineHeight("english", item, 78), 101);
   assert.equal(getSlideshowLanguageLineHeight("coptic", item, 78), 101);
   assert.equal(getSlideshowLanguageLineHeight("arabic", item, 78), 125);
   assert.deepEqual(getSlideshowChromeMetrics(78), {
-    buttonFontSize: 38,
-    buttonLineHeight: 48,
+    buttonFontSize: 51,
+    buttonLineHeight: 62,
+    hyperlinkFontSize: 43,
+    hyperlinkLineHeight: 54,
     speakerFontSize: 78,
     speakerLineHeight: 101,
-    titleFontSize: 36,
-    titleLineHeight: 45,
+    titleFontSize: 39,
+    titleLineHeight: 48,
   });
+});
+
+test("refrain labels no longer shrink only in slideshow mode", () => {
+  const item = verseItem({ verse: { ...verseItem().verse, type: "refrainLabel" } });
+  assert.equal(getSlideshowLanguageFontSize("english", item, 78), 78);
+  assert.equal(getSlideshowLanguageFontSize("coptic", item, 78), 98);
+  assert.equal(getSlideshowLanguageFontSize("arabic", item, 78), 90);
+  assert.equal(getSlideshowLanguageLineHeight("english", item, 78), 101);
+  assert.equal(getSlideshowLanguageLineHeight("arabic", item, 78), 125);
+});
+
+test("slideshow control estimates use the same dimensions as scroll-mode controls", () => {
+  assert.equal(estimateItemHeight({ type: "button" }, 78, ALL_LANGUAGES, 1024), 168);
+  assert.equal(estimateItemHeight({ type: "button", isHyperlink: true }, 78, ALL_LANGUAGES, 1024), 86);
+  assert.equal(estimateItemHeight({ type: "gospelRiteToggle" }, 78, ALL_LANGUAGES, 1024), 88);
 });
 
 test("explicit paragraph breaks survive measurement, joining, and page splitting", () => {
