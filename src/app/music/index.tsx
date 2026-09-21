@@ -8,6 +8,7 @@ import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAware
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicArtistArtwork from '@/components/music/MusicArtistArtwork';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -75,7 +76,7 @@ export default function MusicHomeScreen() {
               <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                 {data.artists.map((artist) => (
                   <Pressable key={artist.id} style={styles.artistCard} onPress={() => router.push(`/music/artist/${artist.id}`)}>
-                    <MusicArtwork asset={artist.profileImageAsset} size={116} rounded label={artist.displayName} />
+                    <MusicArtistArtwork asset={artist.profileImageAsset} size={116} label={artist.displayName} />
                     <Text numberOfLines={1} style={[styles.artistName, isArabic && styles.arabic]}>{artist.displayName}</Text>
                   </Pressable>
                 ))}
