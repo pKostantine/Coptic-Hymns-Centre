@@ -3,6 +3,10 @@ name: Verify CHC
 on:
   pull_request:
     branches: [master]
+  push:
+    branches:
+      - master
+      - "fix/**"
   workflow_dispatch:
 
 permissions:
