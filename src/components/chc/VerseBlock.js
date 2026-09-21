@@ -81,7 +81,9 @@ export default function VerseBlock({
       : theme.colors.rowBlue;
   const hasSeasonalPrefixLine = hasVisibleSeasonalPrefixLine(verse);
   const bodyFontStyle = isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal";
-  const bodyFontWeight = isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400";
+  // Scroll mode does not change body weight for reading references or refrains;
+  // only the inline Bible number itself is bold. Keep slideshow identical.
+  const bodyFontWeight = "400";
   // "Invincible Coptic" only means "this Coptic must always render, even if
   // the language toggle or a translation is missing" -- it does NOT mean the
   // line structurally has no English/Arabic (some DB rows tagged this way do
@@ -136,7 +138,8 @@ export default function VerseBlock({
         ? formatArabicNumbers(verse.seasonalHoosVersePrefix)
         : "",
       fontSize: getSlideshowLanguageFontSize("arabic", { verse }, fontSize),
-      fontFamily: "Arial",
+      // Scroll mode intentionally renders Arabic body text in Georgia.
+      fontFamily: "Georgia",
       lineHeight: getSlideshowLanguageLineHeight("arabic", { verse }, fontSize),
       styles: [styles.arabic],
       textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
@@ -362,7 +365,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         fontWeight={fontWeight}
         width={columnWidth}
         rtl={language.key === "arabic"}
-        firstWordStyle={bibleVerseNumber ? { color: COLORS.gold } : null}
+        firstWordStyle={bibleVerseNumber ? { color: COLORS.gold, fontWeight: "700" } : null}
         forceLines={forceLines}
         minWordsToJustify={minWordsToJustify}
         selectable={selectableText}
@@ -425,7 +428,7 @@ function renderTextWithBibleVerseNumber(text, bibleVerseNumber) {
 
   return (
     <>
-      <Text style={{ color: COLORS.gold }}>{bibleVerseNumber} </Text>
+      <Text style={{ color: COLORS.gold, fontWeight: "700" }}>{bibleVerseNumber} </Text>
       {content}
     </>
   );
@@ -643,7 +646,7 @@ const EASTERN_ARABIC_DIGITS = {
 
 const styles = StyleSheet.create({
   arabic: {
-    fontFamily: "Arial",
+    fontFamily: "Georgia",
     writingDirection: "rtl",
   },
   cell: {
