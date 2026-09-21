@@ -2292,6 +2292,24 @@ The infrastructure is intentionally credential-agnostic in source control. Befor
 
 Until the Worker secrets and platform credentials above exist, database events and application registration code are ready but production push delivery should be treated as **not activated**.
 
+## Completion verification — 2026-09-21
+
+Merged production branches:
+
+- CHC PR #47 → `master`
+- CHC Artists PR #16 → `main`
+- CHC Admin PR #7 → `main`
+
+Verification completed:
+
+- live Supabase notification tables and delivery RPCs exist
+- transactional notification enqueue smoke test passed and was rolled back
+- CHC Admin CI passed `npm install`, TypeScript typecheck, and Expo web export with the notification integration
+- CHC and CHC Artists notification changes are merged; those repositories do not currently expose equivalent PR CI checks
+- the Cloudflare notification-dispatcher source and Wrangler configuration are merged into CHC
+
+Deployment note: the notification dispatcher Worker still requires the Cloudflare account credentials and notification secrets listed above. Those credentials are intentionally not committed to GitHub and are not available through the connected tools in this ChatGPT session, so source integration is complete but live Worker deployment cannot be truthfully marked complete from this session.
+
 ## Notification categories currently wired
 
 CHC:
