@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import NotificationBootstrap from '@/components/NotificationBootstrap';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
@@ -84,6 +85,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
+        <NotificationBootstrap />
         <ReadingPreferencesProvider>
           <CalendarProvider>
             <MusicPlayerProvider>
