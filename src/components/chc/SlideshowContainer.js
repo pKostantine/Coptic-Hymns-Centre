@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { COLORS, SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
+import { DOCUMENT_CONTROL_GEOMETRY } from "./documentVisualMetrics.js";
 import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
@@ -894,8 +895,8 @@ const SlideItem = memo(function SlideItem({
               styles.gospelRiteToggleText,
               {
                 color: copticGospelRite ? COLORS.black : theme.colors.text,
-                fontSize: chrome.buttonFontSize,
-                lineHeight: chrome.buttonLineHeight,
+                fontSize: chrome.titleFontSize,
+                lineHeight: chrome.titleLineHeight,
               },
             ]}
           >
@@ -1480,28 +1481,34 @@ const styles = StyleSheet.create({
   openButtonRow: {
     alignItems: "center",
     flexShrink: 0,
-    paddingVertical: SPACING.md,
   },
   openButton: {
     alignItems: "center",
     backgroundColor: COLORS.subdocSoft,
     borderColor: COLORS.subdocLine,
-    borderRadius: 8,
+    borderRadius: DOCUMENT_CONTROL_GEOMETRY.subdocument.borderRadius,
     borderWidth: 1,
-    gap: SPACING.xs,
+    gap: DOCUMENT_CONTROL_GEOMETRY.subdocument.gap,
     justifyContent: "center",
-    maxWidth: 520,
-    minHeight: 96,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    width: "84%",
+    maxWidth: DOCUMENT_CONTROL_GEOMETRY.subdocument.maxWidth,
+    minHeight: DOCUMENT_CONTROL_GEOMETRY.subdocument.minHeight,
+    paddingHorizontal: DOCUMENT_CONTROL_GEOMETRY.subdocument.paddingHorizontal,
+    paddingVertical: DOCUMENT_CONTROL_GEOMETRY.subdocument.paddingVertical,
+    width: `${DOCUMENT_CONTROL_GEOMETRY.subdocument.widthPercent}%`,
   },
   // Shorter and green rather than tall and gold: a Hyperlink is a transition
   // out of this service, not a document to open on top of it.
   hyperlinkButton: {
     backgroundColor: COLORS.linkSoft,
     borderColor: COLORS.linkLine,
-    minHeight: 72,
+    borderRadius: DOCUMENT_CONTROL_GEOMETRY.hyperlink.borderRadius,
+    flexDirection: "row",
+    gap: DOCUMENT_CONTROL_GEOMETRY.hyperlink.gap,
+    maxWidth: DOCUMENT_CONTROL_GEOMETRY.hyperlink.maxWidth,
+    minHeight: DOCUMENT_CONTROL_GEOMETRY.hyperlink.minHeight,
+    paddingHorizontal: DOCUMENT_CONTROL_GEOMETRY.hyperlink.paddingHorizontal,
+    paddingVertical: DOCUMENT_CONTROL_GEOMETRY.hyperlink.paddingVertical,
+    width: `${DOCUMENT_CONTROL_GEOMETRY.hyperlink.widthPercent}%`,
   },
   hyperlinkArrow: {
     alignItems: "center",
@@ -1510,7 +1517,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     height: 28,
     justifyContent: "center",
-    marginTop: SPACING.xs,
     width: 28,
   },
   hyperlinkArrowGlyph: {
@@ -1534,18 +1540,18 @@ const styles = StyleSheet.create({
   gospelRiteToggleRow: {
     alignItems: "center",
     flexShrink: 0,
-    paddingVertical: SPACING.sm,
+    marginBottom: DOCUMENT_CONTROL_GEOMETRY.gospelRite.marginBottom,
   },
   gospelRiteToggle: {
     alignItems: "center",
     backgroundColor: COLORS.surface,
     borderColor: COLORS.gold,
-    borderRadius: 999,
+    borderRadius: DOCUMENT_CONTROL_GEOMETRY.gospelRite.borderRadius,
     borderWidth: 1,
     flexDirection: "row",
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
+    gap: DOCUMENT_CONTROL_GEOMETRY.gospelRite.gap,
+    paddingHorizontal: DOCUMENT_CONTROL_GEOMETRY.gospelRite.paddingHorizontal,
+    paddingVertical: DOCUMENT_CONTROL_GEOMETRY.gospelRite.paddingVertical,
   },
   gospelRiteToggleOn: {
     backgroundColor: COLORS.gold,
@@ -1553,9 +1559,9 @@ const styles = StyleSheet.create({
   gospelRiteToggleDot: {
     backgroundColor: COLORS.white,
     borderRadius: 999,
-    height: 10,
+    height: DOCUMENT_CONTROL_GEOMETRY.gospelRite.dotSize,
     opacity: 0.4,
-    width: 10,
+    width: DOCUMENT_CONTROL_GEOMETRY.gospelRite.dotSize,
   },
   gospelRiteToggleDotOn: {
     backgroundColor: COLORS.black,
