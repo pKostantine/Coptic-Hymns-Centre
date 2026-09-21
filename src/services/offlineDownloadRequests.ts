@@ -21,6 +21,7 @@ import type {
   OfflineEntitySnapshot,
 } from '@/types/offlineDownloads';
 import type { PlaybackEntityKind } from '@/types/playback';
+import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 
 type DownloadableAsset = MusicConsumerAsset | LearningMediaAsset;
 type LearningDownloadableLesson = Pick<LearningLesson, 'id' | 'mediaType' | 'mediaAsset'>;
@@ -81,7 +82,7 @@ function artworkResource(asset: DownloadableAsset | null | undefined): OfflineDo
   };
 }
 
-function compactResources(resources: Array<OfflineDownloadResource | null>): OfflineDownloadResource[] {
+function compactResources(resources: (OfflineDownloadResource | null)[]): OfflineDownloadResource[] {
   const seen = new Set<string>();
   return resources.flatMap((resource) => {
     if (!resource || seen.has(resource.fileKey)) return [];
@@ -302,7 +303,7 @@ export function learningLessonSetDownloadRequest(lessonSet: LearningLessonSetDet
 }
 
 export function learningPlaylistDownloadRequest(playlist: LearningPlaylistDetail, locale: string): OfflineDownloadRequest {
-  const resources: Array<OfflineDownloadResource | null> = [];
+  const resources: (OfflineDownloadResource | null)[] = [];
   const snapshots: OfflineEntitySnapshot[] = [snapshot('learning_playlist', playlist.id, locale, playlist)];
 
   for (const item of playlist.items) {
