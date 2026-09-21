@@ -1,4 +1,5 @@
 import { COLORS, SPACING } from '../../constants/theme';
+import { DOCUMENT_CONTROL_GEOMETRY, getDocumentVisualMetrics } from './documentVisualMetrics.js';
 import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 
@@ -155,14 +156,16 @@ export function buildDocumentHtml(
     bottomContentInset?: number;
   },
 ) {
-  const sectionTitleFontSize = Math.max(Math.round(fontSize * 0.5), 14);
-  const sectionTitleLineHeight = Math.max(Math.round(fontSize * 0.62), 18);
-  const openButtonFontSize = Math.max(Math.round(sectionTitleFontSize * 1.3), 18);
-  const openButtonLineHeight = Math.max(Math.round(sectionTitleLineHeight * 1.3), 24);
-  const copticFontSize = Math.round(fontSize * 1.25);
-  const arabicFontSize = Math.round(fontSize * 1.15);
-  const verseLineHeight = Math.round(fontSize * 1.3);
-  const arabicVerseLineHeight = Math.round(fontSize * 1.6);
+  const {
+    sectionTitleFontSize,
+    sectionTitleLineHeight,
+    openButtonFontSize,
+    openButtonLineHeight,
+    copticFontSize,
+    arabicFontSize,
+    verseLineHeight,
+    arabicVerseLineHeight,
+  } = getDocumentVisualMetrics(fontSize);
   const effectiveSelectText = Boolean(selectText);
 
   const visibleSections = sections.filter((section) => {
@@ -359,21 +362,21 @@ export function buildDocumentHtml(
         align-items: center;
         background: ${COLORS.subdocSoft};
         border: 1px solid ${COLORS.subdocLine};
-        border-radius: 12px;
+        border-radius: ${DOCUMENT_CONTROL_GEOMETRY.subdocument.borderRadius}px;
         color: ${COLORS.subdoc};
         cursor: pointer;
         display: flex;
         flex-direction: column;
-        gap: ${SPACING.sm}px;
+        gap: ${DOCUMENT_CONTROL_GEOMETRY.subdocument.gap}px;
         font-family: Georgia, serif;
         font-size: ${openButtonFontSize}px;
         font-weight: 800;
-        min-height: 168px;
+        min-height: ${DOCUMENT_CONTROL_GEOMETRY.subdocument.minHeight}px;
         justify-content: center;
         margin: 0 auto;
-        max-width: 420px;
-        padding: ${SPACING.lg}px ${SPACING.md}px;
-        width: 84%;
+        max-width: ${DOCUMENT_CONTROL_GEOMETRY.subdocument.maxWidth}px;
+        padding: ${DOCUMENT_CONTROL_GEOMETRY.subdocument.paddingVertical}px ${DOCUMENT_CONTROL_GEOMETRY.subdocument.paddingHorizontal}px;
+        width: ${DOCUMENT_CONTROL_GEOMETRY.subdocument.widthPercent}%;
       }
       .open-button .arabic {
         direction: rtl;
@@ -385,20 +388,20 @@ export function buildDocumentHtml(
         align-items: center;
         background: ${COLORS.linkSoft};
         border: 1px solid ${COLORS.linkLine};
-        border-radius: 12px;
+        border-radius: ${DOCUMENT_CONTROL_GEOMETRY.hyperlink.borderRadius}px;
         color: ${COLORS.link};
         cursor: pointer;
         display: flex;
         font-family: Georgia, serif;
         font-size: ${Math.max(Math.round(sectionTitleFontSize * 1.1), 16)}px;
         font-weight: 800;
-        gap: ${SPACING.md}px;
+        gap: ${DOCUMENT_CONTROL_GEOMETRY.hyperlink.gap}px;
         justify-content: center;
         margin: ${SPACING.md}px auto;
-        max-width: 420px;
-        min-height: 72px;
-        padding: ${SPACING.md}px ${SPACING.lg}px;
-        width: 84%;
+        max-width: ${DOCUMENT_CONTROL_GEOMETRY.hyperlink.maxWidth}px;
+        min-height: ${DOCUMENT_CONTROL_GEOMETRY.hyperlink.minHeight}px;
+        padding: ${DOCUMENT_CONTROL_GEOMETRY.hyperlink.paddingVertical}px ${DOCUMENT_CONTROL_GEOMETRY.hyperlink.paddingHorizontal}px;
+        width: ${DOCUMENT_CONTROL_GEOMETRY.hyperlink.widthPercent}%;
       }
       .hyperlink-button .hyperlink-label {
         text-align: center;
@@ -424,21 +427,22 @@ export function buildDocumentHtml(
         align-items: center;
         display: flex;
         justify-content: center;
-        margin: 0 0 ${SPACING.lg}px;
+        margin: 0 0 ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.marginBottom}px;
       }
       .gospel-rite-toggle {
         align-items: center;
         background: ${COLORS.surface};
         border: 1px solid ${COLORS.gold};
-        border-radius: 999px;
+        border-radius: ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.borderRadius}px;
         color: ${COLORS.white};
         cursor: pointer;
         display: flex;
         font-family: Georgia, serif;
         font-size: ${sectionTitleFontSize}px;
         font-weight: 700;
-        gap: ${SPACING.sm}px;
-        padding: ${SPACING.sm}px ${SPACING.lg}px;
+        gap: ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.gap}px;
+        line-height: ${sectionTitleLineHeight}px;
+        padding: ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.paddingVertical}px ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.paddingHorizontal}px;
       }
       .gospel-rite-toggle.is-on {
         background: ${COLORS.gold};
@@ -447,8 +451,8 @@ export function buildDocumentHtml(
       .gospel-rite-toggle-dot {
         background: currentColor;
         border-radius: 999px;
-        height: 10px;
-        width: 10px;
+        height: ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.dotSize}px;
+        width: ${DOCUMENT_CONTROL_GEOMETRY.gospelRite.dotSize}px;
         opacity: 0.4;
       }
       .gospel-rite-toggle.is-on .gospel-rite-toggle-dot {
