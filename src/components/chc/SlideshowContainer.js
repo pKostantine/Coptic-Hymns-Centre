@@ -932,8 +932,8 @@ const SlideItem = memo(function SlideItem({
                 styles.openButtonText,
                 {
                   color: item.isHyperlink ? COLORS.link : COLORS.subdoc,
-                  fontSize: chrome.buttonFontSize,
-                  lineHeight: chrome.buttonLineHeight,
+                  fontSize: item.isHyperlink ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
+                  lineHeight: item.isHyperlink ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
                 },
               ]}
             >
@@ -948,8 +948,8 @@ const SlideItem = memo(function SlideItem({
                 styles.openButtonTextArabic,
                 {
                   color: item.isHyperlink ? COLORS.link : COLORS.subdoc,
-                  fontSize: chrome.buttonFontSize,
-                  lineHeight: chrome.buttonLineHeight,
+                  fontSize: item.isHyperlink ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
+                  lineHeight: item.isHyperlink ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
                 },
               ]}
             >
