@@ -73,7 +73,7 @@ export default function VerseBlock({
       // two renderers must never disagree about this.
       usePeopleLineColor
       ? COLORS.peopleLight
-      : forceWhiteText || verse.forceWhiteText || isRefrain || isRecitedPrayer || isReading || (colorIndex ?? index) % 2 === 0
+      : forceWhiteText || verse.forceWhiteText || (colorIndex ?? index) % 2 === 0
       ? theme.colors.text
       : theme.colors.rowBlue;
   const hasSeasonalPrefixLine = hasVisibleSeasonalPrefixLine(verse);
