@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -39,11 +39,6 @@ export default function MusicLibraryScreen() {
   const [newPlaylistVisibility, setNewPlaylistVisibility] = useState<MusicPlaylistVisibility>('private');
   const [showPlaylistCreator, setShowPlaylistCreator] = useState(false);
   const [creating, setCreating] = useState(false);
-  const likedDownload = useMemo(
-    () => library?.authenticated ? musicLikedSongsDownloadRequest(library, locale) : null,
-    [library, locale],
-  );
-
   const loadLibrary = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -226,9 +221,9 @@ export default function MusicLibraryScreen() {
                   <Pressable style={styles.playAll} onPress={() => playLiked(0)}>
                     <Text style={styles.playAllText}>▶ {isArabic ? 'تشغيل' : 'Play'}</Text>
                   </Pressable>
-                  {likedDownload ? (
+                  {Platform.OS !== 'web' ? (
                     <MusicDownloadButton
-                      packageKey={likedDownload.packageKey}
+                      packageKey={`music_liked_songs:liked-songs:${locale}`}
                       request={prepareLikedDownload}
                       isArabic={isArabic}
                       compact
@@ -240,9 +235,7 @@ export default function MusicLibraryScreen() {
 
             {library.likedTracks.length ? (
               <View style={styles.trackList}>
-                {library.likedTracks.map((track, index) => {
-                  const trackDownload = musicTrackDownloadRequest({ track, locale });
-                  return (
+                {library.likedTracks.map((track, index) => (
                     <MusicTrackRow
                       key={track.id}
                       track={track}
@@ -255,22 +248,23 @@ export default function MusicLibraryScreen() {
                       trailing={(
                         <View style={styles.trackActions}>
                           <MusicTrackActionsMenu item={{ track, releaseId: track.releaseId }} isArabic={isArabic} />
-                          <MusicDownloadButton
-                            packageKey={trackDownload.packageKey}
-                            request={async () => {
-                              let lyrics: PublishedTrackLyricsPayload | null = null;
-                              try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
-                              return musicTrackDownloadRequest({ track, locale, lyrics });
-                            }}
-                            isArabic={isArabic}
-                            compact
-                            label=""
-                          />
+                          {Platform.OS !== 'web' ? (
+                            <MusicDownloadButton
+                              packageKey={`music_track:${track.id}:${locale}`}
+                              request={async () => {
+                                let lyrics: PublishedTrackLyricsPayload | null = null;
+                                try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
+                                return musicTrackDownloadRequest({ track, locale, lyrics });
+                              }}
+                              isArabic={isArabic}
+                              compact
+                              label=""
+                            />
+                          ) : null}
                         </View>
                       )}
                     />
-                  );
-                })}
+                  ))}
               </View>
             ) : (
               <EmptyCard text={isArabic ? 'ضع علامة إعجاب على ترنيمة لتظهر هنا.' : 'Like a track and it will appear here.'} />
