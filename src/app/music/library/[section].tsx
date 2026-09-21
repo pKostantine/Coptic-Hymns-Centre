@@ -110,6 +110,12 @@ export default function MusicLibraryFolderScreen() {
     coverAsset: release?.coverAsset ?? null,
   }));
 
+  const likedQueue = likedTracks.map((track) => ({
+    track,
+    releaseId: track.releaseId,
+    coverAsset: track.releaseCoverAsset ?? null,
+  }));
+
   const titles: Record<LibrarySection, { en: string; ar: string; searchEn: string; searchAr: string }> = {
     likes: { en: 'Liked tracks', ar: 'الترانيم المعجبة', searchEn: 'Search liked tracks', searchAr: 'ابحث في الترانيم المعجبة' },
     playlists: { en: 'Playlists', ar: 'قوائم التشغيل', searchEn: 'Search playlists', searchAr: 'ابحث في قوائم التشغيل' },
@@ -192,11 +198,12 @@ export default function MusicLibraryFolderScreen() {
               track={track}
               index={index}
               active={currentItem?.track.id === track.id}
-              onPress={() => playQueue(likedTracks.map((item) => ({ track: item, releaseId: item.releaseId })), index)}
+              artwork={<MusicArtwork asset={track.releaseCoverAsset} size={48} radius={8} label={track.title} />}
+              onPress={() => playQueue(likedQueue, index)}
               showLikeButton
               liked
               onToggleLike={() => void unlikeTrack(track.id)}
-              trailing={<MusicTrackActionsMenu item={{ track, releaseId: track.releaseId }} isArabic={isArabic} />}
+              trailing={<MusicTrackActionsMenu item={{ track, releaseId: track.releaseId, coverAsset: track.releaseCoverAsset }} isArabic={isArabic} />}
             />
           ))}
         </View>

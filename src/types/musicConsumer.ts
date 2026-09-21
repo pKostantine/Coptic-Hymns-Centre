@@ -42,6 +42,8 @@ export interface MusicConsumerTrack {
   discNumber?: number;
   trackNumber?: number;
   releaseId?: string | null;
+  /** Cover artwork for the published release selected by `releaseId`. */
+  releaseCoverAsset?: MusicConsumerAsset | null;
   mediaAsset: MusicConsumerAsset;
   artists: MusicConsumerTrackArtist[];
 }
