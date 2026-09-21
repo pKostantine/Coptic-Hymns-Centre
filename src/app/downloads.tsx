@@ -1,7 +1,7 @@
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/chc/ui/AppHeader'; import ToggleRow from '@/components/chc/ui/ToggleRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme'; import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -10,6 +10,11 @@ import type { OfflineDownloadProgress, OfflineStorageSummary } from '@/types/off
 const EMPTY: OfflineStorageSummary = { packageCount: 0, completeCount: 0, failedCount: 0, totalBytes: 0, musicBytes: 0, learningBytes: 0 };
 function bytes(value: number): string { if (value < 1024) return `${value} B`; if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`; if (value < 1024 ** 3) return `${(value / 1024 ** 2).toFixed(1)} MB`; return `${(value / 1024 ** 3).toFixed(2)} GB`; }
 export default function DownloadsScreen() {
+  if (Platform.OS === 'web') return <Redirect href="/account" />;
+  return <NativeDownloadsScreen />;
+}
+
+function NativeDownloadsScreen() {
   const router = useRouter(); const { preferences: reading } = useReadingPreferences(); const isArabic = reading.appLanguage === 'ar'; const revision = useSyncExternalStore(downloadManager.subscribe, downloadManager.getRevision, downloadManager.getRevision);
   const [summary, setSummary] = useState<OfflineStorageSummary>(EMPTY); const [items, setItems] = useState<OfflineDownloadProgress[]>([]); const [prefs, setPrefs] = useState<DownloadPreferences>({ wifiOnly: false, allowCellular: true, allowVideoOnCellular: false }); const [busy, setBusy] = useState(false);
   useEffect(() => { let active = true; void Promise.all([downloadManager.getStorageSummary(), downloadManager.listDownloads(), getDownloadPreferences()]).then(([nextSummary, nextItems, nextPrefs]) => { if (!active) return; setSummary(nextSummary); setItems(nextItems); setPrefs(nextPrefs); }); return () => { active = false; }; }, [revision]);
