@@ -55,4 +55,7 @@ test('Bible slideshow emits valid presentation JavaScript and max-size safeguard
   assert.match(html, /document\.fonts\.ready/);
   assert.match(html, /PageDown/);
   assert.match(html, /suppressClickUntil/);
+  assert.match(html, /\.verse-number\s*\{[\s\S]*font-weight:\s*700;/);
+  assert.match(html, /padding: calc\(clamp\(8px, 3vh, 24px\) \+ env\(safe-area-inset-top\)\) 14px/);
+  assert.doesNotMatch(html, /\.slide-page \.verse-row\s*\{\s*border-bottom:\s*0;/);
 });
