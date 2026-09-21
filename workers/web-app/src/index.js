@@ -368,7 +368,12 @@ export default {
       preview = await loadPreview(target, previewLocale(url));
     } catch (error) {
       if (target.dedicated) return previewFailureResponse(error);
-      return env.ASSETS.fetch(request);
+      // A normal app route must still boot the Expo SPA even when there is no
+      // public share preview. This is expected for private playlists: the
+      // signed-in app can load them, but the anonymous preview RPC returns
+      // null. Falling back to a raw asset lookup here turns a valid private
+      // route into a 404/blank screen instead of serving the app shell.
+      return getAppShell(request, env);
     }
 
     const entity = entityMetadata(url, target, preview);
