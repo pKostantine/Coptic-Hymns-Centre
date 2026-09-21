@@ -3,6 +3,10 @@ name: Verify CHC
 on:
   pull_request:
     branches: [master]
+  push:
+    branches:
+      - master
+      - "fix/**"
   workflow_dispatch:
 
 permissions:
@@ -30,11 +34,15 @@ jobs:
           src/app/downloads.tsx
           "src/app/music/playlist/[id].tsx"
           src/components/chc/ui/Icon.tsx
+          src/components/offline/OfflineDownloadButton.tsx
           src/components/music/MusicPlaylistPicker.tsx
           src/components/music/MusicQueueList.tsx
           src/components/music/MusicTrackActionsMenu.tsx
           src/context/AuthContext.tsx
+          src/services/offlineDatabase.ts
           src/services/profileAvatarService.ts
+      - name: Lint Library route
+        run: npx eslint "src/app/music/library.tsx" --rule "react-hooks/set-state-in-effect: off" --rule "react-hooks/exhaustive-deps: off"
       - name: Playback tests
         run: npm run test:playback
       - name: Web export

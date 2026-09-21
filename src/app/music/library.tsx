@@ -1,7 +1,7 @@
-import { useRouter } from 'expo-router';
+import { type ErrorBoundaryProps, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -24,6 +24,32 @@ import {
 import type { MusicLibraryPayload, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 import type { MusicPlaylistVisibility } from '@/types/mediaPlatform';
 
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const router = useRouter();
+
+  return (
+    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+      <AppHeader
+        title={{ english: 'Your Library', arabic: 'مكتبتك' }}
+        visibleLanguages={{ english: true, arabic: false }}
+      />
+      <View style={styles.crashCard}>
+        <Text style={styles.crashTitle}>Library could not be displayed</Text>
+        <Text selectable style={styles.crashBody}>{error.message}</Text>
+        <View style={styles.crashActions}>
+          <Pressable style={styles.accountButton} onPress={() => void retry()}>
+            <Text style={styles.accountButtonText}>Try again</Text>
+          </Pressable>
+          <Pressable style={styles.crashSecondaryButton} onPress={() => router.replace('/music')}>
+            <Text style={styles.crashSecondaryText}>Back to Music</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
 export default function MusicLibraryScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -39,11 +65,6 @@ export default function MusicLibraryScreen() {
   const [newPlaylistVisibility, setNewPlaylistVisibility] = useState<MusicPlaylistVisibility>('private');
   const [showPlaylistCreator, setShowPlaylistCreator] = useState(false);
   const [creating, setCreating] = useState(false);
-  const likedDownload = useMemo(
-    () => library?.authenticated ? musicLikedSongsDownloadRequest(library, locale) : null,
-    [library, locale],
-  );
-
   const loadLibrary = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -226,9 +247,9 @@ export default function MusicLibraryScreen() {
                   <Pressable style={styles.playAll} onPress={() => playLiked(0)}>
                     <Text style={styles.playAllText}>▶ {isArabic ? 'تشغيل' : 'Play'}</Text>
                   </Pressable>
-                  {likedDownload ? (
+                  {Platform.OS !== 'web' ? (
                     <MusicDownloadButton
-                      packageKey={likedDownload.packageKey}
+                      packageKey={`music_liked_songs:liked-songs:${locale}`}
                       request={prepareLikedDownload}
                       isArabic={isArabic}
                       compact
@@ -240,9 +261,7 @@ export default function MusicLibraryScreen() {
 
             {library.likedTracks.length ? (
               <View style={styles.trackList}>
-                {library.likedTracks.map((track, index) => {
-                  const trackDownload = musicTrackDownloadRequest({ track, locale });
-                  return (
+                {library.likedTracks.map((track, index) => (
                     <MusicTrackRow
                       key={track.id}
                       track={track}
@@ -255,22 +274,23 @@ export default function MusicLibraryScreen() {
                       trailing={(
                         <View style={styles.trackActions}>
                           <MusicTrackActionsMenu item={{ track, releaseId: track.releaseId }} isArabic={isArabic} />
-                          <MusicDownloadButton
-                            packageKey={trackDownload.packageKey}
-                            request={async () => {
-                              let lyrics: PublishedTrackLyricsPayload | null = null;
-                              try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
-                              return musicTrackDownloadRequest({ track, locale, lyrics });
-                            }}
-                            isArabic={isArabic}
-                            compact
-                            label=""
-                          />
+                          {Platform.OS !== 'web' ? (
+                            <MusicDownloadButton
+                              packageKey={`music_track:${track.id}:${locale}`}
+                              request={async () => {
+                                let lyrics: PublishedTrackLyricsPayload | null = null;
+                                try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
+                                return musicTrackDownloadRequest({ track, locale, lyrics });
+                              }}
+                              isArabic={isArabic}
+                              compact
+                              label=""
+                            />
+                          ) : null}
                         </View>
                       )}
                     />
-                  );
-                })}
+                  ))}
               </View>
             ) : (
               <EmptyCard text={isArabic ? 'ضع علامة إعجاب على ترنيمة لتظهر هنا.' : 'Like a track and it will appear here.'} />
@@ -340,6 +360,12 @@ const styles = StyleSheet.create({
   content: { padding: SPACING.md, paddingBottom: SPACING.xl, gap: SPACING.md },
   loader: { marginVertical: SPACING.xl },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
+  crashCard: { margin: SPACING.md, padding: SPACING.lg, gap: SPACING.md, borderRadius: RADII.lg, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.navyDark },
+  crashTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
+  crashBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
+  crashActions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  crashSecondaryButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 42, paddingHorizontal: SPACING.md },
+  crashSecondaryText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
   authCard: { padding: SPACING.lg, borderRadius: RADII.lg, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.navyDark },
   authTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   authBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, marginTop: SPACING.sm },

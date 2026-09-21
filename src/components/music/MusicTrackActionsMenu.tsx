@@ -68,10 +68,11 @@ export default function MusicTrackActionsMenu({
         <Icon name="ellipsis-horizontal" size={Math.round(size * 0.5)} color={COLORS.white} />
       </Pressable>
 
+      {visible ? (
       <Modal
         animationType="fade"
         transparent
-        visible={visible}
+        visible
         onRequestClose={close}
       >
         <View style={styles.modalRoot}>
@@ -93,7 +94,7 @@ export default function MusicTrackActionsMenu({
                 trackId={item.track.id}
                 label={isArabic ? 'إضافة إلى قائمة تشغيل' : 'Add to playlist'}
                 menuRow
-                onOpen={close}
+                onDismiss={close}
               />
               <ActionRow
                 icon="play-skip-forward"
@@ -109,6 +110,7 @@ export default function MusicTrackActionsMenu({
           </View>
         </View>
       </Modal>
+      ) : null}
     </>
   );
 }

@@ -17,6 +17,7 @@ export default function MusicPlaylistPicker({
   menuRow = false,
   round = false,
   onOpen,
+  onDismiss,
 }: {
   trackId: string;
   compact?: boolean;
@@ -24,6 +25,7 @@ export default function MusicPlaylistPicker({
   menuRow?: boolean;
   round?: boolean;
   onOpen?: () => void;
+  onDismiss?: () => void;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -39,6 +41,11 @@ export default function MusicPlaylistPicker({
   const [newDescription, setNewDescription] = useState('');
   const [newVisibility, setNewVisibility] = useState<MusicPlaylistVisibility>('private');
   const [error, setError] = useState<string | null>(null);
+
+  const dismiss = () => {
+    setVisible(false);
+    onDismiss?.();
+  };
 
   const open = async () => {
     if (!user) {
@@ -109,16 +116,17 @@ export default function MusicPlaylistPicker({
         {menuRow || (!compact && !round) ? <Text style={[styles.triggerText, menuRow && styles.menuTriggerText]}>{label}</Text> : null}
       </Pressable>
 
-      <Modal animationType="slide" transparent visible={visible} onRequestClose={() => setVisible(false)}>
+      {visible ? (
+      <Modal animationType="slide" transparent visible onRequestClose={dismiss}>
         <View style={styles.modalRoot}>
-          <Pressable accessibilityLabel="Close playlist picker" style={styles.backdrop} onPress={() => setVisible(false)} />
+          <Pressable accessibilityLabel="Close playlist picker" style={styles.backdrop} onPress={dismiss} />
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
               <View>
                 <Text style={styles.title}>Add to playlist</Text>
                 <Text style={styles.subtitle}>Choose one or create a new playlist.</Text>
               </View>
-              <Pressable accessibilityLabel="Close" style={styles.closeButton} onPress={() => setVisible(false)}>
+              <Pressable accessibilityLabel="Close" style={styles.closeButton} onPress={dismiss}>
                 <Icon name="close" size={22} color={COLORS.white} />
               </Pressable>
             </View>
@@ -164,6 +172,7 @@ export default function MusicPlaylistPicker({
           </View>
         </View>
       </Modal>
+      ) : null}
     </>
   );
 }
