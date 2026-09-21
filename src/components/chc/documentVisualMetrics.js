@@ -11,11 +11,15 @@ export function getDocumentVisualMetrics(fontSize = 18) {
   const sectionTitleLineHeight = Math.max(Math.round(safeFontSize * 0.62), 18);
   const openButtonFontSize = Math.max(Math.round(sectionTitleFontSize * 1.3), 18);
   const openButtonLineHeight = Math.max(Math.round(sectionTitleLineHeight * 1.3), 24);
+  const hyperlinkFontSize = Math.max(Math.round(sectionTitleFontSize * 1.1), 16);
+  const hyperlinkLineHeight = Math.max(Math.round(hyperlinkFontSize * 1.25), 20);
 
   return {
     arabicFontSize: Math.round(safeFontSize * 1.15),
     arabicVerseLineHeight: Math.round(safeFontSize * 1.6),
     copticFontSize: Math.round(safeFontSize * 1.25),
+    hyperlinkFontSize,
+    hyperlinkLineHeight,
     openButtonFontSize,
     openButtonLineHeight,
     sectionTitleFontSize,
