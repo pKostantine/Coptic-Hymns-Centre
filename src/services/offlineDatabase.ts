@@ -161,6 +161,12 @@ export async function getOfflineDatabase(): Promise<SQLite.SQLiteDatabase> {
           now,
         );
         return db;
+      })
+      .catch((cause) => {
+        // Do not permanently cache a rejected database open/migration. A later
+        // screen visit or download action should be allowed to retry.
+        databasePromise = null;
+        throw cause;
       });
   }
   return databasePromise;
