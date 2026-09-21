@@ -1,3 +1,5 @@
+import { getDocumentVisualMetrics } from "./documentVisualMetrics.js";
+
 /**
  * Pure slideshow layout and pagination helpers.
  *
@@ -17,52 +19,29 @@ function clamp(value, minimum, maximum) {
 }
 
 export function getSlideshowChromeMetrics(fontSize) {
-  const safeFontSize = Math.max(Number(fontSize) || 18, 1);
-  const titleFontSize = clamp(Math.round(safeFontSize * 0.5), 14, 36);
-  const buttonFontSize = clamp(Math.round(safeFontSize * 0.65), 18, 38);
-  // Scroll mode renders speaker labels inside the normal language paragraph,
-  // so the label inherits that language's full font size. Slideshow must use
-  // the same metric instead of shrinking the speaker to a separate chrome
-  // scale.
-  const speakerFontSize = safeFontSize;
-
+  const metrics = getDocumentVisualMetrics(fontSize);
   return {
-    buttonFontSize,
-    buttonLineHeight: Math.max(Math.round(buttonFontSize * 1.25), 24),
-    speakerFontSize,
-    speakerLineHeight: Math.max(Math.round(speakerFontSize * 1.3), 18),
-    titleFontSize,
-    titleLineHeight: Math.max(Math.round(titleFontSize * 1.25), 18),
+    buttonFontSize: metrics.openButtonFontSize,
+    buttonLineHeight: metrics.openButtonLineHeight,
+    speakerFontSize: metrics.speakerFontSize,
+    speakerLineHeight: metrics.speakerLineHeight,
+    titleFontSize: metrics.sectionTitleFontSize,
+    titleLineHeight: metrics.sectionTitleLineHeight,
   };
 }
 
 export function getSlideshowLanguageFontSize(language, item = {}, fontSize = 18) {
-  if (item.verse?.type === "refrainLabel") {
-    return Math.max(Math.round(fontSize * 0.5), 11);
-  }
-
-  if (language === "coptic") {
-    return Math.round(fontSize * 1.25);
-  }
-
-  if (language === "arabic") {
-    return Math.round(fontSize * 1.15);
-  }
-
-  return fontSize;
+  const metrics = getDocumentVisualMetrics(fontSize);
+  if (language === "coptic") return metrics.copticFontSize;
+  if (language === "arabic") return metrics.arabicFontSize;
+  return metrics.verseFontSize;
 }
 
 export function getSlideshowLanguageLineHeight(language, item = {}, fontSize = 18) {
-  if (item.verse?.type === "refrainLabel") {
-    return Math.max(Math.round(fontSize * 0.7), 15);
-  }
-
-  // These are the document reader's proven metrics. In particular, Arabic
-  // needs substantially more leading for vowel marks than English/Coptic;
-  // using 1.25 * the base size clipped Arabic at the largest setting.
+  const metrics = getDocumentVisualMetrics(fontSize);
   return language === "arabic"
-    ? Math.round(fontSize * 1.6)
-    : Math.round(fontSize * 1.3);
+    ? metrics.arabicVerseLineHeight
+    : metrics.verseLineHeight;
 }
 
 export function getSeasonalPrefixLineHeight(language, item = {}, fontSize = 18) {
