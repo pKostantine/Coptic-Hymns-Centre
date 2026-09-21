@@ -1236,6 +1236,8 @@ function getEffectiveAlternatingVerseIndex(section, index) {
       verse.type !== "refrain" &&
       verse.type !== "comment" &&
       verse.type !== "silentComment" &&
+      verse.type !== "silentPrayer" &&
+      verse.type !== "readingReference" &&
       !verse.forceWhiteText &&
       // A "White"/"Blue" prayer_type forces that exact color on this one
       // verse — it never consumes a parity slot, so verses around it
@@ -1259,7 +1261,7 @@ function isPsaliLikeTwoVerseSectionTitle(title) {
 // shared resolveRubricKey so this heuristic doesn't diverge either.
 function getSpeakerRole(type, bishopPresent) {
   const resolved = resolveRubricKey(type, bishopPresent);
-  if (resolved === "priest" || resolved === "bishop" || resolved === "people" || resolved === "deacon" || resolved === "reader") {
+  if (resolved === "priest" || resolved === "bishop" || resolved === "people" || resolved === "deacon" || resolved === "reader" || resolved === "refrain") {
     return resolved === "bishop" ? "priest" : resolved;
   }
   return "";
