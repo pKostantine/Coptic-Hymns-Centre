@@ -428,7 +428,8 @@ function renderTextWithBibleVerseNumber(text, bibleVerseNumber) {
 
   return (
     <>
-      <Text style={{ color: COLORS.gold, fontWeight: "700" }}>{bibleVerseNumber} </Text>
+      <Text style={{ color: COLORS.gold, fontWeight: "700" }}>{bibleVerseNumber}</Text>
+      {"\u2005"}
       {content}
     </>
   );
