@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type ErrorBoundaryProps, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -26,6 +26,35 @@ import { goBack } from '@/utils/navigation';
 import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const router = useRouter();
+
+  return (
+    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+      <View style={styles.header}>
+        <Pressable accessibilityLabel="Back" onPress={() => router.replace('/music/library')} style={styles.backButton}>
+          <Text style={styles.backText}>‹</Text>
+        </Pressable>
+        <Text numberOfLines={1} style={styles.headerTitle}>Playlist</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+      <View style={styles.crashCard}>
+        <Text style={styles.crashTitle}>Playlist could not be displayed</Text>
+        <Text selectable style={styles.crashBody}>{error.message}</Text>
+        <View style={styles.crashActions}>
+          <Pressable style={styles.playButton} onPress={() => void retry()}>
+            <Text style={styles.playButtonText}>Try again</Text>
+          </Pressable>
+          <Pressable style={styles.actionButton} onPress={() => router.replace('/music/library')}>
+            <Text style={styles.actionButtonText}>Back to Library</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
 export default function MusicPlaylistScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -47,11 +76,6 @@ export default function MusicPlaylistScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const queue = useMemo(() => (playlist?.tracks ?? []).map((track) => ({ track, releaseId: track.releaseId, coverAsset: playlist?.coverAsset })), [playlist]);
-  const downloadRequest = useMemo(
-    () => playlist ? musicPlaylistDownloadRequest(playlist, locale) : null,
-    [locale, playlist],
-  );
-
   useEffect(() => {
     let active = true;
     musicService.getLibrary(locale)
@@ -67,6 +91,8 @@ export default function MusicPlaylistScreen() {
   useEffect(() => {
     if (!playlistId) return;
     let active = true;
+    setLoading(true);
+    setError(null);
     musicService.getPlaylist(playlistId, locale)
       .then((payload) => {
         if (!active) return;
@@ -211,9 +237,9 @@ export default function MusicPlaylistScreen() {
                 {playlist.tracks.length ? (
                   <>
                   <Pressable style={styles.playButton} onPress={() => playQueue(queue, 0)}><Text style={styles.playButtonText}>▶ {isArabic ? 'تشغيل' : 'Play'}</Text></Pressable>
-                  {downloadRequest ? (
+                  {Platform.OS !== 'web' ? (
                     <MusicDownloadButton
-                      packageKey={downloadRequest.packageKey}
+                      packageKey={`music_playlist:${playlist.id}:${locale}`}
                       request={preparePlaylistDownload}
                       isArabic={isArabic}
                     />
@@ -267,9 +293,7 @@ export default function MusicPlaylistScreen() {
           ) : null}
 
           <View style={styles.trackList}>
-            {playlist.tracks.length ? playlist.tracks.map((track, index) => {
-              const trackRequest = musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset });
-              return (
+            {playlist.tracks.length ? playlist.tracks.map((track, index) => (
                 <View key={track.id} style={styles.trackWrap}>
                   <View style={styles.trackFlex}>
                     <MusicTrackRow
@@ -283,17 +307,19 @@ export default function MusicPlaylistScreen() {
                       trailing={(
                         <View style={styles.trackActions}>
                           <MusicTrackActionsMenu item={queue[index]} isArabic={isArabic} />
-                          <MusicDownloadButton
-                            packageKey={trackRequest.packageKey}
-                            request={async () => {
-                              let lyrics: PublishedTrackLyricsPayload | null = null;
-                              try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
-                              return musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset, lyrics });
-                            }}
-                            isArabic={isArabic}
-                            compact
-                            label=""
-                          />
+                          {Platform.OS !== 'web' ? (
+                            <MusicDownloadButton
+                              packageKey={`music_track:${track.id}:${locale}`}
+                              request={async () => {
+                                let lyrics: PublishedTrackLyricsPayload | null = null;
+                                try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
+                                return musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset, lyrics });
+                              }}
+                              isArabic={isArabic}
+                              compact
+                              label=""
+                            />
+                          ) : null}
                         </View>
                       )}
                     />
@@ -312,8 +338,7 @@ export default function MusicPlaylistScreen() {
                     </View>
                   ) : null}
                 </View>
-              );
-            }) : (
+              )) : (
               <View style={styles.empty}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'هذه القائمة فارغة.' : 'This playlist is empty.'}</Text></View>
             )}
           </View>
@@ -335,6 +360,10 @@ const styles = StyleSheet.create({
   loader: { marginTop: SPACING.xl },
   center: { padding: SPACING.lg, alignItems: 'center' },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
+  crashCard: { margin: SPACING.md, padding: SPACING.lg, gap: SPACING.md, borderRadius: RADII.lg, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.navyDark },
+  crashTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
+  crashBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
+  crashActions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   content: { padding: SPACING.md, paddingBottom: SPACING.xl },
   hero: { alignItems: 'center', padding: SPACING.lg, borderRadius: RADII.lg, backgroundColor: COLORS.navyDark, borderWidth: 1, borderColor: COLORS.goldLine },
   heroText: { width: '100%', maxWidth: 680, alignItems: 'center', marginTop: SPACING.lg },
