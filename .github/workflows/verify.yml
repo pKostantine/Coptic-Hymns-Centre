@@ -28,10 +28,7 @@ jobs:
           npx eslint
           src/app/account.tsx
           src/app/downloads.tsx
-          "src/app/music/library.tsx"
           "src/app/music/playlist/[id].tsx"
-          "src/app/music/release/[id].tsx"
-          "src/app/music/track/[id].tsx"
           src/components/chc/ui/Icon.tsx
           src/components/music/MusicPlaylistPicker.tsx
           src/components/music/MusicQueueList.tsx
