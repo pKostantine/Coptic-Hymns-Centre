@@ -278,16 +278,15 @@ begin
   )
   returning id into v_notification_id;
 
-  -- Expo is the active native transport. web_push and WNS are already valid
-  -- provider values so the same queue can gain those adapters later without a
-  -- schema migration, but we do not queue undeliverable providers yet.
+  -- Native Expo Push and standards-based Web Push are active transports.
+  -- WNS remains reserved for a future fully-native Windows client.
   insert into private.notification_deliveries (notification_id, device_id, provider)
   select v_notification_id, d.id, d.provider
   from public.notification_devices d
   where d.user_id = p_user_id
     and d.app_key = p_app_key
     and d.enabled = true
-    and d.provider = 'expo'
+    and d.provider in ('expo', 'web_push')
   on conflict (notification_id, device_id) do nothing;
 
   return v_notification_id;
@@ -383,6 +382,68 @@ $$;
 revoke all on function public.claim_notification_deliveries(integer) from public, anon, authenticated;
 grant execute on function public.claim_notification_deliveries(integer) to service_role;
 
+create or replace function public.claim_web_push_deliveries(
+  p_limit integer default 100
+) returns table (
+  delivery_id uuid,
+  notification_id uuid,
+  device_id uuid,
+  subscription jsonb,
+  title text,
+  body text,
+  image_url text,
+  deep_link text,
+  payload jsonb
+)
+language plpgsql
+security definer
+set search_path = ''
+as $
+begin
+  return query
+  with picked as (
+    select d.id
+    from private.notification_deliveries d
+    where d.provider = 'web_push'
+      and d.attempt_count < d.max_attempts
+      and (
+        (d.status = 'queued' and d.available_at <= now())
+        or (d.status = 'processing' and d.claimed_at < now() - interval '10 minutes')
+      )
+    order by d.available_at, d.created_at
+    for update skip locked
+    limit greatest(1, least(coalesce(p_limit, 100), 100))
+  ),
+  claimed as (
+    update private.notification_deliveries d
+    set status = 'processing',
+        claimed_at = now(),
+        attempt_count = d.attempt_count + 1,
+        updated_at = now()
+    from picked p
+    where d.id = p.id
+    returning d.id, d.notification_id, d.device_id
+  )
+  select
+    c.id,
+    c.notification_id,
+    c.device_id,
+    dev.provider_data || jsonb_build_object('endpoint', dev.push_token),
+    n.title,
+    n.body,
+    n.image_url,
+    n.deep_link,
+    n.payload || jsonb_build_object('notification_id', n.id::text, 'deep_link', n.deep_link)
+  from claimed c
+  join public.notification_devices dev on dev.id = c.device_id
+  join public.notifications n on n.id = c.notification_id
+  where dev.enabled = true;
+end;
+$;
+
+revoke all on function public.claim_web_push_deliveries(integer) from public, anon, authenticated;
+grant execute on function public.claim_web_push_deliveries(integer) to service_role;
+
 create or replace function public.complete_notification_delivery(
   p_delivery_id uuid,
   p_result text,
@@ -404,6 +465,10 @@ begin
     update private.notification_deliveries
     set status = 'accepted', provider_ticket_id = p_ticket_id,
         accepted_at = now(), last_error = null, updated_at = now()
+    where id = p_delivery_id;
+  elsif p_result = 'delivered' then
+    update private.notification_deliveries
+    set status = 'delivered', delivered_at = now(), last_error = null, updated_at = now()
     where id = p_delivery_id;
   elsif p_result = 'retry' then
     update private.notification_deliveries
