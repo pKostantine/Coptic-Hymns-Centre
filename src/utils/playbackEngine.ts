@@ -92,6 +92,27 @@ export function moveQueueEntry<T>(
   return { queue, currentIndex: nextCurrent };
 }
 
+/**
+ * Inserts a queue entry without changing which existing entry is playing.
+ * "next" places it directly after the current entry; "end" appends it.
+ */
+export function insertQueueEntry<T>(
+  entries: T[],
+  currentIndex: number,
+  item: T,
+  position: 'next' | 'end',
+): { queue: T[]; currentIndex: number } {
+  const safeIndex = clampPlaybackIndex(entries.length, currentIndex);
+  if (safeIndex < 0) return { queue: [item], currentIndex: 0 };
+
+  const insertAt = position === 'next'
+    ? Math.min(entries.length, safeIndex + 1)
+    : entries.length;
+  const queue = [...entries];
+  queue.splice(insertAt, 0, item);
+  return { queue, currentIndex: safeIndex };
+}
+
 /** Drops everything except the entry that is playing now. */
 export function keepOnlyCurrentEntry<T>(entries: T[], currentIndex: number): { queue: T[]; currentIndex: number } {
   const safeIndex = clampPlaybackIndex(entries.length, currentIndex);
