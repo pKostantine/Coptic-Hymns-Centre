@@ -152,6 +152,50 @@ test('public playlist share routes use the visibility-safe playlist preview RPC'
   assert.match(html, new RegExp(`window\\.location\\.replace\\("https://chc\\.pierrek\\.ca/music/playlist/${PLAYLIST_ID}"\\)`));
 });
 
+test('private playlist direct route falls back to the SPA shell when no public preview exists', async () => {
+  globalThis.fetch = async (input, init) => {
+    assert.equal(String(input), 'https://wtuujmeinzqfikvuofmh.supabase.co/rest/v1/rpc/get_music_playlist_share_preview');
+    assert.deepEqual(JSON.parse(init?.body), { p_playlist_id: PLAYLIST_ID });
+    return new Response('null', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  const requests = [];
+  const env = {
+    ASSETS: {
+      async fetch(request) {
+        const pathname = new URL(request.url).pathname;
+        requests.push(pathname);
+        if (pathname === '/index.html') {
+          return new Response(APP_SHELL, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html; charset=UTF-8' },
+          });
+        }
+        return new Response('not found', {
+          status: 404,
+          headers: { 'Content-Type': 'text/plain; charset=UTF-8' },
+        });
+      },
+    },
+  };
+
+  const response = await worker.fetch(
+    new Request(`https://chc.pierrek.ca/music/playlist/${PLAYLIST_ID}`),
+    env,
+  );
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(requests, [
+    `/music/playlist/${PLAYLIST_ID}`,
+    '/index.html',
+  ]);
+  assert.match(html, /<div id="root"><\/div>/);
+  assert.equal(response.headers.get('x-chc-share-preview'), null);
+});
+
 test('direct entity route replaces the generic SPA Open Graph block', async () => {
   mockPreview();
   const { env, requests } = makeEnv();
