@@ -80,7 +80,8 @@ function NativeOfflineDownloadButton({
         }
       } catch {
         // Offline storage is optional UI. A damaged/unavailable local database
-        // must never take down Music, Learn & Study, or Library rendering.
+        // must never take down Music, Learn & Study, or an authenticated
+        // Library screen while download state is being restored.
         if (!active) return;
         setProgress(null);
         setUpdateAvailable(false);
