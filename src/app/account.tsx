@@ -229,7 +229,9 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
   const isArabic = preferences.appLanguage === 'ar';
   const user = auth.user!;
   const currentName = typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : '';
-  const avatarUrl = typeof user.user_metadata.avatar_url === 'string' ? user.user_metadata.avatar_url : null;
+  const customAvatarUrl = typeof user.user_metadata.chc_avatar_url === 'string' ? user.user_metadata.chc_avatar_url : null;
+  const providerAvatarUrl = typeof user.user_metadata.avatar_url === 'string' ? user.user_metadata.avatar_url : null;
+  const avatarUrl = customAvatarUrl || providerAvatarUrl;
   const [displayName, setDisplayName] = useState(currentName);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -359,7 +361,7 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
             {avatarBusy ? <ActivityIndicator size="small" color={COLORS.goldBright} /> : <Icon name="person-circle-outline" size={18} color={COLORS.goldBright} />}
             <Text style={styles.photoButtonText}>{avatarUrl ? 'Change photo' : 'Add photo'}</Text>
           </Pressable>
-          {avatarUrl ? (
+          {customAvatarUrl ? (
             <Pressable disabled={avatarBusy} style={styles.removePhotoButton} onPress={() => void clearPhoto()}>
               <Text style={styles.removePhotoText}>Remove</Text>
             </Pressable>
