@@ -169,17 +169,47 @@ as $$
 declare
   v_user_id uuid := auth.uid();
   v_id uuid;
+  v_web_host text;
 begin
   if v_user_id is null then raise exception 'authentication_required'; end if;
+
   if p_app_key not in ('chc','chc_artists','chc_admin')
      or p_platform not in ('ios','android','web','windows')
      or p_provider not in ('expo','web_push','wns')
-     or nullif(btrim(p_push_token), '') is null then
+     or nullif(btrim(p_push_token), '') is null
+     or length(p_push_token) > 4096
+     or pg_column_size(coalesce(p_provider_data, '{}'::jsonb)) > 16384 then
     raise exception 'invalid_notification_device';
   end if;
 
-  -- A physical app installation can change accounts. Remove a stale token row
-  -- first so a signed-out account can never keep receiving the new user's pushes.
+  -- Web Push endpoints are capability URLs and become Worker fetch targets.
+  -- Restrict them to known browser push services so a forged registration
+  -- cannot turn the notification Worker into an arbitrary outbound proxy.
+  if p_provider = 'web_push' then
+    if p_app_key <> 'chc' or p_platform not in ('web','windows') then
+      raise exception 'invalid_web_push_app';
+    end if;
+
+    v_web_host := lower(substring(p_push_token from '^https://([^/:?#]+)'));
+    if v_web_host is null
+       or not (
+         v_web_host = 'fcm.googleapis.com'
+         or v_web_host = 'push.services.mozilla.com'
+         or v_web_host like '%.push.services.mozilla.com'
+         or v_web_host = 'push.apple.com'
+         or v_web_host like '%.push.apple.com'
+       ) then
+      raise exception 'unsupported_web_push_endpoint';
+    end if;
+  end if;
+
+  if p_provider = 'expo' and p_platform not in ('ios','android') then
+    raise exception 'invalid_expo_push_platform';
+  end if;
+
+  -- Push endpoints/tokens are installation capabilities. If the same app
+  -- installation changes accounts, move the token rather than leaving the old
+  -- account able to receive future pushes on that installation.
   delete from public.notification_devices
   where app_key = p_app_key
     and provider = p_provider
