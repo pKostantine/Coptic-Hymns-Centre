@@ -7,6 +7,7 @@ import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAware
 import Icon from '@/components/chc/ui/Icon';
 import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicArtistArtwork from '@/components/music/MusicArtistArtwork';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -128,7 +129,7 @@ export default function MusicArtistScreen() {
       ) : (
         <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
-            <MusicArtwork asset={artist.profileImageAsset} size={168} rounded label={artist.displayName} />
+            <MusicArtistArtwork asset={artist.profileImageAsset} size={168} label={artist.displayName} />
             <Text style={styles.name}>{artist.displayName}</Text>
             {artist.biography ? <Text style={styles.bio}>{artist.biography}</Text> : null}
             <View style={styles.artistActions}>
