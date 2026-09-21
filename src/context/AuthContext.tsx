@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { disableNativeNotificationDevice } from '@/services/notificationService';
 import { supabase } from '@/utils/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -196,6 +197,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const signOut = useCallback(async () => {
+    try {
+      await disableNativeNotificationDevice();
+    } catch (error) {
+      console.warn('Unable to detach this device from CHC notifications before sign-out:', error);
+    }
     const { error } = await supabase.auth.signOut();
     authError(error, 'Unable to sign out.');
   }, []);
