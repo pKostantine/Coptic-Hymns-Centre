@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useId, useRef } from 'react';
-import { Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -33,26 +33,32 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   // their tab bar mounted underneath the screen being shown.
   const { reportTabBar } = useBottomChrome();
   const reportId = useId();
-  const shellRef = useRef<View>(null);
+  const barHeight = useRef(0);
   const focused = useRef(false);
-  const measure = useCallback(() => {
-    shellRef.current?.measureInWindow((_x, y) => {
-      if (!focused.current) return;
-      reportTabBar(reportId, Math.max(0, Dimensions.get('window').height - y));
-    });
+  const reportHeight = useCallback((height: number) => {
+    const nextHeight = Math.max(0, Math.round(height));
+    barHeight.current = nextHeight;
+    if (focused.current && nextHeight > 0) {
+      reportTabBar(reportId, nextHeight);
+    }
   }, [reportId, reportTabBar]);
 
   useFocusEffect(useCallback(() => {
     focused.current = true;
-    measure();
+    if (barHeight.current > 0) {
+      reportTabBar(reportId, barHeight.current);
+    }
     return () => {
       focused.current = false;
       reportTabBar(reportId, null);
     };
-  }, [measure, reportId, reportTabBar]));
+  }, [reportId, reportTabBar]));
 
   return (
-    <View ref={shellRef} style={styles.shell} onLayout={measure}>
+    <View
+      style={styles.shell}
+      onLayout={(event) => reportHeight(event.nativeEvent.layout.height)}
+    >
       <View style={[styles.bar, Platform.OS === 'web' && { paddingBottom: insets.bottom }]}>
       <Pressable accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
         {active === 'home' ? <View style={styles.activeIndicator} /> : null}

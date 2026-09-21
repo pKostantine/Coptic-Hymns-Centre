@@ -306,8 +306,6 @@ const styles = StyleSheet.create({
     elevation: 40,
   },
   collapsedButton: {
-    position: 'absolute',
-    right: 18,
     width: 42,
     height: 42,
     borderRadius: 21,
