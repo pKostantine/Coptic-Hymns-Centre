@@ -27,7 +27,6 @@ export default function VerseBlock({
   tableWidth,
   onLanguageLayout,
   isRecitedPrayer = false,
-  isReading = false,
   forceWhiteText = false,
   colorIndex,
   suppressSpeakerLabel = false,
