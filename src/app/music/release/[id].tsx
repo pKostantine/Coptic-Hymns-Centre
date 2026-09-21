@@ -8,7 +8,7 @@ import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
-import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
+import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -263,7 +263,7 @@ export default function MusicReleaseScreen() {
                 onToggleLike={() => void handleToggleTrackLike(track.id)}
                 trailing={(
                   <View style={styles.trackActions}>
-                    <MusicPlaylistPicker trackId={track.id} compact />
+                    <MusicTrackActionsMenu item={queue[index]} isArabic={isArabic} />
                     <MusicDownloadButton
                       packageKey={trackRequest.packageKey}
                       request={async () => {
