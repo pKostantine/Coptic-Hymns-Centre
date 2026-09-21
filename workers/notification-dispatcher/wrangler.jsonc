@@ -1,0 +1,15 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "chc-notification-dispatcher",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-21",
+  "vars": {
+    "SUPABASE_URL": "https://wtuujmeinzqfikvuofmh.supabase.co"
+  },
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

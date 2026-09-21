@@ -2096,3 +2096,218 @@ The implementation should prioritize:
 - polished consumer UX
 - reuse of existing CHC systems
 - future compatibility with Coptic/French localization and deeper Read / Listen / Learn integration
+
+---
+
+# Cross-App Notification Infrastructure — 2026-09-21
+
+Status: **infrastructure implemented; production credentials and store provisioning still required before live delivery can be enabled.**
+
+Notifications are a shared CHC platform concern rather than separate one-off implementations inside each app. The implementation now uses one Supabase event/preferences model and one Cloudflare dispatcher, with app-specific device registrations and deep links.
+
+## Architecture
+
+```text
+Supabase domain event / service notification
+        ↓
+public.notifications
+        ↓
+private.notification_deliveries
+        ↓
+Cloudflare notification dispatcher
+        ├── Expo Push → APNs / FCM → CHC, CHC Artists, CHC Admin
+        └── Web Push / VAPID → installed CHC PWA / Microsoft Store PWA
+```
+
+The app identifier is stored on every registration and notification:
+
+- `chc`
+- `chc_artists`
+- `chc_admin`
+
+A user may therefore register multiple devices and multiple CHC apps without sharing tokens between apps.
+
+## Supabase schema
+
+Migration:
+
+`supabase/migrations/20260921221500_notification_infrastructure.sql`
+
+Live database objects:
+
+- `public.notification_devices`
+  - authenticated user-owned device registrations
+  - app, platform, provider, token/subscription metadata, version, enabled state, last-seen timestamps
+  - providers currently modeled: `expo`, `web_push`, and reserved `wns`
+- `public.notification_preferences`
+  - per-user, per-app, per-category opt-in state
+  - absent preference rows mean the category is enabled by default
+- `public.notifications`
+  - user-visible notification/inbox record
+  - includes category, event type, title, body, optional image, deep link, payload, and read state
+- `private.notification_deliveries`
+  - service-role-only transport queue
+  - tracks provider, attempts, retry availability, Expo ticket IDs, receipt checks, delivery/failure state, and dead device registrations
+
+RLS is enabled on every public notification table. Users can only read or mutate their own device/preferences data, and notification records can only be read by their owner. Delivery queue operations and arbitrary notification creation are service-role only.
+
+Important RPCs:
+
+- `register_notification_device`
+- `disable_notification_device`
+- `enqueue_user_notification` — service role only
+- `claim_notification_deliveries`
+- `claim_web_push_deliveries`
+- `complete_notification_delivery`
+- `complete_notification_deliveries`
+- `claim_notification_receipts`
+- `complete_notification_receipt`
+- `complete_notification_receipts`
+
+Token reassignment is deliberately handled inside `register_notification_device`: if the same physical app installation signs into a different account, the old account's token registration is removed before the current account receives it.
+
+## Automatic event notifications
+
+Database triggers now create notifications from canonical state changes rather than requiring the clients to remember to send them.
+
+### Published music
+
+When `music.releases.publication_status` becomes `published`:
+
+- followers of the primary artist receive a CHC notification in category `followed_artists`
+- members of the owning creator account receive a CHC Artists `release_updates` notification
+
+Deep links:
+
+- CHC: `/music/release/:releaseId`
+- CHC Artists: `/release/:releaseId`
+
+### Submission workflow
+
+When `media.submissions.status` changes:
+
+- `pending_review` notifies active CHC admins using category `new_submissions`
+- `approved`, `changes_requested`, `rejected`, and `published` notify creator-account members using category `submission_updates`
+
+Deep links:
+
+- Admin: `/submission/:submissionId`
+- Artists: `/submission/:submissionId`
+
+### Processing failures
+
+When a `media.media_processing_jobs` row enters `failed`:
+
+- CHC Admin receives `processing_failures` and opens `/processing`
+- the affected creator account receives `processing_errors`
+
+Successful automatic media processing is intentionally silent so admins are alerted to exceptions instead of normal pipeline traffic.
+
+## Native app implementation
+
+`expo-notifications` is installed/configured in all three Expo applications.
+
+Each app has:
+
+- native permission/status handling
+- Android `chc-default` notification channel
+- Expo Push Token registration into Supabase
+- token-roll listener so refreshed native tokens are re-registered
+- cold-start and foreground notification-response routing
+- app-specific deep-link handling
+- device deregistration on explicit sign-out
+- shared preference/inbox service methods
+
+Files in the main CHC repository:
+
+- `src/services/notificationService.ts`
+- `src/components/NotificationBootstrap.tsx`
+
+Equivalent notification bootstrap/services are implemented in CHC Artists and CHC Admin, each using its own `app_key`.
+
+The bootstrap does **not** unexpectedly prompt for notification permission on application launch. It silently restores an already-granted registration. A settings/onboarding UI can explicitly call `syncNativeNotificationDevice({ requestPermission: true })` at the user gesture where CHC chooses to ask for permission.
+
+## CHC Web / Microsoft Store PWA path
+
+CHC web now has standards-based Web Push infrastructure:
+
+- `src/services/webPushService.ts`
+- `public/chc-notification-sw.js`
+- dependency: `@mmmike/web-push`
+
+The browser/PWA registers a service worker, creates a VAPID-bound push subscription, stores that subscription in `notification_devices` as provider `web_push`, displays pushes while CHC is closed, and routes notification clicks back into the correct CHC path.
+
+On Windows, registrations are marked with platform `windows`; other browser registrations use `web`. This supports packaging the existing CHC PWA for the Microsoft Store without creating an unrelated notification database.
+
+The web bootstrap also avoids an unsolicited permission prompt. The public VAPID key must be exposed to the CHC web build as:
+
+`EXPO_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY`
+
+The VAPID private key must never be present in the app/web bundle.
+
+## Cloudflare notification dispatcher
+
+Worker:
+
+`workers/notification-dispatcher/`
+
+The Worker:
+
+- runs from a one-minute cron
+- claims rows with `FOR UPDATE SKIP LOCKED`
+- retries stuck/temporary failures with backoff and a maximum-attempt limit
+- sends native batches through Expo Push
+- records Expo ticket IDs
+- checks Expo delivery receipts after the receipt-delay window
+- automatically disables `DeviceNotRegistered` registrations
+- sends encrypted standards-based Web Push using VAPID
+- disables expired/gone browser subscriptions
+- retries Web Push 429/5xx/network failures
+- exposes `GET /health`
+- exposes a protected manual `POST /run` endpoint for operational testing
+
+Required Worker secrets:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NOTIFICATION_WORKER_SECRET`
+- `WEB_PUSH_VAPID_PUBLIC_KEY`
+- `WEB_PUSH_VAPID_PRIVATE_KEY`
+- `WEB_PUSH_VAPID_SUBJECT`
+- optional `EXPO_ACCESS_TOKEN` if Expo Push enhanced security is enabled
+
+No private notification credential is committed to source control.
+
+## Production activation still required
+
+The infrastructure is intentionally credential-agnostic in source control. Before store production notifications are live:
+
+1. deploy `workers/notification-dispatcher` and provision its secrets
+2. generate one Web Push VAPID keypair; put the public key in the CHC web build and public/private/subject values in the Worker
+3. provision Apple APNs push credentials through the Apple Developer/EAS production app setup
+4. provision Android FCM v1 credentials through the Firebase/EAS production app setup
+5. give CHC Artists and CHC Admin their final EAS project/store identities when those apps are provisioned
+6. produce development/production native builds for push testing; remote push must not be considered validated through Expo Go
+7. package the CHC PWA for the Microsoft Store when the final web manifest/store identity is ready
+8. add the final user-facing notification settings/onboarding surface that calls the already-implemented permission and preference APIs
+
+Until the Worker secrets and platform credentials above exist, database events and application registration code are ready but production push delivery should be treated as **not activated**.
+
+## Notification categories currently wired
+
+CHC:
+
+- `followed_artists`
+
+CHC Artists:
+
+- `release_updates`
+- `submission_updates`
+- `processing_errors`
+
+CHC Admin:
+
+- `new_submissions`
+- `processing_failures`
+
+The data model intentionally accepts future categories without a schema migration, so church reminders, Sunday messages, feast reminders, playlists, CHC announcements, and other opt-in notification types can be added as product features without replacing the delivery infrastructure.
+
