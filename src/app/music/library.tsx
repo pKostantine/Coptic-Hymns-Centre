@@ -8,6 +8,7 @@ import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAware
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicArtistArtwork from '@/components/music/MusicArtistArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
@@ -187,31 +188,6 @@ export default function MusicLibraryScreen() {
           <>
             <View style={styles.sectionHeader}>
               <View>
-                <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الفنانون المتابَعون' : 'Followed Artists'}</Text>
-                <Text style={[styles.sectionMeta, isArabic && styles.arabic]}>{isArabic ? 'آخر الإصدارات من الفنانين الذين تتابعهم' : 'Keep up with the artists you follow'}</Text>
-              </View>
-            </View>
-            {library.followedArtists.length ? (
-              <View style={styles.savedList}>
-                {library.followedArtists.map((artist) => (
-                  <View key={artist.id} style={styles.savedRow}>
-                    <Pressable style={styles.savedMain} onPress={() => router.push(`/music/artist/${artist.id}`)}>
-                      <MusicArtwork asset={artist.profileImageAsset} size={54} radius={8} label={artist.displayName} />
-                      <View style={styles.savedInfo}>
-                        <Text numberOfLines={1} style={[styles.savedTitle, isArabic && styles.arabic]}>{artist.displayName}</Text>
-                        <Text numberOfLines={1} style={[styles.savedMeta, isArabic && styles.arabic]}>{isArabic ? 'فنان متابَع' : 'Following'}</Text>
-                      </View>
-                    </Pressable>
-                    <Pressable accessibilityLabel={`Unfollow ${artist.displayName}`} style={styles.savedAction} onPress={() => void unfollowArtist(artist.id)}>
-                      <Text style={styles.savedActionText}>{isArabic ? 'إلغاء' : 'Unfollow'}</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            ) : <EmptyCard text={isArabic ? 'تابع فناناً ليظهر هنا.' : 'Follow an artist and they will appear here.'} />}
-
-            <View style={styles.sectionHeader}>
-              <View>
                 <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الإصدارات المعجبة' : 'Liked Releases'}</Text>
                 <Text style={[styles.sectionMeta, isArabic && styles.arabic]}>{isArabic ? `${library.likedReleases.length} إصدار` : `${library.likedReleases.length} saved`}</Text>
               </View>
@@ -342,6 +318,32 @@ export default function MusicLibraryScreen() {
             ) : (
               <EmptyCard text={isArabic ? 'أنشئ قائمة تشغيل لتبدأ.' : 'Create your first playlist above.'} />
             )}
+
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الفنانون المتابَعون' : 'Followed Artists'}</Text>
+                <Text style={[styles.sectionMeta, isArabic && styles.arabic]}>{isArabic ? 'آخر الإصدارات من الفنانين الذين تتابعهم' : 'Keep up with the artists you follow'}</Text>
+              </View>
+            </View>
+            {library.followedArtists.length ? (
+              <View style={styles.savedList}>
+                {library.followedArtists.map((artist) => (
+                  <View key={artist.id} style={styles.savedRow}>
+                    <Pressable style={styles.savedMain} onPress={() => router.push(`/music/artist/${artist.id}`)}>
+                      <MusicArtistArtwork asset={artist.profileImageAsset} size={54} label={artist.displayName} />
+                      <View style={styles.savedInfo}>
+                        <Text numberOfLines={1} style={[styles.savedTitle, isArabic && styles.arabic]}>{artist.displayName}</Text>
+                        <Text numberOfLines={1} style={[styles.savedMeta, isArabic && styles.arabic]}>{isArabic ? 'فنان متابَع' : 'Following'}</Text>
+                      </View>
+                    </Pressable>
+                    <Pressable accessibilityLabel={`Unfollow ${artist.displayName}`} style={styles.savedAction} onPress={() => void unfollowArtist(artist.id)}>
+                      <Text style={styles.savedActionText}>{isArabic ? 'إلغاء' : 'Unfollow'}</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : <EmptyCard text={isArabic ? 'تابع فناناً ليظهر هنا.' : 'Follow an artist and they will appear here.'} />}
+
           </>
         ) : null}
       </NowPlayingAwareScrollView>
