@@ -45,6 +45,8 @@ export interface PlaybackContextValue {
   playbackError: string | null;
   playQueue: (items: PlaybackQueueEntry[], startIndex?: number) => void;
   playItem: (item: PlaybackQueueEntry) => void;
+  addNext: (item: PlaybackQueueEntry) => void;
+  addToEnd: (item: PlaybackQueueEntry) => void;
   togglePlayback: () => void;
   next: () => void;
   previous: () => void;
@@ -163,6 +165,36 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     setQueue([item]);
     void loadEntry([item], 0, true);
   }, [loadEntry]);
+
+  const addNext = useCallback((item: PlaybackQueueEntry) => {
+    if (!queue.length || currentIndex < 0) {
+      playItem(item);
+      return;
+    }
+    const insertAt = Math.min(queue.length, currentIndex + 1);
+    const nextQueue = [...queue.slice(0, insertAt), item, ...queue.slice(insertAt)];
+    setQueue(nextQueue);
+    if (!shuffleEnabled) {
+      setOriginalQueue(nextQueue);
+    } else {
+      const originalIndex = originalQueue.findIndex((entry) => entry.key === queue[currentIndex]?.key);
+      const originalInsertAt = originalIndex >= 0 ? originalIndex + 1 : originalQueue.length;
+      setOriginalQueue((entries) => [
+        ...entries.slice(0, originalInsertAt),
+        item,
+        ...entries.slice(originalInsertAt),
+      ]);
+    }
+  }, [currentIndex, originalQueue, playItem, queue, shuffleEnabled]);
+
+  const addToEnd = useCallback((item: PlaybackQueueEntry) => {
+    if (!queue.length || currentIndex < 0) {
+      playItem(item);
+      return;
+    }
+    setQueue((entries) => [...entries, item]);
+    setOriginalQueue((entries) => [...entries, item]);
+  }, [currentIndex, playItem, queue.length]);
 
   const togglePlayback = useCallback(() => {
     if (!currentItem) return;
@@ -417,6 +449,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     playbackError,
     playQueue,
     playItem,
+    addNext,
+    addToEnd,
     togglePlayback,
     next,
     previous,
@@ -443,6 +477,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     loadingSource,
     next,
     playItem,
+    addNext,
+    addToEnd,
     playQueue,
     playbackError,
     previous,
