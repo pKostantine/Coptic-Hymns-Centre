@@ -62,6 +62,7 @@
     "test:slideshow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/slideshowLayout.test.mjs tests/bibleSlideshowHtml.test.cjs",
     "test:conditions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/serviceConditionDates.test.cjs",
     "test:lyrics": "node --test tests/synchronizedLyrics.test.cjs",
+    "test:offline": "node --test tests/offlineDownloadRequests.test.cjs",
     "test:playback": "node --test tests/playbackEngine.test.cjs",
     "test:share": "node --test tests/shareWorker.test.mjs",
     "build": "expo export -p web",

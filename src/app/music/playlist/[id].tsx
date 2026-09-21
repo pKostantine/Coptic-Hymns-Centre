@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -47,11 +47,6 @@ export default function MusicPlaylistScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const queue = useMemo(() => (playlist?.tracks ?? []).map((track) => ({ track, releaseId: track.releaseId, coverAsset: playlist?.coverAsset })), [playlist]);
-  const downloadRequest = useMemo(
-    () => playlist ? musicPlaylistDownloadRequest(playlist, locale) : null,
-    [locale, playlist],
-  );
-
   useEffect(() => {
     let active = true;
     musicService.getLibrary(locale)
@@ -211,9 +206,9 @@ export default function MusicPlaylistScreen() {
                 {playlist.tracks.length ? (
                   <>
                   <Pressable style={styles.playButton} onPress={() => playQueue(queue, 0)}><Text style={styles.playButtonText}>▶ {isArabic ? 'تشغيل' : 'Play'}</Text></Pressable>
-                  {downloadRequest ? (
+                  {Platform.OS !== 'web' ? (
                     <MusicDownloadButton
-                      packageKey={downloadRequest.packageKey}
+                      packageKey={`music_playlist:${playlist.id}:${locale}`}
                       request={preparePlaylistDownload}
                       isArabic={isArabic}
                     />
@@ -267,9 +262,7 @@ export default function MusicPlaylistScreen() {
           ) : null}
 
           <View style={styles.trackList}>
-            {playlist.tracks.length ? playlist.tracks.map((track, index) => {
-              const trackRequest = musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset });
-              return (
+            {playlist.tracks.length ? playlist.tracks.map((track, index) => (
                 <View key={track.id} style={styles.trackWrap}>
                   <View style={styles.trackFlex}>
                     <MusicTrackRow
@@ -283,17 +276,19 @@ export default function MusicPlaylistScreen() {
                       trailing={(
                         <View style={styles.trackActions}>
                           <MusicTrackActionsMenu item={queue[index]} isArabic={isArabic} />
-                          <MusicDownloadButton
-                            packageKey={trackRequest.packageKey}
-                            request={async () => {
-                              let lyrics: PublishedTrackLyricsPayload | null = null;
-                              try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
-                              return musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset, lyrics });
-                            }}
-                            isArabic={isArabic}
-                            compact
-                            label=""
-                          />
+                          {Platform.OS !== 'web' ? (
+                            <MusicDownloadButton
+                              packageKey={`music_track:${track.id}:${locale}`}
+                              request={async () => {
+                                let lyrics: PublishedTrackLyricsPayload | null = null;
+                                try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
+                                return musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset, lyrics });
+                              }}
+                              isArabic={isArabic}
+                              compact
+                              label=""
+                            />
+                          ) : null}
                         </View>
                       )}
                     />
@@ -312,8 +307,7 @@ export default function MusicPlaylistScreen() {
                     </View>
                   ) : null}
                 </View>
-              );
-            }) : (
+              )) : (
               <View style={styles.empty}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'هذه القائمة فارغة.' : 'This playlist is empty.'}</Text></View>
             )}
           </View>
