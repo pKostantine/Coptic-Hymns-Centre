@@ -137,7 +137,16 @@ export async function getMusicPlaylist(playlistId: string, locale = 'en'): Promi
       p_playlist_id: playlistId,
       p_locale: locale,
     });
-    return assertRpcData(data as MusicPlaylistPayload | null, error, 'Load playlist');
+    const playlist = assertRpcData(data as MusicPlaylistPayload | null, error, 'Load playlist');
+    return {
+      ...playlist,
+      tracks: (playlist.tracks ?? []).map((track) => ({
+        ...track,
+        artists: track.artists ?? [],
+      })),
+      coverAsset: playlist.coverAsset ?? null,
+      description: playlist.description ?? null,
+    };
   }, 'music_playlist', playlistId, locale);
 }
 
