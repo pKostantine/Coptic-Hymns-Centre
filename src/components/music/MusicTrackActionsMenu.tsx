@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Icon, { type IconName } from '@/components/chc/ui/Icon';
@@ -6,7 +7,6 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { publicShareUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
-import { useState } from 'react';
 
 interface MusicTrackActionsMenuProps {
   item: MusicQueueItem;
@@ -138,9 +138,12 @@ const styles = StyleSheet.create({
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(0,0,0,0.70)',
-  } as object,
+  },
   sheet: {
     alignSelf: 'center',
     width: '100%',
