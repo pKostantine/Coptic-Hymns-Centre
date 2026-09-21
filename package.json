@@ -64,6 +64,7 @@
     "test:lyrics": "node --test tests/synchronizedLyrics.test.cjs",
     "test:offline": "node --test tests/offlineDownloadRequests.test.cjs",
     "test:playback": "node --test tests/playbackEngine.test.cjs",
+    "test:music-ui": "node --test tests/musicLibraryPlaylistUi.test.cjs",
     "test:share": "node --test tests/shareWorker.test.mjs",
     "build": "expo export -p web",
     "postbuild": "node scripts/verify-cloudflare-share-worker.mjs",

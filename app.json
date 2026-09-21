@@ -55,7 +55,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow CHC to choose a profile photo.",
+          "photosPermission": "Allow CHC to choose a profile or playlist cover photo.",
           "cameraPermission": false,
           "microphonePermission": false
         }

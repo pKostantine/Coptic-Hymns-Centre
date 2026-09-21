@@ -9,6 +9,7 @@ import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
+import PlaylistTrackEditorRow from '@/components/music/PlaylistTrackEditorRow';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -16,6 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
+import { playlistCoverService } from '@/services/playlistCoverService';
 import {
   musicPlaylistDownloadRequest,
   musicTrackDownloadRequest,
@@ -44,6 +46,8 @@ export default function MusicPlaylistScreen() {
   const [editDescription, setEditDescription] = useState('');
   const [editVisibility, setEditVisibility] = useState<MusicPlaylistVisibility>('private');
   const [saving, setSaving] = useState(false);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [reordering, setReordering] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const queue = useMemo(() => (playlist?.tracks ?? []).map((track) => ({ track, releaseId: track.releaseId, coverAsset: playlist?.coverAsset })), [playlist]);
@@ -104,12 +108,27 @@ export default function MusicPlaylistScreen() {
   };
 
   const removeTrack = async (trackId: string) => {
-    if (!playlistId) return;
+    if (!playlistId || !playlist) return;
+    const previousPlaylist = playlist;
+    const nextPlaylist = {
+      ...playlist,
+      tracks: playlist.tracks.filter((track) => track.id !== trackId),
+    };
+    setPlaylist(nextPlaylist);
     try {
       await musicService.removeFromPlaylist(playlistId, trackId);
-      setPlaylist((current) => current ? { ...current, tracks: current.tracks.filter((track) => track.id !== trackId) } : current);
     } catch (cause) {
+      setPlaylist(previousPlaylist);
       Alert.alert('Playlist', cause instanceof Error ? cause.message : 'Unable to remove track.');
+      return;
+    }
+
+    try {
+      setPlaylist(await musicService.getPlaylist(playlistId, locale));
+    } catch {
+      // The remove already succeeded. Keep the accurate optimistic track list;
+      // the dynamic artwork will refresh on the next successful playlist load.
+      setPlaylist(nextPlaylist);
     }
   };
 
@@ -146,19 +165,63 @@ export default function MusicPlaylistScreen() {
     }
   };
 
-  const moveTrack = async (index: number, direction: -1 | 1) => {
-    if (!playlistId || !playlist) return;
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= playlist.tracks.length) return;
+  const moveTrack = async (index: number, nextIndex: number) => {
+    if (!playlistId || !playlist || reordering) return;
+    if (nextIndex < 0 || nextIndex >= playlist.tracks.length || nextIndex === index) return;
     const previousTracks = playlist.tracks;
     const nextTracks = [...previousTracks];
-    [nextTracks[index], nextTracks[nextIndex]] = [nextTracks[nextIndex], nextTracks[index]];
+    const [movedTrack] = nextTracks.splice(index, 1);
+    nextTracks.splice(nextIndex, 0, movedTrack);
     setPlaylist({ ...playlist, tracks: nextTracks });
+    setReordering(true);
+    setError(null);
     try {
       await musicService.setPlaylistTrackOrder(playlistId, nextTracks.map((track) => track.id));
     } catch (cause) {
       setPlaylist({ ...playlist, tracks: previousTracks });
       setError(cause instanceof Error ? cause.message : 'Unable to reorder this playlist.');
+      setReordering(false);
+      return;
+    }
+
+    try {
+      setPlaylist(await musicService.getPlaylist(playlistId, locale));
+    } catch {
+      // The order is already saved. Keep it instead of showing a false
+      // rollback if only the follow-up artwork refresh is unavailable.
+      setPlaylist({ ...playlist, tracks: nextTracks });
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const choosePlaylistCover = async () => {
+    if (!playlistId || !playlist || !user || coverBusy) return;
+    setCoverBusy(true);
+    setError(null);
+    try {
+      const coverAsset = await playlistCoverService.pickAndUpload(user.id, playlistId);
+      if (coverAsset) {
+        setPlaylist({ ...playlist, coverAsset, hasCustomCover: true });
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update the playlist cover.');
+    } finally {
+      setCoverBusy(false);
+    }
+  };
+
+  const clearPlaylistCover = async () => {
+    if (!playlistId || !user || coverBusy) return;
+    setCoverBusy(true);
+    setError(null);
+    try {
+      await playlistCoverService.remove(user.id, playlistId);
+      setPlaylist(await musicService.getPlaylist(playlistId, locale));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to remove the playlist cover.');
+    } finally {
+      setCoverBusy(false);
     }
   };
 
@@ -234,6 +297,27 @@ export default function MusicPlaylistScreen() {
           {playlist.isOwner && editing ? (
             <View style={styles.editor}>
               <Text style={styles.editorTitle}>{isArabic ? 'تعديل قائمة التشغيل' : 'Edit playlist'}</Text>
+              <View style={styles.coverEditor}>
+                <MusicArtwork asset={playlist.coverAsset} size={84} label={playlist.name} />
+                <View style={styles.coverEditorText}>
+                  <Text style={[styles.coverLabel, isArabic && styles.arabic]}>{isArabic ? 'غلاف قائمة التشغيل' : 'Playlist cover'}</Text>
+                  <Text style={[styles.coverHelp, isArabic && styles.arabic]}>
+                    {isArabic
+                      ? 'بدون صورة مخصصة، يتبع الغلاف تلقائياً صورة أول ترنيمة.'
+                      : 'Without a custom image, the cover automatically follows the first track.'}
+                  </Text>
+                  <View style={styles.coverActions}>
+                    <Pressable disabled={coverBusy} style={[styles.coverButton, coverBusy && styles.disabled]} onPress={() => void choosePlaylistCover()}>
+                      <Text style={styles.coverButtonText}>{playlist.hasCustomCover ? (isArabic ? 'استبدال' : 'Replace') : (isArabic ? 'اختيار صورة' : 'Choose image')}</Text>
+                    </Pressable>
+                    {playlist.hasCustomCover ? (
+                      <Pressable disabled={coverBusy} style={[styles.coverRemoveButton, coverBusy && styles.disabled]} onPress={() => void clearPlaylistCover()}>
+                        <Text style={styles.coverRemoveText}>{isArabic ? 'إزالة' : 'Remove'}</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
               <TextInput value={editName} onChangeText={setEditName} placeholder="Playlist name" placeholderTextColor={COLORS.muted} style={styles.input} />
               <TextInput value={editDescription} onChangeText={setEditDescription} placeholder="Description (optional)" placeholderTextColor={COLORS.muted} style={[styles.input, styles.descriptionInput]} multiline />
               <View style={styles.visibilityControl}>
@@ -263,8 +347,21 @@ export default function MusicPlaylistScreen() {
 
           <View style={styles.trackList}>
             {playlist.tracks.length ? playlist.tracks.map((track, index) => (
-                <View key={track.id} style={styles.trackWrap}>
-                  <View style={styles.trackFlex}>
+                playlist.isOwner && editing ? (
+                  <PlaylistTrackEditorRow
+                    key={track.id}
+                    track={track}
+                    index={index}
+                    count={playlist.tracks.length}
+                    active={currentItem?.track.id === track.id}
+                    liked={likedTrackIds.has(track.id)}
+                    onPlay={() => playQueue(queue, index)}
+                    onToggleLike={() => void toggleTrackLike(track.id)}
+                    onRemove={() => void removeTrack(track.id)}
+                    onMove={(fromIndex, toIndex) => void moveTrack(fromIndex, toIndex)}
+                  />
+                ) : (
+                  <View key={track.id} style={styles.trackFlex}>
                     <MusicTrackRow
                       track={track}
                       index={index}
@@ -293,20 +390,7 @@ export default function MusicPlaylistScreen() {
                       )}
                     />
                   </View>
-                  {playlist.isOwner ? (
-                    <View style={styles.ownerTrackActions}>
-                      <Pressable disabled={index === 0} accessibilityLabel="Move track up" onPress={() => void moveTrack(index, -1)} style={[styles.orderButton, index === 0 && styles.disabled]}>
-                        <Icon name="chevron-down" size={15} color={COLORS.muted} style={styles.upIcon} />
-                      </Pressable>
-                      <Pressable disabled={index === playlist.tracks.length - 1} accessibilityLabel="Move track down" onPress={() => void moveTrack(index, 1)} style={[styles.orderButton, index === playlist.tracks.length - 1 && styles.disabled]}>
-                        <Icon name="chevron-down" size={15} color={COLORS.muted} />
-                      </Pressable>
-                      <Pressable accessibilityLabel="Remove from playlist" onPress={() => void removeTrack(track.id)} style={styles.removeButton}>
-                        <Icon name="close" size={17} color={COLORS.muted} />
-                      </Pressable>
-                    </View>
-                  ) : null}
-                </View>
+                )
               )) : (
               <View style={styles.empty}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'هذه القائمة فارغة.' : 'This playlist is empty.'}</Text></View>
             )}
@@ -343,6 +427,15 @@ const styles = StyleSheet.create({
   actionButtonText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
   editor: { borderBottomColor: COLORS.border, borderBottomWidth: 1, gap: SPACING.sm, paddingVertical: SPACING.lg },
   editorTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
+  coverEditor: { alignItems: 'center', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: SPACING.md, padding: SPACING.md },
+  coverEditorText: { flex: 1, minWidth: 0 },
+  coverLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
+  coverHelp: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  coverActions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginTop: SPACING.sm },
+  coverButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: RADII.pill, justifyContent: 'center', minHeight: 34, paddingHorizontal: SPACING.md },
+  coverButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '900' },
+  coverRemoveButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: RADII.pill, borderWidth: 1, justifyContent: 'center', minHeight: 34, paddingHorizontal: SPACING.md },
+  coverRemoveText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
   input: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, minHeight: 46, paddingHorizontal: SPACING.md },
   descriptionInput: { minHeight: 78, paddingTop: 12, textAlignVertical: 'top' },
   visibilityControl: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', padding: 3 },
@@ -363,13 +456,8 @@ const styles = StyleSheet.create({
   confirmDeleteButton: { alignItems: 'center', backgroundColor: COLORS.priest, borderRadius: 8, flex: 1, justifyContent: 'center', minHeight: 40 },
   confirmDeleteText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
   trackList: { marginTop: SPACING.lg, borderRadius: RADII.lg, overflow: 'hidden', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  trackWrap: { flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
   trackFlex: { flex: 1 },
   trackActions: { alignItems: 'center', flexDirection: 'row', gap: 2 },
-  ownerTrackActions: { alignItems: 'center', borderLeftColor: COLORS.border, borderLeftWidth: StyleSheet.hairlineWidth, justifyContent: 'center', width: 38 },
-  orderButton: { alignItems: 'center', height: 28, justifyContent: 'center', width: 36 },
-  upIcon: { transform: [{ rotate: '180deg' }] },
-  removeButton: { alignItems: 'center', height: 28, justifyContent: 'center', width: 36 },
   disabled: { opacity: 0.35 },
   empty: { padding: SPACING.lg },
   emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },

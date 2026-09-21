@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -63,7 +63,7 @@ export default function AppHeader({
             <Icon name="chevron-back" size={24} color={COLORS.gold} />
           </Pressable>
         ) : (
-          <Image source={require('../../../../assets/images/CHC_sm.png')} style={styles.logo} />
+          <View style={styles.iconSpacer} />
         )}
 
         <View style={styles.titleGroup}>
@@ -125,11 +125,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     width: 40,
-  },
-  logo: {
-    height: 44,
-    width: 44,
-    resizeMode: 'contain',
   },
   iconSpacer: {
     height: 40,

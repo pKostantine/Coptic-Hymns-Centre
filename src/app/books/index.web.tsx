@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
@@ -21,8 +21,8 @@ import { useIsMobileWeb } from '@/utils/useIsMobileWeb';
  * stacked header-then-centered-buttons layout as index.tsx (same AppHeader,
  * same actionRow) so the mobile website looks like the mobile app -- a phone
  * browser is still a phone. Only desktop-width web gets the wide/horizontal
- * layout below: a single full-width header row (logo + title on the left,
- * the toolbar on the right), which has room to spare that a phone-width
+ * layout below: a single full-width header row (centered title with the
+ * toolbar on the right), which has room to spare that a phone-width
  * header doesn't.
  */
 export default function BooksHomeWeb() {
@@ -70,9 +70,7 @@ export default function BooksHomeWeb() {
         </>
       ) : (
         <View style={styles.header}>
-          <View style={styles.brand}>
-            <Image source={require('../../../assets/images/CHC_sm_web.png')} style={styles.logo} />
-          </View>
+          <View style={styles.headerSpacer} />
           {/* Absolutely positioned (spanning the full header width, independent
               of the logo/toolbar's own widths) so the title is truly centered
               on the header line, matching AppHeader — not just centered in
@@ -169,10 +167,10 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.sm,
   },
   // Padding matches AppHeader.web.tsx's own desktop container exactly (same
-  // horizontal inset, same asymmetric top/bottom, same logo/title/button
+  // horizontal inset, same asymmetric top/bottom, same title/button
   // dimensions below) so this screen's custom wide header lines up pixel-for-
   // pixel with every other screen's header — same overall height AND the
-  // logo/back-button sitting at the same x position — even though its
+  // left spacer sitting at the same x position — even though its
   // brand-left/toolbar-right layout is structurally different from
   // AppHeader's centered-title one.
   header: {
@@ -187,18 +185,10 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md + 4,
     position: 'relative',
   },
-  brand: {
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-  logo: {
-    height: 48,
-    width: 48,
-    resizeMode: 'contain',
-  },
+  headerSpacer: { height: 48, width: 48 },
   // Positioned against `header` (position: "relative" above), not `brand` —
-  // spans the header's full width so centering is independent of the logo's
-  // and toolbar's own widths, same guarantee AppHeader's centered title has.
+  // spans the header's full width so centering is independent of the spacer
+  // and toolbar widths, same guarantee AppHeader's centered title has.
   centeredHeaderTitle: {
     color: COLORS.white,
     fontFamily: TYPOGRAPHY.title,

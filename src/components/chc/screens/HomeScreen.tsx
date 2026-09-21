@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
@@ -64,6 +64,7 @@ export default function HomeScreen() {
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
   const wide = width >= 760;
+  const heroLogoSize = wide ? 180 : Math.min(156, Math.max(112, width * 0.31));
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000);
@@ -155,12 +156,20 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
       >
         <View style={styles.intro}>
-          <Text style={[styles.introEyebrow, isArabic && styles.arabic]}>
-            {isArabic ? 'اليوم في الكنيسة' : 'TODAY IN THE CHURCH'}
-          </Text>
-          <Text style={[styles.introTitle, isArabic && styles.arabic]}>
-            {isArabic ? 'صلِّ. اقرأ. استمع. تعلّم.' : 'Pray. Read. Listen. Learn.'}
-          </Text>
+          <Image
+            accessible
+            accessibilityLabel="Coptic Hymns Centre logo"
+            source={require('../../../../assets/images/CHC.png')}
+            style={[styles.introLogo, { height: heroLogoSize, width: heroLogoSize }]}
+          />
+          <View style={styles.introCopy}>
+            <Text style={[styles.introEyebrow, isArabic && styles.arabic]}>
+              {isArabic ? 'اليوم في الكنيسة' : 'TODAY IN THE CHURCH'}
+            </Text>
+            <Text style={[styles.introTitle, !wide && styles.introTitleMobile, isArabic && styles.arabic]}>
+              {isArabic ? 'صلِّ. اقرأ. استمع. تعلّم.' : 'Pray. Read. Listen. Learn.'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.card}>
@@ -334,9 +343,12 @@ function SynaxDay({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: SPACING.md, paddingBottom: SPACING.xl * 2, gap: SPACING.md },
-  intro: { paddingHorizontal: 4, paddingVertical: SPACING.sm },
+  intro: { alignItems: 'center', flexDirection: 'row', gap: SPACING.lg, paddingHorizontal: 4, paddingVertical: SPACING.md },
+  introLogo: { resizeMode: 'contain' },
+  introCopy: { flex: 1, minWidth: 0 },
   introEyebrow: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
   introTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 27, fontWeight: '700', marginTop: 5 },
+  introTitleMobile: { fontSize: 24, lineHeight: 27 },
   card: { backgroundColor: COLORS.navyDark, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADII.lg, padding: SPACING.lg, overflow: 'hidden' },
   cardHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   headingIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.goldSoft, borderWidth: 1, borderColor: COLORS.goldLine },

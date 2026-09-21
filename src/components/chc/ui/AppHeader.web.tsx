@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -72,10 +72,7 @@ export default function AppHeader({
             <Icon name="chevron-back" size={isMobileWeb ? 24 : 28} color={COLORS.gold} />
           </Pressable>
         ) : (
-          <Image
-            source={require('../../../../assets/images/CHC_sm_web.png')}
-            style={[styles.logo, isMobileWeb && styles.logoMobile]}
-          />
+          <View style={[styles.iconSpacer, isMobileWeb && styles.iconSpacerMobile]} />
         )}
 
         <View style={styles.titleGroup}>
@@ -155,21 +152,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
-  // Matched to AppHeader.tsx: 40 button, 44 logo, 22 title. Phone-width web
-  // was rendering a header noticeably smaller than the app's.
+  // Matched to AppHeader.tsx: 40 button and 22 title. Phone-width web was
+  // rendering a header noticeably smaller than the app's.
   iconButtonMobile: {
     borderRadius: 18,
     height: 40,
     width: 40,
-  },
-  logo: {
-    height: 48,
-    width: 48,
-    resizeMode: 'contain',
-  },
-  logoMobile: {
-    height: 44,
-    width: 44,
   },
   iconSpacer: {
     height: 48,

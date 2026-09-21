@@ -122,6 +122,7 @@ export default function GlobalNowPlayingOverlay() {
   ]);
 
   const isMusic = Boolean(music.currentItem);
+  const musicTrackId = music.currentItem?.track.id ?? null;
 
   useEffect(() => {
     const trackId = music.currentItem?.track.id;
@@ -259,7 +260,7 @@ export default function GlobalNowPlayingOverlay() {
         subtitle={subtitle}
         liked={isMusic ? miniLiked : undefined}
         likeBusy={isMusic ? miniLikeBusy : undefined}
-        onToggleLike={isMusic && music.currentItem ? async () => {
+        onToggleLike={isMusic && musicTrackId ? async () => {
           if (miniLikeBusy) return;
           if (!libraryAuthenticated) {
             Alert.alert(
@@ -273,7 +274,7 @@ export default function GlobalNowPlayingOverlay() {
           setMiniLikeBusy(true);
           try {
             const nextLiked = !miniLiked;
-            await musicService.setLiked(music.currentItem.track.id, nextLiked);
+            await musicService.setLiked(musicTrackId, nextLiked);
             setMiniLiked(nextLiked);
           } catch (cause) {
             Alert.alert(
