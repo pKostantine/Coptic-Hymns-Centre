@@ -1,3 +1,5 @@
+import { sendPushNotification, WebPushError } from '@mmmike/web-push/send';
+
 const EXPO_SEND_URL = 'https://exp.host/--/api/v2/push/send';
 const EXPO_RECEIPTS_URL = 'https://exp.host/--/api/v2/push/getReceipts';
 
@@ -140,6 +142,88 @@ function receiptOutcome(delivery, receipt) {
   return { delivery_id: delivery.delivery_id, result: 'failed', error: message };
 }
 
+async function dispatchWebPush(env) {
+  if (!env.WEB_PUSH_VAPID_PUBLIC_KEY || !env.WEB_PUSH_VAPID_PRIVATE_KEY || !env.WEB_PUSH_VAPID_SUBJECT) {
+    return { claimed: 0, configured: false };
+  }
+
+  // Keep this below the conservative free-plan subrequest ceiling: each Web
+  // Push delivery is one outbound request, plus the Supabase claim/completion calls.
+  const deliveries = await rpc(env, 'claim_web_push_deliveries', { p_limit: 40 }) || [];
+  if (!deliveries.length) return { claimed: 0, configured: true };
+
+  const vapid = {
+    publicKey: env.WEB_PUSH_VAPID_PUBLIC_KEY,
+    privateKey: env.WEB_PUSH_VAPID_PRIVATE_KEY,
+    subject: env.WEB_PUSH_VAPID_SUBJECT,
+  };
+
+  const results = await Promise.all(deliveries.map(async (delivery) => {
+    try {
+      const delivered = await sendPushNotification(
+        delivery.subscription,
+        {
+          title: delivery.title,
+          body: delivery.body,
+          url: delivery.deep_link || '/',
+          tag: `chc-${delivery.notification_id}`,
+        },
+        vapid,
+        { ttl: 86400, urgency: 'normal', timeoutMs: 10000 },
+      );
+
+      return delivered
+        ? { delivery_id: delivery.delivery_id, result: 'delivered' }
+        : { delivery_id: delivery.delivery_id, result: 'disabled', error: 'Web Push subscription is gone.' };
+    } catch (error) {
+      if (error instanceof WebPushError) {
+        if (error.statusCode === 404 || error.statusCode === 410) {
+          return { delivery_id: delivery.delivery_id, result: 'disabled', error: error.message };
+        }
+
+        if (error.statusCode === 429 || error.statusCode >= 500) {
+          const seconds = error.retryAfterMs
+            ? Math.max(10, Math.min(Math.ceil(error.retryAfterMs / 1000), 3600))
+            : 300;
+          return {
+            delivery_id: delivery.delivery_id,
+            result: 'retry',
+            error: error.message,
+            retry_after_seconds: seconds,
+          };
+        }
+
+        return { delivery_id: delivery.delivery_id, result: 'failed', error: error.message };
+      }
+
+      if (error instanceof TypeError) {
+        return {
+          delivery_id: delivery.delivery_id,
+          result: 'retry',
+          error: error.message,
+          retry_after_seconds: 60,
+        };
+      }
+
+      return {
+        delivery_id: delivery.delivery_id,
+        result: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }));
+
+  await rpc(env, 'complete_notification_deliveries', { p_results: results });
+  return {
+    claimed: deliveries.length,
+    delivered: results.filter((result) => result.result === 'delivered').length,
+    disabled: results.filter((result) => result.result === 'disabled').length,
+    retried: results.filter((result) => result.result === 'retry').length,
+    failed: results.filter((result) => result.result === 'failed').length,
+    configured: true,
+  };
+}
+
 async function checkReceipts(env) {
   const deliveries = await rpc(env, 'claim_notification_receipts', { p_limit: 1000 }) || [];
   if (!deliveries.length) return { checked: 0 };
@@ -179,9 +263,10 @@ async function checkReceipts(env) {
 }
 
 async function runOnce(env) {
-  const dispatch = await dispatchQueued(env);
+  const native = await dispatchQueued(env);
+  const webPush = await dispatchWebPush(env);
   const receipts = await checkReceipts(env);
-  return { dispatch, receipts, ran_at: new Date().toISOString() };
+  return { native, webPush, receipts, ran_at: new Date().toISOString() };
 }
 
 export default {
