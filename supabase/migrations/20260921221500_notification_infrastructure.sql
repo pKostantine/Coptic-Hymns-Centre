@@ -700,12 +700,18 @@ begin
     end loop;
   end if;
 
-  if new.status::text in ('approved','changes_requested','rejected','published') then
+  -- Music publication is notified by music.releases. Skipping the submission
+  -- published event for music prevents duplicate release-is-live pushes.
+  if new.status::text in ('approved','changes_requested','rejected','published')
+     and not (
+       new.status::text = 'published'
+       and new.submission_type::text = 'music_release'
+     ) then
     v_title := case new.status::text
       when 'approved' then 'Submission approved'
       when 'changes_requested' then 'Changes requested'
       when 'rejected' then 'Submission not approved'
-      when 'published' then 'Release is live'
+      when 'published' then 'Submission is live'
     end;
     v_body := case new.status::text
       when 'approved' then new.title || ' has been approved.'
@@ -721,7 +727,11 @@ begin
       perform private.enqueue_notification(
         v_user_id, 'chc_artists', 'submission_updates', 'submission_' || new.status::text,
         v_title, v_body, '/submission/' || new.id::text, null,
-        jsonb_build_object('submission_id', new.id, 'status', new.status::text)
+        jsonb_build_object(
+          'submission_id', new.id,
+          'submission_type', new.submission_type::text,
+          'status', new.status::text
+        )
       );
     end loop;
   end if;
