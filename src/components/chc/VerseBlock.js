@@ -5,7 +5,6 @@ import { formatEnglishDisplayText } from "../../utils/displayText";
 import { resolveRubricKey } from "../../utils/verseRubric";
 import JustifiedText from "./JustifiedText";
 import {
-  getSlideshowChromeMetrics,
   getSlideshowLanguageFontSize,
   getSlideshowLanguageLineHeight,
   hasSeasonalPrefixLine as hasVisibleSeasonalPrefixLine,
@@ -80,7 +79,6 @@ export default function VerseBlock({
       : forceWhiteText || verse.forceWhiteText || isRefrain || isRecitedPrayer || isReading || (colorIndex ?? index) % 2 === 0
       ? theme.colors.text
       : theme.colors.rowBlue;
-  const chrome = getSlideshowChromeMetrics(fontSize);
   const hasSeasonalPrefixLine = hasVisibleSeasonalPrefixLine(verse);
   const bodyFontStyle = isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal";
   const bodyFontWeight = isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400";
@@ -182,7 +180,9 @@ export default function VerseBlock({
   const rowColumnWidth = tableWidth / Math.max(columnLanguages.length, 1);
   const isCenteredAcrossPage = Boolean(verse.centeredAcrossPage);
   const hasSpeakerLabel = rowLanguages.some((language) => language.speakerLabel);
-  const speakerRowHeight = hasSpeakerLabel ? chrome.speakerLineHeight : 0;
+  const speakerRowHeight = hasSpeakerLabel
+    ? Math.max(...rowLanguages.filter((language) => language.speakerLabel).map((language) => language.lineHeight))
+    : 0;
 
   function reportLanguageMetric(language, metric) {
     onLanguageLayout?.(language, metric);
@@ -282,10 +282,10 @@ export default function VerseBlock({
                   {
                     color: getSpeakerColor(rubricType, bishopPresent),
                     fontFamily: language.fontFamily,
-                    fontSize: chrome.speakerFontSize,
+                    fontSize: language.fontSize,
                     fontStyle: bodyFontStyle,
                     fontWeight: bodyFontWeight,
-                    lineHeight: speakerRowHeight,
+                    lineHeight: language.lineHeight,
                     textAlign: getSafeTextAlign(language),
                     width: "100%",
                   },

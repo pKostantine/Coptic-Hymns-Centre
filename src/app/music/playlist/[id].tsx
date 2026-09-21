@@ -1,14 +1,18 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
+import Icon from '@/components/chc/ui/Icon';
+import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
+import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
@@ -17,11 +21,15 @@ import {
   musicTrackDownloadRequest,
 } from '@/services/offlineDownloadRequests';
 import type { MusicPlaylistPayload, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
+import type { MusicPlaylistVisibility } from '@/types/mediaPlatform';
 import { goBack } from '@/utils/navigation';
+import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
+import { shareLink } from '@/utils/shareLink';
 
 export default function MusicPlaylistScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
   const { preferences } = useReadingPreferences();
   const { currentItem, playQueue } = useMusicPlayer();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
@@ -31,6 +39,12 @@ export default function MusicPlaylistScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editVisibility, setEditVisibility] = useState<MusicPlaylistVisibility>('private');
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const queue = useMemo(() => (playlist?.tracks ?? []).map((track) => ({ track, releaseId: track.releaseId, coverAsset: playlist?.coverAsset })), [playlist]);
   const downloadRequest = useMemo(
@@ -48,19 +62,24 @@ export default function MusicPlaylistScreen() {
         if (active) setLikedTrackIds(new Set());
       });
     return () => { active = false; };
-  }, [locale]);
+  }, [locale, user?.id]);
 
   useEffect(() => {
     if (!playlistId) return;
     let active = true;
-    setLoading(true);
-    setError(null);
     musicService.getPlaylist(playlistId, locale)
-      .then((payload) => { if (active) setPlaylist(payload); })
+      .then((payload) => {
+        if (!active) return;
+        setError(null);
+        setPlaylist(payload);
+        setEditName(payload.name);
+        setEditDescription(payload.description ?? '');
+        setEditVisibility(payload.visibility);
+      })
       .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Unable to load playlist.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [locale, playlistId]);
+  }, [locale, playlistId, user?.id]);
 
   const preparePlaylistDownload = async () => {
     if (!playlist) throw new Error('Playlist is not loaded.');
@@ -99,8 +118,75 @@ export default function MusicPlaylistScreen() {
     }
   };
 
+  const savePlaylist = async () => {
+    if (!playlistId || !editName.trim() || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await musicService.updatePlaylist(playlistId, editName.trim(), editDescription.trim() || null, editVisibility);
+      setPlaylist((current) => current ? {
+        ...current,
+        name: editName.trim(),
+        description: editDescription.trim() || null,
+        visibility: editVisibility,
+      } : current);
+      setEditing(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to save this playlist.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deletePlaylist = async () => {
+    if (!playlistId || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await musicService.deletePlaylist(playlistId);
+      router.replace('/music/library');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to delete this playlist.');
+      setSaving(false);
+    }
+  };
+
+  const moveTrack = async (index: number, direction: -1 | 1) => {
+    if (!playlistId || !playlist) return;
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= playlist.tracks.length) return;
+    const previousTracks = playlist.tracks;
+    const nextTracks = [...previousTracks];
+    [nextTracks[index], nextTracks[nextIndex]] = [nextTracks[nextIndex], nextTracks[index]];
+    setPlaylist({ ...playlist, tracks: nextTracks });
+    try {
+      await musicService.setPlaylistTrackOrder(playlistId, nextTracks.map((track) => track.id));
+    } catch (cause) {
+      setPlaylist({ ...playlist, tracks: previousTracks });
+      setError(cause instanceof Error ? cause.message : 'Unable to reorder this playlist.');
+    }
+  };
+
+  const sharePlaylist = async () => {
+    if (!playlist || playlist.visibility !== 'public') return;
+    await shareLink({
+      title: playlist.name,
+      text: playlist.description || `Listen to ${playlist.name} on Coptic Hymns Centre.`,
+      url: publicShareUrl(`/share/music/playlist/${playlist.id}`, playlist.coverAsset?.id),
+    });
+  };
+
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+      {playlist?.visibility === 'public' ? (
+        <ShareMetadata
+          title={playlist.name}
+          description={playlist.description || `Listen to ${playlist.name} on Coptic Hymns Centre.`}
+          canonicalUrl={publicUrl(`/music/playlist/${playlist.id}`)}
+          imageUrl={musicService.resolveAsset(playlist.coverAsset)}
+          type="music.album"
+        />
+      ) : null}
       <View style={styles.header}>
         <Pressable accessibilityLabel="Back" onPress={() => goBack(router, '/music')} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
         <Text numberOfLines={1} style={[styles.headerTitle, isArabic && styles.arabic]}>{isArabic ? 'قائمة التشغيل' : 'Playlist'}</Text>
@@ -121,8 +207,9 @@ export default function MusicPlaylistScreen() {
               <Text style={[styles.meta, isArabic && styles.arabic]}>
                 {isArabic ? `${playlist.tracks.length} ترنيمة` : `${playlist.tracks.length} ${playlist.tracks.length === 1 ? 'track' : 'tracks'}`}
               </Text>
-              {playlist.tracks.length ? (
-                <View style={styles.actions}>
+              <View style={styles.actions}>
+                {playlist.tracks.length ? (
+                  <>
                   <Pressable style={styles.playButton} onPress={() => playQueue(queue, 0)}><Text style={styles.playButtonText}>▶ {isArabic ? 'تشغيل' : 'Play'}</Text></Pressable>
                   {downloadRequest ? (
                     <MusicDownloadButton
@@ -131,10 +218,53 @@ export default function MusicPlaylistScreen() {
                       isArabic={isArabic}
                     />
                   ) : null}
-                </View>
-              ) : null}
+                  </>
+                ) : null}
+                {playlist.visibility === 'public' ? (
+                  <Pressable style={styles.actionButton} onPress={() => void sharePlaylist()}>
+                    <Icon name="share-outline" size={18} color={COLORS.goldBright} />
+                    <Text style={styles.actionButtonText}>{isArabic ? 'مشاركة' : 'Share'}</Text>
+                  </Pressable>
+                ) : null}
+                {playlist.isOwner ? (
+                  <Pressable style={styles.actionButton} onPress={() => setEditing((current) => !current)}>
+                    <Icon name="settings-outline" size={18} color={COLORS.goldBright} />
+                    <Text style={styles.actionButtonText}>{editing ? (isArabic ? 'إغلاق' : 'Close') : (isArabic ? 'تعديل' : 'Edit')}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
           </View>
+
+          {playlist.isOwner && editing ? (
+            <View style={styles.editor}>
+              <Text style={styles.editorTitle}>{isArabic ? 'تعديل قائمة التشغيل' : 'Edit playlist'}</Text>
+              <TextInput value={editName} onChangeText={setEditName} placeholder="Playlist name" placeholderTextColor={COLORS.muted} style={styles.input} />
+              <TextInput value={editDescription} onChangeText={setEditDescription} placeholder="Description (optional)" placeholderTextColor={COLORS.muted} style={[styles.input, styles.descriptionInput]} multiline />
+              <View style={styles.visibilityControl}>
+                {(['private', 'public'] as const).map((visibility) => (
+                  <Pressable key={visibility} accessibilityRole="radio" accessibilityState={{ checked: editVisibility === visibility }} style={[styles.visibilityButton, editVisibility === visibility && styles.visibilityButtonActive]} onPress={() => setEditVisibility(visibility)}>
+                    <Text style={[styles.visibilityText, editVisibility === visibility && styles.visibilityTextActive]}>{visibility === 'private' ? (isArabic ? 'خاصة' : 'Private') : (isArabic ? 'عامة' : 'Public')}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.visibilityHelp}>{editVisibility === 'public' ? 'Anyone with the link can open and play this playlist.' : 'Only you can open this playlist.'}</Text>
+              <Pressable disabled={!editName.trim() || saving} style={[styles.saveButton, (!editName.trim() || saving) && styles.disabled]} onPress={() => void savePlaylist()}>
+                {saving ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.saveButtonText}>{isArabic ? 'حفظ التغييرات' : 'Save changes'}</Text>}
+              </Pressable>
+              {!confirmDelete ? (
+                <Pressable style={styles.deleteButton} onPress={() => setConfirmDelete(true)}><Text style={styles.deleteButtonText}>{isArabic ? 'حذف قائمة التشغيل' : 'Delete playlist'}</Text></Pressable>
+              ) : (
+                <View style={styles.deleteConfirm}>
+                  <Text style={styles.deleteConfirmText}>Delete this playlist? This cannot be undone.</Text>
+                  <View style={styles.deleteActions}>
+                    <Pressable style={styles.cancelDeleteButton} onPress={() => setConfirmDelete(false)}><Text style={styles.cancelDeleteText}>Cancel</Text></Pressable>
+                    <Pressable disabled={saving} style={styles.confirmDeleteButton} onPress={() => void deletePlaylist()}><Text style={styles.confirmDeleteText}>Delete</Text></Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+          ) : null}
 
           <View style={styles.trackList}>
             {playlist.tracks.length ? playlist.tracks.map((track, index) => {
@@ -151,23 +281,36 @@ export default function MusicPlaylistScreen() {
                       liked={likedTrackIds.has(track.id)}
                       onToggleLike={() => void toggleTrackLike(track.id)}
                       trailing={(
-                        <MusicDownloadButton
-                          packageKey={trackRequest.packageKey}
-                          request={async () => {
-                            let lyrics: PublishedTrackLyricsPayload | null = null;
-                            try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
-                            return musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset, lyrics });
-                          }}
-                          isArabic={isArabic}
-                          compact
-                          label=""
-                        />
+                        <View style={styles.trackActions}>
+                          <MusicPlaylistPicker trackId={track.id} compact />
+                          <MusicDownloadButton
+                            packageKey={trackRequest.packageKey}
+                            request={async () => {
+                              let lyrics: PublishedTrackLyricsPayload | null = null;
+                              try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
+                              return musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset, lyrics });
+                            }}
+                            isArabic={isArabic}
+                            compact
+                            label=""
+                          />
+                        </View>
                       )}
                     />
                   </View>
-                  <Pressable accessibilityLabel="Remove from playlist" onPress={() => void removeTrack(track.id)} style={styles.removeButton}>
-                    <Text style={styles.removeText}>×</Text>
-                  </Pressable>
+                  {playlist.isOwner ? (
+                    <View style={styles.ownerTrackActions}>
+                      <Pressable disabled={index === 0} accessibilityLabel="Move track up" onPress={() => void moveTrack(index, -1)} style={[styles.orderButton, index === 0 && styles.disabled]}>
+                        <Icon name="chevron-down" size={15} color={COLORS.muted} style={styles.upIcon} />
+                      </Pressable>
+                      <Pressable disabled={index === playlist.tracks.length - 1} accessibilityLabel="Move track down" onPress={() => void moveTrack(index, 1)} style={[styles.orderButton, index === playlist.tracks.length - 1 && styles.disabled]}>
+                        <Icon name="chevron-down" size={15} color={COLORS.muted} />
+                      </Pressable>
+                      <Pressable accessibilityLabel="Remove from playlist" onPress={() => void removeTrack(track.id)} style={styles.removeButton}>
+                        <Icon name="close" size={17} color={COLORS.muted} />
+                      </Pressable>
+                    </View>
+                  ) : null}
                 </View>
               );
             }) : (
@@ -202,11 +345,38 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.md },
   playButton: { minHeight: 42, paddingHorizontal: SPACING.md, borderRadius: RADII.pill, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   playButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontWeight: '800' },
+  actionButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: SPACING.sm, justifyContent: 'center', minHeight: 42, paddingHorizontal: SPACING.md },
+  actionButtonText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
+  editor: { borderBottomColor: COLORS.border, borderBottomWidth: 1, gap: SPACING.sm, paddingVertical: SPACING.lg },
+  editorTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
+  input: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, minHeight: 46, paddingHorizontal: SPACING.md },
+  descriptionInput: { minHeight: 78, paddingTop: 12, textAlignVertical: 'top' },
+  visibilityControl: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', padding: 3 },
+  visibilityButton: { alignItems: 'center', borderRadius: 6, flex: 1, justifyContent: 'center', minHeight: 40 },
+  visibilityButtonActive: { backgroundColor: COLORS.gold },
+  visibilityText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
+  visibilityTextActive: { color: COLORS.black },
+  visibilityHelp: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, lineHeight: 17 },
+  saveButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 8, justifyContent: 'center', minHeight: 46 },
+  saveButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '900' },
+  deleteButton: { alignItems: 'center', borderColor: 'rgba(214,69,69,0.7)', borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 44 },
+  deleteButtonText: { color: '#FF8A8A', fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
+  deleteConfirm: { borderColor: 'rgba(214,69,69,0.7)', borderRadius: 8, borderWidth: 1, gap: SPACING.sm, padding: SPACING.md },
+  deleteConfirmText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13 },
+  deleteActions: { flexDirection: 'row', gap: SPACING.sm },
+  cancelDeleteButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 40 },
+  cancelDeleteText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
+  confirmDeleteButton: { alignItems: 'center', backgroundColor: COLORS.priest, borderRadius: 8, flex: 1, justifyContent: 'center', minHeight: 40 },
+  confirmDeleteText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
   trackList: { marginTop: SPACING.lg, borderRadius: RADII.lg, overflow: 'hidden', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   trackWrap: { flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
   trackFlex: { flex: 1 },
-  removeButton: { width: 44, alignItems: 'center', justifyContent: 'center' },
-  removeText: { color: COLORS.muted, fontSize: 24 },
+  trackActions: { alignItems: 'center', flexDirection: 'row', gap: 2 },
+  ownerTrackActions: { alignItems: 'center', borderLeftColor: COLORS.border, borderLeftWidth: StyleSheet.hairlineWidth, justifyContent: 'center', width: 38 },
+  orderButton: { alignItems: 'center', height: 28, justifyContent: 'center', width: 36 },
+  upIcon: { transform: [{ rotate: '180deg' }] },
+  removeButton: { alignItems: 'center', height: 28, justifyContent: 'center', width: 36 },
+  disabled: { opacity: 0.35 },
   empty: { padding: SPACING.lg },
   emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },

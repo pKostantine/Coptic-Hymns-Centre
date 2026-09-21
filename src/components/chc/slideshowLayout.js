@@ -20,7 +20,11 @@ export function getSlideshowChromeMetrics(fontSize) {
   const safeFontSize = Math.max(Number(fontSize) || 18, 1);
   const titleFontSize = clamp(Math.round(safeFontSize * 0.5), 14, 36);
   const buttonFontSize = clamp(Math.round(safeFontSize * 0.65), 18, 38);
-  const speakerFontSize = clamp(Math.round(safeFontSize * 0.7), 14, 52);
+  // Scroll mode renders speaker labels inside the normal language paragraph,
+  // so the label inherits that language's full font size. Slideshow must use
+  // the same metric instead of shrinking the speaker to a separate chrome
+  // scale.
+  const speakerFontSize = safeFontSize;
 
   return {
     buttonFontSize,
@@ -86,7 +90,10 @@ export function getVerseVerticalPadding(item = {}) {
 export function getSpeakerRowHeight(item = {}, fontSize = 18, visibleLanguages = {}) {
   if (item.suppressSpeakerLabel || !item.hasSpeakerLabel) return 0;
   if (!visibleLanguages.english && !visibleLanguages.arabic) return 0;
-  return getSlideshowChromeMetrics(fontSize).speakerLineHeight;
+  return Math.max(
+    visibleLanguages.english ? getSlideshowLanguageLineHeight('english', item, fontSize) : 0,
+    visibleLanguages.arabic ? getSlideshowLanguageLineHeight('arabic', item, fontSize) : 0,
+  );
 }
 
 function getLanguagePrefixHeight(language, item, fontSize) {

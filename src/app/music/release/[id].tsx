@@ -8,9 +8,11 @@ import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
+import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useMusicPlayer, type MusicQueueItem } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
@@ -25,6 +27,7 @@ import { shareLink } from '@/utils/shareLink';
 
 export default function MusicReleaseScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const params = useLocalSearchParams<{ id: string; track?: string }>();
   const { width } = useWindowDimensions();
   const { preferences } = useReadingPreferences();
@@ -50,7 +53,7 @@ export default function MusicReleaseScreen() {
       .then((payload) => { if (active) setRelease(payload); })
       .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Unable to load release.'); });
     return () => { active = false; };
-  }, [locale, releaseId]);
+  }, [locale, releaseId, user?.id]);
 
   const tracks = Array.isArray(release?.tracks) ? release.tracks : [];
   const queue = useMemo<MusicQueueItem[]>(() => tracks.map((track) => ({
@@ -87,7 +90,7 @@ export default function MusicReleaseScreen() {
         setReleaseLiked(false);
       });
     return () => { active = false; };
-  }, [locale, releaseId]);
+  }, [locale, releaseId, user?.id]);
 
   const prepareReleaseDownload = async () => {
     if (!release) throw new Error('Release is not loaded.');
@@ -259,23 +262,26 @@ export default function MusicReleaseScreen() {
                 liked={likedTrackIds.has(track.id)}
                 onToggleLike={() => void handleToggleTrackLike(track.id)}
                 trailing={(
-                  <MusicDownloadButton
-                    packageKey={trackRequest.packageKey}
-                    request={async () => {
-                      let lyrics: PublishedTrackLyricsPayload | null = null;
-                      try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional offline metadata */ }
-                      return musicTrackDownloadRequest({
-                        track,
-                        locale,
-                        releaseTitle: release.title,
-                        coverAsset: release.coverAsset,
-                        lyrics,
-                      });
-                    }}
-                    isArabic={isArabic}
-                    compact
-                    label=""
-                  />
+                  <View style={styles.trackActions}>
+                    <MusicPlaylistPicker trackId={track.id} compact />
+                    <MusicDownloadButton
+                      packageKey={trackRequest.packageKey}
+                      request={async () => {
+                        let lyrics: PublishedTrackLyricsPayload | null = null;
+                        try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional offline metadata */ }
+                        return musicTrackDownloadRequest({
+                          track,
+                          locale,
+                          releaseTitle: release.title,
+                          coverAsset: release.coverAsset,
+                          lyrics,
+                        });
+                      }}
+                      isArabic={isArabic}
+                      compact
+                      label=""
+                    />
+                  </View>
                 )}
               />
             );
@@ -360,6 +366,7 @@ const styles = StyleSheet.create({
   actionButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   disabledButton: { opacity: 0.45 },
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  trackActions: { alignItems: 'center', flexDirection: 'row', gap: 2 },
   trackListDesktop: { width: '94%', maxWidth: 1120, alignSelf: 'center', marginHorizontal: 0 },
   loader: { marginTop: SPACING.xl },
   errorBoundary: { flex: 1, padding: SPACING.xl, alignItems: 'center', justifyContent: 'center', gap: SPACING.md },

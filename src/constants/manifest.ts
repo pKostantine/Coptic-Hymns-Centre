@@ -201,6 +201,16 @@ export const HYPERLINK_TARGETS: Record<string, HyperlinkTarget> = {
   LECTIONARY_VESPERS: hyperlinkTarget('/lectionary/vespers', SERVICES_BY_CATEGORY.lectionary, 'vespers'),
   LECTIONARY_MATINS: hyperlinkTarget('/lectionary/matins', SERVICES_BY_CATEGORY.lectionary, 'matins'),
   LECTIONARY_LITURGY: hyperlinkTarget('/lectionary/liturgy', SERVICES_BY_CATEGORY.lectionary, 'liturgy'),
+  INTRODUCTION_TO_EVERY_HOUR: hyperlinkTarget('/agpeya/introduction_to_every_hour', SERVICES_BY_CATEGORY.agpeya, 'introduction_to_every_hour'),
+  FIRST_HOUR: hyperlinkTarget('/agpeya/first_hour', SERVICES_BY_CATEGORY.agpeya, 'first_hour'),
+  THIRD_HOUR: hyperlinkTarget('/agpeya/third_hour', SERVICES_BY_CATEGORY.agpeya, 'third_hour'),
+  SIXTH_HOUR: hyperlinkTarget('/agpeya/sixth_hour', SERVICES_BY_CATEGORY.agpeya, 'sixth_hour'),
+  NINTH_HOUR: hyperlinkTarget('/agpeya/ninth_hour', SERVICES_BY_CATEGORY.agpeya, 'ninth_hour'),
+  ELEVENTH_HOUR: hyperlinkTarget('/agpeya/eleventh_hour', SERVICES_BY_CATEGORY.agpeya, 'eleventh_hour'),
+  TWELFTH_HOUR: hyperlinkTarget('/agpeya/twelfth_hour', SERVICES_BY_CATEGORY.agpeya, 'twelfth_hour'),
+  MIDNIGHT_HOUR: hyperlinkTarget('/agpeya/midnight_hour', SERVICES_BY_CATEGORY.agpeya, 'midnight_hour'),
+  PRAYER_OF_THE_VEIL: hyperlinkTarget('/agpeya/prayer_of_the_veil', SERVICES_BY_CATEGORY.agpeya, 'prayer_of_the_veil'),
+  OTHER_PRAYERS: hyperlinkTarget('/agpeya/other_prayers', SERVICES_BY_CATEGORY.agpeya, 'other_prayers'),
 };
 
 /**

@@ -9,6 +9,7 @@ import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import { COLORS } from '@/constants/theme';
 import { useBottomChrome } from '@/context/BottomChromeContext';
+import { useAuth } from '@/context/AuthContext';
 import { useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -22,6 +23,7 @@ const FLOATING_GAP = 10;
 const EXCLUDED_PATHS = new Set([
   '/calendar',
   '/season-selector',
+  '/account',
   '/settings',
   '/book-settings',
   '/downloads',
@@ -43,6 +45,7 @@ const BOOK_PATH_PREFIXES = [
 
 export default function GlobalNowPlayingOverlay() {
   const router = useRouter();
+  const { user } = useAuth();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { tabBarInset, reportNowPlayingInset } = useBottomChrome();
@@ -142,7 +145,7 @@ export default function GlobalNowPlayingOverlay() {
       });
 
     return () => { active = false; };
-  }, [isPopupOpen, music.currentItem?.track.id, preferences.appLanguage]);
+  }, [isPopupOpen, music.currentItem?.track.id, preferences.appLanguage, user?.id]);
 
   if (!allowDisplay) {
     return null;

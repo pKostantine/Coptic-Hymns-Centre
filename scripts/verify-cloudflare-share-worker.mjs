@@ -4,6 +4,7 @@ const requiredRoutes = [
   '/share/*',
   '/__share-image',
   '/music/artist/*',
+  '/music/playlist/*',
   '/music/release/*',
   '/music/track/*',
   '/learn/cantor/*',

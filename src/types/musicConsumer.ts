@@ -81,6 +81,8 @@ export interface MusicLibraryPlaylist {
 
 export interface MusicLibraryPayload {
   authenticated: boolean;
+  followedArtists: MusicConsumerArtistSummary[];
+  likedReleases: MusicConsumerReleaseSummary[];
   likedTracks: MusicConsumerTrack[];
   playlists: MusicLibraryPlaylist[];
 }
@@ -90,7 +92,8 @@ export interface MusicPlaylistPayload {
   name: string;
   description: string | null;
   visibility: MusicPlaylistVisibility;
-  ownerUserId: string;
+  ownerUserId: string | null;
+  isOwner: boolean;
   coverAsset: MusicConsumerAsset | null;
   tracks: MusicConsumerTrack[];
 }

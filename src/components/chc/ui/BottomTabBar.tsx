@@ -12,7 +12,7 @@ import Icon from './Icon';
 interface BottomTabBarProps {
   /** Top-level CHC section. Switching tabs uses replace(), so the peer sections
    * never build a back-button stack on top of one another. */
-  active: 'home' | 'books' | 'music' | 'learn' | 'settings' | null;
+  active: 'home' | 'books' | 'music' | 'learn' | 'account' | null;
 }
 
 export default function BottomTabBar({ active }: BottomTabBarProps) {
@@ -22,8 +22,8 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   const isCompactLandscape = useIsCompactLandscape();
   const isArabic = preferences.appLanguage === 'ar';
   const labels = isArabic
-    ? { home: 'الرئيسية', books: 'الكتب', music: 'الترانيم', learn: 'التعلّم', settings: 'الإعدادات' }
-    : { home: 'Home', books: 'Books', music: 'Music', learn: 'Learn', settings: 'Settings' };
+    ? { home: 'الرئيسية', books: 'الكتب', music: 'الترانيم', learn: 'التعلّم', account: 'الحساب' }
+    : { home: 'Home', books: 'Books', music: 'Music', learn: 'Learn', account: 'Account' };
   const labelStyle = [styles.tabLabel, isCompactLandscape && styles.tabLabelLandscape, isArabic && styles.tabLabelArabic];
   const tabStyle = [styles.tab, isCompactLandscape && styles.tabLandscape];
   const iconSize = isCompactLandscape ? 22 : 27;
@@ -84,10 +84,10 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
         <Text numberOfLines={1} style={[labelStyle, active === 'learn' && styles.tabLabelLearning]}>{labels.learn}</Text>
       </Pressable>
 
-      <Pressable accessibilityLabel={labels.settings} style={tabStyle} onPress={() => router.replace('/settings')}>
-        {active === 'settings' ? <View style={styles.activeIndicator} /> : null}
-        <Icon name="settings-outline" size={iconSize} color={active === 'settings' ? COLORS.gold : COLORS.muted} />
-        <Text numberOfLines={1} style={[labelStyle, active === 'settings' && styles.tabLabelActive]}>{labels.settings}</Text>
+      <Pressable accessibilityLabel={labels.account} style={tabStyle} onPress={() => router.replace('/account')}>
+        {active === 'account' ? <View style={styles.activeIndicator} /> : null}
+        <Icon name="person-circle-outline" size={iconSize} color={active === 'account' ? COLORS.gold : COLORS.muted} />
+        <Text numberOfLines={1} style={[labelStyle, active === 'account' && styles.tabLabelActive]}>{labels.account}</Text>
       </Pressable>
       </View>
     </View>

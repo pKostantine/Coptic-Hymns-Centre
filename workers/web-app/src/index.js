@@ -13,6 +13,7 @@ const PUBLIC_BUCKET_ROUTES = {
 const ENTITY_KINDS = {
   music: {
     artist: 'profile',
+    playlist: 'music.playlist',
     release: 'music.album',
     track: 'music.song',
   },
@@ -71,8 +72,13 @@ function previewLocale(url) {
   return url.searchParams.get('lang') === 'ar' ? 'ar' : 'en';
 }
 
-async function loadPreview(pathname, locale) {
-  const response = await fetch(SUPABASE_URL + '/rest/v1/rpc/get_share_preview', {
+async function loadPreview(target, locale) {
+  const playlist = target.section === 'music' && target.kind === 'playlist';
+  const rpc = playlist ? 'get_music_playlist_share_preview' : 'get_share_preview';
+  const body = playlist
+    ? { p_playlist_id: target.id }
+    : { p_path: target.path, p_locale: locale };
+  const response = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + rpc, {
     method: 'POST',
     headers: {
       'Accept-Profile': 'public',
@@ -80,7 +86,7 @@ async function loadPreview(pathname, locale) {
       'Content-Type': 'application/json',
       'Content-Profile': 'public',
     },
-    body: JSON.stringify({ p_path: pathname, p_locale: locale }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -359,7 +365,7 @@ export default {
 
     let preview;
     try {
-      preview = await loadPreview(target.path, previewLocale(url));
+      preview = await loadPreview(target, previewLocale(url));
     } catch (error) {
       if (target.dedicated) return previewFailureResponse(error);
       return env.ASSETS.fetch(request);

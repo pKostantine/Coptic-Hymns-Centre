@@ -9,6 +9,7 @@ import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerArtist, MusicConsumerAsset } from '@/types/musicConsumer';
@@ -18,6 +19,7 @@ import { shareLink } from '@/utils/shareLink';
 
 export default function MusicArtistScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const params = useLocalSearchParams<{ id: string }>();
   const artistId = Array.isArray(params.id) ? params.id[0] : params.id;
   const { preferences } = useReadingPreferences();
@@ -51,7 +53,7 @@ export default function MusicArtistScreen() {
         if (active) setError(cause instanceof Error ? cause.message : 'Unable to load artist.');
       });
     return () => { active = false; };
-  }, [artistId, locale]);
+  }, [artistId, locale, user?.id]);
 
   useEffect(() => {
     if (!artist || artist.profileImageAsset || shareArtworkLoaded) return;

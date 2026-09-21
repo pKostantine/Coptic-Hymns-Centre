@@ -10,6 +10,7 @@ const workerModule = await import(
 const worker = workerModule.default;
 
 const RELEASE_ID = 'bab96e57-727c-43a9-af88-36a7e6535b4a';
+const PLAYLIST_ID = 'a2c69b08-2d9c-4f40-a13c-940f5031b7de';
 const ASSET_ID = 'c439ccf6-1662-4bcd-909a-0d24433c6282';
 const ASSET_PATH = 'processed/release/version/cover.jpg';
 const PREVIEW = {
@@ -126,6 +127,29 @@ test('artist and track share routes select their entity-specific Open Graph type
     assert.match(html, new RegExp(`<meta property="og:title" content="${item.title} — Coptic Hymns Centre" \\/>`));
     assert.match(html, /<meta property="og:image" content="https:\/\/chc\.pierrek\.ca\/__share-image\?/);
   }
+});
+
+test('public playlist share routes use the visibility-safe playlist preview RPC', async () => {
+  globalThis.fetch = async (input, init) => {
+    assert.equal(String(input), 'https://wtuujmeinzqfikvuofmh.supabase.co/rest/v1/rpc/get_music_playlist_share_preview');
+    assert.deepEqual(JSON.parse(init?.body), { p_playlist_id: PLAYLIST_ID });
+    return new Response(JSON.stringify({ ...PREVIEW, title: 'Sunday Liturgy' }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  const { env, requests } = makeEnv();
+
+  const response = await worker.fetch(
+    new Request(`https://chc.pierrek.ca/share/music/playlist/${PLAYLIST_ID}`),
+    env,
+  );
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.equal(requests.length, 0);
+  assert.match(html, /<meta property="og:type" content="music\.playlist" \/>/);
+  assert.match(html, /<meta property="og:title" content="Sunday Liturgy — Coptic Hymns Centre" \/>/);
+  assert.match(html, new RegExp(`window\\.location\\.replace\\("https://chc\\.pierrek\\.ca/music/playlist/${PLAYLIST_ID}"\\)`));
 });
 
 test('direct entity route replaces the generic SPA Open Graph block', async () => {

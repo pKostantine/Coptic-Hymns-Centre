@@ -1,7 +1,9 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { learningService } from '@/services/learningService';
 import type { LearningProgressState } from '@/types/learningPlatform';
 
@@ -16,6 +18,8 @@ export default function LearningProgressControl({
   isArabic?: boolean;
   onChanged?: (state: LearningProgressState) => void;
 }) {
+  const router = useRouter();
+  const { user } = useAuth();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [state, setState] = useState<LearningProgressState | null>(null);
   const [saving, setSaving] = useState<LearningProgressState | null>(null);
@@ -36,7 +40,7 @@ export default function LearningProgressControl({
         setError(cause instanceof Error ? cause.message : 'Unable to load progress.');
       });
     return () => { active = false; };
-  }, [hymnId, locale]);
+  }, [hymnId, locale, user?.id]);
 
   const choose = async (nextState: LearningProgressState) => {
     if (!authenticated || saving) return;
@@ -69,6 +73,9 @@ export default function LearningProgressControl({
             : 'You can listen and watch without an account, but learning states are tied to your CHC account.'}
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Pressable style={styles.accountButton} onPress={() => router.push('/account')}>
+          <Text style={styles.accountButtonText}>{isArabic ? 'فتح الحساب' : 'Open Account'}</Text>
+        </Pressable>
       </View>
     );
   }
@@ -138,5 +145,7 @@ const styles = StyleSheet.create({
   authTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '700' },
   authBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19, marginTop: SPACING.xs },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: SPACING.sm },
+  accountButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: COLORS.learning, borderRadius: 8, justifyContent: 'center', marginTop: SPACING.md, minHeight: 40, paddingHorizontal: SPACING.md },
+  accountButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '900' },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });

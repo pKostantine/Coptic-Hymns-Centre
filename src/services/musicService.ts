@@ -120,7 +120,14 @@ export async function searchMusic(query: string, locale = 'en'): Promise<MusicSe
 export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayload> {
   return offlineFallback(async () => {
     const { data, error } = await supabase.rpc('get_my_music_library', { p_locale: locale });
-    return assertRpcData(data as MusicLibraryPayload | null, error, 'Load music library');
+    const library = assertRpcData(data as MusicLibraryPayload | null, error, 'Load music library');
+    return {
+      ...library,
+      followedArtists: library.followedArtists ?? [],
+      likedReleases: library.likedReleases ?? [],
+      likedTracks: library.likedTracks ?? [],
+      playlists: library.playlists ?? [],
+    };
   }, 'music_library', 'library', locale);
 }
 
@@ -191,6 +198,34 @@ export async function removeTrackFromMusicPlaylist(playlistId: string, trackId: 
   return assertRpcData(data as boolean | null, error, 'Remove track from playlist');
 }
 
+export async function updateMusicPlaylist(
+  playlistId: string,
+  name: string,
+  description: string | null,
+  visibility: MusicPlaylistVisibility,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('update_music_playlist', {
+    p_playlist_id: playlistId,
+    p_name: name,
+    p_description: description,
+    p_visibility: visibility,
+  });
+  return assertRpcData(data as boolean | null, error, 'Update playlist');
+}
+
+export async function deleteMusicPlaylist(playlistId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('delete_music_playlist', { p_playlist_id: playlistId });
+  return assertRpcData(data as boolean | null, error, 'Delete playlist');
+}
+
+export async function setMusicPlaylistTrackOrder(playlistId: string, trackIds: string[]): Promise<boolean> {
+  const { data, error } = await supabase.rpc('set_music_playlist_track_order', {
+    p_playlist_id: playlistId,
+    p_track_ids: trackIds,
+  });
+  return assertRpcData(data as boolean | null, error, 'Reorder playlist');
+}
+
 export async function getTrackLyrics(
   trackId: string,
   locale?: string | null,
@@ -222,6 +257,9 @@ export const musicService = {
   getArtistFollowed,
   setArtistFollowed,
   createPlaylist: createMusicPlaylist,
+  updatePlaylist: updateMusicPlaylist,
+  deletePlaylist: deleteMusicPlaylist,
+  setPlaylistTrackOrder: setMusicPlaylistTrackOrder,
   addToPlaylist: addTrackToMusicPlaylist,
   removeFromPlaylist: removeTrackFromMusicPlaylist,
   getLyrics: getTrackLyrics,

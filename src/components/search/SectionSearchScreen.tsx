@@ -22,6 +22,7 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { useAuth } from '@/context/AuthContext';
 import { musicService } from '@/services/musicService';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
 import type { MusicConsumerAsset, MusicConsumerTrack } from '@/types/musicConsumer';
@@ -85,6 +86,7 @@ function musicTrackItem(result: Extract<UnifiedSearchResult, { kind: 'music_trac
 
 export default function SectionSearchScreen({ section }: SectionSearchScreenProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const inputRef = useRef<TextInput>(null);
   const { preferences } = useReadingPreferences();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
@@ -119,7 +121,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
         setLikedTrackIds(new Set());
       });
     return () => { active = false; };
-  }, [locale, music]);
+  }, [locale, music, user?.id]);
 
   useEffect(() => {
     const value = query.trim();

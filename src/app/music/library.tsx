@@ -9,9 +9,11 @@ import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
+import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
@@ -20,9 +22,11 @@ import {
   musicTrackDownloadRequest,
 } from '@/services/offlineDownloadRequests';
 import type { MusicLibraryPayload, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
+import type { MusicPlaylistVisibility } from '@/types/mediaPlatform';
 
 export default function MusicLibraryScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { preferences } = useReadingPreferences();
   const { currentItem, playQueue } = useMusicPlayer();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
@@ -31,6 +35,9 @@ export default function MusicLibraryScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [newPlaylistDescription, setNewPlaylistDescription] = useState('');
+  const [newPlaylistVisibility, setNewPlaylistVisibility] = useState<MusicPlaylistVisibility>('private');
+  const [showPlaylistCreator, setShowPlaylistCreator] = useState(false);
   const [creating, setCreating] = useState(false);
   const likedDownload = useMemo(
     () => library?.authenticated ? musicLikedSongsDownloadRequest(library, locale) : null,
@@ -47,7 +54,7 @@ export default function MusicLibraryScreen() {
     } finally {
       setLoading(false);
     }
-  }, [locale]);
+  }, [locale, user?.id]);
 
   useEffect(() => { void loadLibrary(); }, [loadLibrary]);
 
@@ -57,14 +64,44 @@ export default function MusicLibraryScreen() {
     setCreating(true);
     setError(null);
     try {
-      const playlistId = await musicService.createPlaylist(name);
+      const playlistId = await musicService.createPlaylist(
+        name,
+        newPlaylistDescription.trim() || null,
+        newPlaylistVisibility,
+      );
       setNewPlaylistName('');
+      setNewPlaylistDescription('');
+      setShowPlaylistCreator(false);
       await loadLibrary();
       router.push(`/music/playlist/${playlistId}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to create playlist.');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const unlikeRelease = async (releaseId: string) => {
+    try {
+      await musicService.setReleaseLiked(releaseId, false);
+      setLibrary((current) => current ? {
+        ...current,
+        likedReleases: current.likedReleases.filter((release) => release.id !== releaseId),
+      } : current);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update liked releases.');
+    }
+  };
+
+  const unfollowArtist = async (artistId: string) => {
+    try {
+      await musicService.setArtistFollowed(artistId, false);
+      setLibrary((current) => current ? {
+        ...current,
+        followedArtists: current.followedArtists.filter((artist) => artist.id !== artistId),
+      } : current);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update followed artists.');
     }
   };
 
@@ -119,11 +156,64 @@ export default function MusicLibraryScreen() {
                 ? 'الأغاني المعجبة وقوائم التشغيل مرتبطة بحسابك. تصفح الموسيقى والاستماع متاحان بدون تسجيل الدخول.'
                 : 'Liked Songs and playlists are tied to your account. Browsing and listening still work without signing in.'}
             </Text>
+            <Pressable style={styles.accountButton} onPress={() => router.push('/account')}>
+              <Text style={styles.accountButtonText}>{isArabic ? 'فتح الحساب' : 'Open Account'}</Text>
+            </Pressable>
           </View>
         ) : null}
 
         {library?.authenticated ? (
           <>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الفنانون المتابَعون' : 'Followed Artists'}</Text>
+                <Text style={[styles.sectionMeta, isArabic && styles.arabic]}>{isArabic ? 'آخر الإصدارات من الفنانين الذين تتابعهم' : 'Keep up with the artists you follow'}</Text>
+              </View>
+            </View>
+            {library.followedArtists.length ? (
+              <View style={styles.savedList}>
+                {library.followedArtists.map((artist) => (
+                  <View key={artist.id} style={styles.savedRow}>
+                    <Pressable style={styles.savedMain} onPress={() => router.push(`/music/artist/${artist.id}`)}>
+                      <MusicArtwork asset={artist.profileImageAsset} size={54} radius={8} label={artist.displayName} />
+                      <View style={styles.savedInfo}>
+                        <Text numberOfLines={1} style={[styles.savedTitle, isArabic && styles.arabic]}>{artist.displayName}</Text>
+                        <Text numberOfLines={1} style={[styles.savedMeta, isArabic && styles.arabic]}>{isArabic ? 'فنان متابَع' : 'Following'}</Text>
+                      </View>
+                    </Pressable>
+                    <Pressable accessibilityLabel={`Unfollow ${artist.displayName}`} style={styles.savedAction} onPress={() => void unfollowArtist(artist.id)}>
+                      <Text style={styles.savedActionText}>{isArabic ? 'إلغاء' : 'Unfollow'}</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : <EmptyCard text={isArabic ? 'تابع فناناً ليظهر هنا.' : 'Follow an artist and they will appear here.'} />}
+
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الإصدارات المعجبة' : 'Liked Releases'}</Text>
+                <Text style={[styles.sectionMeta, isArabic && styles.arabic]}>{isArabic ? `${library.likedReleases.length} إصدار` : `${library.likedReleases.length} saved`}</Text>
+              </View>
+            </View>
+            {library.likedReleases.length ? (
+              <View style={styles.savedList}>
+                {library.likedReleases.map((release) => (
+                  <View key={release.id} style={styles.savedRow}>
+                    <Pressable style={styles.savedMain} onPress={() => router.push(`/music/release/${release.id}`)}>
+                      <MusicArtwork asset={release.coverAsset} size={54} radius={8} label={release.title} />
+                      <View style={styles.savedInfo}>
+                        <Text numberOfLines={1} style={[styles.savedTitle, isArabic && styles.arabic]}>{release.title}</Text>
+                        <Text numberOfLines={1} style={[styles.savedMeta, isArabic && styles.arabic]}>{release.primaryArtist?.displayName ?? release.releaseType}</Text>
+                      </View>
+                    </Pressable>
+                    <Pressable accessibilityLabel={`Unlike ${release.title}`} style={styles.heartAction} onPress={() => void unlikeRelease(release.id)}>
+                      <Text style={styles.heartActionText}>♥</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : <EmptyCard text={isArabic ? 'أعجب بإصدار ليظهر هنا.' : 'Like a release and it will appear here.'} />}
+
             <View style={styles.sectionHeader}>
               <View>
                 <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الأغاني المعجبة' : 'Liked Songs'}</Text>
@@ -163,17 +253,20 @@ export default function MusicLibraryScreen() {
                       liked
                       onToggleLike={() => void unlikeTrack(track.id)}
                       trailing={(
-                        <MusicDownloadButton
-                          packageKey={trackDownload.packageKey}
-                          request={async () => {
-                            let lyrics: PublishedTrackLyricsPayload | null = null;
-                            try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
-                            return musicTrackDownloadRequest({ track, locale, lyrics });
-                          }}
-                          isArabic={isArabic}
-                          compact
-                          label=""
-                        />
+                        <View style={styles.trackActions}>
+                          <MusicPlaylistPicker trackId={track.id} compact />
+                          <MusicDownloadButton
+                            packageKey={trackDownload.packageKey}
+                            request={async () => {
+                              let lyrics: PublishedTrackLyricsPayload | null = null;
+                              try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
+                              return musicTrackDownloadRequest({ track, locale, lyrics });
+                            }}
+                            isArabic={isArabic}
+                            compact
+                            label=""
+                          />
+                        </View>
                       )}
                     />
                   );
@@ -190,20 +283,25 @@ export default function MusicLibraryScreen() {
               </View>
             </View>
 
-            <View style={styles.createRow}>
-              <TextInput
-                value={newPlaylistName}
-                onChangeText={setNewPlaylistName}
-                onSubmitEditing={() => void createPlaylist()}
-                placeholder={isArabic ? 'اسم قائمة جديدة' : 'New playlist name'}
-                placeholderTextColor={COLORS.muted}
-                style={[styles.input, isArabic && styles.arabicInput]}
-                returnKeyType="done"
-              />
-              <Pressable disabled={!newPlaylistName.trim() || creating} style={[styles.createButton, (!newPlaylistName.trim() || creating) && styles.disabled]} onPress={() => void createPlaylist()}>
-                <Text style={styles.createButtonText}>{creating ? '…' : '+'}</Text>
-              </Pressable>
-            </View>
+            <Pressable style={styles.newPlaylistButton} onPress={() => setShowPlaylistCreator((current) => !current)}>
+              <Text style={styles.newPlaylistButtonText}>{showPlaylistCreator ? (isArabic ? 'إلغاء' : 'Cancel') : (isArabic ? 'قائمة تشغيل جديدة' : 'New playlist')}</Text>
+            </Pressable>
+            {showPlaylistCreator ? (
+              <View style={styles.playlistCreator}>
+                <TextInput value={newPlaylistName} onChangeText={setNewPlaylistName} placeholder={isArabic ? 'اسم قائمة التشغيل' : 'Playlist name'} placeholderTextColor={COLORS.muted} style={[styles.input, isArabic && styles.arabicInput]} />
+                <TextInput value={newPlaylistDescription} onChangeText={setNewPlaylistDescription} placeholder={isArabic ? 'الوصف (اختياري)' : 'Description (optional)'} placeholderTextColor={COLORS.muted} style={[styles.input, styles.descriptionInput, isArabic && styles.arabicInput]} multiline />
+                <View style={styles.visibilityControl}>
+                  {(['private', 'public'] as const).map((visibility) => (
+                    <Pressable key={visibility} accessibilityRole="radio" accessibilityState={{ checked: newPlaylistVisibility === visibility }} style={[styles.visibilityButton, newPlaylistVisibility === visibility && styles.visibilityButtonActive]} onPress={() => setNewPlaylistVisibility(visibility)}>
+                      <Text style={[styles.visibilityText, newPlaylistVisibility === visibility && styles.visibilityTextActive]}>{visibility === 'private' ? (isArabic ? 'خاصة' : 'Private') : (isArabic ? 'عامة' : 'Public')}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Pressable disabled={!newPlaylistName.trim() || creating} style={[styles.createPlaylistButton, (!newPlaylistName.trim() || creating) && styles.disabled]} onPress={() => void createPlaylist()}>
+                  <Text style={styles.createPlaylistButtonText}>{creating ? (isArabic ? 'جارٍ الإنشاء…' : 'Creating…') : (isArabic ? 'إنشاء قائمة التشغيل' : 'Create playlist')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {library.playlists.length ? (
               <View style={styles.playlistGrid}>
@@ -245,6 +343,8 @@ const styles = StyleSheet.create({
   authCard: { padding: SPACING.lg, borderRadius: RADII.lg, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.navyDark },
   authTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   authBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, marginTop: SPACING.sm },
+  accountButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: COLORS.gold, borderRadius: 8, justifyContent: 'center', marginTop: SPACING.md, minHeight: 42, paddingHorizontal: SPACING.md },
+  accountButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.md, marginTop: SPACING.sm },
   sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
   sectionMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
@@ -252,6 +352,17 @@ const styles = StyleSheet.create({
   playAll: { minHeight: 40, paddingHorizontal: SPACING.md, borderRadius: RADII.pill, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
   trackList: { borderRadius: RADII.lg, overflow: 'hidden', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  trackActions: { alignItems: 'center', flexDirection: 'row', gap: 2 },
+  savedList: { borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, overflow: 'hidden' },
+  savedRow: { alignItems: 'center', borderBottomColor: COLORS.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 72, padding: SPACING.sm },
+  savedMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: SPACING.md, minWidth: 0 },
+  savedInfo: { flex: 1, minWidth: 0 },
+  savedTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800' },
+  savedMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 4, textTransform: 'capitalize' },
+  savedAction: { alignItems: 'center', borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 34, paddingHorizontal: SPACING.sm },
+  savedActionText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800' },
+  heartAction: { alignItems: 'center', height: 40, justifyContent: 'center', width: 40 },
+  heartActionText: { color: COLORS.goldBright, fontSize: 21 },
   emptyCard: { padding: SPACING.lg, borderRadius: RADII.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
   createRow: { flexDirection: 'row', gap: SPACING.sm },
@@ -259,6 +370,17 @@ const styles = StyleSheet.create({
   arabicInput: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   createButton: { width: 46, height: 46, borderRadius: RADII.md, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   createButtonText: { color: COLORS.black, fontSize: 25, fontWeight: '800' },
+  newPlaylistButton: { alignItems: 'center', alignSelf: 'flex-start', borderColor: COLORS.goldLine, borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 42, paddingHorizontal: SPACING.md },
+  newPlaylistButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
+  playlistCreator: { borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, gap: SPACING.sm, padding: SPACING.md },
+  descriptionInput: { minHeight: 76, paddingTop: 12, textAlignVertical: 'top' },
+  visibilityControl: { backgroundColor: COLORS.black, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', padding: 3 },
+  visibilityButton: { alignItems: 'center', borderRadius: 6, flex: 1, justifyContent: 'center', minHeight: 40 },
+  visibilityButtonActive: { backgroundColor: COLORS.gold },
+  visibilityText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
+  visibilityTextActive: { color: COLORS.black },
+  createPlaylistButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 8, justifyContent: 'center', minHeight: 46 },
+  createPlaylistButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '900' },
   disabled: { opacity: 0.45 },
   playlistGrid: { gap: SPACING.sm },
   playlistCard: { minHeight: 94, padding: SPACING.sm, flexDirection: 'row', alignItems: 'center', gap: SPACING.md, borderRadius: RADII.lg, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },

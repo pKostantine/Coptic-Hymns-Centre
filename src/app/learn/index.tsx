@@ -11,12 +11,14 @@ import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningHomePayload, LearningProgressPayload } from '@/types/learningPlatform';
 
 export default function LearningHomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { preferences } = useReadingPreferences();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
@@ -37,7 +39,7 @@ export default function LearningHomeScreen() {
         if (active) setError(cause instanceof Error ? cause.message : 'Unable to load Learn & Study.');
       });
     return () => { active = false; };
-  }, [locale]);
+  }, [locale, user?.id]);
 
   const continueLearning = progress?.items.filter((item) => item.state === 'learning').slice(0, 4) ?? [];
 

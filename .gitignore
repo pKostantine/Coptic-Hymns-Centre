@@ -10,6 +10,7 @@ supabase/.temp/
 dist/
 web-build/
 expo-env.d.ts
+artifacts/
 
 # Native
 .kotlin/

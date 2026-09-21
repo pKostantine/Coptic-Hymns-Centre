@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type SetStateAction } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 
 import { loadBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
 import {
+    applySyncedReadingPreferences,
     AppLanguage,
     BibleVisibleLanguages,
     DEFAULT_READING_PREFERENCES,
@@ -11,12 +12,18 @@ import {
     OrientationMode,
     ReadingPreferences,
     saveReadingPreferences,
+    syncedReadingPreferences,
     VisibleLanguages,
 } from '../utils/preferencesStorage';
+import { useAuth } from './AuthContext';
+import { getMyContentPreferences, saveMyContentPreferences } from '../services/userContentPreferencesService';
+
+export type ContentSyncStatus = 'local' | 'syncing' | 'synced' | 'error';
 
 interface ReadingPreferencesContextValue {
   preferences: ReadingPreferences;
   ready: boolean;
+  contentSyncStatus: ContentSyncStatus;
   toggleLanguage: (key: keyof VisibleLanguages) => void;
   setBibleVisibleLanguages: (updater: SetStateAction<BibleVisibleLanguages>) => void;
   setFontScale: (delta: number) => void;
@@ -50,17 +57,46 @@ function clampFontScale(value: number) {
   return Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, rounded));
 }
 
+function normalizeBookmarks(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((bookmark): bookmark is string => (
+    typeof bookmark === 'string' && bookmark.trim().length > 0 && bookmark.length <= 512
+  )).map((bookmark) => bookmark.trim()))].slice(0, 500);
+}
+
+function contentSignature(preferences: ReadingPreferences, bookmarks: string[]) {
+  return JSON.stringify([syncedReadingPreferences(preferences), normalizeBookmarks(bookmarks)]);
+}
+
 export function ReadingPreferencesProvider({ children }: { children: React.ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const [preferences, setPreferences] = useState<ReadingPreferences>(DEFAULT_READING_PREFERENCES);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
+  const [contentSyncStatus, setContentSyncStatus] = useState<ContentSyncStatus>('local');
+  const [syncedUserId, setSyncedUserId] = useState<string | null>(null);
+  const preferencesRef = useRef(preferences);
+  const bookmarksRef = useRef(bookmarks);
+  const activeSyncUserRef = useRef<string | null>(null);
+  const lastCloudSignatureRef = useRef<string | null>(null);
+  const latestCloudSignatureRef = useRef<string | null>(null);
+  const cloudSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    preferencesRef.current = preferences;
+  }, [preferences]);
+
+  useEffect(() => {
+    bookmarksRef.current = bookmarks;
+  }, [bookmarks]);
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([loadReadingPreferences(), loadBookmarks()]).then(([storedPreferences, storedBookmarks]) => {
       if (cancelled) return;
       setPreferences(storedPreferences);
-      setBookmarks(storedBookmarks);
+      setBookmarks(normalizeBookmarks(storedBookmarks));
       setReady(true);
     });
     return () => {
@@ -75,6 +111,100 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
   useEffect(() => {
     if (ready) saveBookmarks(bookmarks);
   }, [bookmarks, ready]);
+
+  useEffect(() => {
+    if (!ready || authLoading) return;
+    let cancelled = false;
+
+    const synchronize = async () => {
+      // Keep all state changes on the asynchronous side of the account lookup.
+      await Promise.resolve();
+      if (cancelled) return;
+
+      if (!userId) {
+        activeSyncUserRef.current = null;
+        lastCloudSignatureRef.current = null;
+        latestCloudSignatureRef.current = null;
+        setSyncedUserId(null);
+        setContentSyncStatus('local');
+        return;
+      }
+
+      const accountUserId = userId;
+      activeSyncUserRef.current = accountUserId;
+      lastCloudSignatureRef.current = null;
+      setSyncedUserId(null);
+      setContentSyncStatus('syncing');
+
+      try {
+        const cloud = await getMyContentPreferences();
+        if (cancelled || activeSyncUserRef.current !== accountUserId) return;
+        let syncedSignature: string;
+
+        if (cloud.exists) {
+          const nextPreferences = applySyncedReadingPreferences(preferencesRef.current, cloud.preferences);
+          const nextBookmarks = normalizeBookmarks(cloud.bookmarks);
+          preferencesRef.current = nextPreferences;
+          bookmarksRef.current = nextBookmarks;
+          setPreferences(nextPreferences);
+          setBookmarks(nextBookmarks);
+          syncedSignature = contentSignature(nextPreferences, nextBookmarks);
+        } else {
+          const initialPreferences = preferencesRef.current;
+          const initialBookmarks = bookmarksRef.current;
+          syncedSignature = contentSignature(initialPreferences, initialBookmarks);
+          await saveMyContentPreferences(
+            syncedReadingPreferences(initialPreferences),
+            initialBookmarks,
+          );
+          if (cancelled || activeSyncUserRef.current !== accountUserId) return;
+        }
+
+        lastCloudSignatureRef.current = syncedSignature;
+        latestCloudSignatureRef.current = contentSignature(preferencesRef.current, bookmarksRef.current);
+        setSyncedUserId(accountUserId);
+        setContentSyncStatus('synced');
+      } catch (error) {
+        if (cancelled || activeSyncUserRef.current !== accountUserId) return;
+        console.warn('Unable to synchronize CHC content preferences:', error);
+        setContentSyncStatus('error');
+      }
+    };
+
+    void synchronize();
+    return () => { cancelled = true; };
+  }, [authLoading, ready, userId]);
+
+  useEffect(() => {
+    if (!ready || !userId || syncedUserId !== userId) return;
+    const accountUserId = userId;
+    const signature = contentSignature(preferences, bookmarks);
+    latestCloudSignatureRef.current = signature;
+    if (signature === lastCloudSignatureRef.current) return;
+
+    const timer = setTimeout(() => {
+      setContentSyncStatus('syncing');
+      cloudSaveQueueRef.current = cloudSaveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (
+            activeSyncUserRef.current !== accountUserId
+            || latestCloudSignatureRef.current !== signature
+          ) return;
+          await saveMyContentPreferences(syncedReadingPreferences(preferences), bookmarks);
+          if (activeSyncUserRef.current !== accountUserId) return;
+          lastCloudSignatureRef.current = signature;
+          setContentSyncStatus('synced');
+        })
+        .catch((error) => {
+          if (activeSyncUserRef.current !== accountUserId) return;
+          console.warn('Unable to save CHC content preferences:', error);
+          setContentSyncStatus('error');
+        });
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [bookmarks, preferences, ready, syncedUserId, userId]);
 
   const toggleLanguage = useCallback((key: keyof VisibleLanguages) => {
     setPreferences((prev) => ({
@@ -184,6 +314,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     () => ({
       preferences,
       ready,
+      contentSyncStatus,
       toggleLanguage,
       setBibleVisibleLanguages,
       setFontScale,
@@ -207,6 +338,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     [
       preferences,
       ready,
+      contentSyncStatus,
       toggleLanguage,
       setBibleVisibleLanguages,
       setFontScale,

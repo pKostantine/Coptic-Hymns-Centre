@@ -101,8 +101,8 @@ test("maximum-size language metrics leave room for Arabic and Coptic marks", () 
   assert.deepEqual(getSlideshowChromeMetrics(78), {
     buttonFontSize: 38,
     buttonLineHeight: 48,
-    speakerFontSize: 52,
-    speakerLineHeight: 68,
+    speakerFontSize: 78,
+    speakerLineHeight: 101,
     titleFontSize: 36,
     titleLineHeight: 45,
   });

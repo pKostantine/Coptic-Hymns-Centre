@@ -19,6 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import Icon, { type IconName } from '@/components/chc/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
 import MusicLyricsView, { lyricSetShortLabel } from '@/components/music/MusicLyricsView';
 import MusicQueueList from '@/components/music/MusicQueueList';
 import SeekBar from '@/components/music/SeekBar';
@@ -27,6 +28,7 @@ import RoundIconButton from '@/components/playback/RoundIconButton';
 import { useOverlayTransition } from '@/components/playback/useOverlayTransition';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
+import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerAsset, PublishedLyricSet } from '@/types/musicConsumer';
@@ -91,6 +93,7 @@ interface MusicNowPlayingScreenProps {
 }
 
 export default function MusicNowPlayingScreen({ embedded = false, onClose }: MusicNowPlayingScreenProps = {}) {
+  const { user } = useAuth();
   const router = useRouter();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
@@ -218,7 +221,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       })
       .finally(() => { if (active) setLyricsLoading(false); });
     return () => { active = false; };
-  }, [currentItem?.track.id, preferences.appLanguage]);
+  }, [currentItem?.track.id, preferences.appLanguage, user?.id]);
 
   useEffect(() => {
     if (!currentItem) return;
@@ -236,7 +239,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         }
       });
     return () => { active = false; };
-  }, [currentItem?.track.id, preferences.appLanguage]);
+  }, [currentItem?.track.id, preferences.appLanguage, user?.id]);
 
   const selectedSet = lyricSets.find((set) => set.id === selectedLyricSetId) ?? null;
   const activeLineId = useMemo(() => {
@@ -446,6 +449,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       playing={playing}
       buffering={buffering}
       liked={likedTrackIds.has(currentItem.track.id)}
+      trackId={currentItem.track.id}
       likeBusy={likeBusy}
       isArabic={isArabic}
       onSeek={(positionMs) => void seekToMs(positionMs)}
@@ -488,6 +492,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
           playing={playing}
           buffering={buffering}
           liked={likedTrackIds.has(currentItem.track.id)}
+          trackId={currentItem.track.id}
           likeBusy={likeBusy}
           isArabic={isArabic}
           onSeek={(positionMs) => void seekToMs(positionMs)}
@@ -806,6 +811,7 @@ interface PlayerCardProps extends Omit<TransportControlsProps, 'large'> {
   positionMs: number;
   durationMs: number;
   liked: boolean;
+  trackId: string;
   likeBusy: boolean;
   isArabic: boolean;
   onSeek: (positionMs: number) => void;
@@ -828,6 +834,7 @@ function PlayerCard({
   positionMs,
   durationMs,
   liked,
+  trackId,
   likeBusy,
   isArabic,
   onSeek,
@@ -887,7 +894,7 @@ function PlayerCard({
               onPress={onShare}
               size={44}
             />
-
+            <MusicPlaylistPicker trackId={trackId} compact />
           </View>
         </View>
       ) : (
@@ -908,6 +915,7 @@ function PlayerCard({
               onPress={onShare}
               size={compact ? 48 : 42}
             />
+            <MusicPlaylistPicker trackId={trackId} compact />
             {onDownload ? (
               <Pressable style={styles.secondaryAction} onPress={onDownload}>
                 <Text style={styles.secondaryActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>

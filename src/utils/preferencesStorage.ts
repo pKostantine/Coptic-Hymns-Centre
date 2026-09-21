@@ -54,6 +54,18 @@ export interface ReadingPreferences {
   appLanguage: AppLanguage;
 }
 
+export type SyncedReadingPreferences = Pick<ReadingPreferences,
+  | 'visibleLanguages'
+  | 'bibleVisibleLanguages'
+  | 'displayComments'
+  | 'displaySilentPrayers'
+  | 'bishopPresent'
+  | 'copticGospelRite'
+  | 'selectedSaintHymns'
+  | 'inMonastery'
+  | 'appLanguage'
+>;
+
 // Matches the old app's DEFAULT_READING_PREFERENCES exactly (preferencesStorage.js).
 export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   visibleLanguages: {
@@ -154,6 +166,75 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
     ? merged.selectedSaintHymns.filter((token): token is string => typeof token === 'string' && token.includes(':'))
     : [];
   return merged;
+}
+
+function booleanValue(value: unknown, fallback: boolean) {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+/** The content choices that belong to a person rather than a particular screen. */
+export function syncedReadingPreferences(preferences: ReadingPreferences): SyncedReadingPreferences {
+  return {
+    visibleLanguages: preferences.visibleLanguages,
+    bibleVisibleLanguages: preferences.bibleVisibleLanguages,
+    displayComments: preferences.displayComments,
+    displaySilentPrayers: preferences.displaySilentPrayers,
+    bishopPresent: preferences.bishopPresent,
+    copticGospelRite: preferences.copticGospelRite,
+    selectedSaintHymns: preferences.selectedSaintHymns,
+    inMonastery: preferences.inMonastery,
+    appLanguage: preferences.appLanguage,
+  };
+}
+
+/** Applies a cloud payload without touching display choices that are device-specific. */
+export function applySyncedReadingPreferences(
+  local: ReadingPreferences,
+  cloudValue: unknown,
+): ReadingPreferences {
+  const cloud = recordValue(cloudValue);
+  const visible = recordValue(cloud.visibleLanguages);
+  const bible = recordValue(cloud.bibleVisibleLanguages);
+  const saintTokens = Array.isArray(cloud.selectedSaintHymns)
+    ? [...new Set(cloud.selectedSaintHymns.filter((token): token is string => (
+      typeof token === 'string' && token.includes(':') && token.length <= 256
+    )))].slice(0, 250)
+    : local.selectedSaintHymns;
+
+  return {
+    ...local,
+    visibleLanguages: {
+      english: booleanValue(visible.english, local.visibleLanguages.english),
+      coptic: booleanValue(visible.coptic, local.visibleLanguages.coptic),
+      copticRecitedPrayers: booleanValue(visible.copticRecitedPrayers, local.visibleLanguages.copticRecitedPrayers),
+      arabic: booleanValue(visible.arabic, local.visibleLanguages.arabic),
+    },
+    bibleVisibleLanguages: {
+      english: booleanValue(bible.english, local.bibleVisibleLanguages.english),
+      englishNkjv: booleanValue(bible.englishNkjv, local.bibleVisibleLanguages.englishNkjv),
+      englishFromCoptic: booleanValue(bible.englishFromCoptic, local.bibleVisibleLanguages.englishFromCoptic),
+      coptic: booleanValue(bible.coptic, local.bibleVisibleLanguages.coptic),
+      greek: booleanValue(bible.greek, local.bibleVisibleLanguages.greek),
+      arabic: booleanValue(bible.arabic, local.bibleVisibleLanguages.arabic),
+      arabicFromCoptic: booleanValue(bible.arabicFromCoptic, local.bibleVisibleLanguages.arabicFromCoptic),
+      french: booleanValue(bible.french, local.bibleVisibleLanguages.french),
+    },
+    displayComments: booleanValue(cloud.displayComments, local.displayComments),
+    displaySilentPrayers: booleanValue(cloud.displaySilentPrayers, local.displaySilentPrayers),
+    bishopPresent: booleanValue(cloud.bishopPresent, local.bishopPresent),
+    copticGospelRite: booleanValue(cloud.copticGospelRite, local.copticGospelRite),
+    selectedSaintHymns: saintTokens,
+    inMonastery: booleanValue(cloud.inMonastery, local.inMonastery),
+    appLanguage: cloud.appLanguage === 'en' || cloud.appLanguage === 'ar'
+      ? cloud.appLanguage
+      : local.appLanguage,
+  };
 }
 
 export async function loadReadingPreferences(): Promise<ReadingPreferences> {

@@ -9,6 +9,7 @@ import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAware
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type {
@@ -22,6 +23,7 @@ const EMPTY_PLAYLISTS: LearningPlaylistLibraryPayload = { authenticated: false, 
 
 export default function LearningLibraryScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { preferences } = useReadingPreferences();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
@@ -49,7 +51,7 @@ export default function LearningLibraryScreen() {
     } finally {
       if (active.current) setLoading(false);
     }
-  }, [locale]);
+  }, [locale, user?.id]);
 
   useFocusEffect(useCallback(() => {
     const active = { current: true };
@@ -118,6 +120,9 @@ export default function LearningLibraryScreen() {
                   ? 'المحتوى متاح للجميع. يحتاج تتبّع التعلّم والقوائم المخصّصة إلى حساب CHC.'
                   : 'The catalog stays open to everyone. Progress tracking and custom playlists use your CHC account.'}
               </Text>
+              <Pressable style={styles.accountButton} onPress={() => router.push('/account')}>
+                <Text style={styles.accountButtonText}>{isArabic ? 'فتح الحساب' : 'Open Account'}</Text>
+              </Pressable>
             </View>
           </View>
         ) : null}
@@ -233,6 +238,8 @@ const styles = StyleSheet.create({
   authInfo: { flex: 1, minWidth: 0 },
   authTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '700' },
   authBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  accountButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: COLORS.learning, borderRadius: 8, justifyContent: 'center', marginTop: SPACING.sm, minHeight: 38, paddingHorizontal: SPACING.md },
+  accountButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '900' },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.xl, marginBottom: SPACING.sm },
   sectionTitle: { flex: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   sectionMeta: { minWidth: 28, color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '900', textAlign: 'center', paddingVertical: 4, paddingHorizontal: 8, borderRadius: RADII.pill, backgroundColor: COLORS.learningSoft },

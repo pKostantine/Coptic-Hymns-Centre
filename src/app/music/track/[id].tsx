@@ -15,9 +15,11 @@ import Icon from '@/components/chc/ui/Icon';
 import ShareMetadata from '@/components/chc/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicLyricsView from '@/components/music/MusicLyricsView';
+import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
@@ -37,6 +39,7 @@ function formatDuration(durationMs: number | null): string | null {
 
 export default function MusicTrackDetailScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const params = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
   const { preferences } = useReadingPreferences();
@@ -72,7 +75,7 @@ export default function MusicTrackDetailScreen() {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [locale, trackId]);
+  }, [locale, trackId, user?.id]);
 
   useEffect(() => {
     if (!trackId) return;
@@ -89,7 +92,7 @@ export default function MusicTrackDetailScreen() {
         setLiked(false);
       });
     return () => { active = false; };
-  }, [locale, trackId]);
+  }, [locale, trackId, user?.id]);
 
   useEffect(() => {
     if (!trackId) return;
@@ -316,6 +319,7 @@ export default function MusicTrackDetailScreen() {
                 onPress={() => void shareTrack()}
                 size={46}
               />
+              <MusicPlaylistPicker trackId={track.id} />
             </View>
           </View>
         </View>

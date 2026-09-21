@@ -10,6 +10,7 @@ export type IconName =
   | 'bookmark-outline'
   | 'calendar-outline'
   | 'settings-outline'
+  | 'person-circle-outline'
   | 'time-outline'
   | 'add'
   | 'remove'
@@ -155,6 +156,14 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
             strokeLinecap="round"
             strokeLinejoin="round"
           />
+        </Svg>
+      );
+    case 'person-circle-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Circle cx="256" cy="256" r="208" fill="none" stroke={color} strokeWidth={32} strokeLinejoin="round" />
+          <Circle cx="256" cy="176" r="72" fill="none" stroke={color} strokeWidth={32} strokeLinejoin="round" />
+          <Path d="M112 420c18-76 72-116 144-116s126 40 144 116" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     case 'time-outline':

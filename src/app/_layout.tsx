@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import { COLORS } from '@/constants/theme';
+import { AuthProvider } from '@/context/AuthContext';
 import { BottomChromeProvider } from '@/context/BottomChromeContext';
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
@@ -42,13 +43,14 @@ function AppStack() {
         orientation,
       }}
     >
-      {/* Home, Books, Music, Learn & Study, and Settings are peer sections,
+      {/* Home, Books, Music, Learn & Study, and Account are peer sections,
           so switching between them never grows a back stack. */}
       <Stack.Screen name="index" options={{ animation: 'none' }} />
       <Stack.Screen name="books" options={{ animation: 'none' }} />
       <Stack.Screen name="music" options={{ animation: 'none' }} />
       <Stack.Screen name="learn" options={{ animation: 'none' }} />
       <Stack.Screen name="search" options={{ animation: 'none' }} />
+      <Stack.Screen name="account" options={{ animation: 'none' }} />
       <Stack.Screen name="settings" options={{ animation: 'none' }} />
       <Stack.Screen name="synaxarium" options={{ animation: 'default' }} />
       <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
@@ -81,17 +83,19 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ReadingPreferencesProvider>
-        <CalendarProvider>
-          <MusicPlayerProvider>
-            <StatusBar style="light" />
-            <BottomChromeProvider>
-              <AppStack />
-              <GlobalNowPlayingOverlay />
-            </BottomChromeProvider>
-          </MusicPlayerProvider>
-        </CalendarProvider>
-      </ReadingPreferencesProvider>
+      <AuthProvider>
+        <ReadingPreferencesProvider>
+          <CalendarProvider>
+            <MusicPlayerProvider>
+              <StatusBar style="light" />
+              <BottomChromeProvider>
+                <AppStack />
+                <GlobalNowPlayingOverlay />
+              </BottomChromeProvider>
+            </MusicPlayerProvider>
+          </CalendarProvider>
+        </ReadingPreferencesProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
