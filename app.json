@@ -51,6 +51,14 @@
           "recordAudioAndroid": false,
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow CHC to choose a profile photo.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {
