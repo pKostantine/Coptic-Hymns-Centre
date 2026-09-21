@@ -10,9 +10,6 @@ import {
   hasSeasonalPrefixLine as hasVisibleSeasonalPrefixLine,
 } from "./slideshowLayout";
 
-const REFRAIN_TAN = "#9FFFD0";
-const LIGHT_YELLOW = "#FFFF00";
-const SILENT_PRAYER_GRAY = "#C5CBD2";
 const DISABLED_SELECTION_STYLE = Platform.OS === "web"
   ? {
       WebkitTouchCallout: "none",
@@ -57,9 +54,9 @@ export default function VerseBlock({
     isComment
       ? COLORS.comment
       : isSilentPrayer
-      ? SILENT_PRAYER_GRAY
+      ? COLORS.silent
       : isRefrainLabel || isRefrain
-      ? REFRAIN_TAN
+      ? COLORS.refrain
       : isReadingReference
       ? COLORS.comment
       : // "White"/"Blue" prayer_type forces that alternating color directly on
@@ -344,7 +341,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
   let prefixNode = null;
 
   if (parts) {
-    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: REFRAIN_TAN }]}>{parts.prefix}</Text>;
+    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: COLORS.refrain }]}>{parts.prefix}</Text>;
   } else if (language.seasonalHoosVersePrefixSpacer) {
     prefixNode = (
       <Text selectable={selectableText} style={[prefixStyle, { color: "transparent" }]}>{language.seasonalHoosVersePrefixSpacer}</Text>
@@ -413,7 +410,7 @@ function renderLanguageText(language) {
 
   return (
     <>
-      <Text style={[prefixStyle, { color: REFRAIN_TAN }]}>{parts.prefix}</Text>
+      <Text style={[prefixStyle, { color: COLORS.refrain }]}>{parts.prefix}</Text>
       {"\n"}
       {parts.body}
     </>
@@ -457,7 +454,7 @@ function renderTextWithMetropolitanHighlight(text) {
       nodes.push(raw.slice(lastIndex, match.index));
     }
     nodes.push(
-      <Text key={`metropolitan-${key++}`} style={{ color: COLORS.rowBlue }}>
+      <Text key={`metropolitan-${key++}`} style={{ color: COLORS.metropolitanBrackets }}>
         {match[0]}
       </Text>,
     );
@@ -602,12 +599,13 @@ function getSpeakerLabel(type, language, bishopPresent) {
 
 function getSpeakerColor(type, bishopPresent) {
   return {
-    bishop: "#D64545",
-    deacon: LIGHT_YELLOW,
-    people: "#E28A2E",
-    priest: "#D64545",
-    reader: LIGHT_YELLOW,
-  }[getSpeakerRole(type, bishopPresent)] || "#E28A2E";
+    bishop: COLORS.bishop,
+    deacon: COLORS.deacon,
+    people: COLORS.people,
+    priest: COLORS.priest,
+    reader: COLORS.reader,
+    refrain: COLORS.refrain,
+  }[getSpeakerRole(type, bishopPresent)] || COLORS.people;
 }
 
 // "Bishop/Priest" (verse.type === "bishopOrPriest") resolves to "bishop" or
@@ -618,7 +616,7 @@ function getSpeakerColor(type, bishopPresent) {
 // strings — no more prefix-guessing needed.
 function getSpeakerRole(type, bishopPresent) {
   const resolved = resolveRubricKey(type, bishopPresent);
-  if (resolved === "priest" || resolved === "bishop" || resolved === "people" || resolved === "deacon" || resolved === "reader") {
+  if (resolved === "priest" || resolved === "bishop" || resolved === "people" || resolved === "deacon" || resolved === "reader" || resolved === "refrain") {
     return resolved;
   }
   return "";
