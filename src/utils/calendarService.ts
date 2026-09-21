@@ -163,7 +163,7 @@ export async function getSeasonRanges(fromDate: string, toDate: string): Promise
  * filtering from becoming two independent definitions of the same season.
  */
 const CONTEXT_FLAG_TO_INDICATOR_KEY: Record<string, string> = {
-  CopticNewYearPeriod: 'nayrouz-period',
+  Nayrouz: 'nayrouz-period',
   NativityPeriod: 'nativity-period',
   TheophanyPeriod: 'theophany-period',
   NativityParamoun: 'nativity-paramoun',
