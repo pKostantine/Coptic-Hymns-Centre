@@ -422,7 +422,7 @@ export default function JustifiedText({
               {isFirstLine && firstWordStyle && lineWords.length ? (
                 <>
                   <Text selectable={selectable} style={firstWordStyle}>{lineWords[0]}</Text>
-                  {lineWords.length > 1 ? ` ${lineWords.slice(1).join(" ")}` : ""}
+                  {lineWords.length > 1 ? `\u2005${lineWords.slice(1).join(" ")}` : ""}
                 </>
               ) : lineWords.join(" ")}
             </Text>
@@ -438,19 +438,42 @@ export default function JustifiedText({
               width: "100%",
             }}
           >
-            {lineWords.map((word, wordIndex) => (
-              <Text
-                key={wordIndex}
-                selectable={selectable}
-                style={
-                  isFirstLine && wordIndex === 0 && firstWordStyle
-                    ? [style, WORD_INTRINSIC_STYLE, selectionStyle, firstWordStyle]
-                    : [style, WORD_INTRINSIC_STYLE, selectionStyle]
-                }
-              >
-                {word}
-              </Text>
-            ))}
+            {isFirstLine && firstWordStyle && lineWords.length > 1 ? (
+              <>
+                <Text
+                  key="leading-token"
+                  selectable={selectable}
+                  style={[style, WORD_INTRINSIC_STYLE, selectionStyle]}
+                >
+                  <Text selectable={selectable} style={firstWordStyle}>{lineWords[0]}</Text>
+                  {"\u2005"}
+                  {lineWords[1]}
+                </Text>
+                {lineWords.slice(2).map((word, wordIndex) => (
+                  <Text
+                    key={wordIndex + 2}
+                    selectable={selectable}
+                    style={[style, WORD_INTRINSIC_STYLE, selectionStyle]}
+                  >
+                    {word}
+                  </Text>
+                ))}
+              </>
+            ) : (
+              lineWords.map((word, wordIndex) => (
+                <Text
+                  key={wordIndex}
+                  selectable={selectable}
+                  style={
+                    isFirstLine && wordIndex === 0 && firstWordStyle
+                      ? [style, WORD_INTRINSIC_STYLE, selectionStyle, firstWordStyle]
+                      : [style, WORD_INTRINSIC_STYLE, selectionStyle]
+                  }
+                >
+                  {word}
+                </Text>
+              ))
+            )}
           </View>
         );
       })}
