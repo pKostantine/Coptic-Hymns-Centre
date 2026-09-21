@@ -33,6 +33,7 @@ export function getSlideshowChromeMetrics(fontSize) {
 }
 
 export function getSlideshowLanguageFontSize(language, item = {}, fontSize = 18) {
+  void item;
   const metrics = getDocumentVisualMetrics(fontSize);
   if (language === "coptic") return metrics.copticFontSize;
   if (language === "arabic") return metrics.arabicFontSize;
@@ -40,6 +41,7 @@ export function getSlideshowLanguageFontSize(language, item = {}, fontSize = 18)
 }
 
 export function getSlideshowLanguageLineHeight(language, item = {}, fontSize = 18) {
+  void item;
   const metrics = getDocumentVisualMetrics(fontSize);
   return language === "arabic"
     ? metrics.arabicVerseLineHeight
