@@ -17,6 +17,7 @@ import Icon from '@/components/chc/ui/Icon';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicArtistArtwork from '@/components/music/MusicArtistArtwork';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -26,7 +27,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useAuth } from '@/context/AuthContext';
 import { musicService } from '@/services/musicService';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
-import type { MusicConsumerAsset, MusicConsumerTrack } from '@/types/musicConsumer';
+import type { MusicConsumerTrack } from '@/types/musicConsumer';
 import type { UnifiedSearchKind, UnifiedSearchResult } from '@/types/unifiedSearch';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import { goBack } from '@/utils/navigation';
@@ -105,7 +106,6 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   const [error, setError] = useState<string | null>(null);
   const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
   const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
-  const [artistFallbackArt, setArtistFallbackArt] = useState<Record<string, MusicConsumerAsset | null>>({});
 
   useEffect(() => {
     if (!music) return;
@@ -157,33 +157,6 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     };
   }, [locale, query, section]);
 
-  // Some artists intentionally have no profile image. For search, use the
-  // artwork of their latest published release as a useful visual fallback.
-  useEffect(() => {
-    if (!music) return;
-    const missing = results.filter(
-      (result): result is Extract<UnifiedSearchResult, { kind: 'music_artist' }> => (
-        result.kind === 'music_artist'
-        && !result.metadata.profileImageAsset
-        && !(result.entityId in artistFallbackArt)
-      ),
-    );
-    if (!missing.length) return;
-
-    let active = true;
-    void Promise.all(missing.map(async (result) => {
-      try {
-        return [result.entityId, await musicService.getArtistSearchArt(result.entityId)] as const;
-      } catch {
-        return [result.entityId, null] as const;
-      }
-    })).then((pairs) => {
-      if (!active) return;
-      setArtistFallbackArt((current) => ({ ...current, ...Object.fromEntries(pairs) }));
-    });
-
-    return () => { active = false; };
-  }, [artistFallbackArt, music, results]);
 
   const grouped = useMemo(() => {
     const groups = music ? MUSIC_GROUPS : LEARNING_GROUPS;
@@ -410,7 +383,6 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
                   }
                   liked={result.kind === 'music_track' && likedTrackIds.has(result.entityId)}
                   isArabic={isArabic}
-                  artistFallbackArt={artistFallbackArt[result.entityId] ?? null}
                   isLast={index === group.results.length - 1}
                   onPress={() => openResult(result)}
                   onTrackTitlePress={result.kind === 'music_track' ? () => openTrackPage(result) : undefined}
@@ -434,7 +406,6 @@ function SearchResultRow({
   playing,
   liked,
   isArabic,
-  artistFallbackArt,
   isLast,
   onPress,
   onTrackTitlePress,
@@ -446,7 +417,6 @@ function SearchResultRow({
   playing: boolean;
   liked: boolean;
   isArabic: boolean;
-  artistFallbackArt: MusicConsumerAsset | null;
   isLast: boolean;
   onPress: () => void;
   onTrackTitlePress?: () => void;
@@ -458,10 +428,9 @@ function SearchResultRow({
   let artwork = null;
   if (result.kind === 'music_artist') {
     artwork = (
-      <MusicArtwork
-        asset={result.metadata.profileImageAsset ?? artistFallbackArt}
+      <MusicArtistArtwork
+        asset={result.metadata.profileImageAsset}
         size={56}
-        rounded
         label={result.title}
       />
     );
