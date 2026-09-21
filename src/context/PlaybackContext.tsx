@@ -20,6 +20,7 @@ import {
   getManualNextIndex,
   getManualPreviousIndex,
   keepOnlyCurrentEntry,
+  insertQueueEntry,
   moveQueueEntry,
   nextRepeatMode,
   restoreOriginalQueue,
@@ -171,19 +172,13 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       playItem(item);
       return;
     }
-    const insertAt = Math.min(queue.length, currentIndex + 1);
-    const nextQueue = [...queue.slice(0, insertAt), item, ...queue.slice(insertAt)];
-    setQueue(nextQueue);
+    const nextState = insertQueueEntry(queue, currentIndex, item, 'next');
+    setQueue(nextState.queue);
     if (!shuffleEnabled) {
-      setOriginalQueue(nextQueue);
+      setOriginalQueue(nextState.queue);
     } else {
       const originalIndex = originalQueue.findIndex((entry) => entry.key === queue[currentIndex]?.key);
-      const originalInsertAt = originalIndex >= 0 ? originalIndex + 1 : originalQueue.length;
-      setOriginalQueue((entries) => [
-        ...entries.slice(0, originalInsertAt),
-        item,
-        ...entries.slice(originalInsertAt),
-      ]);
+      setOriginalQueue(insertQueueEntry(originalQueue, originalIndex, item, 'next').queue);
     }
   }, [currentIndex, originalQueue, playItem, queue, shuffleEnabled]);
 
@@ -192,9 +187,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       playItem(item);
       return;
     }
-    setQueue((entries) => [...entries, item]);
-    setOriginalQueue((entries) => [...entries, item]);
-  }, [currentIndex, playItem, queue.length]);
+    setQueue(insertQueueEntry(queue, currentIndex, item, 'end').queue);
+    setOriginalQueue(insertQueueEntry(originalQueue, currentIndex, item, 'end').queue);
+  }, [currentIndex, originalQueue, playItem, queue]);
 
   const togglePlayback = useCallback(() => {
     if (!currentItem) return;
