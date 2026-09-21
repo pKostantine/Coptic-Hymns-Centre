@@ -184,7 +184,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const updateAvatarUrl = useCallback(async (avatarUrl: string | null) => {
     const { error } = await supabase.auth.updateUser({
-      data: { avatar_url: avatarUrl },
+      data: { chc_avatar_url: avatarUrl },
     });
     authError(error, 'Unable to update your profile photo.');
   }, []);
