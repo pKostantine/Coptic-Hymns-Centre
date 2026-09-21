@@ -1,4 +1,4 @@
-import { getDocumentVisualMetrics } from "./documentVisualMetrics.js";
+import { DOCUMENT_CONTROL_GEOMETRY, getDocumentVisualMetrics } from "./documentVisualMetrics.js";
 
 /**
  * Pure slideshow layout and pagination helpers.
@@ -23,6 +23,8 @@ export function getSlideshowChromeMetrics(fontSize) {
   return {
     buttonFontSize: metrics.openButtonFontSize,
     buttonLineHeight: metrics.openButtonLineHeight,
+    hyperlinkFontSize: metrics.hyperlinkFontSize,
+    hyperlinkLineHeight: metrics.hyperlinkLineHeight,
     speakerFontSize: metrics.speakerFontSize,
     speakerLineHeight: metrics.speakerLineHeight,
     titleFontSize: metrics.sectionTitleFontSize,
@@ -555,8 +557,23 @@ export function getVerseLineSegmentHeight(segment, fontSize, visibleLanguages) {
 export function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
   const chrome = getSlideshowChromeMetrics(fontSize);
   if (item.type === "title") return chrome.titleLineHeight + SPACING_SM * 2;
-  if (item.type === "button") return Math.max(96, chrome.buttonLineHeight * 2 + SPACING_SM * 4);
-  if (item.type === "gospelRiteToggle") return chrome.buttonLineHeight + SPACING_SM * 4;
+  if (item.type === "button") {
+    if (item.isHyperlink) {
+      return Math.max(
+        DOCUMENT_CONTROL_GEOMETRY.hyperlink.minHeight,
+        chrome.hyperlinkLineHeight + DOCUMENT_CONTROL_GEOMETRY.hyperlink.paddingVertical * 2,
+      );
+    }
+    return Math.max(
+      DOCUMENT_CONTROL_GEOMETRY.subdocument.minHeight,
+      chrome.buttonLineHeight + DOCUMENT_CONTROL_GEOMETRY.subdocument.paddingVertical * 2,
+    );
+  }
+  if (item.type === "gospelRiteToggle") {
+    return chrome.titleLineHeight
+      + DOCUMENT_CONTROL_GEOMETRY.gospelRite.paddingVertical * 2
+      + DOCUMENT_CONTROL_GEOMETRY.gospelRite.marginBottom;
+  }
 
   const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
   const languageHeights = layout.languages
