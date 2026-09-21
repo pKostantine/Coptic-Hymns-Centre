@@ -127,6 +127,8 @@ export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayloa
       likedReleases: library.likedReleases ?? [],
       likedTracks: library.likedTracks ?? [],
       playlists: library.playlists ?? [],
+      recentTracks: library.recentTracks ?? [],
+      recentReleases: library.recentReleases ?? [],
     };
   }, 'music_library', 'library', locale);
 }
@@ -226,6 +228,14 @@ export async function setMusicPlaylistTrackOrder(playlistId: string, trackIds: s
   return assertRpcData(data as boolean | null, error, 'Reorder playlist');
 }
 
+export async function recordMusicPlay(trackId: string, releaseId?: string | null): Promise<boolean> {
+  const { data, error } = await supabase.rpc('record_music_play', {
+    p_track_id: trackId,
+    p_release_id: releaseId ?? null,
+  });
+  return assertRpcData(data as boolean | null, error, 'Record music play');
+}
+
 export async function getTrackLyrics(
   trackId: string,
   locale?: string | null,
@@ -260,6 +270,7 @@ export const musicService = {
   updatePlaylist: updateMusicPlaylist,
   deletePlaylist: deleteMusicPlaylist,
   setPlaylistTrackOrder: setMusicPlaylistTrackOrder,
+  recordPlay: recordMusicPlay,
   addToPlaylist: addTrackToMusicPlaylist,
   removeFromPlaylist: removeTrackFromMusicPlaylist,
   getLyrics: getTrackLyrics,

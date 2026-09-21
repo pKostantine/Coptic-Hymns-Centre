@@ -5,6 +5,7 @@ export interface MusicConsumerAsset extends MediaAssetReference {
   mimeType?: string | null;
   fileSizeBytes?: number | null;
   checksum?: string | null;
+  version?: number | null;
 }
 
 export interface MusicConsumerArtistSummary {
@@ -85,6 +86,18 @@ export interface MusicLibraryPayload {
   likedReleases: MusicConsumerReleaseSummary[];
   likedTracks: MusicConsumerTrack[];
   playlists: MusicLibraryPlaylist[];
+  recentTracks: MusicRecentTrack[];
+  recentReleases: MusicRecentRelease[];
+}
+
+export interface MusicRecentTrack {
+  playedAt: string;
+  track: MusicConsumerTrack;
+  release: MusicConsumerReleaseSummary | null;
+}
+
+export interface MusicRecentRelease extends MusicConsumerReleaseSummary {
+  playedAt: string;
 }
 
 export interface MusicPlaylistPayload {
@@ -94,6 +107,7 @@ export interface MusicPlaylistPayload {
   visibility: MusicPlaylistVisibility;
   ownerUserId: string | null;
   isOwner: boolean;
+  hasCustomCover: boolean;
   coverAsset: MusicConsumerAsset | null;
   tracks: MusicConsumerTrack[];
 }

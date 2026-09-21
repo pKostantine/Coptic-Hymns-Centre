@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { PlaybackProvider, usePlayback } from '@/context/PlaybackContext';
+import { useAuth } from '@/context/AuthContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerAsset, MusicConsumerRelease, MusicConsumerTrack } from '@/types/musicConsumer';
 import type { PlaybackQueueEntry, PlaybackRepeatMode } from '@/types/playback';
@@ -137,10 +138,37 @@ function QueueReleaseMetadataRefresher() {
   return null;
 }
 
+function MusicPlayHistoryRecorder() {
+  const { user } = useAuth();
+  const { currentItem, playing } = usePlayback();
+  const lastRecordedKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!user || !playing || currentItem?.playable.kind !== 'music_track' || !isMusicQueueItem(currentItem.payload)) {
+      return;
+    }
+
+    const historyKey = `${user.id}:${currentItem.key}`;
+    if (lastRecordedKey.current === historyKey) return;
+    lastRecordedKey.current = historyKey;
+
+    const item = currentItem.payload;
+    void musicService.recordPlay(item.track.id, item.releaseId ?? item.track.releaseId ?? null)
+      .catch(() => {
+        // Listening should never fail because history could not be recorded.
+        // Clear the guard so a later playback state change can retry.
+        if (lastRecordedKey.current === historyKey) lastRecordedKey.current = null;
+      });
+  }, [currentItem, playing, user]);
+
+  return null;
+}
+
 export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   return (
     <PlaybackProvider>
       <QueueReleaseMetadataRefresher />
+      <MusicPlayHistoryRecorder />
       {children}
     </PlaybackProvider>
   );
