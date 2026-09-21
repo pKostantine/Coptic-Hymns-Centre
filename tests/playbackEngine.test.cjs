@@ -104,6 +104,24 @@ test('reordering the queue keeps the playing entry selected', () => {
   assert.deepEqual(moveQueueEntry(entries, 0, 1, 99), { queue: ['a', 'c', 'd', 'e', 'b'], currentIndex: 0 });
 });
 
+test('queue insertion adds next or appends without moving the current track', () => {
+  const { insertQueueEntry } = loadHelpers();
+  const entries = ['a', 'b', 'c'];
+
+  assert.deepEqual(
+    insertQueueEntry(entries, 1, 'x', 'next'),
+    { queue: ['a', 'b', 'x', 'c'], currentIndex: 1 },
+  );
+  assert.deepEqual(
+    insertQueueEntry(entries, 1, 'x', 'end'),
+    { queue: ['a', 'b', 'c', 'x'], currentIndex: 1 },
+  );
+  assert.deepEqual(
+    insertQueueEntry([], -1, 'x', 'next'),
+    { queue: ['x'], currentIndex: 0 },
+  );
+});
+
 test('clearing the queue keeps only the playing entry', () => {
   const { keepOnlyCurrentEntry } = loadHelpers();
   assert.deepEqual(keepOnlyCurrentEntry(['a', 'b', 'c'], 1), { queue: ['b'], currentIndex: 0 });
