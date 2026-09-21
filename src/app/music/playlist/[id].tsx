@@ -91,8 +91,6 @@ export default function MusicPlaylistScreen() {
   useEffect(() => {
     if (!playlistId) return;
     let active = true;
-    setLoading(true);
-    setError(null);
     musicService.getPlaylist(playlistId, locale)
       .then((payload) => {
         if (!active) return;
