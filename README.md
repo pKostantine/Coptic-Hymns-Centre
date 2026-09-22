@@ -10,21 +10,24 @@ The project is built with a strong focus on preserving the structure and traditi
 
 ## What CHC Is
 
-CHC is more than a hymn library.
+CHC is more than a hymn library. It is the main user-facing application in a wider Coptic Hymns Centre ecosystem.
 
-The app combines several major parts of Coptic Orthodox life into one platform:
+The app currently brings together:
 
-- **Liturgical books**
+- **Liturgical books and service texts**
 - **The Holy Bible**
-- **Coptic hymns and responses**
-- **Psalmody and praises**
-- **Saints and the Synaxarion**
-- **Church seasons, feasts, and fasts**
-- **Audio recordings**
-- **Multilingual liturgical texts**
-- **Presentation and slideshow tools for church use**
+- **Coptic hymns, responses, Psalmody, and praises**
+- **Saints and the Synaxarium**
+- **Church seasons, feasts, fasts, and lectionary-aware content**
+- **A live Home experience for the current church day**
+- **Music releases, artists, tracks, playlists, synchronized lyrics, and playback**
+- **Learning and study audio**
+- **CHC accounts, profiles, preferences, and cross-device library data**
+- **Native offline downloads for supported audio**
+- **Multilingual liturgical and Scriptural texts**
+- **Search, rich sharing, notifications, and presentation/slideshow tools**
 
-The goal is to create a single reliable place for the texts and media used throughout the Coptic liturgical year.
+The goal is to provide one reliable place for the texts, media, and daily church context used throughout the Coptic liturgical year.
 
 ---
 
@@ -92,6 +95,22 @@ Examples include seasons and occasions such as:
 - Other Coptic feasts and commemorations
 
 The user-facing experience keeps formal feast and season names clear while the underlying system maintains consistent conditions for liturgical logic.
+
+---
+
+## Home and the Live Church Calendar
+
+The Home tab is designed around the **actual current church day**, independent of any date a user may temporarily select inside Books.
+
+It can surface current-day material such as:
+
+- the Coptic date and church season
+- Synaxarium commemorations for today and tomorrow
+- feast and fast context
+- a Sunday message derived from the correct lectionary cycle
+- direct paths into the relevant books and resources
+
+Sunday content follows the appropriate annual, Great Lent, or Holy Fifty Days lectionary logic rather than assuming every Sunday uses the annual cycle.
 
 ---
 
@@ -185,35 +204,50 @@ The goal is to make it easy to find both **what is sung** and **when it is sung*
 
 ## Audio
 
-CHC is also being developed as a home for high-quality Coptic Orthodox audio.
+CHC now includes a full consumer audio experience rather than only a future media library.
 
-The audio side of the platform can include:
+### Music
 
-- Hymn recordings
-- Liturgical recordings
-- Songs
-- Albums
-- Artist pages
-- Choirs and cantors
-- Playlists
-- Live recordings
-- Educational recordings
+The Music section supports:
 
-Audio can be connected directly with the relevant hymn or liturgical text, allowing the textual and musical sides of the tradition to live together inside the same platform.
+- artist pages
+- releases and albums
+- track pages
+- release artwork and artist profile images
+- a persistent mini player and full now-playing experience
+- queue management and seeking
+- synchronized multilingual lyrics
+- likes for tracks and releases
+- followed artists
+- listening history
+- user playlists and playlist editing
+- custom playlist artwork
+- rich share previews for artists, releases, tracks, and public playlists
+- native offline downloads on supported mobile builds
 
-A separate **CHC Artists** application provides the creator-facing side of this system for approved artists and publishers.
+The Music Library is organized into dedicated folders for liked tracks, playlists, liked releases, followed artists, and downloads, with recently played content available alongside them.
+
+### Learn & Study
+
+CHC also has a separate learning-oriented audio experience for hymn instruction and educational recordings, including cantors, albums, lesson sets, lessons, playlists, seasons, search, and playback.
+
+### Playback
+
+Music and learning playback use a shared global playback layer so the player can remain available while the user moves through the rest of the app without being treated as a book setting or document navigation action.
+
+### Creator integration
+
+A separate **CHC Artists** application provides the creator-facing workflow for uploading, processing, editing, timing, and submitting releases that are distributed through CHC.
 
 ---
 
 ## Synaxarion and Saints
 
-CHC includes the Coptic Synaxarion and resources related to the saints of the Church.
+CHC includes the Coptic Synaxarium and saint-related resources throughout the application.
 
-The Synaxarion is organized according to the Coptic calendar and can contain both English and Arabic text.
+The Home tab shows the live Synaxarium for the current day, while the dedicated Synaxarium browser can load the full Coptic year, scroll to the current date, and search entries by saint, event, or text while keeping results grouped by their Coptic dates.
 
-This allows users to read the commemorations of each Coptic day alongside the rest of the liturgical content associated with that date.
-
-Saints can also be used throughout the app to organize items such as:
+Saints are also used to organize and connect liturgical material such as:
 
 - Doxologies
 - Hymns of the Intercessions
@@ -222,7 +256,7 @@ Saints can also be used throughout the app to organize items such as:
 - Verses of the Cymbals
 - Veneration texts
 
-A consistent saint order helps these sections remain organized across the application.
+A consistent saint order keeps these sections aligned across the application.
 
 ---
 
@@ -247,20 +281,43 @@ The goal is to provide a clean, reliable presentation experience even when large
 
 ## Search and Navigation
 
-Because CHC contains a large amount of interconnected content, the app is designed to make navigation as direct as possible.
+CHC is organized as connected app sections rather than isolated documents.
 
-Users can move between resources such as:
+Users can move between:
 
+- Home
 - Books
-- Services
-- Hymns
-- Bible passages
-- Saints
-- Seasons
-- Audio
-- Related liturgical content
+- Bible
+- Music
+- Learn & Study
+- Synaxarium
+- Account and settings
+- related services, hymns, saints, and seasonal content
 
-The long-term goal is for the app to feel like one connected Coptic resource library rather than a collection of unrelated sections.
+The app includes section-specific search experiences for large content areas such as Music, Learn & Study, Bible, and the Synaxarium.
+
+Books retain their own calendar and reading controls, while live Home content remains tied to the real current date.
+
+## Accounts and Preferences
+
+CHC accounts support email/password and Google sign-in.
+
+Signed-in users can keep personal content with them across devices, including areas such as:
+
+- liked tracks and releases
+- followed artists
+- playlists
+- listening history
+- learning progress
+- app and content preferences
+
+Users can also manage their display profile and avatar. Reading and book-display preferences are kept separate from the global audio player so playback controls do not behave like document settings.
+
+## Notifications
+
+The CHC ecosystem now includes shared notification infrastructure for the main app, CHC Artists, and CHC Admin.
+
+The system supports device registration, notification-category preferences, deep links, web push support, and native notification registration for store builds. A dedicated notification dispatcher handles queued delivery, while CHC Admin can send audited manual broadcasts such as feast congratulations and general announcements.
 
 ---
 
@@ -322,56 +379,71 @@ CHC is intended to provide a consistent experience across desktop, web, tablet, 
 
 ## Technology
 
-The CHC application is built using a modern cross-platform architecture.
+The CHC application uses a cross-platform architecture shared across web and native platforms.
 
 ### React Native / Expo
 
-The frontend is built with **React Native and Expo**, allowing CHC to share a large portion of its codebase across:
+The frontend is built with **React Native and Expo**, with Expo Router providing app navigation across:
 
 - iOS
 - iPadOS
 - Android
 - Web
 
-The application can still provide platform-specific behavior where necessary.
+Platform-specific behavior is used where needed, including native downloads, safe-area handling, and web/PWA integrations.
 
 ### Supabase
 
-**Supabase** provides much of the structured backend used by CHC, including:
+**Supabase** provides the structured backend for:
 
-- Liturgical content
+- liturgical books and rites
 - Bible texts
-- Hymns
-- Saints
-- Psalmody
-- Seasonal conditions
-- Metadata
-- User-related data
-- Database relationships
+- calendar and lectionary logic
+- hymns, saints, and Psalmody
+- authentication and user profiles
+- music and learning catalogs
+- likes, follows, playlists, history, and preferences
+- creator submissions and review workflows
+- media-processing state
+- notifications and broadcast auditing
 
-The database structure allows CHC to represent material as interconnected liturgical data rather than static pages.
+The database is designed around relationships and liturgical logic rather than static pages.
 
 ### Cloudflare
 
-**Cloudflare** is used within the wider CHC infrastructure for areas involving media delivery, storage, streaming, and web services.
+**Cloudflare** is used for the deployed web application and the media/edge infrastructure around CHC.
 
-This is particularly important as the audio side of CHC continues to expand.
+The current infrastructure includes components for:
+
+- web delivery through Cloudflare Workers
+- upload authorization
+- media resolution and delivery
+- media processing
+- object-storage cleanup
+- rich-link/share metadata
+- notification dispatch
+
+Large media is kept outside the primary relational database while Supabase stores the catalog, workflow, and access-control state.
 
 ---
 
 ## The CHC Ecosystem
 
-The main Coptic Hymns Centre app is the center of a larger ecosystem.
+The main Coptic Hymns Centre app is the user-facing center of a larger ecosystem.
 
 ### Coptic Hymns Centre
 
-The main application used to read, listen, study, search, and follow Coptic Orthodox resources.
+The main application for reading, listening, learning, searching, following services, managing a personal library, and exploring Coptic Orthodox resources.
 
 ### CHC Artists
 
-A companion platform for approved cantors, choirs, musicians, and publishers to submit and manage audio distributed through CHC.
+The creator portal for approved artists, cantors, choirs, musicians, and publishers. It handles profiles, uploads, release submissions, release editing, synchronized lyrics, release timing, and creator-side media workflows.
 
-Together, these applications allow CHC to support both the people using Coptic resources and the people helping create and preserve them.
+### CHC Admin
+
+The restricted administrative application for CHC staff. It handles submission review, publication controls, media-processing exceptions, storage cleanup, and manual notification broadcasts.
+
+Together, the three applications separate the listener, creator, and administrative workflows while sharing the same CHC backend and media platform.
 
 ---
 
@@ -389,6 +461,6 @@ The project is continually expanding as more texts, translations, recordings, bo
 
 Coptic Hymns Centre is under active development.
 
-The database, user interface, mobile applications, web application, liturgical logic, Bible alignment, audio platform, and presentation tools are all continuing to evolve.
+The project now includes a working cross-platform reading and liturgical application, live church-calendar Home experience, account system, consumer music and learning platforms, creator and admin companion apps, Cloudflare-backed media infrastructure, storage lifecycle management, and shared notification infrastructure.
 
-Features and structures may change as the project grows and additional Coptic resources are integrated.
+The database, interfaces, mobile builds, liturgical logic, Bible alignment, media platform, notifications, and presentation tools continue to evolve as more Coptic resources and production capabilities are added.
