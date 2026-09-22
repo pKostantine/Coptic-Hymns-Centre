@@ -6,9 +6,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  View,
   type ViewStyle,
 } from 'react-native';
 
+import Icon, { type IconName } from '@/components/chc/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { downloadManager } from '@/services/downloadManager';
 import type { OfflineDownloadProgress, OfflineDownloadRequest } from '@/types/offlineDownloads';
@@ -21,8 +23,10 @@ export interface OfflineDownloadButtonProps {
   theme: DownloadTheme;
   isArabic?: boolean;
   compact?: boolean;
+  menuRow?: boolean;
   label?: string;
   style?: ViewStyle;
+  onAction?: () => void;
 }
 
 function percentage(progress: number): string {
@@ -40,8 +44,10 @@ function NativeOfflineDownloadButton({
   theme,
   isArabic = false,
   compact = false,
+  menuRow = false,
   label,
   style,
+  onAction,
 }: OfflineDownloadButtonProps) {
   const revision = useSyncExternalStore(
     downloadManager.subscribe,
@@ -104,6 +110,7 @@ function NativeOfflineDownloadButton({
       if (progress?.status === 'complete' && updateAvailable) {
         await downloadManager.update(await prepare());
         setUpdateAvailable(false);
+        onAction?.();
         return;
       }
 
@@ -124,26 +131,31 @@ function NativeOfflineDownloadButton({
             },
           ],
         );
+        onAction?.();
         return;
       }
 
       if (progress?.status === 'downloading' || progress?.status === 'queued') {
         await downloadManager.pause(packageKey);
+        onAction?.();
         return;
       }
 
       if (progress?.status === 'paused') {
         await downloadManager.resume(packageKey);
+        onAction?.();
         return;
       }
 
       if (progress?.status === 'failed' || progress?.status === 'cancelled') {
         await downloadManager.retry(packageKey);
+        onAction?.();
         return;
       }
 
       await downloadManager.enqueue(await prepare());
       setStorageAvailable(true);
+      onAction?.();
     } catch (cause) {
       Alert.alert(
         isArabic ? 'تعذر التنزيل' : 'Download unavailable',
@@ -154,7 +166,7 @@ function NativeOfflineDownloadButton({
     } finally {
       setBusy(false);
     }
-  }, [busy, isArabic, packageKey, prepare, progress, updateAvailable]);
+  }, [busy, isArabic, onAction, packageKey, prepare, progress, updateAvailable]);
 
   if (!storageAvailable) return null;
 
@@ -173,6 +185,55 @@ function NativeOfflineDownloadButton({
   const accent = theme === 'learning' ? COLORS.learningBright : COLORS.goldBright;
   const soft = theme === 'learning' ? COLORS.learningSoft : COLORS.goldSoft;
   const line = theme === 'learning' ? COLORS.learningLine : COLORS.goldLine;
+
+  if (menuRow) {
+    const removing = progress?.status === 'complete' && !updateAvailable;
+    const menuText = removing
+      ? (isArabic ? 'إزالة التنزيل' : 'Remove download')
+      : text;
+    const menuDetail = updateAvailable
+      ? (isArabic ? 'يتوفر إصدار أحدث' : 'A newer version is available')
+      : removing
+        ? (isArabic ? 'حذف النسخة المحفوظة من هذا الجهاز' : 'Delete the offline copy from this device')
+        : active
+          ? (isArabic ? 'اضغط للإيقاف المؤقت' : 'Tap to pause')
+          : progress?.status === 'paused'
+            ? (isArabic ? 'متابعة التنزيل' : 'Continue this download')
+            : failed
+              ? (isArabic ? 'حاول التنزيل مرة أخرى' : 'Try downloading again')
+              : (isArabic ? 'الحفظ للاستماع بلا اتصال' : 'Save for offline listening');
+    const menuIcon: IconName = updateAvailable
+      ? 'repeat'
+      : removing
+        ? 'trash-outline'
+        : active
+          ? 'pause'
+          : progress?.status === 'paused'
+            ? 'play'
+            : failed
+              ? 'repeat'
+              : 'download-outline';
+    const menuColor = removing ? '#FF8A8A' : accent;
+
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={menuText}
+        accessibilityHint={active ? (isArabic ? 'اضغط للإيقاف المؤقت' : 'Tap to pause') : undefined}
+        disabled={busy}
+        onPress={action}
+        style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed, busy && styles.disabled]}
+      >
+        <View style={[styles.menuIcon, { backgroundColor: soft }]}>
+          {busy ? <ActivityIndicator size="small" color={menuColor} /> : <Icon name={menuIcon} size={20} color={menuColor} />}
+        </View>
+        <View style={styles.menuTextGroup}>
+          <Text style={[styles.menuLabel, removing && styles.menuLabelDanger, isArabic && styles.arabic]}>{menuText}</Text>
+          <Text style={[styles.menuDetail, isArabic && styles.arabic]}>{menuDetail}</Text>
+        </View>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
@@ -220,5 +281,12 @@ const styles = StyleSheet.create({
   compact: { minHeight: 36, paddingHorizontal: SPACING.md },
   disabled: { opacity: 0.65 },
   text: { fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
+  menuRow: { alignItems: 'center', borderRadius: 8, flexDirection: 'row', gap: SPACING.md, minHeight: 62, paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs },
+  menuRowPressed: { backgroundColor: 'rgba(255,255,255,0.06)' },
+  menuIcon: { alignItems: 'center', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  menuTextGroup: { flex: 1, minWidth: 0 },
+  menuLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
+  menuLabelDanger: { color: '#FF8A8A' },
+  menuDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, lineHeight: 16, marginTop: 2 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

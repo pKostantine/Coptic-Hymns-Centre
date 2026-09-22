@@ -233,6 +233,7 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
   const providerAvatarUrl = typeof user.user_metadata.avatar_url === 'string' ? user.user_metadata.avatar_url : null;
   const avatarUrl = customAvatarUrl || providerAvatarUrl;
   const [displayName, setDisplayName] = useState(currentName);
+  const [email, setEmail] = useState(user.email ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordEditor, setShowPasswordEditor] = useState(recoveryMode);
@@ -250,13 +251,22 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
 
   const saveProfile = async () => {
     const trimmed = displayName.trim();
+    const normalizedEmail = email.trim().toLowerCase();
     if (!trimmed || busy) return;
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    const emailChanged = normalizedEmail !== (user.email ?? '').toLowerCase();
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
       await auth.updateDisplayName(trimmed);
-      setNotice('Your profile has been updated.');
+      if (emailChanged) await auth.updateEmail(normalizedEmail);
+      setNotice(emailChanged
+        ? 'Profile saved. Check your email to confirm the new address.'
+        : 'Your profile has been updated.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to update your profile.');
     } finally {
@@ -385,15 +395,18 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
         <Field label="Display name">
           <TextInput value={displayName} onChangeText={setDisplayName} style={styles.input} placeholder="Your name" placeholderTextColor={COLORS.muted} />
         </Field>
-        <Pressable disabled={busy || !displayName.trim()} style={[styles.secondaryButton, (busy || !displayName.trim()) && styles.disabled]} onPress={() => void saveProfile()}>
+        <Field label="Email">
+          <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} style={styles.input} placeholder="you@example.com" placeholderTextColor={COLORS.muted} />
+        </Field>
+        <Pressable disabled={busy || !displayName.trim() || !email.trim()} style={[styles.secondaryButton, (busy || !displayName.trim() || !email.trim()) && styles.disabled]} onPress={() => void saveProfile()}>
           <Text style={styles.secondaryButtonText}>Save profile</Text>
         </Pressable>
       </View>
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الأمان' : 'Security'}</Text>
-        <Text style={styles.accountDetailLabel}>Email</Text>
-        <Text selectable style={styles.accountDetailValue}>{user.email}</Text>
+        <Text style={styles.accountDetailLabel}>Sign-in method</Text>
+        <Text style={styles.accountDetailValue}>{provider}{user.email_confirmed_at ? ' · Verified' : ''}</Text>
 
         {!recoveryMode ? (
           <Pressable style={styles.disclosureRow} onPress={() => setShowPasswordEditor((current) => !current)}>
@@ -505,7 +518,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  profileHero: { borderColor: COLORS.goldLine, backgroundColor: COLORS.navy },
+  profileHero: { paddingTop: SPACING.sm },
   profileHeader: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md },
   profileAvatar: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderColor: COLORS.goldLine, borderRadius: 44, borderWidth: 1, height: 88, justifyContent: 'center', overflow: 'hidden', width: 88 },
   profileAvatarImage: { height: 88, width: 88 },
@@ -521,9 +534,9 @@ const styles = StyleSheet.create({
   signOutSection: { backgroundColor: 'transparent', borderWidth: 0, padding: 0 },
 
   scrollContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
-  container: { alignSelf: 'center', gap: SPACING.lg, maxWidth: 760, width: '100%' },
+  container: { alignSelf: 'center', gap: 0, maxWidth: 640, width: '100%' },
   loader: { marginVertical: SPACING.xl },
-  section: { backgroundColor: COLORS.navyDark, borderColor: COLORS.border, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.md, padding: SPACING.lg },
+  section: { borderBottomColor: COLORS.border, borderBottomWidth: 1, gap: SPACING.md, paddingHorizontal: SPACING.xs, paddingVertical: SPACING.lg },
   recoverySection: { borderColor: COLORS.goldLine, borderTopWidth: 1, paddingTop: SPACING.lg },
   sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700' },
   sectionBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, lineHeight: 22 },

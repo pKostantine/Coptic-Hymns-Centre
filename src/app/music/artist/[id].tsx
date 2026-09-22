@@ -35,22 +35,35 @@ export default function MusicArtistScreen() {
   useEffect(() => {
     if (!artistId) return;
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- route changes reset the visible entity before async loading
     setError(null);
+    setArtist(null);
     setShareArtwork(null);
     setShareArtworkLoaded(false);
+    musicService.getArtist(artistId, locale)
+      .then((payload) => { if (active) setArtist(payload); })
+      .catch((cause) => {
+        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load artist.');
+      });
+    return () => { active = false; };
+  }, [artistId, locale]);
+
+  useEffect(() => {
+    if (!artistId) return;
+    let active = true;
     Promise.all([
-      musicService.getArtist(artistId, locale),
       musicService.getArtistFollowed(artistId),
       musicService.getLibrary(locale),
     ])
-      .then(([payload, isFollowed, library]) => {
+      .then(([isFollowed, library]) => {
         if (!active) return;
-        setArtist(payload);
         setFollowed(isFollowed);
         setLibraryAuthenticated(library.authenticated);
       })
-      .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load artist.');
+      .catch(() => {
+        if (!active) return;
+        setFollowed(false);
+        setLibraryAuthenticated(false);
       });
     return () => { active = false; };
   }, [artistId, locale, user?.id]);

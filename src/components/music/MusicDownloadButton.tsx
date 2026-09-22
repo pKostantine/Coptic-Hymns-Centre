@@ -7,12 +7,16 @@ export default function MusicDownloadButton({
   label,
   isArabic = false,
   compact = false,
+  menuRow = false,
+  onAction,
 }: {
   packageKey: string;
   request: OfflineDownloadRequest | (() => Promise<OfflineDownloadRequest>);
   label?: string;
   isArabic?: boolean;
   compact?: boolean;
+  menuRow?: boolean;
+  onAction?: () => void;
 }) {
   return (
     <OfflineDownloadButton
@@ -22,6 +26,8 @@ export default function MusicDownloadButton({
       label={label}
       isArabic={isArabic}
       compact={compact}
+      menuRow={menuRow}
+      onAction={onAction}
     />
   );
 }

@@ -25,6 +25,7 @@ interface AuthContextValue {
   sendPasswordReset: (email: string) => Promise<void>;
   resendSignupConfirmation: (email: string) => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<void>;
+  updateEmail: (email: string) => Promise<void>;
   updateAvatarUrl: (avatarUrl: string | null) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   clearRecoveryMode: () => void;
@@ -184,6 +185,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     authError(error, 'Unable to update your profile.');
   }, []);
 
+  const updateEmail = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.updateUser(
+      { email: email.trim().toLowerCase() },
+      { emailRedirectTo: accountRedirectUrl() },
+    );
+    authError(error, 'Unable to update your email address.');
+  }, []);
+
   const updateAvatarUrl = useCallback(async (avatarUrl: string | null) => {
     const { error } = await supabase.auth.updateUser({
       data: { chc_avatar_url: avatarUrl },
@@ -222,6 +231,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     sendPasswordReset,
     resendSignupConfirmation,
     updateDisplayName,
+    updateEmail,
     updateAvatarUrl,
     updatePassword,
     clearRecoveryMode: () => setRecoveryMode(false),
@@ -237,6 +247,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     signOut,
     signUpWithEmail,
     updateDisplayName,
+    updateEmail,
     updateAvatarUrl,
     updatePassword,
   ]);

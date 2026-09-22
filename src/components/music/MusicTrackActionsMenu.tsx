@@ -1,10 +1,16 @@
-import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon, { type IconName } from '@/components/chc/ui/Icon';
+import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { musicService } from '@/services/musicService';
+import { musicTrackDownloadRequest } from '@/services/offlineDownloadRequests';
 import { publicShareUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
@@ -21,8 +27,32 @@ export default function MusicTrackActionsMenu({
 }: MusicTrackActionsMenuProps) {
   const [visible, setVisible] = useState(false);
   const { addNext, addToEnd } = useMusicPlayer();
+  const { preferences } = useReadingPreferences();
+  const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
+  const downloadRequest = useMemo(() => musicTrackDownloadRequest({
+    track: item.track,
+    locale,
+    releaseTitle: item.releaseTitle,
+    coverAsset: item.coverAsset,
+  }), [item.coverAsset, item.releaseTitle, item.track, locale]);
 
   const close = () => setVisible(false);
+
+  const prepareDownload = useCallback(async () => {
+    let lyrics = null;
+    try {
+      lyrics = await musicService.getLyrics(item.track.id, locale);
+    } catch {
+      // Lyrics are useful offline metadata, but the audio download can proceed without them.
+    }
+    return musicTrackDownloadRequest({
+      track: item.track,
+      locale,
+      releaseTitle: item.releaseTitle,
+      coverAsset: item.coverAsset,
+      lyrics,
+    });
+  }, [item.coverAsset, item.releaseTitle, item.track, locale]);
 
   const shareTrack = async () => {
     close();
@@ -62,10 +92,10 @@ export default function MusicTrackActionsMenu({
           styles.trigger,
           { width: size, height: size, borderRadius: size / 2 },
           hovered && styles.triggerHovered,
-          pressed && styles.pressed,
+          pressed && styles.triggerPressed,
         ]}
       >
-        <Icon name="ellipsis-horizontal" size={Math.round(size * 0.5)} color={COLORS.white} />
+        <Icon name="ellipsis-vertical" size={Math.max(20, Math.round(size * 0.56))} color={COLORS.muted} />
       </Pressable>
 
       {visible ? (
@@ -77,19 +107,31 @@ export default function MusicTrackActionsMenu({
       >
         <View style={styles.modalRoot}>
           <Pressable accessibilityLabel="Close track options" style={styles.backdrop} onPress={close} />
-          <View style={styles.sheet}>
+          <SafeAreaView edges={['bottom']} style={styles.sheet}>
             <View style={styles.grabber} />
-            <Text numberOfLines={1} style={[styles.title, isArabic && styles.arabic]}>{item.track.title}</Text>
-            {item.releaseTitle ? (
-              <Text numberOfLines={1} style={[styles.subtitle, isArabic && styles.arabic]}>{item.releaseTitle}</Text>
-            ) : null}
+            <View style={styles.sheetHeader}>
+              <MusicArtwork asset={item.coverAsset} size={52} radius={6} label={item.releaseTitle ?? item.track.title} />
+              <View style={styles.sheetHeaderText}>
+                <Text numberOfLines={1} style={[styles.title, isArabic && styles.arabic]}>{item.track.title}</Text>
+                {item.releaseTitle ? (
+                  <Text numberOfLines={1} style={[styles.subtitle, isArabic && styles.arabic]}>{item.releaseTitle}</Text>
+                ) : null}
+              </View>
+              <Pressable accessibilityLabel={isArabic ? 'إغلاق' : 'Close'} onPress={close} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
+                <Icon name="close" size={20} color={COLORS.muted} />
+              </Pressable>
+            </View>
 
             <View style={styles.actions}>
-              <ActionRow
-                icon="share-outline"
-                label={isArabic ? 'مشاركة' : 'Share'}
-                onPress={() => void shareTrack()}
-              />
+              {Platform.OS !== 'web' ? (
+                <MusicDownloadButton
+                  packageKey={downloadRequest.packageKey}
+                  request={prepareDownload}
+                  isArabic={isArabic}
+                  menuRow
+                  onAction={close}
+                />
+              ) : null}
               <MusicPlaylistPicker
                 trackId={item.track.id}
                 label={isArabic ? 'إضافة إلى قائمة تشغيل' : 'Add to playlist'}
@@ -106,8 +148,13 @@ export default function MusicTrackActionsMenu({
                 label={isArabic ? 'إضافة إلى نهاية قائمة الانتظار' : 'Add to end of queue'}
                 onPress={addTrackToEnd}
               />
+              <ActionRow
+                icon="share-outline"
+                label={isArabic ? 'مشاركة' : 'Share'}
+                onPress={() => void shareTrack()}
+              />
             </View>
-          </View>
+          </SafeAreaView>
         </View>
       </Modal>
       ) : null}
@@ -133,9 +180,12 @@ const styles = StyleSheet.create({
   trigger: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
+    borderWidth: 1,
   },
-  triggerHovered: { backgroundColor: 'rgba(255,255,255,0.10)' },
+  triggerHovered: { backgroundColor: COLORS.goldSoft, borderColor: COLORS.goldLine },
+  triggerPressed: { backgroundColor: COLORS.goldSoft, opacity: 0.78 },
   pressed: { opacity: 0.7 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
@@ -167,6 +217,9 @@ const styles = StyleSheet.create({
     marginTop: 9,
     marginBottom: SPACING.md,
   },
+  sheetHeader: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md },
+  sheetHeaderText: { flex: 1, minWidth: 0 },
+  closeButton: { alignItems: 'center', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   title: {
     color: COLORS.white,
     fontFamily: TYPOGRAPHY.title,

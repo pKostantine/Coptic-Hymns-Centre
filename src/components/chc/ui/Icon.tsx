@@ -20,6 +20,9 @@ export type IconName =
   | 'list-outline'
   | 'playlist-add'
   | 'ellipsis-horizontal'
+  | 'ellipsis-vertical'
+  | 'download-outline'
+  | 'trash-outline'
   | 'sunny'
   | 'moon'
   | 'close-fullscreen'
@@ -262,6 +265,26 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
           <Circle cx={112} cy={256} r={34} fill={color} />
           <Circle cx={256} cy={256} r={34} fill={color} />
           <Circle cx={400} cy={256} r={34} fill={color} />
+        </Svg>
+      );
+    case 'ellipsis-vertical':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Circle cx={256} cy={112} r={34} fill={color} />
+          <Circle cx={256} cy={256} r={34} fill={color} />
+          <Circle cx={256} cy={400} r={34} fill={color} />
+        </Svg>
+      );
+    case 'download-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M256 48v272M144 224l112 112 112-112M80 400v48h352v-48" fill="none" stroke={color} strokeWidth={34} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'trash-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M112 112h288M208 112V72h96v40M144 112l24 336h176l24-336M224 192v176M288 192v176" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     case 'sunny':

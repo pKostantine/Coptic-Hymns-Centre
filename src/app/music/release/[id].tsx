@@ -16,10 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useMusicPlayer, type MusicQueueItem } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
-import {
-  musicReleaseDownloadRequest,
-  musicTrackDownloadRequest,
-} from '@/services/offlineDownloadRequests';
+import { musicReleaseDownloadRequest } from '@/services/offlineDownloadRequests';
 import type { MusicConsumerRelease, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
 import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
@@ -243,14 +240,7 @@ export default function MusicReleaseScreen() {
         </View>
 
         <View style={[styles.trackList, desktop && styles.trackListDesktop]}>
-          {tracks.map((track, index) => {
-            const trackRequest = musicTrackDownloadRequest({
-              track,
-              locale,
-              releaseTitle: release.title,
-              coverAsset: release.coverAsset,
-            });
-            return (
+          {tracks.map((track, index) => (
               <MusicTrackRow
                 key={track.id}
                 track={track}
@@ -261,31 +251,9 @@ export default function MusicReleaseScreen() {
                 showLikeButton
                 liked={likedTrackIds.has(track.id)}
                 onToggleLike={() => void handleToggleTrackLike(track.id)}
-                trailing={(
-                  <View style={styles.trackActions}>
-                    <MusicTrackActionsMenu item={queue[index]} isArabic={isArabic} />
-                    <MusicDownloadButton
-                      packageKey={trackRequest.packageKey}
-                      request={async () => {
-                        let lyrics: PublishedTrackLyricsPayload | null = null;
-                        try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional offline metadata */ }
-                        return musicTrackDownloadRequest({
-                          track,
-                          locale,
-                          releaseTitle: release.title,
-                          coverAsset: release.coverAsset,
-                          lyrics,
-                        });
-                      }}
-                      isArabic={isArabic}
-                      compact
-                      label=""
-                    />
-                  </View>
-                )}
+                trailing={<MusicTrackActionsMenu item={queue[index]} isArabic={isArabic} />}
               />
-            );
-          })}
+          ))}
         </View>
       </NowPlayingAwareScrollView>
       <MusicMiniPlayer />
@@ -366,7 +334,6 @@ const styles = StyleSheet.create({
   actionButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   disabledButton: { opacity: 0.45 },
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  trackActions: { alignItems: 'center', flexDirection: 'row', gap: 2 },
   trackListDesktop: { width: '94%', maxWidth: 1120, alignSelf: 'center', marginHorizontal: 0 },
   loader: { marginTop: SPACING.xl },
   errorBoundary: { flex: 1, padding: SPACING.xl, alignItems: 'center', justifyContent: 'center', gap: SPACING.md },

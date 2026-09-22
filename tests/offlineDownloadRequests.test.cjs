@@ -67,12 +67,17 @@ test('playlist track download requests render with performer credits', () => {
   assert.deepEqual(request.resources, []);
 });
 
-test('the web playlist route keeps native download requests lazy', () => {
-  const source = fs.readFileSync('src/app/music/playlist/[id].tsx', 'utf8');
+test('track downloads live in the native-only overflow menu', () => {
+  const playlistSource = fs.readFileSync('src/app/music/playlist/[id].tsx', 'utf8');
+  const menuSource = fs.readFileSync('src/components/music/MusicTrackActionsMenu.tsx', 'utf8');
+  const downloadSource = fs.readFileSync('src/components/offline/OfflineDownloadButton.tsx', 'utf8');
 
-  assert.match(source, /Platform\.OS !== 'web'/);
-  assert.match(source, /packageKey={`music_playlist:\$\{playlist\.id\}:\$\{locale\}`}/);
-  assert.match(source, /packageKey={`music_track:\$\{track\.id\}:\$\{locale\}`}/);
-  assert.doesNotMatch(source, /const trackRequest = musicTrackDownloadRequest/);
-  assert.doesNotMatch(source, /const downloadRequest = useMemo/);
+  assert.match(playlistSource, /Platform\.OS !== 'web'/);
+  assert.match(playlistSource, /packageKey={`music_playlist:\$\{playlist\.id\}:\$\{locale\}`}/);
+  assert.doesNotMatch(playlistSource, /packageKey={`music_track:/);
+  assert.match(menuSource, /Platform\.OS !== 'web'/);
+  assert.match(menuSource, /musicTrackDownloadRequest/);
+  assert.match(menuSource, /menuRow/);
+  assert.match(downloadSource, /Remove download/);
+  assert.match(downloadSource, /downloadManager\.remove\(packageKey\)/);
 });

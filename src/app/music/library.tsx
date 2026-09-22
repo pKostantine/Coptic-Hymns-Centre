@@ -90,7 +90,7 @@ export default function MusicLibraryScreen() {
     router.push({ pathname: '/music/library/[section]', params: { section } });
   };
 
-  const folders: { id: LibraryFolder; title: string; count: number; detail: string }[] = [
+  const folders = ([
     {
       id: 'likes',
       title: isArabic ? 'الترانيم المعجبة' : 'Liked tracks',
@@ -123,7 +123,8 @@ export default function MusicLibraryScreen() {
         ? (isArabic ? 'متاحة في تطبيق الهاتف' : 'Available in the mobile app')
         : (isArabic ? 'محفوظة على هذا الجهاز' : 'Saved on this device'),
     },
-  ];
+  ] satisfies { id: LibraryFolder; title: string; count: number; detail: string }[])
+    .filter((folder) => Platform.OS !== 'web' || folder.id !== 'downloads');
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>

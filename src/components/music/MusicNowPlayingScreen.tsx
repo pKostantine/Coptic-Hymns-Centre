@@ -279,15 +279,6 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     }
   };
 
-  const showDownloadAction = () => {
-    Alert.alert(
-      isArabic ? 'التنزيل' : 'Download',
-      isArabic
-        ? 'تم تجهيز إجراء التنزيل في تجربة الموسيقى. التخزين الكامل والاستماع بلا اتصال سيتم تفعيله في مرحلة التنزيلات.'
-        : 'The download action is part of the Music experience. Full local storage and offline playback are implemented in the dedicated Offline Downloads phase.',
-    );
-  };
-
   const header = (
     <View
       style={[
@@ -458,7 +449,6 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       onNext={next}
       onToggleLike={() => void toggleTrackLike(currentItem.track.id)}
       onShare={() => void handleShareTrack()}
-      onDownload={Platform.OS !== 'web' ? showDownloadAction : undefined}
     />
   );
 
@@ -501,7 +491,6 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
           onNext={next}
           onToggleLike={() => void toggleTrackLike(currentItem.track.id)}
           onShare={() => void handleShareTrack()}
-          onDownload={Platform.OS !== 'web' ? showDownloadAction : undefined}
         />
         <View style={[styles.pullUpRow, styles.pullUpRowLandscape]}>
           <PullUpButton
@@ -817,7 +806,6 @@ interface PlayerCardProps extends Omit<TransportControlsProps, 'large'> {
   onSeek: (positionMs: number) => void;
   onToggleLike: () => void;
   onShare: () => void;
-  onDownload?: () => void;
 }
 
 function PlayerCard({
@@ -840,7 +828,6 @@ function PlayerCard({
   onSeek,
   onToggleLike,
   onShare,
-  onDownload,
   ...transport
 }: PlayerCardProps) {
   const contentWidth = horizontal ? 620 : compact ? 440 : Math.max(artSize, 320);
@@ -916,11 +903,6 @@ function PlayerCard({
               size={compact ? 48 : 42}
             />
             <MusicTrackActionsMenu item={item} isArabic={isArabic} size={44} />
-            {onDownload ? (
-              <Pressable style={styles.secondaryAction} onPress={onDownload}>
-                <Text style={styles.secondaryActionText}>↓ {isArabic ? 'تنزيل' : 'Download'}</Text>
-              </Pressable>
-            ) : null}
           </View>
         </>
       )}
@@ -1041,17 +1023,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   playerActionsHorizontal: { marginTop: 0, flexWrap: 'nowrap', gap: 6 },
-  secondaryAction: {
-    minHeight: 36,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADII.pill,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-  },
-  secondaryActionText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
-
   narrowBody: { flex: 1, minHeight: 0, paddingHorizontal: SPACING.md, paddingBottom: SPACING.md },
   narrowPlayer: { flex: 1, justifyContent: 'center' },
   landscapeBody: {

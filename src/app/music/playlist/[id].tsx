@@ -20,7 +20,6 @@ import { musicService } from '@/services/musicService';
 import { playlistCoverService } from '@/services/playlistCoverService';
 import {
   musicPlaylistDownloadRequest,
-  musicTrackDownloadRequest,
 } from '@/services/offlineDownloadRequests';
 import type { MusicPlaylistPayload, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 import type { MusicPlaylistVisibility } from '@/types/mediaPlatform';
@@ -370,24 +369,7 @@ export default function MusicPlaylistScreen() {
                       showLikeButton
                       liked={likedTrackIds.has(track.id)}
                       onToggleLike={() => void toggleTrackLike(track.id)}
-                      trailing={(
-                        <View style={styles.trackActions}>
-                          <MusicTrackActionsMenu item={queue[index]} isArabic={isArabic} />
-                          {Platform.OS !== 'web' ? (
-                            <MusicDownloadButton
-                              packageKey={`music_track:${track.id}:${locale}`}
-                              request={async () => {
-                                let lyrics: PublishedTrackLyricsPayload | null = null;
-                                try { lyrics = await musicService.getLyrics(track.id, locale); } catch { /* optional */ }
-                                return musicTrackDownloadRequest({ track, locale, coverAsset: playlist.coverAsset, lyrics });
-                              }}
-                              isArabic={isArabic}
-                              compact
-                              label=""
-                            />
-                          ) : null}
-                        </View>
-                      )}
+                      trailing={<MusicTrackActionsMenu item={queue[index]} isArabic={isArabic} />}
                     />
                   </View>
                 )
@@ -457,7 +439,6 @@ const styles = StyleSheet.create({
   confirmDeleteText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
   trackList: { marginTop: SPACING.lg, borderRadius: RADII.lg, overflow: 'hidden', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   trackFlex: { flex: 1 },
-  trackActions: { alignItems: 'center', flexDirection: 'row', gap: 2 },
   disabled: { opacity: 0.35 },
   empty: { padding: SPACING.lg },
   emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
