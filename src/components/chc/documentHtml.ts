@@ -1,6 +1,7 @@
 import { COLORS, SPACING } from '../../constants/theme';
 import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
+import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from './documentPresentationMetrics';
 
 export interface DocumentVerse {
   english: string;
@@ -20,6 +21,8 @@ export interface DocumentVerse {
   nonCopticGospelRiteOnly?: boolean;
   /** Readings only: "chapter:verse" gold badge prefixed before this verse's text in every visible language column. */
   bibleVerseNumber?: string;
+  /** Keeps authored Western digits in Coptic text when a source requires them. */
+  preserveCopticDigits?: boolean;
   /** Pre-Refrain lines only — forces italic on top of whatever color/role the verse naturally resolves to, without changing that role. */
   italic?: boolean;
   /** Forces this verse to render white and excludes it from the alternating parity count in both renderers — used for hymns like vocKyrieEleison that sit outside the enclosing section's alternating cadence. */
@@ -155,10 +158,12 @@ export function buildDocumentHtml(
     bottomContentInset?: number;
   },
 ) {
-  const sectionTitleFontSize = Math.max(Math.round(fontSize * 0.5), 14);
-  const sectionTitleLineHeight = Math.max(Math.round(fontSize * 0.62), 18);
-  const openButtonFontSize = Math.max(Math.round(sectionTitleFontSize * 1.3), 18);
-  const openButtonLineHeight = Math.max(Math.round(sectionTitleLineHeight * 1.3), 24);
+  const {
+    buttonFontSize: openButtonFontSize,
+    buttonLineHeight: openButtonLineHeight,
+    titleFontSize: sectionTitleFontSize,
+    titleLineHeight: sectionTitleLineHeight,
+  } = getDocumentChromeMetrics(fontSize);
   const copticFontSize = Math.round(fontSize * 1.25);
   const arabicFontSize = Math.round(fontSize * 1.15);
   const verseLineHeight = Math.round(fontSize * 1.3);
@@ -258,6 +263,10 @@ export function buildDocumentHtml(
       .title-row.has-collapse-button {
         grid-template-columns: 1fr;
       }
+      .title-row.has-collapse-button .title-text-group {
+        margin-inline: ${DOCUMENT_CONTROL_METRICS.collapseButtonSize}px;
+        width: calc(100% - ${DOCUMENT_CONTROL_METRICS.collapseButtonSize * 2}px);
+      }
       .title-text-group {
         display: grid;
         width: 100%;
@@ -322,8 +331,7 @@ export function buildDocumentHtml(
       }
       .arabic {
         direction: rtl;
-        // font-family: "Arial", sans-serif !important;
-        font-family: Georgia, serif !important;
+        font-family: Arial, sans-serif !important;
         font-size: ${arabicFontSize}px;
         line-height: ${arabicVerseLineHeight}px;
       }
@@ -359,7 +367,7 @@ export function buildDocumentHtml(
         align-items: center;
         background: ${COLORS.subdocSoft};
         border: 1px solid ${COLORS.subdocLine};
-        border-radius: 12px;
+        border-radius: ${DOCUMENT_CONTROL_METRICS.openButtonBorderRadius}px;
         color: ${COLORS.subdoc};
         cursor: pointer;
         display: flex;
@@ -368,12 +376,12 @@ export function buildDocumentHtml(
         font-family: Georgia, serif;
         font-size: ${openButtonFontSize}px;
         font-weight: 800;
-        min-height: 168px;
+        min-height: ${DOCUMENT_CONTROL_METRICS.openButtonMinHeight}px;
         justify-content: center;
         margin: 0 auto;
-        max-width: 420px;
+        max-width: ${DOCUMENT_CONTROL_METRICS.openButtonMaxWidth}px;
         padding: ${SPACING.lg}px ${SPACING.md}px;
-        width: 84%;
+        width: ${DOCUMENT_CONTROL_METRICS.controlWidthPercent}%;
       }
       .open-button .arabic {
         direction: rtl;
@@ -385,7 +393,7 @@ export function buildDocumentHtml(
         align-items: center;
         background: ${COLORS.linkSoft};
         border: 1px solid ${COLORS.linkLine};
-        border-radius: 12px;
+        border-radius: ${DOCUMENT_CONTROL_METRICS.hyperlinkBorderRadius}px;
         color: ${COLORS.link};
         cursor: pointer;
         display: flex;
@@ -395,10 +403,10 @@ export function buildDocumentHtml(
         gap: ${SPACING.md}px;
         justify-content: center;
         margin: ${SPACING.md}px auto;
-        max-width: 420px;
-        min-height: 72px;
+        max-width: ${DOCUMENT_CONTROL_METRICS.hyperlinkMaxWidth}px;
+        min-height: ${DOCUMENT_CONTROL_METRICS.hyperlinkMinHeight}px;
         padding: ${SPACING.md}px ${SPACING.lg}px;
-        width: 84%;
+        width: ${DOCUMENT_CONTROL_METRICS.controlWidthPercent}%;
       }
       .hyperlink-button .hyperlink-label {
         text-align: center;
@@ -1073,7 +1081,9 @@ function renderVerse(
     (verse.type === 'recitedPrayer' || verse.type === 'silentPrayer' || verse.type === 'silentComment') &&
     !copticRecitedPrayers &&
     !isInvincibleCoptic;
-  const copticText = copticHiddenByToggle ? '' : formatCopticNumbers(verse.coptic || '');
+  const copticText = copticHiddenByToggle
+    ? ''
+    : formatCopticNumbers(verse.coptic || '', verse.preserveCopticDigits);
 
   const languages: { className: string; key: keyof VisibleColumns; text: string; speakerLabel?: string; speakerClass?: string }[] = [
     { className: 'english', key: 'english' as const, text: verse.english || '', speakerLabel: rubric?.english, speakerClass: rubric?.class },
@@ -1251,7 +1261,8 @@ function formatCopticNumber(value: number): string {
   return `${COPTIC_HUNDREDS[hundreds] || ''}${COPTIC_TENS[tens] || ''}${COPTIC_DIGITS[ones] || ''}`;
 }
 
-function formatCopticNumbers(text: string) {
+function formatCopticNumbers(text: string, preserveDigits = false) {
+  if (preserveDigits) return String(text || '');
   return String(text || '').replace(/\d+/g, (value) => formatCopticNumber(Number(value)));
 }
 

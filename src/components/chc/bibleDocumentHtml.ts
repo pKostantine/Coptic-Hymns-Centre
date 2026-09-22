@@ -271,21 +271,21 @@ export function buildBibleChapterHtml({
       }
       .slideshow-pages {
         box-sizing: border-box;
-        display: flex;
-        flex-direction: row;
         height: 100vh;
         height: 100dvh;
+        position: relative;
         transition: none;
-        will-change: transform;
-        width: max-content;
+        width: 100vw;
       }
       .slide-page {
         box-sizing: border-box;
-        flex: 0 0 100vw;
         height: 100vh;
         height: 100dvh;
+        left: 0;
         overflow: hidden;
-        padding: calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-top)) 18px calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-bottom));
+        padding: calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-top)) 18px calc(clamp(8px, 3vh, 24px) + env(safe-area-inset-bottom) + ${Math.max(0, Math.round(bottomContentInset))}px);
+        position: absolute;
+        top: 0;
         width: 100vw;
       }
       .slideshow-source {
@@ -298,7 +298,6 @@ export function buildBibleChapterHtml({
         visibility: hidden;
         width: 100vw;
       }
-      .slide-page .verse-row { border-bottom: 0; }
       .slide-page .cell { align-self: start; }
       .tap-zone {
         position: fixed;
@@ -338,7 +337,6 @@ export function buildBibleChapterHtml({
         var pagerStatus = document.getElementById('pager-status');
         var currentPage = 0;
         var pageCount = 1;
-        var pageWidth = 1;
         var isSlideshow = ${JSON.stringify(Boolean(isSlideshow))};
         var selectTextEnabled = ${JSON.stringify(effectiveSelectText)};
         var initialVerse = ${JSON.stringify(initialVerse === null || initialVerse === undefined ? '' : String(initialVerse))};
@@ -355,6 +353,8 @@ export function buildBibleChapterHtml({
         var startY = 0;
         var suppressClickUntil = 0;
         var resizeFrame = 0;
+        var resizeTimer = 0;
+        var pendingResizeAnchor = null;
 
         function post(message) {
           var payload = JSON.stringify(message);
@@ -723,9 +723,10 @@ export function buildBibleChapterHtml({
         function applyPage() {
           if (!isSlideshow || !pages) return;
           currentPage = Math.min(Math.max(currentPage, 0), pageCount - 1);
-          pages.style.transform = 'translate3d(' + -currentPage * pageWidth + 'px, 0, 0)';
           Array.prototype.forEach.call(pages.children || [], function (page, index) {
-            page.setAttribute('aria-hidden', index === currentPage ? 'false' : 'true');
+            var isCurrent = index === currentPage;
+            page.style.display = isCurrent ? 'block' : 'none';
+            page.setAttribute('aria-hidden', isCurrent ? 'false' : 'true');
           });
           if (previousButton) {
             previousButton.disabled = currentPage <= 0;
@@ -748,7 +749,6 @@ export function buildBibleChapterHtml({
 
           pages.style.visibility = 'hidden';
           pages.innerHTML = '';
-          pageWidth = Math.max(pager.clientWidth || window.innerWidth || 1, 1);
 
           rows.forEach(function (row) {
             if (!page) page = createPage();
@@ -939,24 +939,31 @@ export function buildBibleChapterHtml({
 
         if (isSlideshow) {
           requestAnimationFrame(function () {
-            paginate(initialVerse);
+            var initialPaginationDone = false;
             var finishInitialLayout = function () {
-              paginate(getCurrentAnchor());
+              if (initialPaginationDone) return;
+              initialPaginationDone = true;
+              paginate(initialVerse);
               if (initialVerse) highlightVerse(initialVerse);
             };
             if (document.fonts && document.fonts.ready) {
               document.fonts.ready.then(finishInitialLayout);
-            } else {
-              setTimeout(finishInitialLayout, 120);
             }
+            setTimeout(finishInitialLayout, 160);
           });
           window.addEventListener('resize', function () {
-            var anchor = getCurrentAnchor();
+            pendingResizeAnchor = getCurrentAnchor() || pendingResizeAnchor;
             if (resizeFrame) cancelAnimationFrame(resizeFrame);
-            resizeFrame = requestAnimationFrame(function () {
-              resizeFrame = 0;
-              paginate(anchor);
-            });
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function () {
+              resizeTimer = 0;
+              resizeFrame = requestAnimationFrame(function () {
+                resizeFrame = 0;
+                var anchor = pendingResizeAnchor;
+                pendingResizeAnchor = null;
+                paginate(anchor);
+              });
+            }, 80);
           });
         } else if (initialVerse) {
           requestAnimationFrame(function () {

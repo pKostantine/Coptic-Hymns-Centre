@@ -7,6 +7,8 @@
  * is rendered with the exact font and line-height assumptions used here.
  */
 
+import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from "./documentPresentationMetrics.js";
+
 const SPACING_XS = 4;
 const SPACING_SM = 8;
 const SPACING_XL = 32;
@@ -18,8 +20,7 @@ function clamp(value, minimum, maximum) {
 
 export function getSlideshowChromeMetrics(fontSize) {
   const safeFontSize = Math.max(Number(fontSize) || 18, 1);
-  const titleFontSize = clamp(Math.round(safeFontSize * 0.5), 14, 36);
-  const buttonFontSize = clamp(Math.round(safeFontSize * 0.65), 18, 38);
+  const documentChrome = getDocumentChromeMetrics(safeFontSize);
   // Scroll mode renders speaker labels inside the normal language paragraph,
   // so the label inherits that language's full font size. Slideshow must use
   // the same metric instead of shrinking the speaker to a separate chrome
@@ -27,20 +28,13 @@ export function getSlideshowChromeMetrics(fontSize) {
   const speakerFontSize = safeFontSize;
 
   return {
-    buttonFontSize,
-    buttonLineHeight: Math.max(Math.round(buttonFontSize * 1.25), 24),
+    ...documentChrome,
     speakerFontSize,
     speakerLineHeight: Math.max(Math.round(speakerFontSize * 1.3), 18),
-    titleFontSize,
-    titleLineHeight: Math.max(Math.round(titleFontSize * 1.25), 18),
   };
 }
 
 export function getSlideshowLanguageFontSize(language, item = {}, fontSize = 18) {
-  if (item.verse?.type === "refrainLabel") {
-    return Math.max(Math.round(fontSize * 0.5), 11);
-  }
-
   if (language === "coptic") {
     return Math.round(fontSize * 1.25);
   }
@@ -53,10 +47,6 @@ export function getSlideshowLanguageFontSize(language, item = {}, fontSize = 18)
 }
 
 export function getSlideshowLanguageLineHeight(language, item = {}, fontSize = 18) {
-  if (item.verse?.type === "refrainLabel") {
-    return Math.max(Math.round(fontSize * 0.7), 15);
-  }
-
   // These are the document reader's proven metrics. In particular, Arabic
   // needs substantially more leading for vowel marks than English/Coptic;
   // using 1.25 * the base size clipped Arabic at the largest setting.
@@ -106,10 +96,12 @@ function getVerseCommonHeight(item, fontSize, visibleLanguages) {
 }
 
 /** Responsive breathing room which never crowds a short landscape viewport. */
-export function getSlidePadding(viewportHeight = 0) {
+export function getSlidePadding(viewportHeight = 0, bottomContentInset = 0) {
   if (!viewportHeight) return { bottom: SPACING_SM * 2, top: SPACING_SM * 2 };
   const edge = clamp(Math.floor(viewportHeight * 0.04), SPACING_SM, SPACING_XL);
-  return { bottom: edge, top: edge };
+  const requestedInset = Math.max(Number(bottomContentInset) || 0, 0);
+  const boundedInset = Math.min(requestedInset, Math.max(viewportHeight - edge * 2 - 1, 0));
+  return { bottom: edge + boundedInset, top: edge };
 }
 
 /** The content budget is always bounded by the real viewport. */
@@ -576,7 +568,12 @@ export function getVerseLineSegmentHeight(segment, fontSize, visibleLanguages) {
 export function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
   const chrome = getSlideshowChromeMetrics(fontSize);
   if (item.type === "title") return chrome.titleLineHeight + SPACING_SM * 2;
-  if (item.type === "button") return Math.max(96, chrome.buttonLineHeight * 2 + SPACING_SM * 4);
+  if (item.type === "button") {
+    const minimumHeight = item.isHyperlink
+      ? DOCUMENT_CONTROL_METRICS.hyperlinkMinHeight
+      : DOCUMENT_CONTROL_METRICS.openButtonMinHeight;
+    return Math.max(minimumHeight, chrome.buttonLineHeight * 2 + SPACING_SM * 6);
+  }
   if (item.type === "gospelRiteToggle") return chrome.buttonLineHeight + SPACING_SM * 4;
 
   const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
@@ -843,18 +840,26 @@ export function getSlideRenderLayers(currentIndex, slideCount) {
   ];
 }
 
-export function getMeasurementBatch(items, measuredHeights, limit, anchor, preferredSectionId) {
+export function getMeasurementBatch(
+  items,
+  measuredHeights,
+  limit,
+  anchor,
+  preferredSectionId,
+  maxDistance = Number.POSITIVE_INFINITY,
+) {
   const missing = items.filter((item) => typeof measuredHeights[item.id] !== "number");
-  if (missing.length <= limit) return missing;
-  const preferredIndex = items.findIndex((item) =>
+  if (!Number.isFinite(maxDistance) && missing.length <= limit) return missing;
+  const matchedIndex = items.findIndex((item) =>
     (anchor?.sourceItemId && getSourceItemId(item) === anchor.sourceItemId) ||
     (preferredSectionId && item.sectionId === preferredSectionId),
   );
-  if (preferredIndex < 0) return missing.slice(0, limit);
+  const preferredIndex = matchedIndex >= 0 ? matchedIndex : 0;
 
   const prioritized = [];
   const seen = new Set();
-  for (let radius = 0; radius < items.length && prioritized.length < limit; radius += 1) {
+  const radiusLimit = Math.min(items.length - 1, Math.max(0, maxDistance));
+  for (let radius = 0; radius <= radiusLimit && prioritized.length < limit; radius += 1) {
     [preferredIndex + radius, preferredIndex - radius].forEach((index) => {
       const item = items[index];
       if (!item || seen.has(item.id) || typeof measuredHeights[item.id] === "number") return;

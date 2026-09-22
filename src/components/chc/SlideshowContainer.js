@@ -4,6 +4,7 @@ import { COLORS, SPACING } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
 import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
+import { DOCUMENT_CONTROL_METRICS } from "./documentPresentationMetrics";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 import {
   createSlideAnchor,
@@ -24,6 +25,35 @@ import {
   paginateItems,
 } from "./slideshowLayout";
 
+const slideshowMeasurementCache = new Map();
+const MAX_MEASUREMENT_CACHE_ENTRIES = 6000;
+
+function readCachedMeasurement(key) {
+  const cached = slideshowMeasurementCache.get(key);
+  if (!cached) return null;
+  slideshowMeasurementCache.delete(key);
+  slideshowMeasurementCache.set(key, cached);
+  return cached;
+}
+
+function writeCachedMeasurement(key, patch) {
+  if (!key) return;
+  const current = slideshowMeasurementCache.get(key) || {};
+  const next = {
+    ...current,
+    ...patch,
+    languageHeights: {
+      ...(current.languageHeights || {}),
+      ...(patch.languageHeights || {}),
+    },
+  };
+  slideshowMeasurementCache.delete(key);
+  slideshowMeasurementCache.set(key, next);
+  while (slideshowMeasurementCache.size > MAX_MEASUREMENT_CACHE_ENTRIES) {
+    slideshowMeasurementCache.delete(slideshowMeasurementCache.keys().next().value);
+  }
+}
+
 export default function SlideshowContainer({
   sections,
   visibleLanguages,
@@ -36,6 +66,7 @@ export default function SlideshowContainer({
   onCurrentSectionChange,
   onOpenSelector,
   viewportHeightOverride,
+  bottomContentInset = 0,
   onToggleCollapse,
   bishopPresent,
   onAction,
@@ -58,6 +89,7 @@ export default function SlideshowContainer({
   const pendingHeightsRef = useRef({});
   const pendingLanguageHeightsRef = useRef({});
   const pendingMeasurementFrameRef = useRef(null);
+  const itemMeasurementCacheKeysRef = useRef(new Map());
   // Whatever section (hymn) the user is actually looking at right now, kept
   // up to date by the onCurrentSectionChange effect below. A settings change
   // (font size, a language toggle, minimizing a hymn, Bishop Present, ...)
@@ -120,10 +152,12 @@ export default function SlideshowContainer({
         Math.round(viewportHeight || 0),
         Math.round(viewportWidth || 0),
         Math.round(viewportHeightOverride || 0),
+        Math.round(bottomContentInset || 0),
         refreshKey,
       ].join(":"),
     [
       fontSize,
+      bottomContentInset,
       refreshKey,
       slideTableWidth,
       viewportHeight,
@@ -131,6 +165,13 @@ export default function SlideshowContainer({
       viewportWidth,
       visibleLanguages,
     ],
+  );
+  const itemMeasurementCacheKeys = useMemo(
+    () => new Map(items.map((item) => [
+      item.id,
+      `${globalMeasurementKey}:${itemSignatures.get(item.id)}`,
+    ])),
+    [globalMeasurementKey, itemSignatures, items],
   );
   const measuredKey = `${globalMeasurementKey}:${itemsSignature}`;
   useLayoutEffect(() => {
@@ -147,6 +188,7 @@ export default function SlideshowContainer({
       preservedSectionIdRef.current,
     );
     sectionIdOrderRef.current = getSectionIdOrder(items);
+    itemMeasurementCacheKeysRef.current = itemMeasurementCacheKeys;
 
     const newSignatures = itemSignatures;
     // Nothing that affects every item's height changed -- only the item set
@@ -155,22 +197,40 @@ export default function SlideshowContainer({
     // signature is unchanged rather than wiping the whole document, so only
     // the handful of items that actually differ need to remeasure.
     const onlyItemsChanged = lastGlobalMeasurementKeyRef.current === globalMeasurementKey;
-    const keepUnchanged = (current) => {
-      if (!onlyItemsChanged) return {};
+    const cachedMeasurements = new Map(items.map((item) => [
+      item.id,
+      readCachedMeasurement(itemMeasurementCacheKeys.get(item.id)),
+    ]));
+    const keepUnchangedHeights = (current) => {
       const next = {};
       items.forEach((item) => {
-        if (current[item.id] != null && lastItemSignaturesRef.current.get(item.id) === newSignatures.get(item.id)) {
+        if (onlyItemsChanged && current[item.id] != null && lastItemSignaturesRef.current.get(item.id) === newSignatures.get(item.id)) {
           next[item.id] = current[item.id];
+          return;
         }
+        const cachedHeight = cachedMeasurements.get(item.id)?.height;
+        if (typeof cachedHeight === "number") next[item.id] = cachedHeight;
+      });
+      return next;
+    };
+    const keepUnchangedLanguageHeights = (current) => {
+      const next = {};
+      items.forEach((item) => {
+        if (onlyItemsChanged && current[item.id] != null && lastItemSignaturesRef.current.get(item.id) === newSignatures.get(item.id)) {
+          next[item.id] = current[item.id];
+          return;
+        }
+        const cachedLanguageHeights = cachedMeasurements.get(item.id)?.languageHeights;
+        if (cachedLanguageHeights) next[item.id] = cachedLanguageHeights;
       });
       return next;
     };
 
-    setMeasuredHeights(keepUnchanged);
-    setMeasuredLanguageHeights(keepUnchanged);
+    setMeasuredHeights(keepUnchangedHeights);
+    setMeasuredLanguageHeights(keepUnchangedLanguageHeights);
     lastGlobalMeasurementKeyRef.current = globalMeasurementKey;
     lastItemSignaturesRef.current = newSignatures;
-  }, [globalMeasurementKey, itemSignatures, items, measuredKey, refreshKey]);
+  }, [globalMeasurementKey, itemMeasurementCacheKeys, itemSignatures, items, measuredKey, refreshKey]);
 
   useEffect(
     () => () => {
@@ -189,6 +249,13 @@ export default function SlideshowContainer({
     const pendingLanguageHeights = pendingLanguageHeightsRef.current;
     pendingHeightsRef.current = {};
     pendingLanguageHeightsRef.current = {};
+
+    Object.entries(pendingHeights).forEach(([id, height]) => {
+      writeCachedMeasurement(itemMeasurementCacheKeysRef.current.get(id), { height });
+    });
+    Object.entries(pendingLanguageHeights).forEach(([id, languageHeights]) => {
+      writeCachedMeasurement(itemMeasurementCacheKeysRef.current.get(id), { languageHeights });
+    });
 
     if (Object.keys(pendingHeights).length) {
       setMeasuredHeights((current) => {
@@ -302,7 +369,7 @@ export default function SlideshowContainer({
 
     const budget = getSlideContentBudget(
       measuredViewportHeight,
-      getSlidePadding(measuredViewportHeight),
+      getSlidePadding(measuredViewportHeight, bottomContentInset),
     );
     const paginated = paginateItems(
       items,
@@ -317,6 +384,7 @@ export default function SlideshowContainer({
     return dropEmptySlides(paginated);
   }, [
     fontSize,
+    bottomContentInset,
     items,
     measuredHeights,
     measuredLanguageHeights,
@@ -330,8 +398,8 @@ export default function SlideshowContainer({
       ? Math.min(viewportHeight, viewportHeightOverride)
       : viewportHeight || viewportHeightOverride;
   const slidePadding = useMemo(
-    () => getSlidePadding(measuredViewportHeight),
-    [measuredViewportHeight],
+    () => getSlidePadding(measuredViewportHeight, bottomContentInset),
+    [bottomContentInset, measuredViewportHeight],
   );
   // The next bounded batch of items still missing a real measured height.
   // Mounting EVERY unmeasured item in one commit is what made this slow:
@@ -353,6 +421,7 @@ export default function SlideshowContainer({
       MEASUREMENT_BATCH_SIZE,
       currentAnchor,
       selectedSectionId || currentAnchor?.sectionId,
+      MEASUREMENT_WINDOW_RADIUS,
     );
   }, [currentAnchor, items, measuredHeights, selectedSectionId, viewportHeight, viewportHeightOverride]);
   // An empty batch means nothing is left unmeasured, so this stays equivalent
@@ -712,13 +781,8 @@ export function NavigationSurface({
 
   const panResponder = useMemo(() => {
     return PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-          const direction = getPageTurnForSwipe(gestureState.dx);
-          const shouldCapture = Boolean(direction) &&
-            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
-          return shouldCapture;
-        },
-        onMoveShouldSetPanResponder: (_, gestureState) => {
+        onMoveShouldSetPanResponder: (event, gestureState) => {
+          if (isInteractivePointerTarget(event?.target || event?.nativeEvent?.target)) return false;
           const direction = getPageTurnForSwipe(gestureState.dx);
           const shouldCapture = Boolean(direction) &&
             Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
@@ -760,6 +824,7 @@ export function NavigationSurface({
       style={styles.navigationSurface}
       onLayout={(event) => measureSurface(event.nativeEvent.layout.width)}
       onPress={(event) => {
+        if (isInteractivePointerTarget(event.target || event.nativeEvent?.target)) return;
         const nativeEvent = event.nativeEvent || {};
         let turn = null;
 
@@ -819,9 +884,10 @@ export function NavigationSurface({
 // How many unmeasured items may mount in the off-screen measurement layer in
 // a single commit. Large enough that a typical hymn measures in one or two
 // frames, small enough that no commit ever mounts a whole liturgy at once.
-const MEASUREMENT_BATCH_SIZE = 48;
-const COLLAPSE_BUTTON_SIZE = 40;
-const COLLAPSE_BUTTON_CIRCLE = 22;
+const MEASUREMENT_BATCH_SIZE = Platform.OS === "web" ? 48 : 16;
+const MEASUREMENT_WINDOW_RADIUS = Platform.OS === "web" ? 96 : 48;
+const COLLAPSE_BUTTON_SIZE = DOCUMENT_CONTROL_METRICS.collapseButtonSize;
+const COLLAPSE_BUTTON_CIRCLE = DOCUMENT_CONTROL_METRICS.collapseCircleSize;
 const DISABLED_SELECTION_STYLE = Platform.OS === "web"
   ? {
       WebkitTouchCallout: "none",
@@ -834,6 +900,7 @@ const DISABLED_SELECTION_STYLE = Platform.OS === "web"
 function CollapseButton({ collapsed, onPress }) {
   return (
     <Pressable
+      dataSet={{ slideshowControl: "true" }}
       accessibilityLabel={collapsed ? "Expand section" : "Collapse section"}
       accessibilityRole="button"
       onPress={(event) => {
@@ -879,6 +946,7 @@ const SlideItem = memo(function SlideItem({
         onLayout={(event) => onMeasured?.(event.nativeEvent.layout.height, measurementSignature)}
       >
         <Pressable
+          dataSet={{ slideshowControl: "true" }}
           style={[styles.gospelRiteToggle, copticGospelRite && styles.gospelRiteToggleOn]}
           accessibilityRole="switch"
           accessibilityState={{ checked: Boolean(copticGospelRite) }}
@@ -917,7 +985,9 @@ const SlideItem = memo(function SlideItem({
         onLayout={(event) => onMeasured?.(event.nativeEvent.layout.height, measurementSignature)}
       >
         <Pressable
+          dataSet={{ slideshowControl: "true" }}
           accessibilityRole="button"
+          hitSlop={8}
           style={[styles.openButton, item.isHyperlink && styles.hyperlinkButton]}
           onPress={(event) => {
             event.stopPropagation?.();
@@ -1387,6 +1457,18 @@ function isEditableKeyboardTarget(target) {
   return target.isContentEditable || ["button", "input", "select", "textarea", "a"].includes(tagName);
 }
 
+function isInteractivePointerTarget(target) {
+  if (!target || typeof target === "number") return false;
+  const element = target.nodeType === 3 ? target.parentElement : target;
+  if (!element) return false;
+  if (typeof element.closest === "function") {
+    return Boolean(element.closest(
+      '[data-slideshow-control="true"],a,button,input,select,textarea,[role="button"],[role="switch"]',
+    ));
+  }
+  return false;
+}
+
 function requestMeasurementFrame(callback) {
   if (typeof requestAnimationFrame === "function") {
     return requestAnimationFrame(callback);
@@ -1486,22 +1568,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.subdocSoft,
     borderColor: COLORS.subdocLine,
-    borderRadius: 8,
+    borderRadius: DOCUMENT_CONTROL_METRICS.openButtonBorderRadius,
     borderWidth: 1,
-    gap: SPACING.xs,
+    gap: SPACING.sm,
     justifyContent: "center",
-    maxWidth: 520,
-    minHeight: 96,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    width: "84%",
+    maxWidth: DOCUMENT_CONTROL_METRICS.openButtonMaxWidth,
+    minHeight: DOCUMENT_CONTROL_METRICS.openButtonMinHeight,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.lg,
+    width: `${DOCUMENT_CONTROL_METRICS.controlWidthPercent}%`,
   },
   // Shorter and green rather than tall and gold: a Hyperlink is a transition
   // out of this service, not a document to open on top of it.
   hyperlinkButton: {
     backgroundColor: COLORS.linkSoft,
     borderColor: COLORS.linkLine,
-    minHeight: 72,
+    borderRadius: DOCUMENT_CONTROL_METRICS.hyperlinkBorderRadius,
+    flexDirection: "row",
+    gap: SPACING.md,
+    maxWidth: DOCUMENT_CONTROL_METRICS.hyperlinkMaxWidth,
+    minHeight: DOCUMENT_CONTROL_METRICS.hyperlinkMinHeight,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
   },
   hyperlinkArrow: {
     alignItems: "center",
@@ -1510,7 +1598,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     height: 28,
     justifyContent: "center",
-    marginTop: SPACING.xs,
     width: 28,
   },
   hyperlinkArrowGlyph: {
@@ -1570,7 +1657,6 @@ const styles = StyleSheet.create({
     fontFamily: "Georgia",
     fontWeight: "700",
     letterSpacing: 0,
-    paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.sm,
   },
   sectionTitleArabic: {

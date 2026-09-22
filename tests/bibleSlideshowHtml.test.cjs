@@ -46,6 +46,7 @@ test('Bible slideshow emits valid presentation JavaScript and max-size safeguard
     fontSize: 78,
     copticFontDataUri: 'data:font/ttf;base64,AA==',
     isSlideshow: true,
+    bottomContentInset: 72,
   });
   const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(script);
@@ -55,4 +56,10 @@ test('Bible slideshow emits valid presentation JavaScript and max-size safeguard
   assert.match(html, /document\.fonts\.ready/);
   assert.match(html, /PageDown/);
   assert.match(html, /suppressClickUntil/);
+  assert.match(html, /font-weight: 700/);
+  assert.match(html, /bottom\) \+ 72px/);
+  assert.match(html, /page\.style\.display = isCurrent \? 'block' : 'none'/);
+  assert.doesNotMatch(html, /width: max-content/);
+  assert.match(html, /initialPaginationDone/);
+  assert.match(html, /resizeTimer = setTimeout/);
 });

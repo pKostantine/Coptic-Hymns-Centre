@@ -31,6 +31,15 @@ function splitParagraphs(text) {
   return String(text || "").replace(/\r\n?/g, "\n").split("\n");
 }
 
+function getLineWordOffsets(lines) {
+  let offset = 0;
+  return (lines || []).map((line) => {
+    const lineOffset = offset;
+    offset += line.words.length;
+    return lineOffset;
+  });
+}
+
 /**
  * Greedy line-wrap: pack words left-to-right, each line taking as many
  * words as fit before the next one would overflow `maxWidth` -- the same
@@ -330,6 +339,7 @@ export default function JustifiedText({
   width,
   rtl = false,
   firstWordStyle,
+  wordStyles,
   onLayout,
   onLines,
   forceLines,
@@ -360,6 +370,7 @@ export default function JustifiedText({
     [forceLines],
   );
   const lines = forcedLines ?? (IS_WEB ? webLines : native.lines);
+  const lineWordOffsets = useMemo(() => getLineWordOffsets(lines), [lines]);
 
   const reportKey = `${fontFamily}|${fontSize}|${fontWeight}|${fontStyle}|${width}|${text}`;
   const reportableLines = useMemo(
@@ -417,14 +428,24 @@ export default function JustifiedText({
         }
 
         if (isLastLine || lineWords.length < minWordsToJustify) {
+          const needsRichWords = Boolean(firstWordStyle && isFirstLine) || Boolean(wordStyles);
           return (
             <Text key={index} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }]}>
-              {isFirstLine && firstWordStyle && lineWords.length ? (
-                <>
-                  <Text selectable={selectable} style={firstWordStyle}>{lineWords[0]}</Text>
-                  {lineWords.length > 1 ? ` ${lineWords.slice(1).join(" ")}` : ""}
-                </>
-              ) : lineWords.join(" ")}
+              {needsRichWords ? lineWords.map((word, wordIndex) => {
+                const globalWordIndex = lineWordOffsets[index] + wordIndex;
+                return (
+                  <Text
+                    key={wordIndex}
+                    selectable={selectable}
+                    style={[
+                      isFirstLine && wordIndex === 0 ? firstWordStyle : null,
+                      wordStyles?.[globalWordIndex],
+                    ]}
+                  >
+                    {wordIndex ? ` ${word}` : word}
+                  </Text>
+                );
+              }) : lineWords.join(" ")}
             </Text>
           );
         }
@@ -443,9 +464,13 @@ export default function JustifiedText({
                 key={wordIndex}
                 selectable={selectable}
                 style={
-                  isFirstLine && wordIndex === 0 && firstWordStyle
-                    ? [style, WORD_INTRINSIC_STYLE, selectionStyle, firstWordStyle]
-                    : [style, WORD_INTRINSIC_STYLE, selectionStyle]
+                  [
+                    style,
+                    WORD_INTRINSIC_STYLE,
+                    selectionStyle,
+                    isFirstLine && wordIndex === 0 ? firstWordStyle : null,
+                    wordStyles?.[lineWordOffsets[index] + wordIndex],
+                  ]
                 }
               >
                 {word}

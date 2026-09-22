@@ -294,6 +294,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           onCurrentSectionChange={onCurrentSectionChange}
           onOpenSelector={onOpenSelector}
           viewportHeightOverride={undefined}
+          bottomContentInset={nowPlayingInset}
           bishopPresent={preferences.bishopPresent}
           onAction={handleDocumentAction}
           copticGospelRite={copticGospelRite}

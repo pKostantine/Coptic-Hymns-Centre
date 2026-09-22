@@ -249,7 +249,7 @@ export default function BibleChapterDocument() {
       isSlideshow: preferences.slideshowMode,
       preface,
       initialVerse: targetVerse,
-      bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
+      bottomContentInset: nowPlayingInset,
     });
   }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, nowPlayingInset]);
 

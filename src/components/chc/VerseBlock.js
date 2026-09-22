@@ -1,18 +1,18 @@
+import { useEffect, useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { formatEnglishDisplayText } from "../../utils/displayText";
 import { resolveRubricKey } from "../../utils/verseRubric";
-import JustifiedText from "./JustifiedText";
+import JustifiedText, { measureJustifiedLinesWeb } from "./JustifiedText";
 import {
   getSlideshowLanguageFontSize,
   getSlideshowLanguageLineHeight,
   hasSeasonalPrefixLine as hasVisibleSeasonalPrefixLine,
 } from "./slideshowLayout";
 
-const REFRAIN_TAN = "#9FFFD0";
-const LIGHT_YELLOW = "#FFFF00";
-const SILENT_PRAYER_GRAY = "#C5CBD2";
+const REFRAIN_TAN = COLORS.refrain;
+const SILENT_PRAYER_GRAY = COLORS.silent;
 const DISABLED_SELECTION_STYLE = Platform.OS === "web"
   ? {
       WebkitTouchCallout: "none",
@@ -81,7 +81,7 @@ export default function VerseBlock({
       : theme.colors.rowBlue;
   const hasSeasonalPrefixLine = hasVisibleSeasonalPrefixLine(verse);
   const bodyFontStyle = isComment || isRefrain || isRefrainLabel || verse.italic ? "italic" : "normal";
-  const bodyFontWeight = isReadingReference ? "800" : isRefrainLabel || isRefrain ? "500" : "400";
+  const bodyFontWeight = "400";
   // "Invincible Coptic" only means "this Coptic must always render, even if
   // the language toggle or a translation is missing" -- it does NOT mean the
   // line structurally has no English/Arabic (some DB rows tagged this way do
@@ -225,7 +225,18 @@ export default function VerseBlock({
         ]}
       >
         {isJustified ? (
-          <JustifiedVerseBody
+          Platform.OS === "web" ? (
+            <CssJustifiedVerseBody
+              language={language}
+              textStyle={textStyle}
+              selectableText={selectableText}
+              columnWidth={cellWidth - SPACING.xs * 2}
+              fontStyle={bodyFontStyle}
+              fontWeight={bodyFontWeight}
+              onMetric={(metric) => reportLanguageMetric(language.key, metric)}
+            />
+          ) : (
+            <JustifiedVerseBody
             language={language}
             textStyle={textStyle}
             selectableText={selectableText}
@@ -235,7 +246,8 @@ export default function VerseBlock({
             fontStyle={bodyFontStyle}
             fontWeight={bodyFontWeight}
             onMetric={(metric) => reportLanguageMetric(language.key, metric)}
-          />
+            />
+          )
         ) : (
           <Text
             selectable={selectableText}
@@ -333,6 +345,53 @@ export default function VerseBlock({
  * split for how rarely it fires. It's unaffected everywhere else (scroll
  * mode, and every non-justified slideshow verse type).
  */
+function CssJustifiedVerseBody({ language, textStyle, selectableText, columnWidth, fontStyle, fontWeight, onMetric }) {
+  const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
+  const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
+  const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
+  const bodyText = parts ? parts.body : language.text;
+  const measuredText = bibleVerseNumber ? `${bibleVerseNumber} ${bodyText}` : bodyText;
+  const lines = useMemo(
+    () => measureJustifiedLinesWeb(
+      measuredText,
+      language.fontSize,
+      language.fontFamily,
+      columnWidth,
+      fontWeight,
+      fontStyle,
+    ) || [],
+    [columnWidth, fontStyle, fontWeight, language.fontFamily, language.fontSize, measuredText],
+  );
+
+  useEffect(() => {
+    onMetric?.({ lines });
+  }, [lines, onMetric]);
+
+  let prefixNode = null;
+  if (parts) {
+    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: REFRAIN_TAN }]}>{parts.prefix}</Text>;
+  } else if (language.seasonalHoosVersePrefixSpacer) {
+    prefixNode = (
+      <Text selectable={selectableText} style={[prefixStyle, { color: "transparent" }]}>
+        {language.seasonalHoosVersePrefixSpacer}
+      </Text>
+    );
+  }
+
+  return (
+    <>
+      {prefixNode}
+      <Text
+        selectable={selectableText}
+        style={[textStyle, { textAlign: "justify", textJustify: "inter-word" }]}
+        onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height })}
+      >
+        {renderTextWithBibleVerseNumber(bodyText, bibleVerseNumber)}
+      </Text>
+    </>
+  );
+}
+
 function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, onMetric }) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
@@ -349,6 +408,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
   }
 
   const fullText = getJustifiedBodyText(language);
+  const wordStyles = useMemo(() => getMetropolitanWordStyles(fullText), [fullText]);
 
   return (
     <>
@@ -362,7 +422,8 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         fontWeight={fontWeight}
         width={columnWidth}
         rtl={language.key === "arabic"}
-        firstWordStyle={bibleVerseNumber ? { color: COLORS.gold } : null}
+        firstWordStyle={bibleVerseNumber ? { color: COLORS.gold, fontWeight: "700" } : null}
+        wordStyles={wordStyles}
         forceLines={forceLines}
         minWordsToJustify={minWordsToJustify}
         selectable={selectableText}
@@ -425,7 +486,7 @@ function renderTextWithBibleVerseNumber(text, bibleVerseNumber) {
 
   return (
     <>
-      <Text style={{ color: COLORS.gold }}>{bibleVerseNumber} </Text>
+      <Text style={{ color: COLORS.gold, fontWeight: "700" }}>{bibleVerseNumber} </Text>
       {content}
     </>
   );
@@ -438,6 +499,30 @@ function renderTextWithBibleVerseNumber(text, bibleVerseNumber) {
 // unrelated bracket group like "(bishop) ... (metropolitan)"). Mirrors
 // highlightMetropolitanBrackets in documentHtml.ts.
 const METROPOLITAN_BRACKET_PATTERN = /\(([^()]*(?:metropolitan|ⲙⲏⲧⲣⲟⲡⲟⲗⲓⲧ|مطران)[^()]*)\)/giu;
+
+function getMetropolitanWordStyles(text) {
+  const raw = String(text || "");
+  METROPOLITAN_BRACKET_PATTERN.lastIndex = 0;
+  const ranges = [];
+  let match;
+  while ((match = METROPOLITAN_BRACKET_PATTERN.exec(raw))) {
+    ranges.push({ start: match.index, end: match.index + match[0].length });
+  }
+  if (!ranges.length) return null;
+
+  const stylesByWord = {};
+  const wordPattern = /\S+/gu;
+  let wordIndex = 0;
+  while ((match = wordPattern.exec(raw))) {
+    const start = match.index;
+    const end = start + match[0].length;
+    if (ranges.some((range) => start < range.end && end > range.start)) {
+      stylesByWord[wordIndex] = { color: COLORS.metropolitanBrackets };
+    }
+    wordIndex += 1;
+  }
+  return stylesByWord;
+}
 
 function renderTextWithMetropolitanHighlight(text) {
   const raw = String(text || "");
@@ -453,7 +538,7 @@ function renderTextWithMetropolitanHighlight(text) {
       nodes.push(raw.slice(lastIndex, match.index));
     }
     nodes.push(
-      <Text key={`metropolitan-${key++}`} style={{ color: COLORS.rowBlue }}>
+      <Text key={`metropolitan-${key++}`} style={{ color: COLORS.metropolitanBrackets }}>
         {match[0]}
       </Text>,
     );
@@ -598,12 +683,12 @@ function getSpeakerLabel(type, language, bishopPresent) {
 
 function getSpeakerColor(type, bishopPresent) {
   return {
-    bishop: "#D64545",
-    deacon: LIGHT_YELLOW,
-    people: "#E28A2E",
-    priest: "#D64545",
-    reader: LIGHT_YELLOW,
-  }[getSpeakerRole(type, bishopPresent)] || "#E28A2E";
+    bishop: COLORS.bishop,
+    deacon: COLORS.deacon,
+    people: COLORS.people,
+    priest: COLORS.priest,
+    reader: COLORS.reader,
+  }[getSpeakerRole(type, bishopPresent)] || COLORS.people;
 }
 
 // "Bishop/Priest" (verse.type === "bishopOrPriest") resolves to "bishop" or

@@ -16,6 +16,7 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
+import GlobalNowPlayingOverlay from '../../playback/GlobalNowPlayingOverlay';
 
 interface DocumentModalTarget {
   title: { english: string; arabic: string };
@@ -367,6 +368,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             />
           </>
         )}
+        <GlobalNowPlayingOverlay />
         {/* Rendered from inside this document's own Modal, so Calendar and
             Settings appear OVER the subdocument instead of behind it, and
             closing one drops straight back into it. */}

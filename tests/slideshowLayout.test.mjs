@@ -16,6 +16,7 @@ import {
   getSlidePadding,
   getSlideRenderLayers,
   getSlideshowChromeMetrics,
+  getSlideshowLanguageFontSize,
   getSlideshowLanguageLineHeight,
   getVerseLineSegmentHeight,
   getVisibleVerseLanguages,
@@ -99,13 +100,15 @@ test("maximum-size language metrics leave room for Arabic and Coptic marks", () 
   assert.equal(getSlideshowLanguageLineHeight("coptic", item, 78), 101);
   assert.equal(getSlideshowLanguageLineHeight("arabic", item, 78), 125);
   assert.deepEqual(getSlideshowChromeMetrics(78), {
-    buttonFontSize: 38,
-    buttonLineHeight: 48,
+    buttonFontSize: 51,
+    buttonLineHeight: 62,
     speakerFontSize: 78,
     speakerLineHeight: 101,
-    titleFontSize: 36,
-    titleLineHeight: 45,
+    titleFontSize: 39,
+    titleLineHeight: 48,
   });
+  assert.equal(getSlideshowLanguageFontSize('english', { verse: { type: 'refrainLabel' } }, 78), 78);
+  assert.equal(getSlideshowLanguageLineHeight('english', { verse: { type: 'refrainLabel' } }, 78), 101);
 });
 
 test("explicit paragraph breaks survive measurement, joining, and page splitting", () => {
@@ -220,6 +223,23 @@ test("measurement prioritizes the reader's current row instead of restarting at 
   const batch = getMeasurementBatch(items, {}, 8, { sourceItemId: "row-80" }, null);
   assert.equal(batch[0].id, "row-80");
   assert.ok(batch.every((item) => Math.abs(Number(item.id.slice(4)) - 80) <= 4));
+});
+
+test("measurement can stop outside the active reading window", () => {
+  const items = Array.from({ length: 500 }, (_, index) => ({ id: `row-${index}`, sectionId: `section-${index}` }));
+  const nearby = getMeasurementBatch(items, {}, 20, { sourceItemId: "row-250" }, null, 12);
+  assert.equal(nearby.length, 20);
+  assert.ok(nearby.every((item) => Math.abs(Number(item.id.slice(4)) - 250) <= 12));
+
+  const measuredNearby = Object.fromEntries(
+    items
+      .filter((_, index) => Math.abs(index - 250) <= 12)
+      .map((item) => [item.id, 40]),
+  );
+  assert.deepEqual(
+    getMeasurementBatch(items, measuredNearby, 20, { sourceItemId: "row-250" }, null, 12),
+    [],
+  );
 });
 
 test("speaker-only visible columns remain in the aligned layout", () => {
