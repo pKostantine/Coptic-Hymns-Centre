@@ -2310,11 +2310,46 @@ Verification completed:
 
 Deployment note: the notification dispatcher Worker still requires the Cloudflare account credentials and notification secrets listed above. Those credentials are intentionally not committed to GitHub and are not available through the connected tools in this ChatGPT session, so source integration is complete but live Worker deployment cannot be truthfully marked complete from this session.
 
+## Manual CHC Admin notification pusher
+
+CHC Admin now includes a dedicated **Notifications** section for sending custom CHC broadcasts, especially feast greetings and blessings.
+
+Implemented behavior:
+
+- new Admin route: `/notifications`
+- fourth Admin navigation tab: **Notifications**
+- two categories:
+  - `feast_celebrations`
+  - `announcements`
+- compose:
+  - title
+  - message
+  - optional internal CHC deep link
+- notification preview before sending
+- live count of eligible CHC users and registered devices
+- final confirmation step before fan-out
+- recent broadcast history/audit log
+- per-category user preferences are respected
+- disabled/dead devices are excluded
+- the Admin app never receives a Supabase service-role key
+
+Database objects:
+
+- `public.notification_broadcasts`
+- `public.get_admin_notification_broadcast_overview(...)`
+- `public.admin_send_notification_broadcast(...)`
+
+The send RPC requires an authenticated CHC admin through `private.is_admin()`, inserts one notification per eligible user, fans those notifications out to every enabled Expo/Web Push device, and records recipient/device counts on the broadcast audit row.
+
+The notification dispatcher created earlier remains responsible for actual push delivery. Manual broadcasts therefore use the same retry, receipt, dead-token cleanup, Expo Push, and Web Push infrastructure as automatic notifications.
+
 ## Notification categories currently wired
 
 CHC:
 
 - `followed_artists`
+- `feast_celebrations`
+- `announcements`
 
 CHC Artists:
 
