@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -54,6 +54,7 @@ export default function MusicLibraryFolderScreen() {
   const isArabic = locale === 'ar';
   const rawSection = Array.isArray(params.section) ? params.section[0] : params.section;
   const section = VALID_SECTIONS.has(rawSection as LibrarySection) ? rawSection as LibrarySection : 'likes';
+  const isWebDownloadsRoute = Platform.OS === 'web' && section === 'downloads';
   const [library, setLibrary] = useState<MusicLibraryPayload | null>(null);
   const [downloads, setDownloads] = useState<OfflineDownloadProgress[]>([]);
   const [query, setQuery] = useState('');
@@ -66,6 +67,7 @@ export default function MusicLibraryFolderScreen() {
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async (_activeUserId?: string) => {
+    if (isWebDownloadsRoute) return;
     setLoading(true);
     setError(null);
     try {
@@ -80,7 +82,7 @@ export default function MusicLibraryFolderScreen() {
     } finally {
       setLoading(false);
     }
-  }, [locale, section]);
+  }, [isWebDownloadsRoute, locale, section]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- route entry starts an async data load
@@ -99,6 +101,8 @@ export default function MusicLibraryFolderScreen() {
     recent.release?.title,
     ...recent.track.artists.map((artist) => artist.displayName),
   ], normalizedQuery)), [library?.recentTracks, normalizedQuery]);
+
+  if (isWebDownloadsRoute) return <Redirect href="/music/library" />;
 
   const recentQueue = (items: MusicRecentTrack[]) => items.map(({ track, release }) => ({
     track,
