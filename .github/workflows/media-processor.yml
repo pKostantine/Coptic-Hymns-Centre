@@ -1,0 +1,32 @@
+name: Validate CHC Media Processor
+
+on:
+  pull_request:
+    paths:
+      - 'workers/media-processor/**'
+      - '.github/workflows/media-processor.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'workers/media-processor/**'
+      - '.github/workflows/media-processor.yml'
+  workflow_dispatch:
+
+jobs:
+  media-processor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: workers/media-processor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: workers/media-processor/package-lock.json
+      - name: Install processor dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Test codecs, 4K scaling, R2 range streaming and video/audio renditions
+        run: npm test
