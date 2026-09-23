@@ -106,13 +106,10 @@ function daysBetweenIsoDates(startIsoDate, endIsoDate) {
   );
 }
 
-// calendar.get_context_flags currently omits the Great Fast entirely even
-// though calendar.season_ranges contains the correct lent and holy-week
-// ranges. Keep season_ranges as the database source of truth and fill only
-// the missing derived aliases here. This restores the condition vocabulary
-// used throughout the live order tables (especially Offering of the Lamb's
-// THIRD/SIXTH/NINTH/ELEVENTH/TWELFTH_HOUR placements) without hard-coding
-// feast dates in the client.
+// calendar.season_ranges is the source of truth for Great Lent and Holy Week.
+// Derive the same aliases as a compatibility fallback for older RPC versions;
+// the canonical calendar RPC now also recognizes the Lent range directly.
+// This preserves Lent's hour-placement flags on all supported app versions.
 function fetchDerivedLentFlags(isoDate) {
   let cached = lentFlagsCache.get(isoDate);
   if (!cached) {
@@ -174,12 +171,11 @@ async function fetchContextFlags(isoDate, extraContext) {
       if (error) throw new Error(`Unable to load context flags for ${isoDate}: ${error.message}`);
       const flags = { ...(data || {}), ...derivedLentFlags };
       if (derivedLentFlags.Lent) {
-        // The RPC currently emits NormalFastingDays on Lent Wednesdays and
-        // Fridays because it failed to recognize the Lent range first. The
-        // live condition registry explicitly defines that flag as suppressed
-        // during Lent; leaving it set renders both the ordinary-fast and Lent
-        // Agpeya placements (including two Ninth Hours).
+        // Older RPC deployments may incorrectly include ordinary-fast or
+        // annual flags during Lent. Never allow those to overlap Lent's
+        // seasonal hour and hymn placements.
         delete flags.NormalFastingDays;
+        delete flags.Annual;
         delete flags.Joyful29thOfTheMonth;
         flags.Fasts = true;
       }
@@ -316,5 +312,12 @@ export async function getContextFlags(date, extraContext = {}, weekdayDate) {
   ]);
 
   const withWeekday = weekdayFlags ? withWeekdayFlagsFrom(baseFlags, weekdayFlags) : baseFlags;
-  return { ...withWeekday, ...gospelAuthorFlags, ...extraContext };
+  const flags = { ...withWeekday, ...gospelAuthorFlags, ...extraContext };
+  // Even if a caller supplies these as extra context, the two ordinary
+  // conditions must not be active during Great Lent or Holy Week.
+  if (flags.Lent) {
+    delete flags.NormalFastingDays;
+    delete flags.Annual;
+  }
+  return flags;
 }
