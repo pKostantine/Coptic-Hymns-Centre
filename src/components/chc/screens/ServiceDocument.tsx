@@ -208,6 +208,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       documentPositionKey,
       currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
       sections.map(section => section.id),
+      lastSettingsSignatureRef.current,
     );
     markPendingDocumentRestoresDirty();
   }, [restoreSettingsSignature, readerFocused, sections, documentPositionKey]);
@@ -309,9 +310,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       navigatingAwayRef.current = false;
       return;
     }
-    const changed = pending.dirty || pending.sectionId && pending.originalSectionIds.length === 0
-      || (pending as typeof pending & { signature?: string }).signature !== undefined
-        && (pending as typeof pending & { signature?: string }).signature !== restoreSettingsSignature;
+    const changed = pending.dirty || (pending.signature !== undefined && pending.signature !== restoreSettingsSignature);
     if (!changed) {
       clearPendingDocumentRestore(documentPositionKey, pending.sequence);
       navigatingAwayRef.current = false;
@@ -476,6 +475,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       documentPositionKey,
       currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
       readySections?.map(section => section.id) ?? [],
+      restoreSettingsSignature,
     );
     navigatingAwayRef.current = true;
     router.push(href);
@@ -521,6 +521,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         documentPositionKey,
         action.sectionId ?? currentSectionIdRef.current,
         readySections?.map(section => section.id) ?? [],
+        restoreSettingsSignature,
       );
       markPendingDocumentRestoresDirty();
       toggleCopticGospelRite();
@@ -765,6 +766,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
                 documentPositionKey,
                 currentSectionIdRef.current,
                 readySections.map(section => section.id),
+                restoreSettingsSignature,
               );
               markPendingDocumentRestoresDirty();
               toggleBishopPresent();
