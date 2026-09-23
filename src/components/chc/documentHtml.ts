@@ -1564,9 +1564,11 @@ function sermonPlannerScript() {
           var caret = caretAtPoint(x, y);
           var root = caret && closestRoot(caret.node);
           if (!caret || !root) return false;
-          pencilStart = { node: caret.node, offset: caret.offset, root: root };
+          pencilStart = { node: caret.node, offset: caret.offset, root: root, x: x, y: y, moved: false };
           window.__sermonPencilActive = true;
           postAction('sermonPencilGesture', { active: true });
+          var oldSelection = window.getSelection && window.getSelection();
+          if (oldSelection) oldSelection.removeAllRanges();
           if (event && event.cancelable) event.preventDefault();
           return true;
         }
@@ -1575,15 +1577,35 @@ function sermonPlannerScript() {
           var caret = caretAtPoint(x, y);
           if (!caret || closestRoot(caret.node) !== pencilStart.root) return;
           if (event && event.cancelable) event.preventDefault();
+          if (Math.hypot(x - pencilStart.x, y - pencilStart.y) >= 4) pencilStart.moved = true;
+          if (!pencilStart.moved) return;
           var selection = window.getSelection && window.getSelection();
           if (!selection) return;
+          // Pencil strokes stay in one verse: compute only this root's text,
+          // not every verse in the entire Sermon Planner on every move.
+          var root = pencilStart.root;
+          var text = root.textContent || '';
+          var anchor = offsetInRoot(root, pencilStart.node, pencilStart.offset);
+          var focus = offsetInRoot(root, caret.node, caret.offset);
+          var start = Math.min(anchor, focus), end = Math.max(anchor, focus);
+          if (start === end) {
+            var isWordChar = function (char) { return /[\\p{L}\\p{M}\\p{N}_]/u.test(char); };
+            if (isWordChar(text.charAt(start))) end = Math.min(text.length, start + 1);
+            else if (start > 0 && isWordChar(text.charAt(start - 1))) start -= 1;
+            else return;
+          }
+          var expanded = expandToWholeWords(text, start, end);
+          var left = boundaryForOffset(root, expanded.start);
+          var right = boundaryForOffset(root, expanded.end);
           var range = document.createRange();
-          range.setStart(pencilStart.node, pencilStart.offset);
-          range.collapse(true);
-          selection.removeAllRanges();
-          selection.addRange(range);
-          if (selection.extend) selection.extend(caret.node, caret.offset);
-          showExpandedSelection(selection, anchorsFromSelection(selection));
+          try {
+            range.setStart(left.node, left.offset);
+            range.setEnd(right.node, right.offset);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } catch (error) {
+            // Don't interrupt the stroke if a verse was re-rendered mid-drag.
+          }
         }
         function endPencil(x, y, event) {
           if (!pencilStart) return;
