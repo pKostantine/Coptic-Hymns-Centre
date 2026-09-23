@@ -208,6 +208,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               suppressAllSpeakerLabels,
               bottomContentInset,
               sermonPlannerMode,
+              nativeSwipeNavigation: true,
             })
           : null,
       [
