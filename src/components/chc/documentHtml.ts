@@ -513,13 +513,23 @@ export function buildDocumentHtml(
         setTimeout(reportContentHeight, 120);
       });
       window.addEventListener('resize', reportContentHeight);
-      window.scrollToSection = function (sectionId) {
+      window.scrollToSection = function (sectionId, edge) {
         var candidates = Array.isArray(sectionId) ? sectionId : [sectionId];
         for (var i = 0; i < candidates.length; i += 1) {
-          var element = document.getElementById(candidates[i]);
+          var candidate = candidates[i];
+          var id = typeof candidate === 'string' ? candidate : candidate && candidate.sectionId;
+          var targetEdge = typeof candidate === 'string' ? edge : candidate && candidate.edge;
+          var element = id && document.getElementById(id);
           if (element) {
-            var top = element.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0);
-            window.scrollTo({ top: Math.max(top - 1, 0), behavior: 'auto' });
+            var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+            // If a calendar/content change removed the original hymn, show
+            // the END of its closest surviving predecessor, not its title.
+            // For a surviving hymn every settings change uses its START.
+            var target = targetEdge === 'end'
+              ? element.getBoundingClientRect().bottom + scrollY - window.innerHeight + 16
+              : element.getBoundingClientRect().top + scrollY - 1;
+            var maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+            window.scrollTo({ top: Math.min(Math.max(target, 0), maxScroll), behavior: 'auto' });
             return true;
           }
         }
