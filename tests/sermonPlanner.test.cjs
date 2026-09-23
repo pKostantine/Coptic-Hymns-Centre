@@ -147,7 +147,7 @@ test('Highlight citations retain the exact reading and verse number', () => {
   const compiled = utilSource.slice(start, end).replace(
     'export function getSermonHighlightVerseReferences(sections: DocumentSection[]): Record<string, string> {',
     'function getSermonHighlightVerseReferences(sections) {',
-  );
+  ).replace('const result: Record<string, string> = {};', 'const result = {};');
   const getReferences = new Function(compiled + '\nreturn getSermonHighlightVerseReferences;')();
   const labels = getReferences([
     { id: 'gospel', verses: [
