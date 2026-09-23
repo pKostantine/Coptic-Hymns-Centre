@@ -619,8 +619,12 @@ const SCHEMAS_WITHOUT_HYMN_TITLES = new Set([
 // these, it stays first and is skipped later in the fallback list.
 const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "psalmody", "agpeya", "veneration", "doxologies"];
 
-function getHymnKeyLookupSchemas(schema) {
-  return [...new Set([schema, ...HYMN_KEY_FALLBACK_SCHEMAS].filter(Boolean))];
+function getHymnKeyLookupSchemas(schema, table) {
+  // Sermon Planner reuses the existing Gospel Rite's Psalm/Gospel framing
+  // hymns. Only its document needs this extra lookup; avoid querying the
+  // gospel_rite schema for every other service in CHC.
+  const extraSchemas = schema === "liturgy" && table === "sermon_planner" ? ["gospel_rite"] : [];
+  return [...new Set([schema, ...HYMN_KEY_FALLBACK_SCHEMAS, ...extraSchemas].filter(Boolean))];
 }
 
 export async function fetchServiceRows(schema, table) {
@@ -628,7 +632,7 @@ export async function fetchServiceRows(schema, table) {
   if (!orderRows.length) return [];
 
   const hymnKeys = uniqueNonEmpty(orderRows.map((row) => row.hymn_key));
-  const lookupSchemas = getHymnKeyLookupSchemas(schema);
+  const lookupSchemas = getHymnKeyLookupSchemas(schema, table);
   const [titleRowsBySchema, textRowsBySchema] = await Promise.all([
     Promise.all(lookupSchemas.map((lookupSchema) => fetchSchemaTitlesByKeys(lookupSchema, hymnKeys))),
     Promise.all(lookupSchemas.map((lookupSchema) => fetchSchemaTextRowsByKeys(lookupSchema, hymnKeys))),
@@ -1103,8 +1107,29 @@ export function formatDocumentHymnSection(section) {
 
 export async function hydrateSupabaseServiceHymn(schema, table, date, extraContext = {}, weekdayDate, depth = 0) {
   const structuralFlags = deriveStructuralFlags(schema, table);
-  const flags = await getContextFlags(date, { ...structuralFlags, ...extraContext }, weekdayDate);
   const isoDate = toIsoDateString(date);
+
+  if (schema === "liturgy" && table === "sermon_planner") {
+    // The same document contains Vespers, Matins, and Liturgy. Hydrating it
+    // with all three flags at once would pick the Liturgy Gospel author for
+    // every introduction and allow the wrong service's inline Psalm/Gospel.
+    // Resolve the flags separately, then apply each set only to its own rows.
+    const sharedContext = { ...structuralFlags, ...extraContext };
+    delete sharedContext.Vespers;
+    delete sharedContext.Matins;
+    delete sharedContext.Liturgy;
+    const [vespersFlags, matinsFlags, liturgyFlags] = await Promise.all([
+      getContextFlags(date, { ...sharedContext, Vespers: true }, weekdayDate),
+      getContextFlags(date, { ...sharedContext, Matins: true }),
+      getContextFlags(date, { ...sharedContext, Liturgy: true }),
+    ]);
+    const flagsByService = { Vespers: vespersFlags, Matins: matinsFlags, Liturgy: liturgyFlags };
+    return hydrateWithFlags(schema, table, liturgyFlags, depth, isoDate, (section) =>
+      flagsByService[section.condition] || liturgyFlags,
+    );
+  }
+
+  const flags = await getContextFlags(date, { ...structuralFlags, ...extraContext }, weekdayDate);
   return hydrateWithFlags(schema, table, flags, depth, isoDate);
 }
 
@@ -1315,13 +1340,14 @@ function dropDuplicateSaintHymns(sections) {
   });
 }
 
-async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
+async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, sectionFlagsForRow = null) {
   const rawRows = await fetchServiceRows(schema, table);
   const sections = assembleServiceSections(rawRows);
 
   const visibleSections = dropDuplicateSaintHymns(
     sections
       .map((section) => {
+        const flags = sectionFlagsForRow ? sectionFlagsForRow(section) : documentFlags;
         const visibility = evaluateBishopAwareVisibility(section.condition, flags);
         return visibility.visible
           ? { ...section, bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }
@@ -1332,6 +1358,9 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
 
   const hydrated = [];
   for (const section of visibleSections) {
+    // Scoped service flags also flow into the hymn's own verses and nested
+    // inline reading resolutions, not only its order-table condition.
+    const flags = sectionFlagsForRow ? sectionFlagsForRow(section) : documentFlags;
     // A Hyperlink placeholder leaves this document altogether for another
     // service, so — unlike a Subdocument, whose content is prefetched here and
     // stashed for its modal — there is nothing to hydrate: the destination
@@ -1435,6 +1464,14 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
     }
 
     if (section.isInlinePlacement) {
+      // Sermon Planner's Synaxarium is intentionally inline rather than the
+      // button used by Lectionary Liturgy. Keep the same day resolution.
+      if (section.hymn_key === "SYNAXARIUM" && isoDate) {
+        const synaxariumSections = await resolveSynaxariumSections(isoDate);
+        hydrated.push(...buildWholeTableInlineSections(synaxariumSections, section));
+        continue;
+      }
+
       // A reading-resolution sentinel (e.g. PAULINE_EPISTLE_WITHOUT_COPTIC,
       // nested inside readings.pauline_epistle between its introduction and
       // conclusion rows) needs the day's actual scripture text, not a
@@ -1456,11 +1493,18 @@ async function hydrateWithFlags(schema, table, flags, depth, isoDate) {
       // resolved onto `section` above, same as any other hymn_key) get
       // applied to the imported content.
       const target = resolveWholeTableInlineTarget(section.hymn_key);
-      if (!target || depth >= 3) continue;
-      const nestedSections = await hydrateWholeTableInlineNested(section.hymn_key, target, flags, depth + 1, isoDate);
-      const toggleSection = buildGospelRiteToggleSection(section.hymn_key, section.id);
-      pushWholeTableInlineSections(hydrated, toggleSection, buildWholeTableInlineSections(nestedSections, section));
-      continue;
+      if (target) {
+        if (depth >= 3) continue;
+        const nestedSections = await hydrateWholeTableInlineNested(section.hymn_key, target, flags, depth + 1, isoDate);
+        const toggleSection = buildGospelRiteToggleSection(section.hymn_key, section.id);
+        pushWholeTableInlineSections(hydrated, toggleSection, buildWholeTableInlineSections(nestedSections, section));
+        continue;
+      }
+      // A regular hymn (e.g. Sermon Planner's introductionAndPsalm/gospel)
+      // may be marked Inline in its order table while its own hymn_texts
+      // contain the actual inline reading sentinels. Render those verses
+      // normally instead of discarding the whole hymn as an unknown target.
+      if (!section.verses.length) continue;
     }
 
     // A section's verses can be interrupted by a whole-table Inline
