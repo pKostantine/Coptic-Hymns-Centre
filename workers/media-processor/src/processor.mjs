@@ -150,9 +150,9 @@ export function getS3Client() {
   });
 }
 
-async function downloadObject(config, bucket, key, destinationPath) {
+export async function downloadObject(config, bucket, key, destinationPath, s3Client = null) {
   if (config.r2Driver === 's3') {
-    const client = getS3Client();
+    const client = s3Client || getS3Client();
     const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
     if (!response.Body) throw new Error(`R2 returned no body for ${bucket}/${key}`);
     // Stream the download onto scratch disk. Buffering a multi-GB original in
@@ -179,7 +179,7 @@ async function downloadObject(config, bucket, key, destinationPath) {
 const DELIVERY_MULTIPART_THRESHOLD = 100 * 1024 * 1024;
 const DELIVERY_PART_BYTES = 64 * 1024 * 1024;
 
-async function multipartUploadObject(client, bucket, key, sourcePath, sourceSize, contentType) {
+export async function multipartUploadObject(client, bucket, key, sourcePath, sourceSize, contentType) {
   const created = await client.send(new CreateMultipartUploadCommand({
     Bucket: bucket,
     Key: key,
@@ -311,7 +311,7 @@ export async function listStorageObjects(config, bucket) {
   return objects;
 }
 
-async function sha256File(filePath) {
+export async function sha256File(filePath) {
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(filePath)) hash.update(chunk);
   return hash.digest('hex');
