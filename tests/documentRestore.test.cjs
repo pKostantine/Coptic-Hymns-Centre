@@ -110,3 +110,19 @@ test('native, iframe, and slideshow implement the two distinct target edges', ()
   assert.match(reader, /captureDocumentRestore\(/);
   assert.match(reader, /resolveDocumentRestore\(/);
 });
+
+test('Bible captures the current verse and restores it without deep-link highlighting', () => {
+  const html = fs.readFileSync('src/components/chc/bibleDocumentHtml.ts', 'utf8');
+  const chapter = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
+  const native = fs.readFileSync('src/components/chc/BibleWebView.tsx', 'utf8');
+  const web = fs.readFileSync('src/components/chc/BibleWebView.web.tsx', 'utf8');
+  assert.match(html, /type: 'currentVerse'/);
+  assert.match(html, /restoreVerse \|\| initialVerse/);
+  assert.match(html, /initialVerse && !restoreVerse/);
+  assert.match(html, /window\.addEventListener\('scroll', scheduleScrollReport/);
+  assert.match(chapter, /restoreVerse=\{restoreVerse\}/);
+  assert.match(chapter, /restoreGuardRef/);
+  assert.match(chapter, /blurredSnapshotRef/);
+  assert.match(native, /onLoadEnd/);
+  assert.match(web, /onLoad/);
+});
