@@ -60,5 +60,7 @@ test('web slideshow keeps user-selected font size independent of orientation', (
   assert.match(scrollReader, /-webkit-text-size-adjust:\s*none/);
   // Slide width is a measurement/pagination input, not a typography multiplier.
   assert.match(slideshow, /slideTableWidth\s*=\s*Math\.max\(viewportWidth/);
-  assert.doesNotMatch(surface, /fontSize\s*=\s*[^;]*(?:screenWidth|screenHeight)/);
+  const fontDeclaration = surface.match(/const fontSize\s*=[^;]+;/)?.[0] || '';
+  assert.match(fontDeclaration, /fontScaleToPx\(preferences\.fontScale\)/);
+  assert.doesNotMatch(fontDeclaration, /screenWidth|screenHeight/);
 });
