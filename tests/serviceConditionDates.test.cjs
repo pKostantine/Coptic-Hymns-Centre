@@ -78,6 +78,18 @@ test('Other Vespers services keep the existing raw-date weekday override', () =>
   assert.equal(isoDate(lectionaryWeekdayDate), '2026-09-19');
 });
 
+test('Sermon Planner passes the Vespers weekday only to its mixed-context hydrator', () => {
+  const { getServiceWeekdayConditionDate } = loadHelpers();
+  const vespersEffectiveDate = dateOnly('2026-09-19');
+  const weekdayDate = getServiceWeekdayConditionDate({
+    schema: 'liturgy',
+    table: 'sermon_planner',
+    effectiveDate: dateOnly('2026-09-20'),
+    vespersEffectiveDate,
+  });
+  assert.equal(weekdayDate, vespersEffectiveDate);
+});
+
 test('Non-Vespers services do not override weekday conditions', () => {
   const { getServiceWeekdayConditionDate } = loadHelpers();
 
