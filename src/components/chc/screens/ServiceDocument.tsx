@@ -21,6 +21,7 @@ import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import { getLastDocumentPosition, setLastDocumentPosition } from '../../../utils/lastDocumentPosition';
 import { goBack } from '../../../utils/navigation';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
+import { getUserConditionFlags } from '../../../utils/userConditionFlags';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 
 interface ServiceDocumentProps {
@@ -108,10 +109,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // isConditionAtomSatisfied in conditionEngine.js). Monastery is the one
   // gating the Prayer of the Veil.
   const userConditionFlags = useMemo(
-    () => ({
-      ...Object.fromEntries((preferences.selectedSaintHymns || []).map((token) => [token, true])),
-      Monastery: Boolean(preferences.inMonastery),
-    }),
+    () => getUserConditionFlags(preferences),
     [preferences.selectedSaintHymns, preferences.inMonastery],
   );
 
@@ -216,7 +214,9 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           schema,
           table,
           effectiveDate,
-          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...userConditionFlags, ...extraContext },
+          // Explicit Book Settings choices (including Monastery) take priority
+          // over entry-point context, so no route can silently override the toggle.
+          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...extraContext, ...userConditionFlags },
           weekdayConditionDate,
         ),
       )
