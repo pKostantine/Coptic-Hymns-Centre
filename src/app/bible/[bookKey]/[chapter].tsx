@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Head from 'expo-router/head';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -182,6 +182,58 @@ export default function BibleChapterDocument() {
   // well as in the URL so that leaving this chapter drops it -- otherwise the
   // next chapter would jump to whatever verse number the link happened to name.
   const [targetVerse, setTargetVerse] = useState<string | null>(verseParam || null);
+  // The live verse is reported by both scroll and slideshow HTML. Freeze it
+  // before a language/display change, not after the new HTML has reflowed.
+  const currentVerseRef = useRef<string | null>(verseParam || null);
+  const [restoreVerse, setRestoreVerse] = useState<string | null>(null);
+  const restoreGuardRef = useRef<string | null>(null);
+  const chapterIdentityRef = useRef(`${bookKey}:${chapter}:${psalmNumbering}`);
+  const settingsSignature = JSON.stringify([
+    preferences.bibleVisibleLanguages, preferences.fontScale, preferences.slideshowMode,
+    preferences.selectText, preferences.appLanguage,
+  ]);
+  const settingsSignatureRef = useRef(settingsSignature);
+  const latestSettingsSignatureRef = useRef(settingsSignature);
+  latestSettingsSignatureRef.current = settingsSignature;
+  const focusedRef = useRef(true);
+  const blurredSnapshotRef = useRef<{ verse: string | null; signature: string } | null>(null);
+
+  // This chapter can stay mounted underneath Book Settings. Never let a
+  // background iframe/WebView scroll report replace the frozen verse.
+  useFocusEffect(useCallback(() => {
+    focusedRef.current = true;
+    const snapshot = blurredSnapshotRef.current;
+    blurredSnapshotRef.current = null;
+    if (snapshot && snapshot.signature !== latestSettingsSignatureRef.current && snapshot.verse) {
+      currentVerseRef.current = snapshot.verse;
+      restoreGuardRef.current = snapshot.verse;
+      setRestoreVerse(snapshot.verse);
+    }
+    settingsSignatureRef.current = latestSettingsSignatureRef.current;
+    return () => {
+      blurredSnapshotRef.current = {
+        verse: currentVerseRef.current,
+        signature: latestSettingsSignatureRef.current,
+      };
+      focusedRef.current = false;
+    };
+  }, [bookKey, chapter, psalmNumbering]));
+
+  useLayoutEffect(() => {
+    if (chapterIdentityRef.current !== `${bookKey}:${chapter}:${psalmNumbering}`) {
+      chapterIdentityRef.current = `${bookKey}:${chapter}:${psalmNumbering}`;
+      currentVerseRef.current = verseParam || null;
+      restoreGuardRef.current = null;
+      setRestoreVerse(null);
+      settingsSignatureRef.current = settingsSignature;
+      return;
+    }
+    if (settingsSignatureRef.current === settingsSignature) return;
+    settingsSignatureRef.current = settingsSignature;
+    if (!focusedRef.current || !currentVerseRef.current) return;
+    restoreGuardRef.current = currentVerseRef.current;
+    setRestoreVerse(currentVerseRef.current);
+  }, [settingsSignature, bookKey, chapter, psalmNumbering, verseParam]);
   const [selectorSlide] = useState(() => new Animated.Value(1));
   const enabledLanguages = preferences.bibleVisibleLanguages;
 
@@ -249,11 +301,12 @@ export default function BibleChapterDocument() {
       isSlideshow: preferences.slideshowMode,
       preface,
       initialVerse: targetVerse,
+      restoreVerse,
       // Now Playing is an overlay in slideshow mode. It must never shorten
       // the page or change where Bible verses split.
       bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, nowPlayingInset]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, nowPlayingInset]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -263,6 +316,9 @@ export default function BibleChapterDocument() {
       if (targetChapter === null) return;
       setIsSelectorOpen(false);
       setTargetVerse(null);
+      currentVerseRef.current = null;
+      restoreGuardRef.current = null;
+      setRestoreVerse(null);
       router.setParams({ chapter: String(targetChapter), verse: '' });
     },
     [router],
@@ -270,13 +326,21 @@ export default function BibleChapterDocument() {
 
   function selectVerse(verse: number | string) {
     setIsSelectorOpen(false);
+    currentVerseRef.current = String(verse);
+    restoreGuardRef.current = null;
     bibleWebViewRef.current?.selectVerse(verse);
   }
 
   function toggleLanguage(language: BibleLanguageKey) {
     const next = { ...enabledLanguages, [language]: !enabledLanguages[language] };
     const activeCount = availableLanguages.filter((item) => next[item]).length;
-    if (activeCount) setBibleVisibleLanguages(next);
+    if (activeCount) {
+      if (currentVerseRef.current) {
+        restoreGuardRef.current = currentVerseRef.current;
+        setRestoreVerse(currentVerseRef.current);
+      }
+      setBibleVisibleLanguages(next);
+    }
   }
 
   const goBackALevel = useCallback(() => {
@@ -348,9 +412,15 @@ export default function BibleChapterDocument() {
             ref={bibleWebViewRef}
             html={chapterHtml}
             scrollEnabled={!preferences.slideshowMode}
+            restoreVerse={restoreVerse}
             selectText={effectiveSelectText}
             onAction={(action) => {
-              if (action.type === 'openSelector') setIsSelectorOpen(true);
+              if (action.type === 'currentVerse' && action.verse) {
+                if (!focusedRef.current) return;
+                if (restoreGuardRef.current && restoreGuardRef.current !== action.verse) return;
+                restoreGuardRef.current = null;
+                currentVerseRef.current = action.verse;
+              } else if (action.type === 'openSelector') setIsSelectorOpen(true);
               else if (action.type === 'previousLevel') goBackALevel();
             }}
           />
@@ -468,6 +538,10 @@ export default function BibleChapterDocument() {
                     style={styles.selectorIconButton}
                     onPress={() => {
                       setIsSelectorOpen(false);
+                      blurredSnapshotRef.current = {
+                        verse: currentVerseRef.current,
+                        signature: latestSettingsSignatureRef.current,
+                      };
                       router.push('/book-settings');
                     }}
                   >
