@@ -53,8 +53,8 @@ test('Bible slideshow emits valid presentation JavaScript and max-size safeguard
   assert.doesNotThrow(() => new Function(script));
   // The CSS pixel font size is the same after rotation; only the page budget
   // and line wrapping change. Disable mobile browser text inflation in WebView.
-  assert.match(html, /-webkit-text-size-adjust:\\s*none/);
-  assert.match(html, /text-size-adjust:\\s*none/);
+  assert.match(html, /-webkit-text-size-adjust:\s*none/);
+  assert.match(html, /text-size-adjust:\s*none/);
   assert.match(html, /height: 100dvh/);
   assert.match(html, /data-segment-progress/);
   assert.match(html, /document\.fonts\.ready/);
