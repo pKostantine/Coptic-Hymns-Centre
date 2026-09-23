@@ -804,7 +804,7 @@ export function buildDocumentHtml(
         scheduleReport();
       })();
       (function () {
-        if (!${JSON.stringify(nativeSwipeNavigation)} || ${JSON.stringify(sermonPlannerMode)}) return;
+        if (!${JSON.stringify(nativeSwipeNavigation)}) return;
         var startX = null, startY = null, fired = false, lastPostAt = 0;
         function getSelectorEdge() {
           return Math.min(240, Math.max(128, window.innerWidth * 0.18));
@@ -820,6 +820,7 @@ export function buildDocumentHtml(
         }
         function onStart(x, y) { startX = x; startY = y; fired = false; }
         function onMove(x, y, event) {
+          if (window.__sermonPencilActive || window.__sermonPenPointerActive) { onCancel(); return; }
           if (startX === null || fired) return;
           var dx = x - startX, dy = y - startY;
           var absDx = Math.abs(dx), absDy = Math.abs(dy);
@@ -849,12 +850,18 @@ export function buildDocumentHtml(
           var selectorEdge = getSelectorEdge();
           return x < 56 || x > window.innerWidth - selectorEdge;
         }
-        document.addEventListener('pointerdown', function (e) { if (e.pointerType !== 'pen' && isEdgeStart(e.clientX)) onStart(e.clientX, e.clientY); });
+        document.addEventListener('pointerdown', function (e) {
+          if (e.pointerType === 'pen') { window.__sermonPenPointerActive = true; onCancel(); return; }
+          if (isEdgeStart(e.clientX)) onStart(e.clientX, e.clientY);
+        });
         document.addEventListener('pointermove', function (e) { if (e.pointerType !== 'pen' && !window.__sermonPencilActive) onMove(e.clientX, e.clientY, e); });
-        document.addEventListener('pointerup', function (e) { onEnd(e.clientX, e.clientY); });
-        document.addEventListener('pointercancel', onCancel);
-        document.addEventListener('touchstart', function (e) { var t = e.touches[0]; if (t && t.touchType !== 'stylus' && isEdgeStart(t.clientX)) onStart(t.clientX, t.clientY); }, { passive: true });
-        document.addEventListener('touchmove', function (e) { var t = e.touches[0]; if (t && t.touchType !== 'stylus' && !window.__sermonPencilActive) onMove(t.clientX, t.clientY, e); }, { passive: false });
+        document.addEventListener('pointerup', function (e) {
+          if (e.pointerType === 'pen') { window.__sermonPenPointerActive = false; onCancel(); return; }
+          onEnd(e.clientX, e.clientY);
+        });
+        document.addEventListener('pointercancel', function () { window.__sermonPenPointerActive = false; onCancel(); });
+        document.addEventListener('touchstart', function (e) { var t = e.touches[0]; if (t && t.touchType !== 'stylus' && !window.__sermonPenPointerActive && !window.__sermonPencilActive && isEdgeStart(t.clientX)) onStart(t.clientX, t.clientY); }, { passive: true });
+        document.addEventListener('touchmove', function (e) { var t = e.touches[0]; if (t && t.touchType !== 'stylus' && !window.__sermonPenPointerActive && !window.__sermonPencilActive) onMove(t.clientX, t.clientY, e); }, { passive: false });
         document.addEventListener('touchend', function (e) { var t = e.changedTouches[0]; onEnd(t.clientX, t.clientY, e); }, { passive: false });
         document.addEventListener('touchcancel', onCancel);
       })();
