@@ -19,7 +19,7 @@ export default function Root({ children }: PropsWithChildren) {
             show navy instead of the browser's default white. */}
         <style
           dangerouslySetInnerHTML={{
-            __html: 'html,body{background-color:#003566;}',
+            __html: 'html,body{background-color:#003566;}[data-testid="slideshow-container"]{-webkit-text-size-adjust:none;text-size-adjust:none;}',
           }}
         />
       </head>
