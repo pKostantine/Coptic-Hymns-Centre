@@ -56,6 +56,45 @@ test('device classification and level size are invariant through rotation', () =
   }), 'desktop');
 });
 
+test('mobile web keeps its device size when Expo OS metadata is unavailable', () => {
+  const mobileBrowsers = [
+    { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', shortEdge: 390, expected: 'phone' },
+    { userAgent: 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Mobile Safari/537.36', shortEdge: 412, expected: 'phone' },
+    { userAgent: 'Mozilla/5.0 (Linux; Android 15; Tablet) AppleWebKit/537.36 Safari/537.36', shortEdge: 800, expected: 'tablet' },
+    { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15', shortEdge: 820, maxTouchPoints: 5, expected: 'tablet' },
+  ];
+  for (const browser of mobileBrowsers) {
+    const input = {
+      platform: 'web',
+      deviceType: null,
+      osName: null,
+      userAgent: browser.userAgent,
+      maxTouchPoints: browser.maxTouchPoints ?? 0,
+    };
+    const portrait = classifyReadingDevice({
+      ...input,
+      screenWidth: browser.shortEdge,
+      screenHeight: 1180,
+    });
+    const landscape = classifyReadingDevice({
+      ...input,
+      screenWidth: 1180,
+      screenHeight: browser.shortEdge,
+    });
+    assert.equal(portrait, browser.expected);
+    assert.equal(landscape, browser.expected);
+    for (let level = 1; level <= 10; level++) {
+      assert.equal(readingFontSizeForLevel(level, portrait), readingFontSizeForLevel(level, landscape));
+    }
+  }
+  // A desktop browser resized to a phone-sized window stays desktop-sized.
+  assert.equal(classifyReadingDevice({
+    platform: 'web', deviceType: null, osName: 'Windows',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    screenWidth: 390, screenHeight: 844,
+  }), 'desktop');
+});
+
 test('old font preferences migrate by nearest rendered size', () => {
   assert.equal(migrateReadingFontLevel(2, 20, 'phone'), 6);
   assert.equal(migrateReadingFontLevel(2, 20, 'tablet'), 5);
