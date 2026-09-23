@@ -100,6 +100,11 @@ test('Only Sermon Planner includes the Gospel Rite in hymn-key fallback lookups'
   assert.equal(getLookups('liturgy', 'sermon_planner')[0], 'liturgy');
 });
 
+test('Liturgy Gospel with Coptic uses the normalized all-caps sentinel', () => {
+  assert.match(hymnLibrarySource, /"LITURGY_GOSPEL_WITH_COPTIC"/);
+  assert.doesNotMatch(hymnLibrarySource, /"Liturgy_GOSPEL_WITH_COPTIC"/);
+});
+
 test('Inline Synaxarium and regular inline Gospel hymns are both supported', () => {
   assert.match(hymnLibrarySource, /section\.hymn_key === "SYNAXARIUM" && isoDate/);
   assert.match(hymnLibrarySource, /buildWholeTableInlineSections\(synaxariumSections, section\)/);

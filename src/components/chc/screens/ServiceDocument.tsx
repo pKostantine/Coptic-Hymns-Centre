@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
+import SermonPlannerDrawer from '../ui/SermonPlannerDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
@@ -14,6 +15,8 @@ import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useCalendar } from '../../../context/CalendarContext';
+import { useAuth } from '../../../context/AuthContext';
+import { useSermonPlanner } from '../../../hooks/useSermonPlanner';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
 import { getEpistleConditionFlags } from '../../../utils/readingsService';
@@ -29,6 +32,11 @@ import { goBack } from '../../../utils/navigation';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
 import { getUserConditionFlags } from '../../../utils/userConditionFlags';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
+import {
+  createSermonHighlight,
+  getSermonPlannerReferences,
+  isSermonHighlightAnchor,
+} from '../../../utils/sermonPlanner';
 
 interface ServiceDocumentProps {
   schema: string;
@@ -71,8 +79,17 @@ interface AntiphonaryModalTarget {
  */
 export default function ServiceDocument({ schema, table, title, arabic, extraContext, entryId, backHref }: ServiceDocumentProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent, toggleCopticGospelRite } = useReadingPreferences();
   const { effectiveDate, vespersEffectiveDate } = useCalendar();
+  const isSermonPlanner = schema === 'liturgy' && table === 'sermon_planner';
+  const sermonServiceDate = effectiveDate.toISOString().slice(0, 10);
+  const sermonPlanner = useSermonPlanner(
+    `${schema}.${table}`,
+    sermonServiceDate,
+    user?.id,
+    isSermonPlanner,
+  );
   const weekdayConditionDate = useMemo(
     () =>
       getServiceWeekdayConditionDate({
@@ -138,6 +155,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // In-document toggle button state, rendered wherever GOSPEL_RITE is spliced in.
   const copticGospelRite = preferences.copticGospelRite;
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [activeSermonHighlightId, setActiveSermonHighlightId] = useState<string | null>(null);
   // Seeded from the same module-level store selectedSlideSectionId is (see
   // below): changing a setting can unmount this screen and mount it again,
   // and starting back at null would leave the content selector with nothing
@@ -227,6 +245,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   }, [restoreSettingsSignature, readerFocused, sections, documentPositionKey]);
 
   const bookmarked = isBookmarked(bookmarkId);
+  const sermonReferences = useMemo(
+    () => isSermonPlanner && readySections ? getSermonPlannerReferences(readySections) : [],
+    [isSermonPlanner, readySections],
+  );
   // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
   // to a saved subdocument bookmark) — fire once when sections first load.
   const { sub: initialSubdocumentKey } = useLocalSearchParams<{ sub?: string }>();
@@ -524,6 +546,24 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   };
 
   const handleAction = (action: DocumentAction) => {
+    if (isSermonPlanner && action.type === 'createSermonHighlights') {
+      const color = action.color === 'rose' || action.color === 'blue' || action.color === 'green'
+        ? action.color
+        : 'gold';
+      const highlights = (action.anchors || [])
+        .filter(isSermonHighlightAnchor)
+        .map((anchor) => createSermonHighlight(anchor, color));
+      sermonPlanner.addHighlights(highlights);
+      if (highlights[0]) setActiveSermonHighlightId(highlights[0].id);
+      return;
+    }
+
+    if (isSermonPlanner && action.type === 'openSermonNote' && action.highlightId) {
+      setActiveSermonHighlightId(action.highlightId);
+      setSelectorOpen(true);
+      return;
+    }
+
     if (action.type === 'toggleCopticGospelRite') {
       // The toggle button lives inside the first Gospel Rite section. Pre-set
       // the preserved section to the always-visible section immediately before
@@ -711,8 +751,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           onBack={() => leaveDocument()}
           rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
           onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
-          rightIcon="list-outline"
-          rightAccessibilityLabel="Open content list"
+          rightIcon={isSermonPlanner ? 'document-text-outline' : 'list-outline'}
+          rightAccessibilityLabel={isSermonPlanner ? 'Open sermon notes' : 'Open content list'}
           onRightPress={() => setSelectorOpen(true)}
         />
       ) : null}
@@ -753,8 +793,35 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             initialScrollSectionId={restoreRequest?.target.sectionId ?? currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
             onCollapseToggle={setSelectedSlideSectionId}
             keyboardNavigationEnabled={!isCoveredByModal}
+            sermonPlannerMode={isSermonPlanner}
+            sermonHighlights={sermonPlanner.plan.highlights}
           />
           </View>
+          {isSermonPlanner ? (
+            <SermonPlannerDrawer
+              visible={selectorOpen}
+              references={sermonReferences}
+              highlights={sermonPlanner.plan.highlights}
+              generalNotes={sermonPlanner.plan.generalNotes}
+              activeHighlightId={activeSermonHighlightId}
+              syncStatus={sermonPlanner.syncStatus}
+              signedIn={Boolean(user)}
+              onClose={() => setSelectorOpen(false)}
+              onSelectReference={(reference) => documentRef.current?.scrollToVerse(reference.verseId)}
+              onJumpToHighlight={(highlight) => documentRef.current?.scrollToSermonHighlight(highlight.id)}
+              onChangeGeneralNotes={sermonPlanner.setGeneralNotes}
+              onChangeHighlightNote={(id, note) => sermonPlanner.updateHighlight(id, { note })}
+              onChangeHighlightColor={sermonPlanner.setHighlightColor}
+              onDeleteHighlight={(id) => {
+                sermonPlanner.deleteHighlight(id);
+                if (activeSermonHighlightId === id) setActiveSermonHighlightId(null);
+              }}
+              bookmarked={bookmarked}
+              onToggleBookmark={() => toggleBookmark(bookmarkId)}
+              onOpenCalendar={() => navigateAway('/calendar')}
+              onOpenSettings={() => navigateAway('/book-settings')}
+            />
+          ) : (
           <ContentSelectorDrawer
             visible={selectorOpen}
             sections={readySections}
@@ -790,6 +857,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             copticGospelRite={copticGospelRite}
             appLanguage={preferences.appLanguage}
           />
+          )}
         </>
       )}
       {/* Deliberately outside the branch above. Changing the date clears

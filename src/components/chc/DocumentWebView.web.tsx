@@ -5,6 +5,7 @@ import { COLORS } from '../../constants/theme';
 import { sectionRestoreCandidates, type DocumentRestoreRequest } from '../../utils/sectionRestore';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
+import type { SermonHighlight } from '../../types/sermonPlanner';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
 
 export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
@@ -15,6 +16,7 @@ export interface DocumentWebViewHandle {
   scrollToTune: (tune: string) => void;
   /** Pre-set the section the WebView will restore to on its next load (e.g. before triggering a state change that causes a full HTML rebuild). */
   setPreservedSection: (id: string, edge?: 'start' | 'end') => void;
+  scrollToSermonHighlight: (id: string) => void;
 }
 
 interface DocumentWebViewProps {
@@ -39,6 +41,8 @@ interface DocumentWebViewProps {
   restoreRequest?: DocumentRestoreRequest | null;
   /** Extra scrollable space at the bottom for floating app chrome such as the global mini player. */
   bottomContentInset?: number;
+  sermonPlannerMode?: boolean;
+  sermonHighlights?: SermonHighlight[];
 }
 
 /**
@@ -67,6 +71,8 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       restoreRequest,
       bottomContentInset = 0,
       collapsedSectionIds,
+      sermonPlannerMode = false,
+      sermonHighlights = [],
     },
     ref,
   ) => {
@@ -115,7 +121,17 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         preservedEdgeRef.current = edge;
         pendingRestoreSectionIdRef.current = id;
       },
+      scrollToSermonHighlight: (id: string) => {
+        const win = iframeRef.current?.contentWindow as (Window & { scrollToSermonHighlight?: (id: string) => void }) | null | undefined;
+        win?.scrollToSermonHighlight?.(id);
+      },
     }));
+
+    useEffect(() => {
+      if (!sermonPlannerMode) return;
+      const win = iframeRef.current?.contentWindow as (Window & { setSermonHighlights?: (value: SermonHighlight[]) => void }) | null | undefined;
+      win?.setSermonHighlights?.(sermonHighlights);
+    }, [sermonHighlights, sermonPlannerMode]);
 
     useEffect(() => {
       const handleMessage = (event: MessageEvent) => {
@@ -155,6 +171,10 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       const candidates = sectionRestoreCandidates(sections.map((section) => section.id), preservedSectionIdRef.current)
         .map((sectionId, index) => ({ sectionId, edge: index ? 'end' : preservedEdgeRef.current }));
       if (candidates.length) win?.scrollToSection?.(candidates);
+      if (sermonPlannerMode) {
+        const annotationWindow = win as typeof win & { setSermonHighlights?: (value: SermonHighlight[]) => void };
+        annotationWindow?.setSermonHighlights?.(sermonHighlights);
+      }
     };
 
     useEffect(() => {
@@ -195,6 +215,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               copticGospelRite,
               suppressAllSpeakerLabels,
               bottomContentInset,
+              sermonPlannerMode,
             })
           : null,
       [
@@ -211,6 +232,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         copticGospelRite,
         suppressAllSpeakerLabels,
         bottomContentInset,
+        sermonPlannerMode,
       ],
     );
 

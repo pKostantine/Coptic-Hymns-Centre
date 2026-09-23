@@ -18,6 +18,7 @@ export type IconName =
   | 'library-outline'
   | 'school-outline'
   | 'list-outline'
+  | 'document-text-outline'
   | 'playlist-add'
   | 'ellipsis-horizontal'
   | 'ellipsis-vertical'
@@ -265,6 +266,13 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
           <Circle cx={112} cy={256} r={34} fill={color} />
           <Circle cx={256} cy={256} r={34} fill={color} />
           <Circle cx={400} cy={256} r={34} fill={color} />
+        </Svg>
+      );
+    case 'document-text-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M160 48h176l96 96v288a32 32 0 0 1-32 32H160a32 32 0 0 1-32-32V80a32 32 0 0 1 32-32Z" fill="none" stroke={color} strokeWidth={30} strokeLinejoin="round" />
+          <Path d="M336 48v96h96M192 240h160M192 304h160M192 368h112" fill="none" stroke={color} strokeWidth={28} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     case 'ellipsis-vertical':

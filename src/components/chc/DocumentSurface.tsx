@@ -9,6 +9,7 @@ import { useBottomChrome } from '../../context/BottomChromeContext';
 import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
 import { fontScaleToPx, ReadingPreferences } from '../../utils/preferencesStorage';
 import type { DocumentRestoreRequest } from '../../utils/sectionRestore';
+import type { SermonHighlight } from '../../types/sermonPlanner';
 
 interface DocumentSurfaceProps {
   sections: DocumentSection[];
@@ -31,6 +32,8 @@ interface DocumentSurfaceProps {
   onCollapseToggle?: (sectionId: string) => void;
   /** Whether this surface may consume desktop arrow-key navigation. Disable it whenever another document or drawer is stacked above this one. */
   keyboardNavigationEnabled?: boolean;
+  sermonPlannerMode?: boolean;
+  sermonHighlights?: SermonHighlight[];
 }
 
 /** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer/silentComment — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
@@ -122,13 +125,16 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       restoreRequest,
       onCollapseToggle,
       keyboardNavigationEnabled = true,
+      sermonPlannerMode = false,
+      sermonHighlights = [],
     },
     ref,
   ) => {
     const { width: screenWidth } = useWindowDimensions();
     const { nowPlayingInset } = useBottomChrome();
     const fontSize = fontScaleToPx(preferences.fontScale);
-    const effectiveSelectText = preferences.selectText && !preferences.slideshowMode;
+    const effectiveSlideshowMode = preferences.slideshowMode && !sermonPlannerMode;
+    const effectiveSelectText = sermonPlannerMode || (preferences.selectText && !effectiveSlideshowMode);
     // section.id already includes hymn_key + item_order. Combining it with
     // collapseMemoryScope keeps repeated hymns separate both within one
     // document and across Vespers/Matins/Liturgy or nested subdocuments.
@@ -281,7 +287,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       );
     }
 
-    if (preferences.slideshowMode) {
+    if (effectiveSlideshowMode) {
       return (
         <SlideshowContainer
           sections={slideshowSections}
@@ -328,6 +334,8 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         initialSectionId={initialScrollSectionId}
         restoreRequest={restoreRequest}
         bottomContentInset={nowPlayingInset}
+        sermonPlannerMode={sermonPlannerMode}
+        sermonHighlights={sermonHighlights}
       />
     );
   },

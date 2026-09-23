@@ -3,6 +3,10 @@ import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesSto
 import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from './documentPresentationMetrics';
+import type {
+  SermonHighlightAnchor,
+  SermonHighlightColor,
+} from '../../types/sermonPlanner';
 
 export interface DocumentVerse {
   english: string;
@@ -47,6 +51,8 @@ export interface DocumentSection {
   defaultCollapsed?: boolean;
   /** order table hymn_key this section was assembled from — used to exclude specific hymns (e.g. "ourFather") from the content selector. */
   hymnKey?: string;
+  /** Groups hydrated sections that came from one inline source, such as the Sermon Planner's Synaxarium. */
+  sourceGroupKey?: string;
   /** A Subdocument placeholder rendered as a button that opens the nested document in a full-screen modal, instead of being expanded inline. */
   isSubdocumentButton?: boolean;
   subdocumentKey?: string;
@@ -80,6 +86,9 @@ export interface DocumentAction {
   sectionId?: string;
   verseId?: string | null;
   collapsed?: boolean;
+  anchors?: SermonHighlightAnchor[];
+  color?: SermonHighlightColor;
+  highlightId?: string;
   /** "contentHeight" only: how tall the laid-out document is, for anything embedding it at its natural size. */
   height?: number;
 }
@@ -141,6 +150,7 @@ export function buildDocumentHtml(
     copticGospelRite = false,
     suppressAllSpeakerLabels = false,
     bottomContentInset = 0,
+    sermonPlannerMode = false,
   }: {
     copticFontDataUri: string;
     fontSize: number;
@@ -157,6 +167,8 @@ export function buildDocumentHtml(
     suppressAllSpeakerLabels?: boolean;
     /** Extra bottom clearance for app-level floating chrome, in CSS pixels. */
     bottomContentInset?: number;
+    /** Adds persistent range highlighting and Pencil-aware annotation controls. */
+    sermonPlannerMode?: boolean;
   },
 ) {
   const {
@@ -171,7 +183,7 @@ export function buildDocumentHtml(
   const arabicFontSize = Math.round(fontSize * 1.15);
   const verseLineHeight = Math.round(fontSize * 1.3);
   const arabicVerseLineHeight = Math.round(fontSize * 1.6);
-  const effectiveSelectText = Boolean(selectText);
+  const effectiveSelectText = Boolean(selectText || sermonPlannerMode);
 
   const visibleSections = sections.filter((section) => {
     if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;
@@ -203,6 +215,7 @@ export function buildDocumentHtml(
         copticGospelRite,
         suppressMap,
         suppressAllSpeakerLabels,
+        sermonPlannerMode,
       }),
     )
     .join('');
@@ -351,6 +364,7 @@ export function buildDocumentHtml(
         width: 0.25em;
       }
       .metropolitan { color: ${COLORS.metropolitanBrackets}; }
+      ${sermonPlannerMode ? sermonPlannerStyles() : ''}
       .section-title {
         color: ${COLORS.gold};
         font-family: Georgia, serif;
@@ -838,6 +852,7 @@ export function buildDocumentHtml(
         document.addEventListener('touchend', function (e) { var t = e.changedTouches[0]; onEnd(t.clientX, t.clientY, e); }, { passive: false });
         document.addEventListener('touchcancel', onCancel);
       })();
+      ${sermonPlannerMode ? sermonPlannerScript() : ''}
     </script>
   </body>
 </html>`;
@@ -890,6 +905,7 @@ function renderSection(
     copticGospelRite: boolean;
     suppressMap: Map<DocumentVerse, boolean>;
     suppressAllSpeakerLabels: boolean;
+    sermonPlannerMode: boolean;
   },
 ) {
   const { appLanguage, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite, suppressMap } = opts;
@@ -1064,12 +1080,14 @@ function renderVerse(
     bishopPresent,
     copticRecitedPrayers,
     suppressAllSpeakerLabels,
+    sermonPlannerMode,
   }: {
     fontSize: number;
     visibleColumns: VisibleColumns;
     bishopPresent: boolean;
     copticRecitedPrayers: boolean;
     suppressAllSpeakerLabels: boolean;
+    sermonPlannerMode: boolean;
   },
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent, suppressAllSpeakerLabels);
@@ -1170,11 +1188,16 @@ function renderVerse(
     // row it has already been placed below that line, so the filler would
     // only open a blank gap above it.
     const speakerLabel = spansRow ? '' : language.speakerLabel;
+    const verseId = `${section.id}::v${index}`;
+    const bodyText = highlightMetropolitanBrackets(language.text);
+    const renderedBody = sermonPlannerMode
+      ? `<span class="sermon-annotatable-text" data-sermon-section-id="${escapeAttribute(section.id)}" data-sermon-verse-id="${escapeAttribute(verseId)}" data-sermon-language="${escapeAttribute(language.key)}">${bodyText}</span>`
+      : bodyText;
     return `
         <div class="cell" data-language="${escapeAttribute(language.key)}"${spansRow ? ' style="grid-column: 1 / -1;"' : ''}>
           <p class="verse-text ${language.className} ${centered ? 'centered' : ''}" style="${textStyle}">${
             speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(speakerLabel)}</span><br/>` : ''
-          }${verseNumberText ? `<span class="bible-verse-number" data-copy-text="${escapeAttribute(verseNumberText)}">${escapeHtml(verseNumberText)}</span><span class="bible-verse-number-gap"></span>` : ''}${highlightMetropolitanBrackets(language.text)}</p>
+          }${verseNumberText ? `<span class="bible-verse-number" data-copy-text="${escapeAttribute(verseNumberText)}">${escapeHtml(verseNumberText)}</span><span class="bible-verse-number-gap"></span>` : ''}${renderedBody}</p>
         </div>
       `;
   };
@@ -1189,6 +1212,339 @@ function renderVerse(
   const verseId = `${section.id}::v${index}`;
 
   return `<div class="verse-row" data-verse-id="${escapeAttribute(verseId)}"${tuneAttribute} style="grid-template-columns: ${gridTemplateColumns};">${cells}</div>`;
+}
+
+function sermonPlannerStyles() {
+  return `
+      .sermon-annotatable-text {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      mark.sermon-highlight {
+        border-radius: 3px;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+        color: inherit;
+        cursor: pointer;
+        padding: 0 0.05em;
+      }
+      mark.sermon-highlight[data-sermon-color="gold"] { background: rgba(235, 190, 52, 0.46); }
+      mark.sermon-highlight[data-sermon-color="rose"] { background: rgba(232, 91, 120, 0.42); }
+      mark.sermon-highlight[data-sermon-color="blue"] { background: rgba(75, 154, 219, 0.46); }
+      mark.sermon-highlight[data-sermon-color="green"] { background: rgba(74, 173, 116, 0.44); }
+      mark.sermon-highlight.sermon-highlight-pulse { animation: sermon-highlight-pulse 900ms ease-out; }
+      @keyframes sermon-highlight-pulse {
+        0%, 100% { outline: 0 solid rgba(235, 190, 52, 0); }
+        35% { outline: 5px solid rgba(235, 190, 52, 0.42); }
+      }
+      #sermon-highlight-tools {
+        align-items: center;
+        background: #151719;
+        border: 1px solid rgba(235, 190, 52, 0.5);
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.48);
+        display: none;
+        gap: 8px;
+        padding: 8px 10px;
+        position: fixed;
+        transform: translate(-50%, -100%);
+        z-index: 2147483647;
+      }
+      #sermon-highlight-tools.is-visible { display: flex; }
+      .sermon-color-button {
+        border: 2px solid rgba(255, 255, 255, 0.72);
+        border-radius: 999px;
+        height: 28px;
+        padding: 0;
+        width: 28px;
+      }
+      .sermon-color-button[data-color="gold"] { background: #d7ad2c; }
+      .sermon-color-button[data-color="rose"] { background: #d65b75; }
+      .sermon-color-button[data-color="blue"] { background: #4c9ad8; }
+      .sermon-color-button[data-color="green"] { background: #4aaa73; }
+  `;
+}
+
+function sermonPlannerScript() {
+  return `
+      (function () {
+        var currentHighlights = [];
+        var annotationSelector = '.sermon-annotatable-text[data-sermon-verse-id][data-sermon-language]';
+        var palette = document.createElement('div');
+        palette.id = 'sermon-highlight-tools';
+        palette.setAttribute('role', 'toolbar');
+        palette.setAttribute('aria-label', 'Highlight selected text');
+        ['gold', 'rose', 'blue', 'green'].forEach(function (color) {
+          var button = document.createElement('button');
+          button.className = 'sermon-color-button';
+          button.type = 'button';
+          button.setAttribute('data-color', color);
+          button.setAttribute('aria-label', 'Highlight ' + color);
+          palette.appendChild(button);
+        });
+        document.body.appendChild(palette);
+
+        function closestRoot(node) {
+          var element = node && node.nodeType === 1 ? node : node && node.parentElement;
+          return element && element.closest ? element.closest(annotationSelector) : null;
+        }
+
+        function unwrapHighlights() {
+          Array.prototype.slice.call(document.querySelectorAll('mark.sermon-highlight')).forEach(function (mark) {
+            var parent = mark.parentNode;
+            while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+            parent.removeChild(mark);
+            parent.normalize();
+          });
+        }
+
+        function boundaryForOffset(root, requestedOffset) {
+          var offset = Math.max(0, Math.min(Number(requestedOffset) || 0, root.textContent.length));
+          var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+          var consumed = 0;
+          var node;
+          while ((node = walker.nextNode())) {
+            var next = consumed + node.nodeValue.length;
+            if (offset <= next) return { node: node, offset: offset - consumed };
+            consumed = next;
+          }
+          return { node: root, offset: root.childNodes.length };
+        }
+
+        function resolveOffsets(root, highlight) {
+          var text = root.textContent || '';
+          var start = Math.max(0, Math.min(Number(highlight.startOffset) || 0, text.length));
+          var end = Math.max(start, Math.min(Number(highlight.endOffset) || start, text.length));
+          var quote = String(highlight.quote || '');
+          if (quote && text.slice(start, end) !== quote) {
+            var nearbyStart = Math.max(0, start - 80);
+            var nearby = text.slice(nearbyStart, Math.min(text.length, end + 80));
+            var nearbyIndex = nearby.indexOf(quote);
+            if (nearbyIndex >= 0) {
+              start = nearbyStart + nearbyIndex;
+              end = start + quote.length;
+            } else {
+              var firstIndex = text.indexOf(quote);
+              if (firstIndex >= 0 && text.indexOf(quote, firstIndex + 1) < 0) {
+                start = firstIndex;
+                end = firstIndex + quote.length;
+              }
+            }
+          }
+          return { start: start, end: end };
+        }
+
+        function applyHighlights() {
+          unwrapHighlights();
+          var ordered = currentHighlights.slice().sort(function (a, b) {
+            return Number(b.startOffset) - Number(a.startOffset);
+          });
+          ordered.forEach(function (highlight) {
+            var selector = annotationSelector
+              + '[data-sermon-verse-id="' + CSS.escape(String(highlight.verseId || '')) + '"]'
+              + '[data-sermon-language="' + CSS.escape(String(highlight.language || '')) + '"]';
+            var root = document.querySelector(selector);
+            if (!root) return;
+            var offsets = resolveOffsets(root, highlight);
+            if (offsets.end <= offsets.start) return;
+            var start = boundaryForOffset(root, offsets.start);
+            var end = boundaryForOffset(root, offsets.end);
+            var range = document.createRange();
+            try {
+              range.setStart(start.node, start.offset);
+              range.setEnd(end.node, end.offset);
+              var mark = document.createElement('mark');
+              mark.className = 'sermon-highlight';
+              mark.setAttribute('data-sermon-highlight-id', String(highlight.id));
+              mark.setAttribute('data-sermon-color', String(highlight.color || 'gold'));
+              mark.appendChild(range.extractContents());
+              range.insertNode(mark);
+            } catch (error) {
+              // A stale anchor should never make the document unreadable.
+            }
+          });
+        }
+
+        window.setSermonHighlights = function (highlights) {
+          currentHighlights = Array.isArray(highlights) ? highlights : [];
+          applyHighlights();
+        };
+
+        window.scrollToSermonHighlight = function (highlightId) {
+          var mark = document.querySelector('mark[data-sermon-highlight-id="' + CSS.escape(String(highlightId || '')) + '"]');
+          if (!mark) return false;
+          mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          mark.classList.remove('sermon-highlight-pulse');
+          void mark.offsetWidth;
+          mark.classList.add('sermon-highlight-pulse');
+          return true;
+        };
+
+        function offsetInRoot(root, node, offset) {
+          var range = document.createRange();
+          range.selectNodeContents(root);
+          try {
+            range.setEnd(node, offset);
+            return range.toString().length;
+          } catch (error) {
+            return 0;
+          }
+        }
+
+        function anchorsFromSelection(selection) {
+          if (!selection || !selection.rangeCount || selection.isCollapsed) return [];
+          var range = selection.getRangeAt(0);
+          var anchors = [];
+          Array.prototype.slice.call(document.querySelectorAll(annotationSelector)).forEach(function (root) {
+            try {
+              if (!range.intersectsNode(root)) return;
+            } catch (error) {
+              return;
+            }
+            var clipped = document.createRange();
+            clipped.selectNodeContents(root);
+            if (root.contains(range.startContainer)) clipped.setStart(range.startContainer, range.startOffset);
+            if (root.contains(range.endContainer)) clipped.setEnd(range.endContainer, range.endOffset);
+            var startOffset = offsetInRoot(root, clipped.startContainer, clipped.startOffset);
+            var endOffset = offsetInRoot(root, clipped.endContainer, clipped.endOffset);
+            var fullText = root.textContent || '';
+            while (startOffset < endOffset && /\\s/.test(fullText.charAt(startOffset))) startOffset += 1;
+            while (endOffset > startOffset && /\\s/.test(fullText.charAt(endOffset - 1))) endOffset -= 1;
+            if (endOffset <= startOffset) return;
+            var overlaps = currentHighlights.some(function (highlight) {
+              return highlight.verseId === root.getAttribute('data-sermon-verse-id')
+                && highlight.language === root.getAttribute('data-sermon-language')
+                && startOffset < Number(highlight.endOffset)
+                && endOffset > Number(highlight.startOffset);
+            });
+            if (overlaps) return;
+            anchors.push({
+              sectionId: root.getAttribute('data-sermon-section-id'),
+              verseId: root.getAttribute('data-sermon-verse-id'),
+              language: root.getAttribute('data-sermon-language'),
+              startOffset: startOffset,
+              endOffset: endOffset,
+              quote: fullText.slice(startOffset, endOffset),
+            });
+          });
+          return anchors;
+        }
+
+        function hidePalette() {
+          palette.classList.remove('is-visible');
+        }
+
+        function showPaletteForSelection() {
+          var selection = window.getSelection && window.getSelection();
+          var anchors = anchorsFromSelection(selection);
+          if (!anchors.length) {
+            hidePalette();
+            return;
+          }
+          var rect = selection.getRangeAt(0).getBoundingClientRect();
+          var x = Math.max(78, Math.min(window.innerWidth - 78, rect.left + rect.width / 2));
+          var y = Math.max(60, rect.top - 8);
+          palette.style.left = x + 'px';
+          palette.style.top = y + 'px';
+          palette.classList.add('is-visible');
+        }
+
+        function commitSelection(color) {
+          var selection = window.getSelection && window.getSelection();
+          var anchors = anchorsFromSelection(selection);
+          if (anchors.length) postAction('createSermonHighlights', { anchors: anchors, color: color || 'gold' });
+          if (selection) selection.removeAllRanges();
+          hidePalette();
+        }
+
+        palette.addEventListener('pointerdown', function (event) { event.preventDefault(); });
+        palette.addEventListener('click', function (event) {
+          var button = event.target.closest('[data-color]');
+          if (button) commitSelection(button.getAttribute('data-color'));
+        });
+
+        document.addEventListener('click', function (event) {
+          var mark = event.target.closest('mark[data-sermon-highlight-id]');
+          if (!mark) return;
+          postAction('openSermonNote', { highlightId: mark.getAttribute('data-sermon-highlight-id') });
+        });
+        document.addEventListener('selectionchange', function () {
+          var selection = window.getSelection && window.getSelection();
+          if (!selection || selection.isCollapsed) hidePalette();
+        });
+        document.addEventListener('pointerup', function (event) {
+          if (event.pointerType !== 'pen') setTimeout(showPaletteForSelection, 0);
+        });
+        document.addEventListener('touchend', function () { setTimeout(showPaletteForSelection, 80); }, { passive: true });
+        document.addEventListener('keyup', function () { setTimeout(showPaletteForSelection, 0); });
+
+        function caretAtPoint(x, y) {
+          if (document.caretPositionFromPoint) {
+            var position = document.caretPositionFromPoint(x, y);
+            return position ? { node: position.offsetNode, offset: position.offset } : null;
+          }
+          if (document.caretRangeFromPoint) {
+            var range = document.caretRangeFromPoint(x, y);
+            return range ? { node: range.startContainer, offset: range.startOffset } : null;
+          }
+          return null;
+        }
+
+        var pencilStart = null;
+        function startPencil(x, y, event) {
+          var caret = caretAtPoint(x, y);
+          var root = caret && closestRoot(caret.node);
+          if (!caret || !root) return false;
+          pencilStart = { node: caret.node, offset: caret.offset, root: root };
+          if (event && event.cancelable) event.preventDefault();
+          return true;
+        }
+        function movePencil(x, y, event) {
+          if (!pencilStart) return;
+          var caret = caretAtPoint(x, y);
+          if (!caret || closestRoot(caret.node) !== pencilStart.root) return;
+          if (event && event.cancelable) event.preventDefault();
+          var selection = window.getSelection && window.getSelection();
+          if (!selection) return;
+          var range = document.createRange();
+          range.setStart(pencilStart.node, pencilStart.offset);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          if (selection.extend) selection.extend(caret.node, caret.offset);
+        }
+        function endPencil(x, y, event) {
+          if (!pencilStart) return;
+          movePencil(x, y, event);
+          pencilStart = null;
+          commitSelection('gold');
+        }
+
+        document.addEventListener('pointerdown', function (event) {
+          if (event.pointerType === 'pen') startPencil(event.clientX, event.clientY, event);
+        }, { passive: false });
+        document.addEventListener('pointermove', function (event) {
+          if (event.pointerType === 'pen') movePencil(event.clientX, event.clientY, event);
+        }, { passive: false });
+        document.addEventListener('pointerup', function (event) {
+          if (event.pointerType === 'pen') endPencil(event.clientX, event.clientY, event);
+        }, { passive: false });
+        document.addEventListener('pointercancel', function () { pencilStart = null; });
+
+        document.addEventListener('touchstart', function (event) {
+          var touch = event.touches && event.touches[0];
+          if (touch && touch.touchType === 'stylus') startPencil(touch.clientX, touch.clientY, event);
+        }, { passive: false });
+        document.addEventListener('touchmove', function (event) {
+          var touch = event.touches && event.touches[0];
+          if (touch && touch.touchType === 'stylus') movePencil(touch.clientX, touch.clientY, event);
+        }, { passive: false });
+        document.addEventListener('touchend', function (event) {
+          var touch = event.changedTouches && event.changedTouches[0];
+          if (touch && touch.touchType === 'stylus') endPencil(touch.clientX, touch.clientY, event);
+        }, { passive: false });
+      })();
+  `;
 }
 
 function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean) {

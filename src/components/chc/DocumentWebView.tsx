@@ -6,6 +6,7 @@ import { COLORS } from '../../constants/theme';
 import { sectionRestoreCandidates, type DocumentRestoreRequest } from '../../utils/sectionRestore';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
+import type { SermonHighlight } from '../../types/sermonPlanner';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
 
 export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
@@ -16,6 +17,7 @@ export interface DocumentWebViewHandle {
   scrollToTune: (tune: string) => void;
   /** Pre-set the section the WebView will restore to on its next load (e.g. before triggering a state change that causes a full HTML rebuild). */
   setPreservedSection: (id: string, edge?: 'start' | 'end') => void;
+  scrollToSermonHighlight: (id: string) => void;
 }
 
 interface DocumentWebViewProps {
@@ -40,6 +42,8 @@ interface DocumentWebViewProps {
   restoreRequest?: DocumentRestoreRequest | null;
   /** Extra scrollable space at the bottom for floating app chrome such as the global mini player. */
   bottomContentInset?: number;
+  sermonPlannerMode?: boolean;
+  sermonHighlights?: SermonHighlight[];
 }
 
 /**
@@ -66,6 +70,8 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       restoreRequest,
       bottomContentInset = 0,
       collapsedSectionIds,
+      sermonPlannerMode = false,
+      sermonHighlights = [],
     },
     ref,
   ) => {
@@ -111,7 +117,23 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         preservedEdgeRef.current = edge;
         pendingRestoreSectionIdRef.current = id;
       },
+      scrollToSermonHighlight: (id: string) => {
+        webviewRef.current?.injectJavaScript(`window.scrollToSermonHighlight && window.scrollToSermonHighlight(${JSON.stringify(id)}); true;`);
+      },
     }));
+
+    const syncSermonHighlights = () => {
+      if (!sermonPlannerMode) return;
+      webviewRef.current?.injectJavaScript(
+        `window.setSermonHighlights && window.setSermonHighlights(${JSON.stringify(sermonHighlights)}); true;`,
+      );
+    };
+
+    useEffect(() => {
+      syncSermonHighlights();
+      // The serialized highlight payload is the actual renderer dependency.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sermonPlannerMode, JSON.stringify(sermonHighlights)]);
 
     const handleMessage = (event: WebViewMessageEvent) => {
       try {
@@ -145,6 +167,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
           `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(candidates)}); } true;`,
         );
       }
+      syncSermonHighlights();
     };
 
     useEffect(() => {
@@ -184,6 +207,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               copticGospelRite,
               suppressAllSpeakerLabels,
               bottomContentInset,
+              sermonPlannerMode,
             })
           : null,
       [
@@ -200,6 +224,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         copticGospelRite,
         suppressAllSpeakerLabels,
         bottomContentInset,
+        sermonPlannerMode,
       ],
     );
 
@@ -227,7 +252,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         scrollEnabled
         showsVerticalScrollIndicator={false}
         javaScriptEnabled
-        textInteractionEnabled={selectText}
+        textInteractionEnabled={selectText || sermonPlannerMode}
         onMessage={handleMessage}
         onLoadEnd={handleLoadEnd}
       />

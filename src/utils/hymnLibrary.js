@@ -143,12 +143,9 @@ export const READING_SENTINELS = new Set([
   "VESPERS_GOSPEL_WITHOUT_COPTIC",
   "VESPERS_PSALM_WITH_COPTIC",
   "VESPERS_PSALM_WITHOUT_COPTIC",
-  // Not a typo — gospel_rite.hymn_texts really does spell the Liturgy
-  // Gospel sentinels this way (mixed case), unlike every other
-  // WITH/WITHOUT_COPTIC sibling above (verified directly against the live
-  // data) — matched here exactly as stored, not uppercased to match the
-  // others.
-  "Liturgy_GOSPEL_WITH_COPTIC",
+  // The with-Coptic key is normalized to the same all-caps convention as
+  // the other reading sentinels. The without-Coptic source remains mixed-case.
+  "LITURGY_GOSPEL_WITH_COPTIC",
   "Liturgy_GOSPEL_WITHOUT_COPTIC",
   // The actual scripture-text sentinels nested inside readings.pauline_epistle/
   // catholic_epistle/praxis/coptic_* (see SUBDOCUMENT_MAP) — everything
@@ -187,7 +184,7 @@ const READING_SENTINEL_MAP = {
   VESPERS_GOSPEL_WITHOUT_COPTIC: { service: "Vespers", readingType: "Gospel", withCoptic: false },
   VESPERS_PSALM_WITH_COPTIC: { service: "Vespers", readingType: "Psalm", withCoptic: true },
   VESPERS_PSALM_WITHOUT_COPTIC: { service: "Vespers", readingType: "Psalm", withCoptic: false },
-  "Liturgy_GOSPEL_WITH_COPTIC": { service: "Liturgy", readingType: "Gospel", withCoptic: true },
+  LITURGY_GOSPEL_WITH_COPTIC: { service: "Liturgy", readingType: "Gospel", withCoptic: true },
   "Liturgy_GOSPEL_WITHOUT_COPTIC": { service: "Liturgy", readingType: "Gospel", withCoptic: false },
 };
 
@@ -1473,7 +1470,10 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       // button used by Lectionary Liturgy. Keep the same day resolution.
       if (section.hymn_key === "SYNAXARIUM" && isoDate) {
         const synaxariumSections = omitSynaxariumPreamble(await resolveSynaxariumSections(isoDate));
-        hydrated.push(...buildWholeTableInlineSections(synaxariumSections, section));
+        hydrated.push(...buildWholeTableInlineSections(synaxariumSections, section).map((nestedSection) => ({
+          ...nestedSection,
+          sourceGroupKey: "SYNAXARIUM",
+        })));
         continue;
       }
 
@@ -1883,7 +1883,7 @@ async function fetchInlineHymnVerses(schema, hymnKey) {
  * splices — see `sections` below), recursively following any further
  * inline_hymn_key references those rows carry themselves — e.g. gospel_rite's
  * "copticGospel" hymn is itself just 3 rows, each an inline reference to
- * VESPERS_GOSPEL_WITH_COPTIC/MATINS_GOSPEL_WITH_COPTIC/Liturgy_GOSPEL_WITH_COPTIC
+ * VESPERS_GOSPEL_WITH_COPTIC/MATINS_GOSPEL_WITH_COPTIC/LITURGY_GOSPEL_WITH_COPTIC
  * (condition-gated by Vespers/Matins/Liturgy), each with its own
  * inline_hymn_title_shown=true/inline_hymn_minimization="Minimized". A naive
  * one-level splice (just reading english/coptic/arabic off each row) renders
