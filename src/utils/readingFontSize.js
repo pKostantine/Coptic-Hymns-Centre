@@ -56,7 +56,7 @@ export function classifyReadingDevice({
     const os = String(osName || "");
     const agent = String(userAgent || "");
     const isIPadDesktopAgent =
-      /\\bMacintosh\\b/i.test(agent) && Number(maxTouchPoints) > 1;
+      /\bMacintosh\b/i.test(agent) && Number(maxTouchPoints) > 1;
     const isMobileWeb =
       /^(android|ios|ipados)$/i.test(os) ||
       /android|iphone|ipad|ipod/i.test(agent) ||
