@@ -259,14 +259,15 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     // function always hydrates both states itself, so it's fixed too and
     // the persisted copticGospelRite preference isn't a dep below either.
     //
-    // liturgy_of_the_word is the one document that references the readings
-    // schema's Pauline/Catholic Epistle inline splices — those need today's
+    // The Liturgy of the Word, Lectionary Liturgy, and Sermon Planner reference
+    // the readings schema's Pauline/Catholic Epistle inline splices. These need today's
     // PaulineEpistleRomans/CatholicEpistle1Peter-style condition flags (see
     // getEpistleConditionFlags) to pick the right introduction line, resolved
     // here and merged into extraContext before hydrating.
     const needsEpistleFlags =
       (schema === 'liturgy' && table === 'liturgy_of_the_word') ||
-      (schema === 'liturgy' && table === 'lectionary_liturgy');
+      (schema === 'liturgy' && table === 'lectionary_liturgy') ||
+      (schema === 'liturgy' && table === 'sermon_planner');
     const epistleFlagsPromise = needsEpistleFlags ? getEpistleConditionFlags(effectiveDate) : Promise.resolve({});
 
     epistleFlagsPromise
