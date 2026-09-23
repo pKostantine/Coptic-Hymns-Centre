@@ -6,6 +6,7 @@ import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeop
 import VerseBlock from "./VerseBlock";
 import { DOCUMENT_CONTROL_METRICS } from "./documentPresentationMetrics";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
+import { isStylusGestureEvent } from "../../utils/isStylusGestureEvent";
 import {
   createSlideAnchor,
   estimateItemHeight,
@@ -809,13 +810,14 @@ export function NavigationSurface({
   const panResponder = useMemo(() => {
     return PanResponder.create({
         onMoveShouldSetPanResponder: (event, gestureState) => {
-          if (isInteractivePointerTarget(event?.target || event?.nativeEvent?.target)) return false;
+          if (isStylusGestureEvent(event) || isInteractivePointerTarget(event?.target || event?.nativeEvent?.target)) return false;
           const direction = getPageTurnForSwipe(gestureState.dx);
           const shouldCapture = Boolean(direction) &&
             Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
           return shouldCapture;
         },
-        onPanResponderRelease: (_, gestureState) => {
+        onPanResponderRelease: (event, gestureState) => {
+          if (isStylusGestureEvent(event)) return;
           const pageTurn = getPageTurnForSwipe(gestureState.dx);
           const selectorEdgeWidth = Math.min(
             240,
