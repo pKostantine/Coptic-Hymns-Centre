@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 
 import { loadBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
+import { markPendingDocumentRestoresDirty } from '../utils/lastDocumentPosition';
 import {
     applySyncedReadingPreferences,
     AppLanguage,
@@ -77,6 +78,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
   const [contentSyncStatus, setContentSyncStatus] = useState<ContentSyncStatus>('local');
   const [syncedUserId, setSyncedUserId] = useState<string | null>(null);
   const preferencesRef = useRef(preferences);
+  const previousRestorePreferencesRef = useRef<ReadingPreferences | null>(null);
   const bookmarksRef = useRef(bookmarks);
   const activeSyncUserRef = useRef<string | null>(null);
   const lastCloudSignatureRef = useRef<string | null>(null);
@@ -84,8 +86,14 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
   const cloudSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
+    // A document snapshot made before opening Book Settings must remain
+    // anchored to that original hymn even after several toggles or a revert.
+    if (ready && previousRestorePreferencesRef.current && previousRestorePreferencesRef.current !== preferences) {
+      markPendingDocumentRestoresDirty();
+    }
+    if (ready) previousRestorePreferencesRef.current = preferences;
     preferencesRef.current = preferences;
-  }, [preferences]);
+  }, [preferences, ready]);
 
   useEffect(() => {
     bookmarksRef.current = bookmarks;
