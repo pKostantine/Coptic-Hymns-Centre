@@ -11,6 +11,7 @@ export interface BibleWebViewHandle {
 export interface BibleWebViewAction {
   type: 'openSelector' | 'previousLevel' | 'currentVerse';
   verse?: string;
+  readerId?: string;
 }
 
 interface BibleWebViewProps {
