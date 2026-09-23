@@ -35,6 +35,7 @@ import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import {
   createSermonHighlight,
   getSermonPlannerReferences,
+  getSermonHighlightVerseReferences,
   isSermonHighlightAnchor,
 } from '../../../utils/sermonPlanner';
 
@@ -247,6 +248,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const bookmarked = isBookmarked(bookmarkId);
   const sermonReferences = useMemo(
     () => isSermonPlanner && readySections ? getSermonPlannerReferences(readySections) : [],
+    [isSermonPlanner, readySections],
+  );
+  const sermonVerseReferences = useMemo(
+    () => isSermonPlanner && readySections ? getSermonHighlightVerseReferences(readySections) : {},
     [isSermonPlanner, readySections],
   );
   // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
@@ -802,6 +807,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
               visible={selectorOpen}
               references={sermonReferences}
               highlights={sermonPlanner.plan.highlights}
+              verseReferences={sermonVerseReferences}
               generalNotes={sermonPlanner.plan.generalNotes}
               activeHighlightId={activeSermonHighlightId}
               syncStatus={sermonPlanner.syncStatus}
