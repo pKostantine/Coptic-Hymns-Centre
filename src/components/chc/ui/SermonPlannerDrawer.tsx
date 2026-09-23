@@ -38,6 +38,7 @@ interface SermonPlannerDrawerProps {
   visible: boolean;
   references: SermonReadingReference[];
   highlights: SermonHighlight[];
+  verseReferences: Record<string, string>;
   generalNotes: string;
   activeHighlightId?: string | null;
   syncStatus: SermonPlanSyncStatus;
@@ -72,6 +73,7 @@ export default function SermonPlannerDrawer({
   visible,
   references,
   highlights,
+  verseReferences,
   generalNotes,
   activeHighlightId,
   syncStatus,
@@ -206,7 +208,7 @@ export default function SermonPlannerDrawer({
               <View style={styles.emptyState}>
                 <View style={styles.emptyMarker} />
                 <Text style={styles.emptyTitle}>No highlights yet</Text>
-                <Text style={styles.emptyBody}>Select text to choose a color. With Apple Pencil, drag directly across the words.</Text>
+                <Text style={styles.emptyBody}>Select text to choose a color. With Apple Pencil, drag across words to highlight them.</Text>
               </View>
             ) : highlights.map((highlight) => {
               const isActive = highlight.id === activeHighlightId;
@@ -225,16 +227,6 @@ export default function SermonPlannerDrawer({
                     <Text style={styles.highlightLanguage}>{languageLabel(highlight.language)}</Text>
                     <View style={styles.highlightActions}>
                       <Pressable
-                        accessibilityLabel="Show highlight in reading"
-                        style={styles.iconButton}
-                        onPress={() => {
-                          onClose();
-                          onJumpToHighlight(highlight);
-                        }}
-                      >
-                        <Icon name="eye-outline" size={18} color={COLORS.goldBright} />
-                      </Pressable>
-                      <Pressable
                         accessibilityLabel="Delete highlight"
                         style={styles.iconButton}
                         onPress={() => onDeleteHighlight(highlight.id)}
@@ -243,7 +235,20 @@ export default function SermonPlannerDrawer({
                       </Pressable>
                     </View>
                   </View>
-                  <Text numberOfLines={5} style={styles.quote}>“{highlight.quote}”</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Go to highlighted verse${verseReferences[highlight.verseId] ? `, ${verseReferences[highlight.verseId]}` : ''}`}
+                    onPress={() => {
+                      onClose();
+                      onJumpToHighlight(highlight);
+                    }}
+                    style={({ pressed }) => pressed && styles.pressed}
+                  >
+                    {verseReferences[highlight.verseId] ? (
+                      <Text style={styles.highlightReference}>{verseReferences[highlight.verseId]}</Text>
+                    ) : null}
+                    <Text numberOfLines={5} style={styles.quote}>“{highlight.quote}”</Text>
+                  </Pressable>
                   <View style={styles.colorRow}>
                     {(Object.keys(HIGHLIGHT_COLORS) as SermonHighlightColor[]).map((color) => (
                       <Pressable
@@ -371,6 +376,7 @@ const styles = StyleSheet.create({
   highlightLanguage: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   highlightActions: { flexDirection: 'row', gap: SPACING.xs },
   iconButton: { alignItems: 'center', height: 34, justifyContent: 'center', width: 34 },
+  highlightReference: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700', marginTop: SPACING.sm },
   quote: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 15, lineHeight: 22, marginTop: SPACING.sm },
   colorRow: { flexDirection: 'row', gap: 10, marginTop: SPACING.md },
   colorSwatch: { borderColor: 'transparent', borderRadius: 999, borderWidth: 2, height: 24, width: 24 },
