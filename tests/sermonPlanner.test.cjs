@@ -106,3 +106,29 @@ test('Inline Synaxarium and regular inline Gospel hymns are both supported', () 
   assert.match(hymnLibrarySource, /if \(!section\.verses\.length\) continue;/);
   assert.match(hymnLibrarySource, /sectionFlagsForRow \? sectionFlagsForRow\(section\) : documentFlags/);
 });
+
+test('Sermon Planner omits only the Synaxarium date and priest introduction', () => {
+  const definition = extractFunction(
+    'function omitSynaxariumPreamble(',
+    '\n/** Same as resolveReadingSentinelVerses',
+  );
+  const omitPreamble = new Function(definition + '\nreturn omitSynaxariumPreamble;')();
+  const sections = [
+    { id: 'synaxarium-date-2026-09-23', title: 'Thoout 13, 1743' },
+    { id: 'synaxarium-intro', verses: ['Priest introduction'] },
+    { id: 'commemoration-1', verses: ['First saint'] },
+    { id: 'commemoration-2', verses: ['Second saint'] },
+  ];
+
+  assert.deepEqual(omitPreamble(sections), sections.slice(2));
+  assert.equal(sections.length, 4, 'Shared Synaxarium sections must not be mutated');
+  assert.match(
+    hymnLibrarySource,
+    /if \(section\.hymn_key === "SYNAXARIUM" && isoDate\) \{\s*const synaxariumSections = omitSynaxariumPreamble\(await resolveSynaxariumSections\(isoDate\)\)/,
+  );
+  assert.match(
+    hymnLibrarySource,
+    /const synaxariumSections = await resolveSynaxariumSections\(isoDate\);\s*const label = section\.title/,
+    'The standard Lectionary Synaxarium must retain the date and introduction',
+  );
+});
