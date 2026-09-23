@@ -33,18 +33,41 @@ export function classifyReadingDevice({
   osName,
   screenWidth,
   screenHeight,
+  userAgent,
+  maxTouchPoints,
 }) {
+  // Prefer the device's physical category when Expo can identify it.
   if (deviceType === DEVICE_TYPE_PHONE) return "phone";
   if (deviceType === DEVICE_TYPE_TABLET) return "tablet";
   if (deviceType === DEVICE_TYPE_DESKTOP || deviceType === DEVICE_TYPE_TV) return "desktop";
 
+  // The shorter FULL-SCREEN dimension is invariant when the device rotates.
+  // Never classify from the current window width: phone landscape, browser
+  // split-view and toolbar changes would change the user's font size.
   const shortEdge = Math.min(
     positiveDimension(screenWidth),
     positiveDimension(screenHeight),
   );
-  const isMobileWeb = platform === "web" && /^(android|ios|ipados)$/i.test(String(osName || ""));
 
-  if (platform === "ios" || platform === "android" || isMobileWeb) {
+  if (platform === "web") {
+    // expo-device normally reports iOS/Android in osName on web, but can
+    // return null in less common browsers. Fall back to the user agent so an
+    // unidentified mobile browser does not silently receive desktop sizes.
+    const os = String(osName || "");
+    const agent = String(userAgent || "");
+    const isIPadDesktopAgent =
+      /\\bMacintosh\\b/i.test(agent) && Number(maxTouchPoints) > 1;
+    const isMobileWeb =
+      /^(android|ios|ipados)$/i.test(os) ||
+      /android|iphone|ipad|ipod/i.test(agent) ||
+      isIPadDesktopAgent;
+
+    if (!isMobileWeb) return "desktop";
+    if (isIPadDesktopAgent) return "tablet";
+    return shortEdge >= TABLET_SHORT_EDGE ? "tablet" : "phone";
+  }
+
+  if (platform === "ios" || platform === "android") {
     return shortEdge >= TABLET_SHORT_EDGE ? "tablet" : "phone";
   }
 
