@@ -62,6 +62,7 @@ export default function SlideshowContainer({
   tableWidth,
   titleHelpers,
   selectedSectionId,
+  restoreRequest,
   onCurrentSectionChange,
   onOpenSelector,
   viewportHeightOverride,
@@ -84,6 +85,7 @@ export default function SlideshowContainer({
   const [currentAnchor, setCurrentAnchor] = useState(null);
   const measurementSignatureRef = useRef("");
   const lastAppliedSelectedSectionId = useRef(null);
+  const lastAppliedRestoreTokenRef = useRef(null);
   const pendingHeightsRef = useRef({});
   const pendingLanguageHeightsRef = useRef({});
   const pendingMeasurementFrameRef = useRef(null);
@@ -407,10 +409,10 @@ export default function SlideshowContainer({
       measuredHeights,
       MEASUREMENT_BATCH_SIZE,
       currentAnchor,
-      selectedSectionId || currentAnchor?.sectionId,
+      restoreRequest?.target.sectionId || selectedSectionId || currentAnchor?.sectionId,
       MEASUREMENT_WINDOW_RADIUS,
     );
-  }, [currentAnchor, items, measuredHeights, selectedSectionId, viewportHeight, viewportHeightOverride]);
+  }, [currentAnchor, items, measuredHeights, restoreRequest?.token, selectedSectionId, viewportHeight, viewportHeightOverride]);
   // An empty batch means the active reading window is fully measured. Faraway
   // items intentionally remain estimated until the reader approaches them.
   const isActiveMeasurementComplete = useMemo(
@@ -431,6 +433,35 @@ export default function SlideshowContainer({
     navigationIndexRef.current = resolvedSlideIndex;
   }, [resolvedSlideIndex]);
 
+  // The settings/calendar transaction is independent of the content-selector
+  // selection. Its token must jump even when the hymn id has not changed (a
+  // font change while already on that hymn), and an "end" target must land on
+  // the LAST page that contains the preceding hymn.
+  useLayoutEffect(() => {
+    if (!restoreRequest || lastAppliedRestoreTokenRef.current === restoreRequest.token) return;
+    if (!(viewportHeight || viewportHeightOverride)) return;
+    const { sectionId, edge } = restoreRequest.target;
+    let targetSlideIndex = -1;
+    slides.forEach((slide, index) => {
+      if (!slide.some(item => item.sectionId === sectionId)) return;
+      if (edge === 'end' || targetSlideIndex < 0) targetSlideIndex = index;
+    });
+    if (targetSlideIndex < 0) return; // still measuring/loading this deck
+    const targetSlide = slides[targetSlideIndex];
+    // The last page can also hold the start of the next hymn. Anchor to the
+    // target hymn's own final item rather than the first item of that page.
+    const targetItems = targetSlide.filter(item => item.sectionId === sectionId);
+    const targetItem = edge === 'end' ? targetItems[targetItems.length - 1] : targetItems[0];
+    lastAppliedRestoreTokenRef.current = restoreRequest.token;
+    lastAppliedSelectedSectionId.current = selectedSectionId ?? null;
+    preservedSectionIdRef.current = sectionId;
+    pendingRestoreSectionIdRef.current = sectionId;
+    pendingRestoreCandidatesRef.current = [];
+    navigationIndexRef.current = targetSlideIndex;
+    setCurrentSlideIndex(targetSlideIndex);
+    setCurrentAnchor(createSlideAnchor(targetItem ? [targetItem] : targetSlide));
+  }, [restoreRequest?.token, slides, selectedSectionId, viewportHeight, viewportHeightOverride]);
+
   useEffect(() => {
     // A fresh, explicit content-selector pick always wins over (and cancels)
     // whatever the reset effect above was hoping to auto-restore — otherwise
@@ -449,6 +480,11 @@ export default function SlideshowContainer({
       selectedSectionId && lastAppliedSelectedSectionId.current !== selectedSectionId,
     );
     const anchoredIndex = findSlideIndexForAnchor(slides, currentAnchor);
+
+    // An explicit post-settings jump overrides the previous verse anchor.
+    // The layout effect above owns this request; don't let the ordinary
+    // "preserve exact verse on repagination" path cancel its pending jump.
+    if (restoreRequest && lastAppliedRestoreTokenRef.current === restoreRequest.token) return;
 
     // Measurement, a resize, or a font/language change can rebuild every
     // page. If the precise row/line anchor survived, it is strictly better
@@ -506,7 +542,7 @@ export default function SlideshowContainer({
       pendingRestoreSectionIdRef.current = null;
       pendingRestoreCandidatesRef.current = [];
     }
-  }, [currentAnchor, selectedSectionId, slides]);
+  }, [currentAnchor, selectedSectionId, slides, restoreRequest?.token]);
 
   useEffect(() => {
     // A transient viewport collapse -- the container's own height briefly
@@ -518,7 +554,10 @@ export default function SlideshowContainer({
     if (!(viewportHeight || viewportHeightOverride)) return;
 
     const currentSlide = slides[resolvedSlideIndex];
-    const currentSectionId = findSlideSectionId(currentSlide);
+    const pendingSectionId = pendingRestoreSectionIdRef.current;
+    const currentSectionId = pendingSectionId && currentSlide?.some(item => item.sectionId === pendingSectionId)
+      ? pendingSectionId
+      : findSlideSectionId(currentSlide);
     if (!currentSectionId) return;
 
     // A section-level fallback may still be pending when the exact anchored
