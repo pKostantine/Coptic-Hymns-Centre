@@ -18,7 +18,7 @@ export default function MusicSectionNav({ active }: { active: MusicSection }) {
       {items.map((item) => (
         <Pressable
           key={item.id}
-          onPress={() => item.id === 'search' ? router.push(item.route) : router.replace(item.route)}
+          onPress={() => router.replace(item.route)}
           style={[styles.item, active === item.id && styles.itemActive]}
         >
           <Text style={[styles.label, active === item.id && styles.labelActive]}>{item.label}</Text>

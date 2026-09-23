@@ -25,7 +25,7 @@ export default function LearningSectionNav({ active }: { active: LearningSection
       {items.map((item) => (
         <Pressable
           key={item.id}
-          onPress={() => item.id === 'search' ? router.push(item.route) : router.replace(item.route)}
+          onPress={() => router.replace(item.route)}
           style={[styles.item, active === item.id && styles.itemActive]}
         >
           <Text style={[

@@ -1,12 +1,35 @@
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { useEffect, useRef } from 'react';
+import { VideoView, useVideoPlayer, type VideoView as VideoViewHandle } from 'expo-video';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, RADII, TYPOGRAPHY } from '@/constants/theme';
 
-export default function LearningVideoPlayer({ uri }: { uri: string | null }) {
+export interface LearningVideoPlayerHandle {
+  enterPictureInPicture: () => Promise<void>;
+}
+
+export default function LearningVideoPlayer({
+  uri,
+  onHandle,
+}: {
+  uri: string | null;
+  onHandle?: (handle: LearningVideoPlayerHandle | null) => void;
+}) {
+  const viewRef = useRef<VideoViewHandle>(null);
   const player = useVideoPlayer(uri, (instance) => {
     instance.loop = false;
+    instance.staysActiveInBackground = true;
+    instance.showNowPlayingNotification = true;
   });
+
+  useEffect(() => {
+    onHandle?.({
+      enterPictureInPicture: async () => {
+        await viewRef.current?.startPictureInPicture();
+      },
+    });
+    return () => onHandle?.(null);
+  }, [onHandle]);
 
   if (!uri) {
     return (
@@ -18,10 +41,13 @@ export default function LearningVideoPlayer({ uri }: { uri: string | null }) {
 
   return (
     <VideoView
+      ref={viewRef}
       player={player}
       style={styles.video}
       contentFit="contain"
       nativeControls
+      allowsPictureInPicture
+      startsPictureInPictureAutomatically
       fullscreenOptions={{ enable: true }}
     />
   );

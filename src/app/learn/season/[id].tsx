@@ -72,7 +72,8 @@ export default function LearningSeasonScreen() {
                 key={album.id}
                 kind="album"
                 title={album.title}
-                meta={isArabic ? 'ألبوم تعلّم' : 'Learning album'}
+                meta={album.cantorName}
+                artwork={album.coverAsset}
                 isArabic={isArabic}
                 onPress={() => router.push('/learn/album/' + album.id)}
               />
@@ -87,7 +88,8 @@ export default function LearningSeasonScreen() {
                 key={lessonSet.id}
                 kind="lesson_set"
                 title={lessonSet.title}
-                meta={isArabic ? 'منهج لحن' : 'Hymn course'}
+                meta={lessonSet.cantorName}
+                artwork={lessonSet.coverAsset}
                 isArabic={isArabic}
                 onPress={() => router.push('/learn/lesson-set/' + lessonSet.id)}
               />

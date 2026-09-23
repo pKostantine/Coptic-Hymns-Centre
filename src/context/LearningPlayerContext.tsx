@@ -26,6 +26,7 @@ export interface LearningQueueItem {
 
 interface LearningPlayerContextValue {
   queue: LearningQueueItem[];
+  queueKeys: string[];
   currentIndex: number;
   currentItem: LearningQueueItem | null;
   playing: boolean;
@@ -33,6 +34,7 @@ interface LearningPlayerContextValue {
   currentTimeMs: number;
   durationMs: number;
   repeatMode: PlaybackRepeatMode;
+  shuffleEnabled: boolean;
   playbackError: string | null;
   playQueue: (items: LearningQueueItem[], startIndex?: number) => void;
   playItem: (item: LearningQueueItem) => void;
@@ -41,7 +43,10 @@ interface LearningPlayerContextValue {
   previous: () => void;
   seekToMs: (positionMs: number) => Promise<void>;
   selectQueueIndex: (index: number) => void;
+  moveQueueItem: (fromIndex: number, toIndex: number) => void;
+  clearUpcoming: () => void;
   cycleRepeatMode: () => void;
+  toggleShuffle: () => void;
 }
 
 export function learningAlbumQueue(album: LearningAlbumDetail): LearningQueueItem[] {
@@ -62,14 +67,14 @@ export function learningAlbumQueue(album: LearningAlbumDetail): LearningQueueIte
 
 export function learningLessonSetAudioQueue(lessonSet: LearningLessonSetDetail): LearningQueueItem[] {
   return lessonSet.lessons
-    .filter((lesson) => lesson.mediaType === 'audio')
+    .filter((lesson) => lesson.mediaType === 'audio' || lesson.audioAsset)
     .map((lesson) => ({
       kind: 'lesson',
       id: lesson.id,
       title: lesson.title,
       subtitle: lesson.description,
       durationMs: lesson.durationMs,
-      mediaAsset: lesson.mediaAsset,
+      mediaAsset: lesson.audioAsset ?? lesson.mediaAsset,
       containerId: lessonSet.id,
       containerTitle: lessonSet.title,
       cantorName: lessonSet.cantor.displayName,
@@ -115,6 +120,10 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     () => playback.queue.map((entry) => entry.payload).filter(isLearningQueueItem),
     [playback.queue],
   );
+  const queueKeys = useMemo(
+    () => playback.queue.filter((entry) => isLearningQueueItem(entry.payload)).map((entry) => entry.key),
+    [playback.queue],
+  );
   const currentItem = playback.currentItem?.playable.kind === 'learning_audio'
     && isLearningQueueItem(playback.currentItem.payload)
     ? playback.currentItem.payload
@@ -130,6 +139,7 @@ export function useLearningPlayer(): LearningPlayerContextValue {
 
   return {
     queue,
+    queueKeys,
     currentIndex: currentItem ? playback.currentIndex : -1,
     currentItem,
     playing: currentItem ? playback.playing : false,
@@ -137,6 +147,7 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     currentTimeMs: currentItem ? playback.currentTimeMs : 0,
     durationMs: currentItem ? playback.durationMs : 0,
     repeatMode: playback.repeatMode,
+    shuffleEnabled: playback.shuffleEnabled,
     playbackError: playback.playbackError,
     playQueue,
     playItem,
@@ -145,6 +156,9 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     previous: playback.previous,
     seekToMs: playback.seekToMs,
     selectQueueIndex: playback.selectQueueIndex,
+    moveQueueItem: playback.moveQueueItem,
+    clearUpcoming: playback.clearUpcoming,
     cycleRepeatMode: playback.cycleRepeatMode,
+    toggleShuffle: playback.toggleShuffle,
   };
 }

@@ -13,6 +13,8 @@ import type {
   LearningPlaylistLibraryPayload,
   LearningPlaylistSummary,
   LearningPlaylistVisibility,
+  LearningItemLibraryPayload,
+  LearningLyricsPayload,
   LearningProgressMutationResult,
   LearningProgressPayload,
   LearningProgressState,
@@ -148,6 +150,50 @@ export async function getMyLearningPlaylists(locale = 'en'): Promise<LearningPla
   return assertRpcData(data as LearningPlaylistLibraryPayload | null, error, 'Load learning playlists');
 }
 
+export async function getMyLearningItems(locale = 'en'): Promise<LearningItemLibraryPayload> {
+  if (!await hasAuthenticatedSession()) return { authenticated: false, likedItemIds: [], items: [] };
+  const { data, error } = await supabase.rpc('get_my_learning_items', { p_locale: locale });
+  return assertRpcData(data as LearningItemLibraryPayload | null, error, 'Load My Learning');
+}
+
+export async function setLearningItemProgress(
+  itemKind: LearningPlaylistItemKind,
+  itemId: string,
+  state: LearningProgressState,
+): Promise<void> {
+  const { error } = await supabase.rpc('set_learning_item_progress', {
+    p_item_kind: itemKind,
+    p_item_id: itemId,
+    p_state: state,
+  });
+  if (error) throw new Error('Update learning list: ' + error.message);
+}
+
+export async function setLearningItemLiked(
+  itemKind: LearningPlaylistItemKind,
+  itemId: string,
+  liked: boolean,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('set_learning_item_liked', {
+    p_item_kind: itemKind,
+    p_item_id: itemId,
+    p_liked: liked,
+  });
+  return assertRpcData(data as boolean | null, error, 'Update liked learning item');
+}
+
+export async function getLearningLyrics(
+  itemKind: LearningPlaylistItemKind,
+  itemId: string,
+): Promise<LearningLyricsPayload> {
+  const { data, error } = await supabase.rpc('get_published_learning_item_lyrics', {
+    p_item_kind: itemKind,
+    p_item_id: itemId,
+    p_locale: null,
+  });
+  return assertRpcData(data as LearningLyricsPayload | null, error, 'Load learning lyrics');
+}
+
 export async function getLearningPlaylist(
   playlistId: string,
   locale = 'en',
@@ -177,6 +223,26 @@ export async function createLearningPlaylist(
     'Create learning playlist',
   );
   return { ...created, itemCount: 0 };
+}
+
+export async function updateLearningPlaylist(
+  playlistId: string,
+  name: string,
+  description: string | null,
+  visibility: LearningPlaylistVisibility,
+): Promise<LearningPlaylistDetail> {
+  const { data, error } = await supabase.rpc('update_learning_playlist', {
+    p_playlist_id: playlistId,
+    p_name: name,
+    p_description: description,
+    p_visibility: visibility,
+  });
+  return assertRpcData(data as LearningPlaylistDetail | null, error, 'Update learning playlist');
+}
+
+export async function deleteLearningPlaylist(playlistId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('delete_learning_playlist', { p_playlist_id: playlistId });
+  return assertRpcData(data as boolean | null, error, 'Delete learning playlist');
 }
 
 export async function addLearningPlaylistItem(
@@ -265,9 +331,15 @@ export const learningService = {
   getLesson: getLearningLesson,
   getProgress: getMyLearningProgress,
   setProgress: setLearningProgress,
+  getItemLibrary: getMyLearningItems,
+  setItemProgress: setLearningItemProgress,
+  setItemLiked: setLearningItemLiked,
+  getLyrics: getLearningLyrics,
   getPlaylists: getMyLearningPlaylists,
   getPlaylist: getLearningPlaylist,
   createPlaylist: createLearningPlaylist,
+  updatePlaylist: updateLearningPlaylist,
+  deletePlaylist: deleteLearningPlaylist,
   addPlaylistItem: addLearningPlaylistItem,
   removePlaylistItem: removeLearningPlaylistItem,
   search: searchLearning,

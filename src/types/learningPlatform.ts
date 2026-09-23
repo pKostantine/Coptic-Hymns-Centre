@@ -40,7 +40,9 @@ export interface LearningAlbumSummary {
   title: string;
   description?: string | null;
   cantorId?: string;
+  cantorName?: string | null;
   seasonId?: string | null;
+  coverAsset?: LearningMediaAsset | null;
 }
 
 export interface LearningAlbumRecording {
@@ -68,8 +70,10 @@ export interface LearningLessonSetSummary {
   title: string;
   description?: string | null;
   cantorId?: string;
+  cantorName?: string | null;
   seasonId?: string | null;
   hymnId: string;
+  coverAsset?: LearningMediaAsset | null;
 }
 
 export interface LearningLesson {
@@ -80,6 +84,8 @@ export interface LearningLesson {
   durationMs: number | null;
   sortOrder: number;
   mediaAsset: LearningMediaAsset;
+  /** Smaller M4A extracted from video lessons for true audio-only playback. */
+  audioAsset?: LearningMediaAsset | null;
 }
 
 export interface LearningLessonSetDetail {
@@ -184,6 +190,57 @@ export interface LearningPlaylistDetail {
 export interface LearningPlaylistLibraryPayload {
   authenticated: boolean;
   playlists: LearningPlaylistSummary[];
+}
+
+export interface LearningLibraryItem {
+  progressId: string;
+  itemKind: LearningPlaylistItemKind;
+  itemId: string;
+  state: LearningProgressState;
+  title: string;
+  subtitle: string | null;
+  mediaType: LearningLessonMediaType;
+  durationMs: number | null;
+  containerId: string;
+  containerTitle: string;
+  cantorId: string;
+  cantorName: string;
+  hymnId: string | null;
+  mediaAsset: LearningMediaAsset;
+  coverAsset: LearningMediaAsset | null;
+}
+
+export interface LearningItemLibraryPayload {
+  authenticated: boolean;
+  likedItemIds: string[];
+  items: LearningLibraryItem[];
+}
+
+export interface LearningLyricLine {
+  id: string;
+  sequence: number;
+  startMs: number | null;
+  endMs: number | null;
+  text: string;
+  words: [];
+}
+
+export interface LearningLyricSet {
+  id: string;
+  itemKind: LearningPlaylistItemKind;
+  itemId: string;
+  locale: string;
+  kind: 'original';
+  syncPrecision: 'unsynced' | 'line';
+  description: string | null;
+  publicationStatus: string;
+  lines: LearningLyricLine[];
+}
+
+export interface LearningLyricsPayload {
+  itemKind: LearningPlaylistItemKind;
+  itemId: string;
+  lyricSets: LearningLyricSet[];
 }
 
 export interface LearningLessonSearchResult extends Omit<LearningLesson, 'sortOrder'> {

@@ -1,12 +1,15 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import type { LearningMediaAsset } from '@/types/learningPlatform';
+import LearningArtwork from './LearningArtwork';
 
 export default function LearningCollectionCard({
   kind,
   title,
   description,
   meta,
+  artwork,
   onPress,
   isArabic = false,
 }: {
@@ -14,15 +17,20 @@ export default function LearningCollectionCard({
   title: string;
   description?: string | null;
   meta?: string | null;
+  artwork?: LearningMediaAsset | null;
   onPress: () => void;
   isArabic?: boolean;
 }) {
   const isLessonSet = kind === 'lesson_set';
   return (
     <Pressable style={styles.card} onPress={onPress}>
-      <View style={[styles.icon, isLessonSet && styles.iconLessons]}>
-        <Text style={styles.iconGlyph}>{isLessonSet ? '1·2·3' : '♪'}</Text>
-      </View>
+      {artwork ? (
+        <LearningArtwork asset={artwork} size={68} radius={8} label={title} />
+      ) : (
+        <View style={[styles.icon, isLessonSet && styles.iconLessons]}>
+          <Text style={styles.iconGlyph}>{isLessonSet ? '1·2·3' : '♪'}</Text>
+        </View>
+      )}
       <View style={styles.info}>
         <Text numberOfLines={2} style={[styles.title, isArabic && styles.arabic]}>{title}</Text>
         {meta ? <Text numberOfLines={1} style={[styles.meta, isArabic && styles.arabic]}>{meta}</Text> : null}
@@ -35,7 +43,7 @@ export default function LearningCollectionCard({
 
 const styles = StyleSheet.create({
   card: {
-    minHeight: 88,
+    minHeight: 92,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
@@ -46,8 +54,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   icon: {
-    width: 64,
-    height: 64,
+    width: 68,
+    height: 68,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADII.md,

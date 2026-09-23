@@ -53,6 +53,13 @@
         }
       ],
       [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Allow CHC to choose a profile or playlist cover photo.",

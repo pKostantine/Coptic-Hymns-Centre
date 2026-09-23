@@ -1,15 +1,15 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
-import LearningProgressControl from '@/components/learning/LearningProgressControl';
-import LearningVideoPlayer from '@/components/learning/LearningVideoPlayer';
+import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
+import LearningVideoPlayer, { type LearningVideoPlayerHandle } from '@/components/learning/LearningVideoPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { learningLessonSetAudioQueue, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { usePlayback } from '@/context/PlaybackContext';
@@ -17,6 +17,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { downloadManager } from '@/services/downloadManager';
 import { learningService, type LearningLessonDetailPayload } from '@/services/learningService';
 import { learningLessonDownloadRequest } from '@/services/offlineDownloadRequests';
+import { goBack } from '@/utils/navigation';
 
 export default function LearningLessonScreen() {
   const router = useRouter();
@@ -29,6 +30,8 @@ export default function LearningLessonScreen() {
   const [data, setData] = useState<LearningLessonDetailPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [videoMode, setVideoMode] = useState<'video' | 'audio'>('video');
+  const [videoHandle, setVideoHandle] = useState<LearningVideoPlayerHandle | null>(null);
   const { playQueue, currentItem, playing } = useLearningPlayer();
   const globalPlayback = usePlayback();
   const audioQueue = useMemo(() => data ? learningLessonSetAudioQueue(data.lessonSet) : [], [data]);
@@ -75,16 +78,54 @@ export default function LearningLessonScreen() {
     if (index >= 0) playQueue(audioQueue, index);
   };
 
+  const leaveLesson = async () => {
+    if (Platform.OS !== 'web' && data?.lesson.mediaType === 'video' && videoMode === 'video' && videoHandle) {
+      try {
+        await videoHandle.enterPictureInPicture();
+      } catch {
+        // PiP can be disabled by the device or unavailable in Expo Go.
+      }
+    }
+    goBack(router, '/learn');
+  };
+
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{data ? data.lesson.title + ' — Learn & Study' : 'Lesson — Learn & Study'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'الدرس' : 'Lesson'} isArabic={isArabic} />
+      <LearningBackHeader title={isArabic ? 'الدرس' : 'Lesson'} isArabic={isArabic} onBack={() => void leaveLesson()} />
       {!data && !error && !linkIncomplete ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {linkIncomplete || error ? <Text style={styles.error}>{linkIncomplete ? 'This lesson link is incomplete.' : error}</Text> : null}
       {data ? (
         <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {data.lesson.mediaType === 'video' ? (
-            <LearningVideoPlayer uri={videoUri} />
+            <View style={styles.videoSection}>
+              <View style={styles.modeSwitch}>
+                <Pressable onPress={() => setVideoMode('video')} style={[styles.modeButton, videoMode === 'video' && styles.modeButtonActive]}>
+                  <Text style={[styles.modeText, videoMode === 'video' && styles.modeTextActive]}>{isArabic ? 'فيديو' : 'Video'}</Text>
+                </Pressable>
+                <Pressable
+                  disabled={!data.lesson.audioAsset}
+                  onPress={() => {
+                    setVideoMode('audio');
+                    playAudio();
+                  }}
+                  style={[styles.modeButton, videoMode === 'audio' && styles.modeButtonActive, !data.lesson.audioAsset && styles.disabled]}
+                >
+                  <Text style={[styles.modeText, videoMode === 'audio' && styles.modeTextActive]}>{isArabic ? 'صوت فقط' : 'Audio only'}</Text>
+                </Pressable>
+              </View>
+              {videoMode === 'video' ? (
+                <LearningVideoPlayer uri={videoUri} onHandle={setVideoHandle} />
+              ) : (
+                <View style={styles.audioHero}>
+                  <View style={styles.audioIcon}><Text style={styles.audioGlyph}>♪</Text></View>
+                  <Pressable style={styles.audioButton} onPress={playAudio}>
+                    <Text style={styles.audioButtonText}>{currentItem?.id === data.lesson.id && playing ? 'Now Playing' : 'Play audio-only lesson'}</Text>
+                  </Pressable>
+                  <Text style={styles.dataNote}>Uses the smaller audio rendition instead of streaming video.</Text>
+                </View>
+              )}
+            </View>
           ) : (
             <View style={styles.audioHero}>
               <View style={styles.audioIcon}><Text style={styles.audioGlyph}>♪</Text></View>
@@ -115,10 +156,9 @@ export default function LearningLessonScreen() {
                 <LearningDownloadButton packageKey={downloadRequest.packageKey} request={downloadRequest} isArabic={isArabic} />
               </View>
             ) : null}
-          </View>
-
-          <View style={styles.progressCard}>
-            <LearningProgressControl hymnId={data.lessonSet.hymn.id} locale={locale} isArabic={isArabic} />
+            <View style={styles.libraryAction}>
+              <LearningPlaylistPicker itemKind="lesson" itemId={data.lesson.id} locale={locale} isArabic={isArabic} />
+            </View>
           </View>
         </NowPlayingAwareScrollView>
       ) : null}
@@ -132,6 +172,13 @@ const styles = StyleSheet.create({
   loader: { marginTop: SPACING.xl },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center', margin: SPACING.xl },
   content: { padding: SPACING.md, paddingBottom: SPACING.xl },
+  videoSection: { width: '100%', gap: SPACING.sm },
+  modeSwitch: { alignSelf: 'center', flexDirection: 'row', padding: 3, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.learningLine, backgroundColor: COLORS.surface },
+  modeButton: { minHeight: 38, minWidth: 104, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADII.pill },
+  modeButtonActive: { backgroundColor: COLORS.learning },
+  modeText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
+  modeTextActive: { color: COLORS.learningDeep },
+  disabled: { opacity: 0.4 },
   audioHero: {
     width: '100%',
     aspectRatio: 16 / 9,
@@ -147,6 +194,7 @@ const styles = StyleSheet.create({
   audioGlyph: { color: COLORS.learningBright, fontSize: 42, fontWeight: '700' },
   audioButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SPACING.xl, borderRadius: RADII.pill, backgroundColor: COLORS.learning },
   audioButtonText: { color: COLORS.learningDeep, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '900' },
+  dataNote: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, textAlign: 'center', paddingHorizontal: SPACING.lg },
   meta: { alignItems: 'center', maxWidth: 720, width: '100%', alignSelf: 'center', marginTop: SPACING.lg },
   type: { color: COLORS.learning, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 27, fontWeight: '700', textAlign: 'center', marginTop: SPACING.sm },
@@ -154,6 +202,6 @@ const styles = StyleSheet.create({
   cantor: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, textAlign: 'center', marginTop: 4 },
   description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: SPACING.md },
   downloadWrap: { marginTop: SPACING.lg },
-  progressCard: { marginTop: SPACING.lg, padding: SPACING.md, borderRadius: RADII.lg, backgroundColor: COLORS.surfaceSoft, borderWidth: 1, borderColor: COLORS.border },
+  libraryAction: { marginTop: SPACING.md },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });

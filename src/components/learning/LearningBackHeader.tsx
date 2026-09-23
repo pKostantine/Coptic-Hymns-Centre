@@ -7,14 +7,16 @@ import { goBack } from '@/utils/navigation';
 export default function LearningBackHeader({
   title,
   isArabic = false,
+  onBack,
 }: {
   title: string;
   isArabic?: boolean;
+  onBack?: () => void;
 }) {
   const router = useRouter();
   return (
     <View style={styles.header}>
-      <Pressable accessibilityLabel="Back" onPress={() => goBack(router, '/learn')} style={styles.backButton}>
+      <Pressable accessibilityLabel="Back" onPress={onBack ?? (() => goBack(router, '/learn'))} style={styles.backButton}>
         <Text style={styles.backText}>‹</Text>
       </Pressable>
       <Text numberOfLines={1} style={[styles.title, isArabic && styles.arabic]}>{title}</Text>

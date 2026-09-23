@@ -1,4 +1,4 @@
-import { usePathname, useRouter } from 'expo-router';
+import { usePathname } from 'expo-router';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Alert, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MusicNowPlayingScreen from '@/components/music/MusicNowPlayingScreen';
 import Icon from '@/components/chc/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
+import LearningNowPlayingScreen from '@/components/learning/LearningNowPlayingScreen';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import { COLORS } from '@/constants/theme';
 import { useBottomChrome } from '@/context/BottomChromeContext';
@@ -13,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { learningService } from '@/services/learningService';
 import { musicService } from '@/services/musicService';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import MiniPlayerCard from './MiniPlayerCard';
@@ -44,7 +46,6 @@ const BOOK_PATH_PREFIXES = [
 ];
 
 export default function GlobalNowPlayingOverlay() {
-  const router = useRouter();
   const { user } = useAuth();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -128,19 +129,30 @@ export default function GlobalNowPlayingOverlay() {
 
   const isMusic = Boolean(music.currentItem);
   const musicTrackId = music.currentItem?.track.id ?? null;
+  const learningItemId = learning.currentItem?.id ?? null;
+  const learningItemKind = learning.currentItem?.kind === 'recording' ? 'album_recording' : 'lesson';
 
   useEffect(() => {
-    const trackId = music.currentItem?.track.id;
-    if (!trackId) {
-      return;
-    }
+    const trackId = music.currentItem?.track.id ?? null;
+    const learnId = learning.currentItem?.id ?? null;
+    if (!trackId && !learnId) return;
 
     let active = true;
-    musicService.getLibrary(preferences.appLanguage === 'ar' ? 'ar' : 'en')
+    const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
+    const request = trackId
+      ? musicService.getLibrary(locale).then((library) => ({
+          authenticated: library.authenticated,
+          liked: library.likedTracks.some((track) => track.id === trackId),
+        }))
+      : learningService.getItemLibrary(locale).then((library) => ({
+          authenticated: library.authenticated,
+          liked: library.likedItemIds.includes(learnId as string),
+        }));
+    request
       .then((library) => {
         if (!active) return;
         setLibraryAuthenticated(library.authenticated);
-        setMiniLiked(library.likedTracks.some((track) => track.id === trackId));
+        setMiniLiked(library.liked);
       })
       .catch(() => {
         if (!active) return;
@@ -149,7 +161,7 @@ export default function GlobalNowPlayingOverlay() {
       });
 
     return () => { active = false; };
-  }, [isPopupOpen, music.currentItem?.track.id, preferences.appLanguage, user?.id]);
+  }, [isPopupOpen, learning.currentItem?.id, music.currentItem?.track.id, preferences.appLanguage, user?.id]);
 
   if (!allowDisplay) {
     return null;
@@ -164,9 +176,16 @@ export default function GlobalNowPlayingOverlay() {
     );
   }
 
-  const onOpen = isMusic
-    ? () => setIsPopupOpen(true)
-    : () => router.push('/learn/now-playing');
+  if (isPopupOpen && learning.currentItem) {
+    return (
+      <LearningNowPlayingScreen
+        embedded
+        onClose={() => setIsPopupOpen(false)}
+      />
+    );
+  }
+
+  const onOpen = () => setIsPopupOpen(true);
   const onTogglePlayback = isMusic ? music.togglePlayback : learning.togglePlayback;
   const onNext = isMusic ? music.next : learning.next;
   const accentColor = isMusic ? COLORS.gold : COLORS.learning;
@@ -266,28 +285,32 @@ export default function GlobalNowPlayingOverlay() {
         title={title}
         titleSuffix={titleSuffix}
         subtitle={subtitle}
-        liked={isMusic ? miniLiked : undefined}
-        likeBusy={isMusic ? miniLikeBusy : undefined}
-        onToggleLike={isMusic && musicTrackId ? async () => {
+        liked={miniLiked}
+        likeBusy={miniLikeBusy}
+        onToggleLike={(musicTrackId || learningItemId) ? async () => {
           if (miniLikeBusy) return;
           if (!libraryAuthenticated) {
             Alert.alert(
               preferences.appLanguage === 'ar' ? 'الأغاني المعجبة' : 'Liked Songs',
               preferences.appLanguage === 'ar'
                 ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'
-                : 'Sign in to your CHC account to save Liked Songs.',
+                : `Sign in to your CHC account to save ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
             );
             return;
           }
           setMiniLikeBusy(true);
           try {
             const nextLiked = !miniLiked;
-            await musicService.setLiked(musicTrackId, nextLiked);
+            if (isMusic && musicTrackId) {
+              await musicService.setLiked(musicTrackId, nextLiked);
+            } else if (learningItemId) {
+              await learningService.setItemLiked(learningItemKind, learningItemId, nextLiked);
+            }
             setMiniLiked(nextLiked);
           } catch (cause) {
             Alert.alert(
               preferences.appLanguage === 'ar' ? 'الأغاني المعجبة' : 'Liked Songs',
-              cause instanceof Error ? cause.message : 'Unable to update Liked Songs.',
+              cause instanceof Error ? cause.message : `Unable to update ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
             );
           } finally {
             setMiniLikeBusy(false);

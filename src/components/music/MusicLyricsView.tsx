@@ -40,6 +40,7 @@ interface MusicLyricsViewProps {
   forceCompact?: boolean;
   /** Lets the parent provide a more space-efficient selector. */
   hideTabs?: boolean;
+  accentColor?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -57,6 +58,7 @@ export default function MusicLyricsView({
   variant = 'panel',
   forceCompact = false,
   hideTabs = false,
+  accentColor = COLORS.gold,
   style,
 }: MusicLyricsViewProps) {
   const { width } = useWindowDimensions();
@@ -66,6 +68,7 @@ export default function MusicLyricsView({
   const fullscreen = variant === 'fullscreen';
   const compact = forceCompact || width < 420 || (fullscreen && width < 520);
   const selectedSet = lyricSets.find((set) => set.id === selectedSetId) ?? null;
+  const unsynced = selectedSet?.syncPrecision === 'unsynced';
 
   useEffect(() => {
     lineOffsets.current.clear();
@@ -97,7 +100,13 @@ export default function MusicLyricsView({
                 accessibilityRole="tab"
                 accessibilityState={{ selected }}
                 onPress={() => onSelectSet(set.id)}
-                style={({ pressed }) => [styles.tab, compact && styles.tabCompact, selected && styles.tabActive, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.tab,
+                  compact && styles.tabCompact,
+                  selected && styles.tabActive,
+                  selected && { backgroundColor: accentColor },
+                  pressed && styles.pressed,
+                ]}
               >
                 <Text numberOfLines={1} style={[styles.tabText, compact && styles.tabTextCompact, selected && styles.tabTextActive]}>{lyricSetLabel(set)}</Text>
               </Pressable>
@@ -119,7 +128,7 @@ export default function MusicLyricsView({
         nestedScrollEnabled
         onLayout={(event) => { viewportHeight.current = event.nativeEvent.layout.height; }}
       >
-        {loading && !selectedSet ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
+        {loading && !selectedSet ? <ActivityIndicator color={accentColor} style={styles.loader} /> : null}
 
         {selectedSet ? (
           <View>
@@ -147,6 +156,7 @@ export default function MusicLyricsView({
                       selectedSet.locale === 'cop' && compact && styles.copticCompact,
                       selectedSet.locale === 'cop' && fullscreen && styles.copticFullscreen,
                       selectedSet.locale === 'cop' && fullscreen && compact && styles.copticFullscreenCompact,
+                      unsynced && styles.lineTextUnsynced,
                       active && styles.lineTextActive,
                       active && fullscreen && styles.lineTextActiveFullscreen,
                       active && fullscreen && compact && styles.lineTextActiveFullscreenCompact,
@@ -203,6 +213,7 @@ const styles = StyleSheet.create({
   lineTextFullscreen: { fontSize: 40, lineHeight: 56, textAlign: 'center', opacity: 0.38 },
   lineTextFullscreenCompact: { fontSize: 22, lineHeight: 31 },
   lineTextActive: { color: COLORS.white, opacity: 1 },
+  lineTextUnsynced: { color: COLORS.white, opacity: 1 },
   lineTextActiveFullscreen: { fontSize: 42, lineHeight: 58 },
   lineTextActiveFullscreenCompact: { fontSize: 24, lineHeight: 33 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },

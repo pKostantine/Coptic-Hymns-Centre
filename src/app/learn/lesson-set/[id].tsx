@@ -11,7 +11,6 @@ import LearningDownloadButton from '@/components/learning/LearningDownloadButton
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
-import LearningProgressControl from '@/components/learning/LearningProgressControl';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { learningLessonSetAudioQueue, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -97,10 +96,6 @@ export default function LearningLessonSetScreen() {
             </View>
           </View>
 
-          <View style={styles.progressCard}>
-            <LearningProgressControl hymnId={lessonSet.hymn.id} locale={locale} isArabic={isArabic} />
-          </View>
-
           <View style={styles.headingRow}>
             <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الدروس' : 'Lessons'}</Text>
             <Text style={[styles.sectionMeta, isArabic && styles.arabic]}>
@@ -167,7 +162,6 @@ const styles = StyleSheet.create({
   playAll: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SPACING.lg, borderRadius: RADII.pill, backgroundColor: COLORS.learning },
   playAllText: { color: COLORS.learningDeep, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
   disabled: { opacity: 0.45 },
-  progressCard: { marginTop: SPACING.lg, padding: SPACING.md, borderRadius: RADII.lg, backgroundColor: COLORS.surfaceSoft, borderWidth: 1, borderColor: COLORS.border },
   headingRow: { marginTop: SPACING.xl, marginBottom: SPACING.md },
   sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   sectionMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },

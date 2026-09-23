@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
@@ -8,13 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
-import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
-import type { LearningHomePayload, LearningProgressPayload } from '@/types/learningPlatform';
+import type { LearningHomePayload, LearningItemLibraryPayload } from '@/types/learningPlatform';
 
 export default function LearningHomeScreen() {
   const router = useRouter();
@@ -23,17 +21,17 @@ export default function LearningHomeScreen() {
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
   const [home, setHome] = useState<LearningHomePayload | null>(null);
-  const [progress, setProgress] = useState<LearningProgressPayload | null>(null);
+  const [library, setLibrary] = useState<LearningItemLibraryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    Promise.all([learningService.getHome(locale), learningService.getProgress(locale)])
-      .then(([homePayload, progressPayload]) => {
+    Promise.all([learningService.getHome(locale), learningService.getItemLibrary(locale)])
+      .then(([homePayload, libraryPayload]) => {
         if (!active) return;
         setError(null);
         setHome(homePayload);
-        setProgress(progressPayload);
+        setLibrary(libraryPayload);
       })
       .catch((cause) => {
         if (active) setError(cause instanceof Error ? cause.message : 'Unable to load Learn & Study.');
@@ -41,7 +39,7 @@ export default function LearningHomeScreen() {
     return () => { active = false; };
   }, [locale, user?.id]);
 
-  const continueLearning = progress?.items.filter((item) => item.state === 'learning').slice(0, 4) ?? [];
+  const continueLearning = library?.items.filter((item) => item.state === 'learning').slice(0, 4) ?? [];
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -55,23 +53,6 @@ export default function LearningHomeScreen() {
       <LearningSectionNav active="home" />
 
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={[COLORS.learningDeep, COLORS.navyDark]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <Text style={[styles.eyebrow, isArabic && styles.arabic]}>CHC LEARN & STUDY</Text>
-          <Text style={[styles.heroTitle, isArabic && styles.arabic]}>
-            {isArabic ? 'استمع. تعلّم. رتّل.' : 'Listen. Learn. Chant.'}
-          </Text>
-          <Text style={[styles.heroBody, isArabic && styles.arabic]}>
-            {isArabic
-              ? 'دروس مرتبة للألحان القبطية، منظّمة حسب المعلّمين والمواسم.'
-              : 'Structured Coptic hymn lessons, organized around the cantors who teach them and the seasons in which they are prayed.'}
-          </Text>
-        </LinearGradient>
-
         <View style={styles.discoveryGrid}>
           <Pressable style={styles.discoveryCard} onPress={() => router.push('/learn/cantors')}>
             <View style={styles.discoveryIcon}><Text style={styles.discoveryGlyph}>♬</Text></View>
@@ -112,7 +93,13 @@ export default function LearningHomeScreen() {
             />
             <View style={styles.continueList}>
               {continueLearning.map((item, index) => (
-                <Pressable key={item.hymnId} style={styles.continueCard} onPress={() => router.push('/learn/hymn/' + item.hymnId)}>
+                <Pressable
+                  key={item.itemKind + ':' + item.itemId}
+                  style={styles.continueCard}
+                  onPress={() => item.itemKind === 'lesson'
+                    ? router.push({ pathname: '/learn/lesson/[id]', params: { id: item.itemId, setId: item.containerId } })
+                    : router.push({ pathname: '/learn/album/[id]', params: { id: item.containerId } })}
+                >
                   <View style={styles.continueNumber}><Text style={styles.continueNumberText}>{index + 1}</Text></View>
                   <View style={styles.continueInfo}>
                     <Text numberOfLines={1} style={[styles.continueTitle, isArabic && styles.arabic]}>{item.title}</Text>
@@ -124,48 +111,6 @@ export default function LearningHomeScreen() {
                 </Pressable>
               ))}
             </View>
-          </>
-        ) : null}
-
-        {home ? (
-          <>
-            <SectionHeading
-              title={isArabic ? 'تعلّم مع المعلّمين' : 'Learn from Cantors'}
-              action={isArabic ? 'عرض الكل' : 'See all'}
-              onAction={() => router.push('/learn/cantors')}
-              isArabic={isArabic}
-            />
-            {home.cantors.length ? (
-              <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-                {home.cantors.map((cantor) => (
-                  <Pressable key={cantor.id} style={styles.cantorCard} onPress={() => router.push('/learn/cantor/' + cantor.id)}>
-                    <LearningArtwork asset={cantor.profileImageAsset} size={112} rounded label={cantor.displayName} />
-                    <Text numberOfLines={2} style={[styles.cantorName, isArabic && styles.arabic]}>{cantor.displayName}</Text>
-                  </Pressable>
-                ))}
-              </NowPlayingAwareScrollView>
-            ) : <Empty text={isArabic ? 'لا يوجد معلّمون منشورون بعد.' : 'No published cantors yet.'} />}
-
-            <SectionHeading
-              title={isArabic ? 'تعلّم حسب الموسم' : 'Study by Season'}
-              action={isArabic ? 'عرض الكل' : 'See all'}
-              onAction={() => router.push('/learn/seasons')}
-              isArabic={isArabic}
-            />
-            {home.seasons.length ? (
-              <View style={styles.seasonList}>
-                {home.seasons.slice(0, 6).map((season, index) => (
-                  <Pressable key={season.id} style={styles.seasonCard} onPress={() => router.push('/learn/season/' + season.id)}>
-                    <View style={styles.seasonNumber}><Text style={styles.seasonNumberText}>{String(index + 1).padStart(2, '0')}</Text></View>
-                    <View style={styles.seasonInfo}>
-                      <Text style={[styles.seasonTitle, isArabic && styles.arabic]}>{season.title}</Text>
-                      {season.description ? <Text numberOfLines={2} style={[styles.seasonDescription, isArabic && styles.arabic]}>{season.description}</Text> : null}
-                    </View>
-                    <Text style={styles.chevron}>›</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : <Empty text={isArabic ? 'لا توجد مواسم منشورة بعد.' : 'No published seasons yet.'} />}
           </>
         ) : null}
       </NowPlayingAwareScrollView>
@@ -194,38 +139,26 @@ function SectionHeading({
   );
 }
 
-function Empty({ text }: { text: string }) {
-  return <View style={styles.empty}><Text style={styles.emptyText}>{text}</Text></View>;
-}
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   content: { paddingBottom: SPACING.xl },
-  hero: {
-    margin: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: COLORS.learningLine,
-  },
-  eyebrow: { color: COLORS.learning, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
-  heroTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 29, fontWeight: '700', marginTop: SPACING.sm },
-  heroBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 21, marginTop: SPACING.sm, maxWidth: 620 },
-  discoveryGrid: { gap: SPACING.sm, paddingHorizontal: SPACING.md },
+  discoveryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, padding: SPACING.md },
   discoveryCard: {
-    minHeight: 78,
+    flexGrow: 1,
+    flexBasis: 280,
+    minHeight: 124,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    padding: SPACING.md,
+    padding: SPACING.lg,
     borderRadius: RADII.lg,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
   discoveryIcon: {
-    width: 46,
-    height: 46,
+    width: 62,
+    height: 62,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADII.md,
@@ -233,10 +166,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.learningLine,
   },
-  discoveryGlyph: { color: COLORS.learningBright, fontSize: 23 },
+  discoveryGlyph: { color: COLORS.learningBright, fontSize: 29 },
   discoveryText: { flex: 1, minWidth: 0 },
-  discoveryTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700' },
-  discoveryBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
+  discoveryTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
+  discoveryBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 5 },
   chevron: { color: COLORS.learning, fontSize: 28 },
   loader: { marginVertical: SPACING.xl },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center', margin: SPACING.lg },
@@ -251,35 +184,6 @@ const styles = StyleSheet.create({
   },
   sectionHeading: { flex: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   sectionAction: { color: COLORS.learning, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
-  horizontalList: { paddingHorizontal: SPACING.md, gap: SPACING.md },
-  cantorCard: { width: 120, alignItems: 'center' },
-  cantorName: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: SPACING.sm },
-  seasonList: { gap: SPACING.sm, paddingHorizontal: SPACING.md },
-  seasonCard: {
-    minHeight: 82,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    padding: SPACING.md,
-    borderRadius: RADII.lg,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  seasonNumber: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 24,
-    backgroundColor: COLORS.learningDeep,
-    borderWidth: 1,
-    borderColor: COLORS.learningLine,
-  },
-  seasonNumberText: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '700' },
-  seasonInfo: { flex: 1, minWidth: 0 },
-  seasonTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '700' },
-  seasonDescription: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, lineHeight: 17, marginTop: 4 },
   continueList: { gap: SPACING.sm, paddingHorizontal: SPACING.md },
   continueCard: {
     minHeight: 66,
@@ -299,7 +203,5 @@ const styles = StyleSheet.create({
   continueMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 3 },
   resume: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.learning },
   resumeText: { color: COLORS.learningDeep, fontSize: 12, fontWeight: '900' },
-  empty: { marginHorizontal: SPACING.md, padding: SPACING.lg, borderRadius: RADII.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });
