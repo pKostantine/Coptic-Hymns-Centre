@@ -89,6 +89,8 @@ export interface DocumentAction {
   anchors?: SermonHighlightAnchor[];
   color?: SermonHighlightColor;
   highlightId?: string;
+  /** Native WebView stylus gesture state, used to suspend edge navigation. */
+  active?: boolean;
   /** "contentHeight" only: how tall the laid-out document is, for anything embedding it at its natural size. */
   height?: number;
 }
