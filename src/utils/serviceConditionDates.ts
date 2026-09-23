@@ -39,6 +39,12 @@ export function getServiceWeekdayConditionDate({
     return addUtcDays(effectiveDate, -1);
   }
 
+  // Sermon Planner mixes all three services in one document. Its hydrator
+  // applies this override only to the Vespers rows, not Matins or Liturgy.
+  if (schema === 'liturgy' && table === 'sermon_planner') {
+    return vespersEffectiveDate;
+  }
+
   if (isVespersWeekdayService(schema, table, extraContext)) {
     return vespersEffectiveDate;
   }
