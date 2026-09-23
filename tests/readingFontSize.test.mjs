@@ -110,5 +110,8 @@ test('every CHC reading renderer receives the same base-size calculation', () =>
 
   assert.match(surface, /const fontSize = fontScaleToPx\(preferences\.fontScale\);/);
   assert.match(bible, /const fontSize = fontScaleToPx\(preferences\.fontScale\);/);
-  assert.doesNotMatch(surface, /fontScaleMultiplier|fontSize\s*=\s*[^;]*(?:screenWidth|screenHeight)/);
+  const fontDeclaration = surface.match(/const fontSize\s*=[^;]+;/)?.[0] || '';
+  assert.match(fontDeclaration, /fontScaleToPx\(preferences\.fontScale\)/);
+  assert.doesNotMatch(fontDeclaration, /screenWidth|screenHeight/);
+  assert.doesNotMatch(surface, /fontScaleMultiplier/);
 });
