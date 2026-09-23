@@ -151,6 +151,7 @@ export function buildDocumentHtml(
     suppressAllSpeakerLabels = false,
     bottomContentInset = 0,
     sermonPlannerMode = false,
+    nativeSwipeNavigation = false,
   }: {
     copticFontDataUri: string;
     fontSize: number;
@@ -169,6 +170,8 @@ export function buildDocumentHtml(
     bottomContentInset?: number;
     /** Adds persistent range highlighting and Pencil-aware annotation controls. */
     sermonPlannerMode?: boolean;
+    /** Native touch edge navigation only; no swipe-to-exit on any website. */
+    nativeSwipeNavigation?: boolean;
   },
 ) {
   const {
@@ -799,6 +802,7 @@ export function buildDocumentHtml(
         scheduleReport();
       })();
       (function () {
+        if (!${JSON.stringify(nativeSwipeNavigation)} || ${JSON.stringify(sermonPlannerMode)}) return;
         var startX = null, startY = null, fired = false, lastPostAt = 0;
         function getSelectorEdge() {
           return Math.min(240, Math.max(128, window.innerWidth * 0.18));
@@ -843,12 +847,12 @@ export function buildDocumentHtml(
           var selectorEdge = getSelectorEdge();
           return x < 56 || x > window.innerWidth - selectorEdge;
         }
-        document.addEventListener('pointerdown', function (e) { if (isEdgeStart(e.clientX)) onStart(e.clientX, e.clientY); });
-        document.addEventListener('pointermove', function (e) { onMove(e.clientX, e.clientY, e); });
+        document.addEventListener('pointerdown', function (e) { if (e.pointerType !== 'pen' && isEdgeStart(e.clientX)) onStart(e.clientX, e.clientY); });
+        document.addEventListener('pointermove', function (e) { if (e.pointerType !== 'pen' && !window.__sermonPencilActive) onMove(e.clientX, e.clientY, e); });
         document.addEventListener('pointerup', function (e) { onEnd(e.clientX, e.clientY); });
         document.addEventListener('pointercancel', onCancel);
-        document.addEventListener('touchstart', function (e) { var t = e.touches[0]; if (isEdgeStart(t.clientX)) onStart(t.clientX, t.clientY); }, { passive: true });
-        document.addEventListener('touchmove', function (e) { var t = e.touches[0]; onMove(t.clientX, t.clientY, e); }, { passive: false });
+        document.addEventListener('touchstart', function (e) { var t = e.touches[0]; if (t && t.touchType !== 'stylus' && isEdgeStart(t.clientX)) onStart(t.clientX, t.clientY); }, { passive: true });
+        document.addEventListener('touchmove', function (e) { var t = e.touches[0]; if (t && t.touchType !== 'stylus' && !window.__sermonPencilActive) onMove(t.clientX, t.clientY, e); }, { passive: false });
         document.addEventListener('touchend', function (e) { var t = e.changedTouches[0]; onEnd(t.clientX, t.clientY, e); }, { passive: false });
         document.addEventListener('touchcancel', onCancel);
       })();
@@ -1391,6 +1395,28 @@ function sermonPlannerScript() {
           }
         }
 
+        // Intl.Segmenter respects punctuation and multilingual word boundaries
+        // (English contractions, Arabic and Coptic); the Unicode fallback
+        // handles older embedded WebViews.
+        function expandToWholeWords(text, start, end) {
+          var segmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+            ? new Intl.Segmenter(undefined, { granularity: 'word' }) : null;
+          if (segmenter) {
+            var segments = Array.from(segmenter.segment(text));
+            segments.forEach(function (part) {
+              if (!part.isWordLike) return;
+              var wordStart = part.index, wordEnd = part.index + part.segment.length;
+              if (wordStart < start && start < wordEnd) start = wordStart;
+              if (wordStart < end && end < wordEnd) end = wordEnd;
+            });
+          } else {
+            var wordChar = function (char) { return /[\\p{L}\\p{M}\\p{N}_]/u.test(char); };
+            while (start > 0 && wordChar(text.charAt(start)) && wordChar(text.charAt(start - 1))) start -= 1;
+            while (end < text.length && wordChar(text.charAt(end - 1)) && wordChar(text.charAt(end))) end += 1;
+          }
+          return { start: start, end: end };
+        }
+
         function anchorsFromSelection(selection) {
           if (!selection || !selection.rangeCount || selection.isCollapsed) return [];
           var range = selection.getRangeAt(0);
@@ -1411,6 +1437,9 @@ function sermonPlannerScript() {
             while (startOffset < endOffset && /\\s/.test(fullText.charAt(startOffset))) startOffset += 1;
             while (endOffset > startOffset && /\\s/.test(fullText.charAt(endOffset - 1))) endOffset -= 1;
             if (endOffset <= startOffset) return;
+            var expanded = expandToWholeWords(fullText, startOffset, endOffset);
+            startOffset = expanded.start;
+            endOffset = expanded.end;
             var overlaps = currentHighlights.some(function (highlight) {
               return highlight.verseId === root.getAttribute('data-sermon-verse-id')
                 && highlight.language === root.getAttribute('data-sermon-language')
@@ -1430,6 +1459,29 @@ function sermonPlannerScript() {
           return anchors;
         }
 
+        function showExpandedSelection(selection, anchors) {
+          if (!selection || !anchors.length) return;
+          var first = anchors[0], last = anchors[anchors.length - 1];
+          var startRoot = document.querySelector(annotationSelector
+            + '[data-sermon-verse-id="' + CSS.escape(first.verseId) + '"]'
+            + '[data-sermon-language="' + CSS.escape(first.language) + '"]');
+          var endRoot = document.querySelector(annotationSelector
+            + '[data-sermon-verse-id="' + CSS.escape(last.verseId) + '"]'
+            + '[data-sermon-language="' + CSS.escape(last.language) + '"]');
+          if (!startRoot || !endRoot) return;
+          var start = boundaryForOffset(startRoot, first.startOffset);
+          var end = boundaryForOffset(endRoot, last.endOffset);
+          var range = document.createRange();
+          try {
+            range.setStart(start.node, start.offset);
+            range.setEnd(end.node, end.offset);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } catch (error) {
+            // Keep the user's original selection when the DOM changed mid-drag.
+          }
+        }
+
         function hidePalette() {
           palette.classList.remove('is-visible');
         }
@@ -1441,6 +1493,7 @@ function sermonPlannerScript() {
             hidePalette();
             return;
           }
+          showExpandedSelection(selection, anchors);
           var rect = selection.getRangeAt(0).getBoundingClientRect();
           var x = Math.max(78, Math.min(window.innerWidth - 78, rect.left + rect.width / 2));
           var y = Math.max(60, rect.top - 8);
@@ -1491,11 +1544,20 @@ function sermonPlannerScript() {
         }
 
         var pencilStart = null;
+        window.__sermonPencilActive = false;
+        function stopPencil() {
+          if (!pencilStart && !window.__sermonPencilActive) return;
+          pencilStart = null;
+          window.__sermonPencilActive = false;
+          postAction('sermonPencilGesture', { active: false });
+        }
         function startPencil(x, y, event) {
           var caret = caretAtPoint(x, y);
           var root = caret && closestRoot(caret.node);
           if (!caret || !root) return false;
           pencilStart = { node: caret.node, offset: caret.offset, root: root };
+          window.__sermonPencilActive = true;
+          postAction('sermonPencilGesture', { active: true });
           if (event && event.cancelable) event.preventDefault();
           return true;
         }
@@ -1512,12 +1574,13 @@ function sermonPlannerScript() {
           selection.removeAllRanges();
           selection.addRange(range);
           if (selection.extend) selection.extend(caret.node, caret.offset);
+          showExpandedSelection(selection, anchorsFromSelection(selection));
         }
         function endPencil(x, y, event) {
           if (!pencilStart) return;
           movePencil(x, y, event);
-          pencilStart = null;
           commitSelection('gold');
+          stopPencil();
         }
 
         document.addEventListener('pointerdown', function (event) {
@@ -1529,7 +1592,7 @@ function sermonPlannerScript() {
         document.addEventListener('pointerup', function (event) {
           if (event.pointerType === 'pen') endPencil(event.clientX, event.clientY, event);
         }, { passive: false });
-        document.addEventListener('pointercancel', function () { pencilStart = null; });
+        document.addEventListener('pointercancel', stopPencil);
 
         document.addEventListener('touchstart', function (event) {
           var touch = event.touches && event.touches[0];
@@ -1543,6 +1606,7 @@ function sermonPlannerScript() {
           var touch = event.changedTouches && event.changedTouches[0];
           if (touch && touch.touchType === 'stylus') endPencil(touch.clientX, touch.clientY, event);
         }, { passive: false });
+        document.addEventListener('touchcancel', stopPencil);
       })();
   `;
 }
