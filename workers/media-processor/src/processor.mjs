@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { maybeRunStreamedMediaJob } from './streamed-media.mjs';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
 import { AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client, UploadPartCommand } from '@aws-sdk/client-s3';
@@ -628,6 +629,13 @@ async function runJob(config, job) {
   if (!handler) {
     throw new Error(`No handler for job type ${job.job_type}`);
   }
+
+  // R2 HTTP Range input and stdout multipart output bypass the 1 GB Railway
+  // scratch-disk and RAM limits for multi-hour video and extracted audio.
+  const streamed = await maybeRunStreamedMediaJob(config, job, {
+    getS3Client, callRpc, deleteObject,
+  });
+  if (streamed) return streamed;
 
   const jobDir = path.join(config.workDir, `chc-media-job-${job.job_id}`);
   const inputPath = path.join(jobDir, `input${sourceExtension(job.input_path)}`);
