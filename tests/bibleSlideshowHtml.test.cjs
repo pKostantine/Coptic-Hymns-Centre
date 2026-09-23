@@ -46,7 +46,7 @@ test('Bible slideshow emits valid presentation JavaScript and max-size safeguard
     fontSize: 78,
     copticFontDataUri: 'data:font/ttf;base64,AA==',
     isSlideshow: true,
-    bottomContentInset: 72,
+    bottomContentInset: 0,
   });
   const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(script);
@@ -57,9 +57,14 @@ test('Bible slideshow emits valid presentation JavaScript and max-size safeguard
   assert.match(html, /PageDown/);
   assert.match(html, /suppressClickUntil/);
   assert.match(html, /font-weight: 700/);
-  assert.match(html, /bottom\) \+ 72px/);
+  assert.match(html, /bottom\) \+ 0px/);
   assert.match(html, /page\.style\.display = isCurrent \? 'block' : 'none'/);
   assert.doesNotMatch(html, /width: max-content/);
   assert.match(html, /initialPaginationDone/);
   assert.match(html, /resizeTimer = setTimeout/);
+});
+
+test('Bible slideshow route excludes the Now Playing overlay from pagination', () => {
+  const route = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
+  assert.match(route, /bottomContentInset:\s*preferences\.slideshowMode\s*\?\s*0\s*:\s*nowPlayingInset/);
 });

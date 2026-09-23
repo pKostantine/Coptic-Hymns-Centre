@@ -1,5 +1,6 @@
 import { COLORS, SPACING } from '../../constants/theme';
 import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
+import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from './documentPresentationMetrics';
 
@@ -161,6 +162,8 @@ export function buildDocumentHtml(
   const {
     buttonFontSize: openButtonFontSize,
     buttonLineHeight: openButtonLineHeight,
+    hyperlinkFontSize,
+    hyperlinkLineHeight,
     titleFontSize: sectionTitleFontSize,
     titleLineHeight: sectionTitleLineHeight,
   } = getDocumentChromeMetrics(fontSize);
@@ -398,7 +401,7 @@ export function buildDocumentHtml(
         cursor: pointer;
         display: flex;
         font-family: Georgia, serif;
-        font-size: ${Math.max(Math.round(sectionTitleFontSize * 1.1), 16)}px;
+        font-size: ${hyperlinkFontSize}px;
         font-weight: 800;
         gap: ${SPACING.md}px;
         justify-content: center;
@@ -409,11 +412,15 @@ export function buildDocumentHtml(
         width: ${DOCUMENT_CONTROL_METRICS.controlWidthPercent}%;
       }
       .hyperlink-button .hyperlink-label {
+        font-size: ${hyperlinkFontSize}px;
+        line-height: ${hyperlinkLineHeight}px;
         text-align: center;
       }
       .hyperlink-button .hyperlink-label.arabic {
         direction: rtl;
         font-family: "Arial", sans-serif;
+        font-size: ${hyperlinkFontSize}px;
+        line-height: ${hyperlinkLineHeight}px;
       }
       .hyperlink-button .hyperlink-arrow {
         align-items: center;
@@ -446,6 +453,7 @@ export function buildDocumentHtml(
         font-size: ${sectionTitleFontSize}px;
         font-weight: 700;
         gap: ${SPACING.sm}px;
+        line-height: ${sectionTitleLineHeight}px;
         padding: ${SPACING.sm}px ${SPACING.lg}px;
       }
       .gospel-rite-toggle.is-on {
@@ -1172,29 +1180,6 @@ function renderVerse(
   return `<div class="verse-row" data-verse-id="${escapeAttribute(verseId)}"${tuneAttribute} style="grid-template-columns: ${gridTemplateColumns};">${cells}</div>`;
 }
 
-/** Verse types that never take part in Single/Double/Quadruple Alternating — kept in sync with resolveVerseColor's early returns below. */
-const NON_ALTERNATING_TYPES = new Set(['comment', 'silentComment', 'silentPrayer', 'refrain', 'refrainLabel', 'readingReference']);
-
-/**
- * The alternating color parity only ticks for verses that are actually
- * rendered as alternating participants — Refrain/Comment/etc. rows
- * (frequently conditional, e.g. Kiahk-only refrains) don't consume a
- * parity slot, so the sequence seen by the alternation is "verse 1 / verse
- * 2 / verse 3..." regardless of what non-participant rows are interleaved.
- */
-function getEffectiveAlternatingIndex(verses: DocumentVerse[], index: number, bishopPresent: boolean): number {
-  let count = -1;
-  for (let i = 0; i <= index; i += 1) {
-    if ((verses[i].bishopOnly && !bishopPresent) || (verses[i].priestOnly && bishopPresent)) continue;
-    // A "White"/"Blue" prayer_type forces that exact color on this one verse
-    // — it never consumes a parity slot, so the verses around it alternate
-    // exactly as if it weren't there at all (see resolveVerseColorBase).
-    if (verses[i].prayerType === 'White' || verses[i].prayerType === 'Blue' || verses[i].forceWhiteText) continue;
-    if (!NON_ALTERNATING_TYPES.has(verses[i].type)) count += 1;
-  }
-  return count;
-}
-
 function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean) {
   const resolved = resolveVerseColorBase(verse, index, section, bishopPresent, allSpeakerLabelsSuppressed);
   // Pre-Refrain lines keep whatever role/color they'd naturally get — this
@@ -1209,7 +1194,7 @@ function resolveVerseColorBase(verse: DocumentVerse, index: number, section: Doc
   if (verse.type === 'readingReference') return { color: COLORS.comment, italic: false };
   // "White"/"Blue" prayer_type forces that alternating color directly,
   // bypassing the normal alternation computation for this verse entirely —
-  // getEffectiveAlternatingIndex above excludes it from the count so
+  // the shared alternating-index helper excludes it from the count so
   // surrounding verses keep alternating exactly as if it weren't there.
   if (verse.prayerType === 'White' || verse.forceWhiteText) return { color: COLORS.white, italic: false };
   if (verse.prayerType === 'Blue') return { color: COLORS.rowBlue, italic: false };
@@ -1234,9 +1219,7 @@ function resolveVerseColorBase(verse: DocumentVerse, index: number, section: Doc
   }
   if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
 
-  const effectiveIndex = getEffectiveAlternatingIndex(section.verses, index, bishopPresent);
-  let colorIndex = Math.floor(effectiveIndex / section.alternateEvery) % 2;
-  if (section.reverseAlternating) colorIndex = colorIndex === 0 ? 1 : 0;
+  const colorIndex = getAlternatingVerseColorIndex(section, index, bishopPresent);
   return { color: colorIndex === 0 ? COLORS.white : COLORS.rowBlue, italic: false };
 }
 

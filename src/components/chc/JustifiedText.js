@@ -286,7 +286,12 @@ function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle
   const isMeasuring = lines == null;
   const measuringNode = isMeasuring ? (
     <Text
-      style={[style, { position: "absolute", opacity: 0, width }]}
+      // Keep the probe invisible but in normal layout flow. The slideshow's
+      // outer measurement wrapper also receives this first layout pass; an
+      // absolutely positioned probe made that wrapper report only its cell
+      // padding, so long verses were cached as a few pixels tall and then
+      // clipped when their real text replaced the probe.
+      style={[style, { opacity: 0, width }]}
       onTextLayout={handleTextLayout}
     >
       {text}
@@ -389,18 +394,11 @@ export default function JustifiedText({
   }, [forceLines, onLines, reportKey, reportableLines]);
 
   if (!forceLines && !IS_WEB && native.isMeasuring) {
-    // No onLayout here (deliberately -- see native.measuringNode's own
-    // definition): the measuring node is absolutely positioned and
-    // contributes ~0 to this View's height, so calling onLayout now would
-    // report a bogus near-zero height for this language before its real
-    // content (and onTextLayout's line data, reported below once measuring
-    // finishes) ever exists. SlideshowContainer.js's pagination distinguishes
-    // "no lines because this metric doesn't need them" from "lines not in
-    // yet" purely by whether a metric was reported at all -- a premature
-    // height-only report here would satisfy that check too early, unmounting
-    // this item from the off-screen measurement layer before its line data
-    // arrives and silently falling back to much-less-accurate
-    // character-count estimation for tall-verse splitting.
+    // The invisible measuring Text stays in flow so its parent reports the
+    // real paragraph height on this first pass. We still wait for
+    // onTextLayout before reporting language lines; that second metric gives
+    // pagination exact split boundaries without ever caching a zero-height
+    // verse first.
     return (
       <View style={{ width }}>
         {native.measuringNode}

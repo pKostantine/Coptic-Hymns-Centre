@@ -99,7 +99,11 @@ export default function GlobalNowPlayingOverlay() {
   }, [collapseAnimation, isCollapsed]);
 
   useEffect(() => {
-    if (!allowDisplay) {
+    // The slideshow deliberately renders underneath the floating player. The
+    // player is an overlay there, not bottom chrome that changes pagination.
+    // Publishing its height while slideshow mode is active creates the exact
+    // full-width dead band that the collapsed button is meant to avoid.
+    if (!allowDisplay || preferences.slideshowMode) {
       reportNowPlayingInset(0);
       return;
     }
@@ -117,6 +121,7 @@ export default function GlobalNowPlayingOverlay() {
     expandedHeight,
     insets.bottom,
     isCollapsed,
+    preferences.slideshowMode,
     reportNowPlayingInset,
     tabBarInset,
   ]);
@@ -127,8 +132,6 @@ export default function GlobalNowPlayingOverlay() {
   useEffect(() => {
     const trackId = music.currentItem?.track.id;
     if (!trackId) {
-      setMiniLiked(false);
-      setLibraryAuthenticated(false);
       return;
     }
 
@@ -213,10 +216,15 @@ export default function GlobalNowPlayingOverlay() {
   if (isCollapsed) {
     return (
       <Animated.View
+        testID="global-now-playing-collapsed"
+        pointerEvents="box-none"
         style={{
           position: 'absolute',
           right: 18,
           bottom: overlayBottom,
+          width: 42,
+          height: 42,
+          backgroundColor: 'transparent',
           opacity: collapsedOpacity,
           transform: [{ translateY: lift }, { scale: collapsedScale }],
           zIndex: 40,

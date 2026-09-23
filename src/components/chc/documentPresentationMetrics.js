@@ -22,10 +22,14 @@ export function getDocumentChromeMetrics(fontSize) {
   const titleLineHeight = Math.max(Math.round(safeFontSize * 0.62), 18);
   const buttonFontSize = Math.max(Math.round(titleFontSize * 1.3), 18);
   const buttonLineHeight = Math.max(Math.round(titleLineHeight * 1.3), 24);
+  const hyperlinkFontSize = Math.max(Math.round(titleFontSize * 1.1), 16);
+  const hyperlinkLineHeight = Math.max(Math.round(hyperlinkFontSize * 1.2), 20);
 
   return {
     buttonFontSize,
     buttonLineHeight,
+    hyperlinkFontSize,
+    hyperlinkLineHeight,
     titleFontSize,
     titleLineHeight,
   };

@@ -249,7 +249,9 @@ export default function BibleChapterDocument() {
       isSlideshow: preferences.slideshowMode,
       preface,
       initialVerse: targetVerse,
-      bottomContentInset: nowPlayingInset,
+      // Now Playing is an overlay in slideshow mode. It must never shorten
+      // the page or change where Bible verses split.
+      bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
     });
   }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, nowPlayingInset]);
 

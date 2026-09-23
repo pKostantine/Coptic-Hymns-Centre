@@ -2,12 +2,12 @@ import { useEffect, useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
-import { formatEnglishDisplayText } from "../../utils/displayText";
 import { resolveRubricKey } from "../../utils/verseRubric";
 import JustifiedText, { measureJustifiedLinesWeb } from "./JustifiedText";
 import {
   getSlideshowLanguageFontSize,
   getSlideshowLanguageLineHeight,
+  hasRenderableSlideshowLanguageBody,
   hasSeasonalPrefixLine as hasVisibleSeasonalPrefixLine,
 } from "./slideshowLayout";
 
@@ -64,8 +64,8 @@ export default function VerseBlock({
       ? COLORS.comment
       : // "White"/"Blue" prayer_type forces that alternating color directly on
       // this one verse — surrounding verses alternate exactly as if it
-      // weren't there (see getEffectiveAlternatingVerseIndex in
-      // SlideshowContainer.js, which excludes it from the parity count).
+      // weren't there (see the shared versePresentation helper, which
+      // excludes it from the parity count in both renderers).
       verse.prayerType === "White"
       ? theme.colors.text
       : verse.prayerType === "Blue"
@@ -101,7 +101,7 @@ export default function VerseBlock({
     {
       key: "english",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "english", bishopPresent),
-      text: formatEnglishDisplayText(verse.english),
+      text: String(verse.english || ""),
       bibleVerseNumber: bibleNumberFor("english"),
       seasonalHoosVersePrefix: hasSeasonalPrefixLine ? verse.seasonalHoosVersePrefix : "",
       fontSize: getSlideshowLanguageFontSize("english", { verse }, fontSize),
@@ -190,6 +190,10 @@ export default function VerseBlock({
 
   function renderLanguageCell(language, spansRow = false) {
     const isJustified = language.textAlign === "justify";
+    // A completed language remains as an empty alignment column while the
+    // other translations continue. Never let a stale native measurement
+    // line become visible content in that empty cell.
+    const hasVisibleBody = hasRenderableSlideshowLanguageBody(language);
     const selectionStyle = selectableText ? null : DISABLED_SELECTION_STYLE;
     const cellWidth = spansRow ? tableWidth : rowColumnWidth;
     const cellWidthStyle = { flexBasis: cellWidth, maxWidth: cellWidth };
@@ -224,7 +228,7 @@ export default function VerseBlock({
           cellWidthStyle,
         ]}
       >
-        {isJustified ? (
+        {!hasVisibleBody ? null : isJustified ? (
           Platform.OS === "web" ? (
             <CssJustifiedVerseBody
               language={language}

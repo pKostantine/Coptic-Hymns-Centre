@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { COLORS, SPACING } from "../../constants/theme";
-import { formatEnglishDisplayText } from "../../utils/displayText";
+import { getAlternatingVerseColorIndex } from "../../utils/versePresentation";
 import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 import { DOCUMENT_CONTROL_METRICS } from "./documentPresentationMetrics";
@@ -62,11 +62,9 @@ export default function SlideshowContainer({
   tableWidth,
   titleHelpers,
   selectedSectionId,
-  refreshKey,
   onCurrentSectionChange,
   onOpenSelector,
   viewportHeightOverride,
-  bottomContentInset = 0,
   onToggleCollapse,
   bishopPresent,
   onAction,
@@ -149,20 +147,10 @@ export default function SlideshowContainer({
         visibleLanguages.coptic,
         visibleLanguages.copticRecitedPrayers,
         visibleLanguages.arabic,
-        Math.round(viewportHeight || 0),
-        Math.round(viewportWidth || 0),
-        Math.round(viewportHeightOverride || 0),
-        Math.round(bottomContentInset || 0),
-        refreshKey,
       ].join(":"),
     [
       fontSize,
-      bottomContentInset,
-      refreshKey,
       slideTableWidth,
-      viewportHeight,
-      viewportHeightOverride,
-      viewportWidth,
       visibleLanguages,
     ],
   );
@@ -230,7 +218,7 @@ export default function SlideshowContainer({
     setMeasuredLanguageHeights(keepUnchangedLanguageHeights);
     lastGlobalMeasurementKeyRef.current = globalMeasurementKey;
     lastItemSignaturesRef.current = newSignatures;
-  }, [globalMeasurementKey, itemMeasurementCacheKeys, itemSignatures, items, measuredKey, refreshKey]);
+  }, [globalMeasurementKey, itemMeasurementCacheKeys, itemSignatures, items, measuredKey]);
 
   useEffect(
     () => () => {
@@ -369,7 +357,7 @@ export default function SlideshowContainer({
 
     const budget = getSlideContentBudget(
       measuredViewportHeight,
-      getSlidePadding(measuredViewportHeight, bottomContentInset),
+      getSlidePadding(measuredViewportHeight),
     );
     const paginated = paginateItems(
       items,
@@ -384,7 +372,6 @@ export default function SlideshowContainer({
     return dropEmptySlides(paginated);
   }, [
     fontSize,
-    bottomContentInset,
     items,
     measuredHeights,
     measuredLanguageHeights,
@@ -398,20 +385,20 @@ export default function SlideshowContainer({
       ? Math.min(viewportHeight, viewportHeightOverride)
       : viewportHeight || viewportHeightOverride;
   const slidePadding = useMemo(
-    () => getSlidePadding(measuredViewportHeight, bottomContentInset),
-    [bottomContentInset, measuredViewportHeight],
+    () => getSlidePadding(measuredViewportHeight),
+    [measuredViewportHeight],
   );
   // The next bounded batch of items still missing a real measured height.
   // Mounting EVERY unmeasured item in one commit is what made this slow:
-  // anything that changes globalMeasurementKey (font size, a language
-  // toggle, a rotation, or entering Slideshow Mode at all) wipes every
+  // anything that changes globalMeasurementKey (font size, width, or a
+  // language toggle) wipes every
   // cached height, so the measurement layer would try to mount every verse
   // in the document at once -- thousands of views in a single synchronous
   // commit, which is the freeze. Capping each commit lets the batch measure,
   // land its heights, advance the filter, and mount the next batch on a
   // later frame, so the UI stays responsive the whole way through.
   // Pagination keeps falling back to estimateItemHeight for anything not yet
-  // measured. The current anchor is measured first after a jump or resize;
+  // measured. The current anchor is measured first after a jump or width change;
   // the remaining document then settles in bounded batches.
   const measurementBatch = useMemo(() => {
     if (!(viewportHeight || viewportHeightOverride)) return [];
@@ -424,10 +411,9 @@ export default function SlideshowContainer({
       MEASUREMENT_WINDOW_RADIUS,
     );
   }, [currentAnchor, items, measuredHeights, selectedSectionId, viewportHeight, viewportHeightOverride]);
-  // An empty batch means nothing is left unmeasured, so this stays equivalent
-  // to the old items.every(...) check without rescanning the whole document
-  // on every render.
-  const isMeasurementComplete = useMemo(
+  // An empty batch means the active reading window is fully measured. Faraway
+  // items intentionally remain estimated until the reader approaches them.
+  const isActiveMeasurementComplete = useMemo(
     () => Boolean(viewportHeight || viewportHeightOverride) && measurementBatch.length === 0,
     [measurementBatch, viewportHeight, viewportHeightOverride],
   );
@@ -593,13 +579,14 @@ export default function SlideshowContainer({
 
   return (
     <View
+      testID="slideshow-container"
       style={[styles.container, DISABLED_SELECTION_STYLE]}
       onLayout={(event) => {
         setViewportHeight(event.nativeEvent.layout.height);
         setViewportWidth(event.nativeEvent.layout.width);
       }}
     >
-      {!isMeasurementComplete ? (
+      {!isActiveMeasurementComplete ? (
         <View pointerEvents="none" style={[styles.measurementLayer, DISABLED_SELECTION_STYLE]}>
           {/* Only items missing a cached height mount here, a bounded batch
               at a time (see measurementBatch above) -- most of the time
@@ -672,12 +659,13 @@ const SlideDeck = memo(function SlideDeck({ slides, currentIndex, ...slideProps 
   const renderLayers = getSlideRenderLayers(currentIndex, slides.length);
 
   return (
-    <View style={styles.slideDeck}>
+    <View testID="slideshow-deck" style={styles.slideDeck}>
       {renderLayers.map(({ index, inFlow }) => {
         const isCurrent = inFlow;
         return (
           <View
             key={getSlideKey(slides[index], index)}
+            testID={isCurrent ? "slideshow-current-slide" : undefined}
             accessibilityElementsHidden={!isCurrent}
             importantForAccessibility={isCurrent ? "yes" : "no-hide-descendants"}
             pointerEvents={isCurrent ? "auto" : "none"}
@@ -962,8 +950,8 @@ const SlideItem = memo(function SlideItem({
               styles.gospelRiteToggleText,
               {
                 color: copticGospelRite ? COLORS.black : theme.colors.text,
-                fontSize: chrome.buttonFontSize,
-                lineHeight: chrome.buttonLineHeight,
+                fontSize: chrome.titleFontSize,
+                lineHeight: chrome.titleLineHeight,
               },
             ]}
           >
@@ -1001,8 +989,8 @@ const SlideItem = memo(function SlideItem({
                 styles.openButtonText,
                 {
                   color: item.isHyperlink ? COLORS.link : COLORS.subdoc,
-                  fontSize: chrome.buttonFontSize,
-                  lineHeight: chrome.buttonLineHeight,
+                  fontSize: item.isHyperlink ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
+                  lineHeight: item.isHyperlink ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
                 },
               ]}
             >
@@ -1017,8 +1005,8 @@ const SlideItem = memo(function SlideItem({
                 styles.openButtonTextArabic,
                 {
                   color: item.isHyperlink ? COLORS.link : COLORS.subdoc,
-                  fontSize: chrome.buttonFontSize,
-                  lineHeight: chrome.buttonLineHeight,
+                  fontSize: item.isHyperlink ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
+                  lineHeight: item.isHyperlink ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
                 },
               ]}
             >
@@ -1237,7 +1225,7 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         sectionId: section.id,
         type: "verse",
         verse,
-        colorIndex: getVerseColorIndex(section, verseIndex, bishopPresent),
+        colorIndex: getAlternatingVerseColorIndex(section, verseIndex, bishopPresent),
         suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || Boolean(suppressMap.get(verse)),
         hasSpeakerLabel: Boolean(getSpeakerRole(verse.personRole || verse.type, bishopPresent)),
         // Computed here rather than in VerseBlock because the decision needs
@@ -1262,70 +1250,6 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
   });
 }
 
-function getVerseColorIndex(section, index, bishopPresent) {
-  const title = typeof section.title === "string" ? section.title : section.title?.english || "";
-  const effectiveIndex = getEffectiveAlternatingVerseIndex(section, index);
-
-  if (section.alternateEvery !== undefined) {
-    if (!section.alternateEvery) return 0;
-    const colorIndex = Math.floor(effectiveIndex / section.alternateEvery);
-    return section.reverseAlternating ? colorIndex + 1 : colorIndex;
-  }
-
-  if (/^o daughter of david$/i.test(title)) {
-    return Math.floor(effectiveIndex / 4);
-  }
-
-  const shouldUsePairing =
-    section.isPsali ||
-    /psali|aripsaleen/i.test(title) ||
-    isPsaliLikeTwoVerseSectionTitle(title) ||
-    (section.verses || []).some((verse) => Boolean(getSpeakerRole(verse.personRole || verse.type, bishopPresent)));
-
-  if (!shouldUsePairing) {
-    return effectiveIndex;
-  }
-
-  if (/conclusion of the (adam|watos) psali/i.test(title)) {
-    return effectiveIndex;
-  }
-
-  if (getSpeakerRole(section.verses?.[0]?.personRole || section.verses?.[0]?.type, bishopPresent) === "priest") {
-    return effectiveIndex <= 2 ? 0 : 1 + Math.floor((effectiveIndex - 3) / 2);
-  }
-
-  return Math.floor(effectiveIndex / 2);
-}
-
-function getEffectiveAlternatingVerseIndex(section, index) {
-  return (section.verses || [])
-    .slice(0, index + 1)
-    .filter((verse) =>
-      verse.type !== "refrainLabel" &&
-      verse.type !== "refrain" &&
-      verse.type !== "comment" &&
-      verse.type !== "silentComment" &&
-      !verse.forceWhiteText &&
-      // A "White"/"Blue" prayer_type forces that exact color on this one
-      // verse — it never consumes a parity slot, so verses around it
-      // alternate exactly as if it weren't there at all (see rowTextColor
-      // in VerseBlock.js).
-      verse.prayerType !== "White" &&
-      verse.prayerType !== "Blue"
-    )
-    .length - 1;
-}
-
-function isPsaliLikeTwoVerseSectionTitle(title) {
-  return /^(agios o theos|the lord said to moses|let us all praise along with david|koiahk praise for the holy trinity|god eternal|(alternate:\s*)?bless the god of israel|the (first|second|third|fourth|fifth|sixth|seventh) explanation)$/i
-    .test(String(title || "").trim());
-}
-
-// Used only by the psali/pairing color-alternation heuristic in
-// getVerseColorIndex above — actual speaker-label suppression is
-// computeGlobalSuppressSpeakerLabelFlags from utils/verseRubric.js (shared
-// with the WebView reader), not this. Resolves "bishopOrPriest" via the same
-// shared resolveRubricKey so this heuristic doesn't diverge either.
 function getSpeakerRole(type, bishopPresent) {
   const resolved = resolveRubricKey(type, bishopPresent);
   if (resolved === "priest" || resolved === "bishop" || resolved === "people" || resolved === "deacon" || resolved === "reader") {
@@ -1369,7 +1293,7 @@ function buildTitleLanguages(title, visibleLanguages, titleHelpers) {
     languages.push({
       align: "center",
       key: "english",
-      text: formatEnglishDisplayText(titleHelpers.getTitleText(title)),
+      text: String(titleHelpers.getTitleText(title) || ""),
     });
   }
 
@@ -1386,7 +1310,7 @@ function buildTitleLanguages(title, visibleLanguages, titleHelpers) {
     : [{
         align: "center",
         key: "english",
-        text: formatEnglishDisplayText(titleParts.english || ""),
+        text: String(titleParts.english || ""),
       }];
 }
 
@@ -1490,7 +1414,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     minHeight: 0,
-    overflow: "hidden",
+    // The slide deck fills the document surface, so the screen itself is the
+    // clipping boundary. A nested hard clip made the bottom player overlay's
+    // former inset look like a black bar and cut off the last visible line.
+    overflow: "visible",
     width: "100%",
     ...Platform.select({
       web: {
@@ -1621,7 +1548,7 @@ const styles = StyleSheet.create({
   gospelRiteToggleRow: {
     alignItems: "center",
     flexShrink: 0,
-    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.lg,
   },
   gospelRiteToggle: {
     alignItems: "center",
@@ -1666,12 +1593,12 @@ const styles = StyleSheet.create({
   },
   slide: {
     flex: 1,
-    overflow: "hidden",
+    overflow: "visible",
   },
   slideDeck: {
     flex: 1,
     minHeight: 0,
-    overflow: "hidden",
+    overflow: "visible",
     position: "relative",
     width: "100%",
   },

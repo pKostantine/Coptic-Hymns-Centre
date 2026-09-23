@@ -2,21 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
+import { formatEnglishDisplayText } from '../../../utils/displayText';
+import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
+import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
+import GlobalNowPlayingOverlay from '../../playback/GlobalNowPlayingOverlay';
+import DocumentSurface from '../DocumentSurface';
+import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
+import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import AppHeader from '../ui/AppHeader';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
 import CalendarScreen from './CalendarScreen';
 import SeasonSelectorScreen from './SeasonSelectorScreen';
 import SettingsScreen from './SettingsScreen';
-import DocumentSurface from '../DocumentSurface';
-import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
-import { getSectionSelectorTitle } from '../sectionSelectorTitle';
-import { formatEnglishDisplayText } from '../../../utils/displayText';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
-import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
-import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
-import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
-import GlobalNowPlayingOverlay from '../../playback/GlobalNowPlayingOverlay';
 
 interface DocumentModalTarget {
   title: { english: string; arabic: string };

@@ -96,12 +96,10 @@ function getVerseCommonHeight(item, fontSize, visibleLanguages) {
 }
 
 /** Responsive breathing room which never crowds a short landscape viewport. */
-export function getSlidePadding(viewportHeight = 0, bottomContentInset = 0) {
+export function getSlidePadding(viewportHeight = 0) {
   if (!viewportHeight) return { bottom: SPACING_SM * 2, top: SPACING_SM * 2 };
   const edge = clamp(Math.floor(viewportHeight * 0.04), SPACING_SM, SPACING_XL);
-  const requestedInset = Math.max(Number(bottomContentInset) || 0, 0);
-  const boundedInset = Math.min(requestedInset, Math.max(viewportHeight - edge * 2 - 1, 0));
-  return { bottom: edge + boundedInset, top: edge };
+  return { bottom: edge, top: edge };
 }
 
 /** The content budget is always bounded by the real viewport. */
@@ -572,9 +570,15 @@ export function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth)
     const minimumHeight = item.isHyperlink
       ? DOCUMENT_CONTROL_METRICS.hyperlinkMinHeight
       : DOCUMENT_CONTROL_METRICS.openButtonMinHeight;
-    return Math.max(minimumHeight, chrome.buttonLineHeight * 2 + SPACING_SM * 6);
+    const lineHeight = item.isHyperlink
+      ? chrome.hyperlinkLineHeight
+      : chrome.buttonLineHeight;
+    const contentHeight = item.isHyperlink
+      ? lineHeight + SPACING_SM * 4
+      : lineHeight * 2 + SPACING_SM * 6;
+    return SPACING_SM * 4 + Math.max(minimumHeight, contentHeight);
   }
-  if (item.type === "gospelRiteToggle") return chrome.buttonLineHeight + SPACING_SM * 4;
+  if (item.type === "gospelRiteToggle") return chrome.titleLineHeight + SPACING_SM * 5;
 
   const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
   const languageHeights = layout.languages
@@ -639,6 +643,15 @@ export function getVisibleVerseLanguages(item, visibleLanguages = {}) {
       Boolean(visibleLanguages.coptic || forceCoptic) &&
       (!item.isRecitedPrayer || visibleLanguages.copticRecitedPrayers || forceCoptic);
   });
+}
+
+export function hasRenderableSlideshowLanguageBody(language = {}) {
+  return Boolean(
+    String(language.text || "").trim() ||
+    String(language.bibleVerseNumber || "").trim() ||
+    String(language.seasonalHoosVersePrefix || "").trim() ||
+    String(language.seasonalHoosVersePrefixSpacer || "").trim(),
+  );
 }
 
 export function createEstimatedTextLines(text, maxLineLength) {

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createEstimatedTextLines,
   createSlideAnchor,
+  createVerseLineSegment,
   findSlideIndexForAnchor,
   getAdjacentSlideIndexes,
   getItemSignature,
@@ -20,10 +21,15 @@ import {
   getSlideshowLanguageLineHeight,
   getVerseLineSegmentHeight,
   getVisibleVerseLanguages,
+  hasRenderableSlideshowLanguageBody,
   hashSlideshowText,
   joinRenderedLines,
   paginateItems,
 } from "../src/components/chc/slideshowLayout.js";
+import {
+  getAlternatingVerseColorIndex,
+  getEffectiveAlternatingVerseIndex,
+} from "../src/utils/versePresentation.js";
 
 const ALL_LANGUAGES = {
   english: true,
@@ -94,6 +100,18 @@ test("responsive padding never creates a budget taller than the viewport", () =>
   });
 });
 
+test("overlay insets never change slideshow padding or page formation", () => {
+  [320, 568, 900].forEach((height) => {
+    const withoutOverlay = getSlidePadding(height);
+    const withOversizedOverlay = getSlidePadding(height, height * 0.75);
+    assert.deepEqual(withOversizedOverlay, withoutOverlay);
+    assert.equal(
+      getSlideContentBudget(height, withOversizedOverlay),
+      getSlideContentBudget(height, withoutOverlay),
+    );
+  });
+});
+
 test("maximum-size language metrics leave room for Arabic and Coptic marks", () => {
   const item = verseItem();
   assert.equal(getSlideshowLanguageLineHeight("english", item, 78), 101);
@@ -102,6 +120,8 @@ test("maximum-size language metrics leave room for Arabic and Coptic marks", () 
   assert.deepEqual(getSlideshowChromeMetrics(78), {
     buttonFontSize: 51,
     buttonLineHeight: 62,
+    hyperlinkFontSize: 43,
+    hyperlinkLineHeight: 52,
     speakerFontSize: 78,
     speakerLineHeight: 101,
     titleFontSize: 39,
@@ -223,6 +243,63 @@ test("measurement prioritizes the reader's current row instead of restarting at 
   const batch = getMeasurementBatch(items, {}, 8, { sourceItemId: "row-80" }, null);
   assert.equal(batch[0].id, "row-80");
   assert.ok(batch.every((item) => Math.abs(Number(item.id.slice(4)) - 80) <= 4));
+});
+
+test("a finished translation stays truly empty on later continuation slides", () => {
+  const item = verseItem({
+    verse: {
+      ...verseItem().verse,
+      bibleVerseNumber: "1",
+    },
+  });
+  const state = {
+    languages: [
+      { language: "english", lines: metricLines("English", 3), offset: 0 },
+      { language: "coptic", lines: metricLines("Coptic", 1), offset: 0 },
+      { language: "arabic", lines: metricLines("Arabic", 3), offset: 0 },
+    ],
+  };
+
+  createVerseLineSegment(item, state, { english: 1, coptic: 1, arabic: 1 }, 0);
+  const continuation = createVerseLineSegment(item, state, { english: 1, arabic: 1 }, 1).item;
+
+  assert.equal(continuation.verse.coptic, "");
+  assert.equal(continuation.verse.slideshowForcedLines.coptic, undefined);
+  assert.equal(continuation.verse.slideshowBibleNumberLanguages.includes("coptic"), false);
+  assert.deepEqual(continuation.verse.slideshowLanguageKeys, ["english", "coptic", "arabic"]);
+});
+
+test("an empty continuation cell ignores stale native line content", () => {
+  assert.equal(hasRenderableSlideshowLanguageBody({
+    text: "",
+    forceLines: [{ text: "I" }],
+  }), false);
+  assert.equal(hasRenderableSlideshowLanguageBody({ text: "I" }), true);
+});
+
+test("scroll and slideshow share one alternating-color sequence", () => {
+  const section = {
+    alternateEvery: 1,
+    verses: [
+      { type: "priest" },
+      { type: "readingReference" },
+      { type: "people" },
+      { type: "silentPrayer" },
+      { type: "deacon" },
+      { type: "priest", prayerType: "White" },
+      { type: "people" },
+    ],
+  };
+
+  assert.deepEqual(
+    section.verses.map((_, index) => getEffectiveAlternatingVerseIndex(section.verses, index)),
+    [0, 0, 1, 1, 2, 2, 3],
+  );
+  assert.deepEqual(
+    section.verses.map((_, index) => getAlternatingVerseColorIndex(section, index)),
+    [0, 0, 1, 1, 0, 0, 1],
+  );
+  assert.equal(getAlternatingVerseColorIndex({ ...section, forceWhiteVerses: true }, 6), 0);
 });
 
 test("measurement can stop outside the active reading window", () => {
