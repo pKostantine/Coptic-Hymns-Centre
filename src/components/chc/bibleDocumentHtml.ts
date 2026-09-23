@@ -147,7 +147,8 @@ export function buildBibleChapterHtml({
         background: #000;
         color: var(--text-color);
         font-family: Georgia, 'Times New Roman', serif;
-        -webkit-text-size-adjust: 100%;
+        -webkit-text-size-adjust: none;
+        text-size-adjust: none;
         -webkit-user-select: ${effectiveSelectText ? 'text' : 'none'};
         user-select: ${effectiveSelectText ? 'text' : 'none'};
       }
