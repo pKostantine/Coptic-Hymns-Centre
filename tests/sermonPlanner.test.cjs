@@ -1,0 +1,108 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const test = require('node:test');
+
+const hymnLibrarySource = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
+const manifestSource = fs.readFileSync('src/constants/manifest.ts', 'utf8');
+const documentSource = fs.readFileSync('src/components/chc/screens/ServiceDocument.tsx', 'utf8');
+
+function extractFunction(startMarker, endMarker) {
+  const start = hymnLibrarySource.indexOf(startMarker);
+  const end = hymnLibrarySource.indexOf(endMarker, start);
+  assert.ok(start >= 0 && end > start, 'Sermon Planner test harness could not find the hydrator');
+  return hymnLibrarySource.slice(start, end).replace(/^export /, '');
+}
+
+function loadHydrateService(getContextFlags, hydrateWithFlags) {
+  const definition = extractFunction(
+    'export async function hydrateSupabaseServiceHymn(',
+    '\n// A single misconfigured',
+  );
+  return new Function(
+    'deriveStructuralFlags', 'getContextFlags', 'toIsoDateString', 'hydrateWithFlags',
+    definition + '\nreturn hydrateSupabaseServiceHymn;',
+  )(
+    () => ({}),
+    getContextFlags,
+    (date) => date.toISOString().slice(0, 10),
+    hydrateWithFlags,
+  );
+}
+
+test('Sermon Planner is a Lectionary entry using its existing order table and epistle flags', () => {
+  assert.match(manifestSource, /id: 'sermon_planner', schema: 'liturgy', table: 'sermon_planner'/);
+  assert.match(documentSource, /table === 'sermon_planner'/);
+});
+
+test('Sermon Planner scopes Gospel/weekday/service conditions to each reading', async () => {
+  const date = new Date('2026-09-20T00:00:00Z');
+  const vespersWeekday = new Date('2026-09-19T00:00:00Z');
+  const calls = [];
+  let hydrated;
+  const getContextFlags = async (_date, extraContext, weekdayDate) => {
+    calls.push({ extraContext, weekdayDate });
+    const author = extraContext.Vespers ? 'Vespers'
+      : extraContext.Matins ? 'Matins' : 'Liturgy';
+    return { ...extraContext, author };
+  };
+  const hydrateWithFlags = async (schema, table, flags, depth, isoDate, flagsForSection) => {
+    hydrated = { schema, table, flags, depth, isoDate, flagsForSection };
+    return ['rendered'];
+  };
+  const hydrate = loadHydrateService(getContextFlags, hydrateWithFlags);
+  const result = await hydrate('liturgy', 'sermon_planner', date, {
+    BishopPresent: true, PaulineEpistleRomans: true,
+  }, vespersWeekday);
+
+  assert.deepEqual(result, ['rendered']);
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls.map(({ extraContext }) => [
+    extraContext.Vespers === true, extraContext.Matins === true, extraContext.Liturgy === true,
+  ]), [[true, false, false], [false, true, false], [false, false, true]]);
+  assert.equal(calls[0].weekdayDate, vespersWeekday);
+  assert.equal(calls[1].weekdayDate, undefined);
+  assert.equal(calls[2].weekdayDate, undefined);
+  assert.ok(calls.every(({ extraContext }) => extraContext.PaulineEpistleRomans));
+  assert.equal(hydrated.isoDate, '2026-09-20');
+  assert.deepEqual(
+    ['Vespers', 'Matins', 'Liturgy', null].map((condition) =>
+      hydrated.flagsForSection({ condition }).author,
+    ),
+    ['Vespers', 'Matins', 'Liturgy', 'Liturgy'],
+  );
+});
+
+test('Unrelated Lectionary services retain the ordinary one-context hydrator', async () => {
+  const calls = [];
+  let received;
+  const hydrate = loadHydrateService(
+    async (_date, flags, weekdayDate) => {
+      calls.push({ flags, weekdayDate });
+      return flags;
+    },
+    async (...args) => { received = args; return ['normal']; },
+  );
+  const result = await hydrate('liturgy', 'lectionary_matins', new Date('2026-09-20T00:00:00Z'), { Matins: true });
+  assert.deepEqual(result, ['normal']);
+  assert.equal(calls.length, 1);
+  assert.equal(received.length, 5);
+  assert.equal(received[2].Matins, true);
+});
+
+test('Only Sermon Planner includes the Gospel Rite in hymn-key fallback lookups', () => {
+  const definition = extractFunction('function getHymnKeyLookupSchemas(', '\nexport async function fetchServiceRows(');
+  const getLookups = new Function(
+    'HYMN_KEY_FALLBACK_SCHEMAS',
+    definition + '\nreturn getHymnKeyLookupSchemas;',
+  )(['public', 'liturgy', 'psalmody']);
+  assert.ok(getLookups('liturgy', 'sermon_planner').includes('gospel_rite'));
+  assert.ok(!getLookups('liturgy', 'lectionary_liturgy').includes('gospel_rite'));
+  assert.equal(getLookups('liturgy', 'sermon_planner')[0], 'liturgy');
+});
+
+test('Inline Synaxarium and regular inline Gospel hymns are both supported', () => {
+  assert.match(hymnLibrarySource, /section\.hymn_key === "SYNAXARIUM" && isoDate/);
+  assert.match(hymnLibrarySource, /buildWholeTableInlineSections\(synaxariumSections, section\)/);
+  assert.match(hymnLibrarySource, /if \(!section\.verses\.length\) continue;/);
+  assert.match(hymnLibrarySource, /sectionFlagsForRow \? sectionFlagsForRow\(section\) : documentFlags/);
+});
