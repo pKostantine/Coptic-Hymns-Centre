@@ -63,7 +63,7 @@
     "lint": "expo lint",
     "test:slideshow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/slideshowLayout.test.mjs tests/slideshowNativeMeasurement.test.cjs tests/bibleSlideshowHtml.test.cjs",
     "test:reading": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/readingFontSize.test.mjs",
-    "test:conditions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/serviceConditionDates.test.cjs tests/lentConditionFlags.test.cjs",
+    "test:conditions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/serviceConditionDates.test.cjs tests/lentConditionFlags.test.cjs tests/monasteryConditionFlags.test.cjs",
     "test:lyrics": "node --test tests/synchronizedLyrics.test.cjs",
     "test:offline": "node --test tests/offlineDownloadRequests.test.cjs",
     "test:playback": "node --test tests/playbackEngine.test.cjs",
