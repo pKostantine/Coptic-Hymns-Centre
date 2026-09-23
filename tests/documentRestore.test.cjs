@@ -126,3 +126,15 @@ test('Bible captures the current verse and restores it without deep-link highlig
   assert.match(native, /onLoadEnd/);
   assert.match(web, /onLoad/);
 });
+
+test('Bible verse selector freezes its opening verse across successive language toggles', () => {
+  const chapter = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
+  const html = fs.readFileSync('src/components/chc/bibleDocumentHtml.ts', 'utf8');
+  assert.match(chapter, /selectorAnchorRef\.current = currentVerseRef\.current/);
+  assert.match(chapter, /const anchor = selectorAnchorRef\.current \|\| currentVerseRef\.current/);
+  assert.match(chapter, /selectorOpenRef\.current\) return/);
+  assert.match(chapter, /setBibleVisibleLanguages\(next\)/);
+  assert.match(chapter, /action\.readerId !== readerId/);
+  assert.match(html, /message\.readerId = readerId/);
+  assert.match(html, /initialAnchorVerse = restoreVerse \|\| initialVerse/);
+});
