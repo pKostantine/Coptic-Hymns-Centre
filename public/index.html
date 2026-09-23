@@ -41,6 +41,13 @@
         display: flex;
         flex: 1;
       }
+      /* The book slideshow uses explicit user-selected font sizes; never inflate
+         its text when the phone rotates or its width changes. Do not apply
+         this to the whole app: other screens keep browser accessibility text. */
+      [data-testid="slideshow-container"] {
+        -webkit-text-size-adjust: none;
+        text-size-adjust: none;
+      }
       /* Follow Safari's visible viewport as its toolbars expand or collapse. */
       @supports (height: 100dvh) {
         body {

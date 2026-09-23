@@ -38,3 +38,26 @@ test('collapsed Now Playing control cannot create a full-width slideshow mask', 
     assert.doesNotMatch(style, /overflow:\s*["']hidden["']/);
   }
 });
+
+// Mobile Safari/Chrome can inflate text when the containing column becomes
+// wider in landscape even with an unchanged CSS font-size. Both production
+// HTML entrypoints must opt only the slideshow subtree out of that behavior.
+test('web slideshow keeps user-selected font size independent of orientation', () => {
+  const singlePage = fs.readFileSync('public/index.html', 'utf8');
+  const expoRouterHtml = fs.readFileSync('src/app/+html.tsx', 'utf8');
+  const slideshow = fs.readFileSync('src/components/chc/SlideshowContainer.js', 'utf8');
+  const surface = fs.readFileSync('src/components/chc/DocumentSurface.tsx', 'utf8');
+  const scrollReader = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
+
+  for (const entrypoint of [singlePage, expoRouterHtml]) {
+    assert.match(entrypoint, /\[data-testid="slideshow-container"\]/);
+    assert.match(entrypoint, /-webkit-text-size-adjust:\s*none/);
+    assert.match(entrypoint, /text-size-adjust:\s*none/);
+  }
+  assert.match(slideshow, /testID="slideshow-container"/);
+  assert.match(surface, /fontScaleToPx\(preferences\.fontScale\) \* fontScaleMultiplier/);
+  assert.match(scrollReader, /-webkit-text-size-adjust:\s*none/);
+  // Slide width is a measurement/pagination input, not a typography multiplier.
+  assert.match(slideshow, /slideTableWidth\s*=\s*Math\.max\(viewportWidth/);
+  assert.doesNotMatch(surface, /fontSize\s*=\s*[^;]*(?:screenWidth|screenHeight)/);
+});

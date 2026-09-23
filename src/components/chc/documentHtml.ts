@@ -224,7 +224,8 @@ export function buildDocumentHtml(
         margin: 0;
         padding: 0;
         width: 100%;
-        -webkit-text-size-adjust: 100%;
+        -webkit-text-size-adjust: none;
+        text-size-adjust: none;
       }
       body {
         font-family: Georgia, serif;
