@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 import { ActivityIndicator, View } from 'react-native';
 
 import { COLORS } from '../../constants/theme';
-import { sectionRestoreCandidates } from '../../utils/sectionRestore';
+import { sectionRestoreCandidates, type DocumentRestoreRequest } from '../../utils/sectionRestore';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
@@ -10,11 +10,11 @@ import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, wit
 export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
 
 export interface DocumentWebViewHandle {
-  scrollToSection: (id: string) => void;
+  scrollToSection: (id: string, edge?: 'start' | 'end') => void;
   scrollToVerse: (id: string) => void;
   scrollToTune: (tune: string) => void;
   /** Pre-set the section the WebView will restore to on its next load (e.g. before triggering a state change that causes a full HTML rebuild). */
-  setPreservedSection: (id: string) => void;
+  setPreservedSection: (id: string, edge?: 'start' | 'end') => void;
 }
 
 interface DocumentWebViewProps {
@@ -35,6 +35,8 @@ interface DocumentWebViewProps {
   collapsedSectionIds?: Record<string, boolean>;
   /** Section to scroll to the moment this WebView finishes its first load — e.g. wherever the user was reading in slideshow mode just before switching, or the last remembered position for a brand-new mount. Only consulted once, at mount; changing it on a later render has no effect (use the imperative scrollToSection handle for that). */
   initialSectionId?: string | null;
+  /** Explicit post-settings/calendar jump. The token forces a jump even to the already selected hymn. */
+  restoreRequest?: DocumentRestoreRequest | null;
   /** Extra scrollable space at the bottom for floating app chrome such as the global mini player. */
   bottomContentInset?: number;
 }
@@ -62,6 +64,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       suppressAllSpeakerLabels = false,
       onAction,
       initialSectionId,
+      restoreRequest,
       bottomContentInset = 0,
       collapsedSectionIds,
     },
@@ -82,11 +85,22 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     // first load, rather than only being able to correct itself starting
     // from its *second* reload onward.
     const preservedSectionIdRef = useRef<string | null>(initialSectionId ?? null);
+    const preservedEdgeRef = useRef<'start' | 'end'>('start');
+    const pendingRestoreSectionIdRef = useRef<string | null>(null);
+    const lastRestoreTokenRef = useRef<string | null>(null);
+    // Assign before the rebuilt HTML/iframe is committed, never after a
+    // transient "at the top" position report can overwrite the target.
+    if (restoreRequest && lastRestoreTokenRef.current !== restoreRequest.token) {
+      lastRestoreTokenRef.current = restoreRequest.token;
+      preservedSectionIdRef.current = restoreRequest.target.sectionId;
+      preservedEdgeRef.current = restoreRequest.target.edge;
+      pendingRestoreSectionIdRef.current = restoreRequest.target.sectionId;
+    }
 
     useImperativeHandle(ref, () => ({
-      scrollToSection: (id: string) => {
-        const win = iframeRef.current?.contentWindow as (Window & { scrollToSection?: (id: string) => void }) | null | undefined;
-        win?.scrollToSection?.(id);
+      scrollToSection: (id: string, edge: 'start' | 'end' = 'start') => {
+        const win = iframeRef.current?.contentWindow as (Window & { scrollToSection?: (id: string, edge?: 'start' | 'end') => void }) | null | undefined;
+        win?.scrollToSection?.(id, edge);
       },
       scrollToVerse: (id: string) => {
         const win = iframeRef.current?.contentWindow as (Window & { scrollToVerse?: (id: string) => boolean }) | null | undefined;
@@ -96,8 +110,10 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         const win = iframeRef.current?.contentWindow as (Window & { scrollToTune?: (tune: string) => void }) | null | undefined;
         win?.scrollToTune?.(tune);
       },
-      setPreservedSection: (id: string) => {
+      setPreservedSection: (id: string, edge: 'start' | 'end' = 'start') => {
         preservedSectionIdRef.current = id;
+        preservedEdgeRef.current = edge;
+        pendingRestoreSectionIdRef.current = id;
       },
     }));
 
@@ -107,7 +123,10 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         try {
           const action = JSON.parse(event.data);
           if (action?.type === 'currentSection' && action.sectionId) {
+            if (pendingRestoreSectionIdRef.current && pendingRestoreSectionIdRef.current !== action.sectionId) return;
+            pendingRestoreSectionIdRef.current = null;
             preservedSectionIdRef.current = action.sectionId;
+            preservedEdgeRef.current = 'start';
           }
           // Remember the title that was actually tapped before the collapse
           // state rebuilds this HTML, so the reload stays anchored there.
@@ -126,16 +145,25 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     const handleLoad = () => {
       const win = iframeRef.current?.contentWindow as
-        | (Window & { scrollToSection?: (id: string | string[]) => void })
+        | (Window & { scrollToSection?: (candidates: Array<{ sectionId: string; edge: 'start' | 'end' }>) => void })
         | null
         | undefined;
       // The whole chain, not just the remembered section: this load is
       // usually a settings change rebuilding the document, and that setting
       // may be what hid the section being restored to. See
       // sectionRestoreCandidates.
-      const candidates = sectionRestoreCandidates(sections.map((section) => section.id), preservedSectionIdRef.current);
+      const candidates = sectionRestoreCandidates(sections.map((section) => section.id), preservedSectionIdRef.current)
+        .map((sectionId, index) => ({ sectionId, edge: index ? 'end' : preservedEdgeRef.current }));
       if (candidates.length) win?.scrollToSection?.(candidates);
     };
+
+    useEffect(() => {
+      if (!restoreRequest) return;
+      const win = iframeRef.current?.contentWindow as (Window & {
+        scrollToSection?: (id: string, edge?: 'start' | 'end') => void
+      }) | null | undefined;
+      win?.scrollToSection?.(restoreRequest.target.sectionId, restoreRequest.target.edge);
+    }, [restoreRequest?.token]);
 
     // Collapse state is deliberately NOT a dependency of this build, and is
     // read from a ref rather than captured by it. The reader opens and closes

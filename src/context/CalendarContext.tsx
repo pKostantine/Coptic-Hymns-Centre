@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { localDateAtUtcMidnight } from '../utils/dateUtils';
+import { markPendingDocumentRestoresDirty } from '../utils/lastDocumentPosition';
 
 export type LiturgicalDayPeriod = 'morning' | 'evening';
 
@@ -56,24 +57,31 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLive || manualOverrideRef.current) return undefined;
     const interval = setInterval(() => {
-      setLiturgicalDayPeriodState(computeDefaultPeriod());
+      const nextPeriod = computeDefaultPeriod();
+      setLiturgicalDayPeriodState(current => {
+        if (current !== nextPeriod) markPendingDocumentRestoresDirty();
+        return nextPeriod;
+      });
     }, 60000);
     return () => clearInterval(interval);
   }, [isLive]);
 
   const selectDate = useCallback((date: Date) => {
+    markPendingDocumentRestoresDirty();
     setSelectedDate(date);
     manualOverrideRef.current = false;
     setLiturgicalDayPeriodState('morning');
   }, []);
 
   const goLive = useCallback(() => {
+    markPendingDocumentRestoresDirty();
     setSelectedDate(null);
     manualOverrideRef.current = false;
     setLiturgicalDayPeriodState(computeDefaultPeriod());
   }, []);
 
   const setLiturgicalDayPeriod = useCallback((period: LiturgicalDayPeriod) => {
+    markPendingDocumentRestoresDirty();
     manualOverrideRef.current = true;
     setLiturgicalDayPeriodState(period);
   }, []);

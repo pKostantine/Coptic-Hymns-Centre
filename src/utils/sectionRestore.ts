@@ -32,3 +32,49 @@ export function sectionRestoreCandidates(
   for (let i = index; i >= 0; i -= 1) candidates.push(sectionIds[i]);
   return candidates;
 }
+
+/** A settings/calendar restore always starts at the original hymn's title.
+ * If the hymn is gone, the nearest *preceding* surviving hymn is shown at its
+ * end instead. Never substitute a following hymn when an earlier one exists. */
+export interface DocumentRestoreTarget {
+  sectionId: string;
+  edge: 'start' | 'end';
+}
+export interface DocumentRestoreRequest {
+  token: string;
+  target: DocumentRestoreTarget;
+}
+
+/** The ordering MUST come from the document before it changed. */
+export function resolveDocumentRestore(
+  originalSectionIds: readonly string[],
+  originalSectionId: string,
+  visibleNewSectionIds: readonly string[],
+): DocumentRestoreTarget | null {
+  const visible = new Set(visibleNewSectionIds);
+  if (visible.has(originalSectionId)) return { sectionId: originalSectionId, edge: 'start' };
+  const originalIndex = originalSectionIds.lastIndexOf(originalSectionId);
+  for (let index = originalIndex - 1; index >= 0; index -= 1) {
+    const sectionId = originalSectionIds[index];
+    if (visible.has(sectionId)) return { sectionId, edge: 'end' };
+  }
+  // A removed first hymn has no predecessor. There is no sensible "end of
+  // previous" target, so take the new document's start.
+  return visibleNewSectionIds.length ? { sectionId: visibleNewSectionIds[0], edge: 'start' } : null;
+}
+
+export function visibleDocumentSectionIds(
+  sections: readonly {
+    id: string; titlePrayerType?: string | null; bishopOnly?: boolean;
+    priestOnly?: boolean; copticGospelRiteOnly?: boolean; nonCopticGospelRiteOnly?: boolean;
+  }[],
+  preferences: { displaySilentPrayers: boolean; bishopPresent: boolean; copticGospelRite: boolean },
+): string[] {
+  return sections.filter(section =>
+    (preferences.displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer') &&
+    (!section.bishopOnly || preferences.bishopPresent) &&
+    (!section.priestOnly || !preferences.bishopPresent) &&
+    (!section.copticGospelRiteOnly || preferences.copticGospelRite) &&
+    (!section.nonCopticGospelRiteOnly || !preferences.copticGospelRite)
+  ).map(section => section.id);
+}

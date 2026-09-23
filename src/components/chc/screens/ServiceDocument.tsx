@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Href, Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Href, Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +18,13 @@ import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
 import { getEpistleConditionFlags } from '../../../utils/readingsService';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
-import { getLastDocumentPosition, setLastDocumentPosition } from '../../../utils/lastDocumentPosition';
+import {
+  captureDocumentRestore, clearPendingDocumentRestore, getLastDocumentPosition,
+  getPendingDocumentRestore, markPendingDocumentRestoresDirty, setLastDocumentPosition,
+} from '../../../utils/lastDocumentPosition';
+import {
+  resolveDocumentRestore, visibleDocumentSectionIds, type DocumentRestoreRequest,
+} from '../../../utils/sectionRestore';
 import { goBack } from '../../../utils/navigation';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
 import { getUserConditionFlags } from '../../../utils/userConditionFlags';
@@ -114,6 +120,20 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   );
 
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
+  // An old hydration must not briefly render as though it belongs to a new
+  // date/condition set while the replacement document is being fetched.
+  const conditionsKey = JSON.stringify([schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags]);
+  const [loadedConditionsKey, setLoadedConditionsKey] = useState<string | null>(null);
+  const readySections = loadedConditionsKey === conditionsKey ? sections : null;
+  const restoreSettingsSignature = JSON.stringify([
+    preferences.visibleLanguages, preferences.fontScale, preferences.orientationMode,
+    preferences.selectText, preferences.slideshowMode, preferences.displayComments,
+    preferences.displaySilentPrayers, preferences.displayNowPlayingBar,
+    preferences.bishopPresent, preferences.copticGospelRite, preferences.inMonastery,
+    preferences.selectedSaintHymns, preferences.appLanguage, effectiveDate, vespersEffectiveDate,
+  ]);
+  const [readerFocused, setReaderFocused] = useState(true);
+  const [restoreRequest, setRestoreRequest] = useState<DocumentRestoreRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   // In-document toggle button state, rendered wherever GOSPEL_RITE is spliced in.
   const copticGospelRite = preferences.copticGospelRite;
@@ -132,6 +152,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // Slideshow mode doesn't need this: SlideshowContainer already restores
   // its own verse-level position internally whenever it repaginates.
   const [currentVerseId, setCurrentVerseId] = useState<string | null>(null);
+  const currentSectionIdRef = useRef(currentSectionId);
   // Seeded synchronously (not via an effect) from the module-level store: a
   // child effect inside SlideshowContainer reports "slide 0" the instant it
   // mounts, which — if this started out undefined and only got set a render
@@ -164,7 +185,46 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // cleared after a few seconds (long enough for the transition, and its
   // knock-on layout settling, to be over) rather than on any particular
   // "we're back and focused" event, since this screen has no such signal.
-  const navigatingAwayRef = useRef(false);
+  const navigatingAwayRef = useRef(Boolean(getPendingDocumentRestore(documentPositionKey)));
+  const lastSettingsSignatureRef = useRef(restoreSettingsSignature);
+  const latestSettingsSignatureRef = useRef(restoreSettingsSignature);
+  latestSettingsSignatureRef.current = restoreSettingsSignature;
+  const latestSectionOrderRef = useRef<string[]>([]);
+  if (readySections) latestSectionOrderRef.current = readySections.map(section => section.id);
+  // Blur is authoritative; never trust background scroll/page callbacks while
+  // Settings or Calendar is covering the reader, even on a slow device.
+  useFocusEffect(useCallback(() => {
+    setReaderFocused(true);
+    return () => {
+      // Covers alternate routes to Settings/Calendar as well as the in-book
+      // selector. Capturing on blur is harmless if no settings change occurs.
+      captureDocumentRestore(
+        documentPositionKey,
+        currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
+        latestSectionOrderRef.current,
+        latestSettingsSignatureRef.current,
+      );
+      navigatingAwayRef.current = true;
+      setReaderFocused(false);
+    };
+  }, [documentPositionKey]));
+
+  // Also handle preference changes made from the in-document controls and
+  // automatic live-calendar rollover while this screen itself is focused.
+  // This layout effect runs before a new WebView can report a reflowed position.
+  useLayoutEffect(() => {
+    const previousSignature = lastSettingsSignatureRef.current;
+    const changed = previousSignature !== restoreSettingsSignature;
+    lastSettingsSignatureRef.current = restoreSettingsSignature;
+    if (!changed || !readerFocused || !sections) return;
+    captureDocumentRestore(
+      documentPositionKey,
+      currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
+      sections.map(section => section.id),
+      previousSignature,
+    );
+    markPendingDocumentRestoresDirty();
+  }, [restoreSettingsSignature, readerFocused, sections, documentPositionKey]);
 
   const bookmarked = isBookmarked(bookmarkId);
   // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
@@ -182,6 +242,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   useEffect(() => {
     let cancelled = false;
     setSections(null);
+    setLoadedConditionsKey(null);
     setError(null);
     hasRestoredScrollPositionRef.current = false;
 
@@ -224,6 +285,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         if (!cancelled) {
           const newSections = result as DocumentSection[];
           setSections(newSections);
+          setLoadedConditionsKey(conditionsKey);
           // If a subdocument is open, refresh its sections from the new hydration
           // so date/settings changes update the subdocument content without closing it.
           setSubdocumentModal((current) => {
@@ -249,7 +311,58 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags]);
+  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey]);
+
+  // A single post-change request is issued only when the new document has
+  // hydrated AND the reader has focus again. No intermediate settings toggle
+  // can replace the original section/order frozen before entering Settings.
+  useEffect(() => {
+    if (!readerFocused || !readySections) return;
+    const pending = getPendingDocumentRestore(documentPositionKey);
+    if (!pending) {
+      navigatingAwayRef.current = false;
+      return;
+    }
+    const changed = pending.dirty || (pending.signature !== undefined && pending.signature !== restoreSettingsSignature);
+    if (!changed) {
+      clearPendingDocumentRestore(documentPositionKey, pending.sequence);
+      navigatingAwayRef.current = false;
+      return;
+    }
+    const visibleIds = visibleDocumentSectionIds(readySections, {
+      displaySilentPrayers: preferences.displaySilentPrayers,
+      bishopPresent: preferences.bishopPresent,
+      copticGospelRite,
+    });
+    const target = resolveDocumentRestore(pending.originalSectionIds, pending.sectionId, visibleIds);
+    if (!target) return; // no visible hymns; keep the snapshot until there are
+    const token = `${pending.sequence}:${pending.revision}:${restoreSettingsSignature}`;
+    pendingScrollRestoreSectionIdRef.current = target.sectionId;
+    currentSectionIdRef.current = target.sectionId;
+    setCurrentSectionId(target.sectionId);
+    setCurrentVerseId(null);
+    setLastDocumentPosition(documentPositionKey, target.sectionId);
+    setSelectedSlideSectionId(target.sectionId);
+    setRestoreRequest({ token, target });
+    documentRef.current?.setPreservedSection(target.sectionId, target.edge);
+    clearPendingDocumentRestore(documentPositionKey, pending.sequence);
+    navigatingAwayRef.current = false;
+    const clearGuard = setTimeout(() => {
+      if (pendingScrollRestoreSectionIdRef.current === target.sectionId) {
+        pendingScrollRestoreSectionIdRef.current = null;
+      }
+    }, 4000);
+    return () => clearTimeout(clearGuard);
+  }, [readerFocused, readySections, documentPositionKey, preferences, copticGospelRite, restoreSettingsSignature]);
+
+  // Once the replacement renderer mounts (or an already-mounted reader's
+  // settings change does not require a full HTML reload), perform the jump
+  // imperatively too. Its load handler separately enforces the same target.
+  useEffect(() => {
+    if (!restoreRequest || preferences.slideshowMode) return;
+    documentRef.current?.setPreservedSection(restoreRequest.target.sectionId, restoreRequest.target.edge);
+    documentRef.current?.scrollToSection(restoreRequest.target.sectionId, restoreRequest.target.edge);
+  }, [restoreRequest, preferences.slideshowMode]);
 
   // The scrolling WebView reader has no equivalent "seed the initial prop"
   // option (scrollToSection is imperative and needs the WebView mounted
@@ -265,11 +378,12 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // the top" report racing ahead of initialSectionId's correction and
   // overwriting the store before it lands.
   useEffect(() => {
-    if (!sections || hasRestoredScrollPositionRef.current || preferences.slideshowMode) return;
+    if (!readySections || hasRestoredScrollPositionRef.current || preferences.slideshowMode) return;
+    if (getPendingDocumentRestore(documentPositionKey)) return;
     hasRestoredScrollPositionRef.current = true;
 
     const lastSectionId = getLastDocumentPosition(documentPositionKey);
-    if (!lastSectionId || !sections.some((s) => s.id === lastSectionId)) return;
+    if (!lastSectionId || !readySections.some((s) => s.id === lastSectionId)) return;
     pendingScrollRestoreSectionIdRef.current = lastSectionId;
     const clearGuardTimeoutId = setTimeout(() => {
       if (pendingScrollRestoreSectionIdRef.current === lastSectionId) {
@@ -277,7 +391,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       }
     }, 2000);
     return () => clearTimeout(clearGuardTimeoutId);
-  }, [sections, documentPositionKey, preferences.slideshowMode]);
+  }, [readySections, documentPositionKey, preferences.slideshowMode]);
 
   useEffect(() => {
     if (!sections || !initialSubdocumentKey || initialSubOpenedRef.current) return;
@@ -307,7 +421,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     const nextKey = `${screenWidth}x${screenHeight}`;
     if (dimensionKeyRef.current === nextKey) return;
     dimensionKeyRef.current = nextKey;
-    if (preferences.slideshowMode) return;
+    if (preferences.slideshowMode || getPendingDocumentRestore(documentPositionKey)) return;
     if (!currentVerseId && !currentSectionId) return;
 
     const timeoutId = setTimeout(() => {
@@ -333,7 +447,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   useEffect(() => {
     if (previousSlideshowModeRef.current === preferences.slideshowMode) return;
     previousSlideshowModeRef.current = preferences.slideshowMode;
-    if (!currentSectionId) return;
+    if (getPendingDocumentRestore(documentPositionKey) || !currentSectionId) return;
 
     if (preferences.slideshowMode) {
       setSelectedSlideSectionId(currentSectionId);
@@ -370,10 +484,14 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // See navigatingAwayRef's declaration -- used for any navigation that
   // leaves this screen mounted behind the destination (Settings, Calendar).
   const navigateAway = (href: Href) => {
+    captureDocumentRestore(
+      documentPositionKey,
+      currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
+      readySections?.map(section => section.id) ?? [],
+      restoreSettingsSignature,
+    );
     navigatingAwayRef.current = true;
-    setTimeout(() => {
-      navigatingAwayRef.current = false;
-    }, 3000);
+    setSelectorOpen(false);
     router.push(href);
   };
 
@@ -413,15 +531,13 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       // Find the toggle button's section in the NEW state (after the flip) —
       // both variants are in the raw array; only the one matching the new state
       // will exist in the rebuilt HTML, so that's the one to scroll to.
-      const newState = !copticGospelRite;
-      const newToggleSection = sections?.find(
-        (s) => s.startsGospelRiteToggle && (newState ? s.copticGospelRiteOnly : s.nonCopticGospelRiteOnly),
+      captureDocumentRestore(
+        documentPositionKey,
+        action.sectionId ?? currentSectionIdRef.current,
+        readySections?.map(section => section.id) ?? [],
+        restoreSettingsSignature,
       );
-      let targetSectionId: string | null = newToggleSection?.id ?? action.sectionId ?? currentSectionId ?? null;
-      if (targetSectionId) documentRef.current?.setPreservedSection(targetSectionId);
-      if (preferences.slideshowMode && targetSectionId) {
-        setSelectedSlideSectionId(targetSectionId);
-      }
+      markPendingDocumentRestoresDirty();
       toggleCopticGospelRite();
       return;
     }
@@ -437,7 +553,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       // the document while a modal covers it, so nothing it reports during
       // that window reflects real reading position. Same idea for
       // navigatingAwayRef, covering the Settings/Calendar transition itself.
-      if (selectorOpen || navigatingAwayRef.current) return;
+      if (selectorOpen || navigatingAwayRef.current || getPendingDocumentRestore(documentPositionKey)) return;
 
       const pendingTarget = pendingScrollRestoreSectionIdRef.current;
       if (pendingTarget && action.sectionId !== pendingTarget) {
@@ -449,6 +565,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       }
       pendingScrollRestoreSectionIdRef.current = null;
       if (action.sectionId) {
+        currentSectionIdRef.current = action.sectionId;
         setCurrentSectionId(action.sectionId);
         setLastDocumentPosition(documentPositionKey, action.sectionId);
       }
@@ -506,6 +623,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     setSubdocumentModal(null);
     if (!triggerSectionId) return;
 
+    currentSectionIdRef.current = triggerSectionId;
     setCurrentSectionId(triggerSectionId);
     setLastDocumentPosition(documentPositionKey, triggerSectionId);
     if (preferences.slideshowMode) {
@@ -601,15 +719,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
         </View>
-      ) : !sections ? (
+      ) : !readySections ? (
         <LoadingScreen />
       ) : (
         <>
           <View style={styles.documentFrame}>
           <DocumentSurface
             ref={documentRef}
-            sections={sections}
+            sections={readySections}
             preferences={preferences}
+            restoreRequest={restoreRequest}
             collapseMemoryScope={documentPositionKey}
             onAction={handleAction}
             selectedSectionId={selectedSlideSectionId}
@@ -620,24 +739,30 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
               // right as the mode toggle flips the other way), not a real
               // position update; trusting it would silently overwrite the
               // correct remembered position with garbage.
-              if (!preferences.slideshowMode) return;
+              if (!preferences.slideshowMode || navigatingAwayRef.current || getPendingDocumentRestore(documentPositionKey)) return;
+              if (pendingScrollRestoreSectionIdRef.current && pendingScrollRestoreSectionIdRef.current !== id) return;
+              pendingScrollRestoreSectionIdRef.current = null;
+              currentSectionIdRef.current = id;
               setCurrentSectionId(id);
               setLastDocumentPosition(documentPositionKey, id);
             }}
             onOpenSelector={() => setSelectorOpen(true)}
             copticGospelRite={copticGospelRite}
             suppressAllSpeakerLabels={schema === 'agpeya'}
-            initialScrollSectionId={currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
+            initialScrollSectionId={restoreRequest?.target.sectionId ?? currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
             onCollapseToggle={setSelectedSlideSectionId}
             keyboardNavigationEnabled={!isCoveredByModal}
           />
           </View>
           <ContentSelectorDrawer
             visible={selectorOpen}
-            sections={sections}
+            sections={readySections}
             currentSectionId={currentSectionId}
             onClose={() => setSelectorOpen(false)}
             onSelectSection={(id) => {
+              currentSectionIdRef.current = id;
+              setCurrentSectionId(id);
+              setLastDocumentPosition(documentPositionKey, id);
               if (preferences.slideshowMode) {
                 setSelectedSlideSectionId(id);
               } else {
@@ -650,7 +775,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
             onOpenCalendar={() => navigateAway('/calendar')}
             onOpenSettings={() => navigateAway('/book-settings')}
             bishopPresent={preferences.bishopPresent}
-            onToggleBishopPresent={toggleBishopPresent}
+            onToggleBishopPresent={() => {
+              captureDocumentRestore(
+                documentPositionKey,
+                currentSectionIdRef.current,
+                readySections.map(section => section.id),
+                restoreSettingsSignature,
+              );
+              markPendingDocumentRestoresDirty();
+              toggleBishopPresent();
+            }}
             displaySilentPrayers={preferences.displaySilentPrayers}
             copticGospelRite={copticGospelRite}
             appLanguage={preferences.appLanguage}

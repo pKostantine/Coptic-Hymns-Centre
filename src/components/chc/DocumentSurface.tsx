@@ -8,6 +8,7 @@ import { CHC_SLIDESHOW_THEME, COLORS } from '../../constants/theme';
 import { useBottomChrome } from '../../context/BottomChromeContext';
 import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
 import { fontScaleToPx, ReadingPreferences } from '../../utils/preferencesStorage';
+import type { DocumentRestoreRequest } from '../../utils/sectionRestore';
 
 interface DocumentSurfaceProps {
   sections: DocumentSection[];
@@ -20,6 +21,8 @@ interface DocumentSurfaceProps {
   onOpenSelector?: () => void;
   /** Where a freshly mounted WebView (scroll mode) should scroll to on its very first load — see DocumentWebView's initialSectionId. Slideshow mode has its own equivalent via selectedSectionId, which (unlike this) can also drive jumps after the initial mount. */
   initialScrollSectionId?: string | null;
+  /** Frozen pre-settings/calendar anchor, resolved against the new visible document. */
+  restoreRequest?: DocumentRestoreRequest | null;
   /** Current on/off state of the in-document "Coptic Gospel Rite" toggle button (only rendered where GOSPEL_RITE content is spliced in). */
   copticGospelRite?: boolean;
   /** Forces every verse's person-type indicator (Priest:/Deacon:/etc.) hidden, in both the scroll and slideshow renderers — the Agpeya's own top-level documents default to this (see ServiceDocument.tsx), since the Hours are prayed by one person with no one to address a speaker role to; a subdocument/Antiphonary modal (DocumentModal.tsx) never sets this, so an Hour opened as a subdocument of a liturgical service keeps its real speaker roles. */
@@ -116,6 +119,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       copticGospelRite = false,
       suppressAllSpeakerLabels = false,
       initialScrollSectionId,
+      restoreRequest,
       onCollapseToggle,
       keyboardNavigationEnabled = true,
     },
@@ -287,6 +291,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           tableWidth={screenWidth}
           titleHelpers={titleHelpers}
           selectedSectionId={selectedSectionId}
+          restoreRequest={restoreRequest}
           onCurrentSectionChange={onCurrentSectionChange}
           onOpenSelector={onOpenSelector}
           viewportHeightOverride={undefined}
@@ -321,6 +326,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         suppressAllSpeakerLabels={suppressAllSpeakerLabels}
         onAction={handleDocumentAction}
         initialSectionId={initialScrollSectionId}
+        restoreRequest={restoreRequest}
         bottomContentInset={nowPlayingInset}
       />
     );
