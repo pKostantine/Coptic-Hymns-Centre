@@ -20,8 +20,6 @@ interface DocumentSurfaceProps {
   onOpenSelector?: () => void;
   /** Where a freshly mounted WebView (scroll mode) should scroll to on its very first load — see DocumentWebView's initialSectionId. Slideshow mode has its own equivalent via selectedSectionId, which (unlike this) can also drive jumps after the initial mount. */
   initialScrollSectionId?: string | null;
-  /** Scales the reading font size relative to the user's normal preference. Defaults to 1 — subdocuments intentionally match the main document's font size exactly, same as every other reading preference. */
-  fontScaleMultiplier?: number;
   /** Current on/off state of the in-document "Coptic Gospel Rite" toggle button (only rendered where GOSPEL_RITE content is spliced in). */
   copticGospelRite?: boolean;
   /** Forces every verse's person-type indicator (Priest:/Deacon:/etc.) hidden, in both the scroll and slideshow renderers — the Agpeya's own top-level documents default to this (see ServiceDocument.tsx), since the Hours are prayed by one person with no one to address a speaker role to; a subdocument/Antiphonary modal (DocumentModal.tsx) never sets this, so an Hour opened as a subdocument of a liturgical service keeps its real speaker roles. */
@@ -115,7 +113,6 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       selectedSectionId,
       onCurrentSectionChange,
       onOpenSelector,
-      fontScaleMultiplier = 1,
       copticGospelRite = false,
       suppressAllSpeakerLabels = false,
       initialScrollSectionId,
@@ -126,7 +123,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
   ) => {
     const { width: screenWidth } = useWindowDimensions();
     const { nowPlayingInset } = useBottomChrome();
-    const fontSize = Math.round(fontScaleToPx(preferences.fontScale) * fontScaleMultiplier);
+    const fontSize = fontScaleToPx(preferences.fontScale);
     const effectiveSelectText = preferences.selectText && !preferences.slideshowMode;
     // section.id already includes hymn_key + item_order. Combining it with
     // collapseMemoryScope keeps repeated hymns separate both within one
