@@ -46,6 +46,7 @@ export function buildBibleChapterHtml({
   isSlideshow = false,
   preface = null,
   initialVerse = null,
+  restoreVerse = null,
   bottomContentInset = 0,
 }: {
   verses: BibleDisplayVerse[];
@@ -59,6 +60,8 @@ export function buildBibleChapterHtml({
   bottomContentInset?: number;
   /** Verse to land on when the chapter opens (a search hit or a deep link), instead of the top. */
   initialVerse?: string | number | null;
+  /** Current verse to retain across language/display changes; never highlighted as a deep link. */
+  restoreVerse?: string | number | null;
 }) {
   const safeFontSize = Math.max(12, Number(fontSize) || 18);
   const effectiveSelectText = Boolean(selectText) && !isSlideshow;
@@ -341,6 +344,15 @@ export function buildBibleChapterHtml({
         var isSlideshow = ${JSON.stringify(Boolean(isSlideshow))};
         var selectTextEnabled = ${JSON.stringify(effectiveSelectText)};
         var initialVerse = ${JSON.stringify(initialVerse === null || initialVerse === undefined ? '' : String(initialVerse))};
+        var restoreVerse = ${JSON.stringify(restoreVerse === null || restoreVerse === undefined ? '' : String(restoreVerse))};
+        var initialAnchorVerse = restoreVerse || initialVerse;
+        var lastReportedVerse = '';
+        function reportVerse(verse) {
+          verse = String(verse || '');
+          if (!verse || verse === lastReportedVerse) return;
+          lastReportedVerse = verse;
+          post({ type: 'currentVerse', verse: verse });
+        }
         var selectableLanguages = ${JSON.stringify(effectiveLanguages)};
         var selectingLanguage = null;
         var richCopyColors = {
@@ -738,6 +750,8 @@ export function buildBibleChapterHtml({
             nextButton.setAttribute('aria-disabled', currentPage >= pageCount - 1 ? 'true' : 'false');
           }
           if (pagerStatus) pagerStatus.textContent = 'Slide ' + (currentPage + 1) + ' of ' + pageCount;
+          var current = getCurrentAnchor();
+          if (current) reportVerse(current.verse);
         }
 
         function paginate(preferredAnchor) {
@@ -848,7 +862,10 @@ export function buildBibleChapterHtml({
             selectAnchor({ verse: String(verse), progress: 0 });
             return;
           }
-          if (target) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          if (target) {
+            target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            reportVerse(verse);
+          }
         }
 
         window.selectBibleVerse = selectVerse;
@@ -944,8 +961,8 @@ export function buildBibleChapterHtml({
             var finishInitialLayout = function () {
               if (initialPaginationDone) return;
               initialPaginationDone = true;
-              paginate(initialVerse);
-              if (initialVerse) highlightVerse(initialVerse);
+              paginate(initialAnchorVerse);
+              if (initialVerse && !restoreVerse) highlightVerse(initialVerse);
             };
             if (document.fonts && document.fonts.ready) {
               document.fonts.ready.then(finishInitialLayout);
@@ -966,11 +983,32 @@ export function buildBibleChapterHtml({
               });
             }, 80);
           });
-        } else if (initialVerse) {
+        } else {
+          var rows = Array.prototype.slice.call(document.querySelectorAll('#source-document .verse-row[data-verse], .scroll-document .verse-row[data-verse], body.scroll .verse-row[data-verse]'));
+          var scrollReportPending = false;
+          function reportScrollVerse() {
+            scrollReportPending = false;
+            if (!rows.length) return;
+            var current = rows[0];
+            for (var i = 0; i < rows.length; i += 1) {
+              if (rows[i].getBoundingClientRect().top <= 96) current = rows[i];
+              else break;
+            }
+            reportVerse(current.getAttribute('data-verse'));
+          }
+          function scheduleScrollReport() {
+            if (scrollReportPending) return;
+            scrollReportPending = true;
+            requestAnimationFrame(reportScrollVerse);
+          }
+          window.addEventListener('scroll', scheduleScrollReport, { passive: true });
           requestAnimationFrame(function () {
-            var target = document.querySelector('[data-verse="' + String(initialVerse).replace(/"/g, '\\\\22 ') + '"]');
-            if (target) target.scrollIntoView({ block: 'start' });
-            highlightVerse(initialVerse);
+            if (initialAnchorVerse) {
+              var target = document.querySelector('[data-verse="' + String(initialAnchorVerse).replace(/"/g, '\\\\22 ') + '"]');
+              if (target) target.scrollIntoView({ block: 'start' });
+              if (initialVerse && !restoreVerse) highlightVerse(initialVerse);
+            }
+            scheduleScrollReport();
           });
         }
       })();
