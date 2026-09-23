@@ -47,6 +47,7 @@ export function buildBibleChapterHtml({
   preface = null,
   initialVerse = null,
   restoreVerse = null,
+  readerId = '',
   bottomContentInset = 0,
 }: {
   verses: BibleDisplayVerse[];
@@ -62,6 +63,8 @@ export function buildBibleChapterHtml({
   initialVerse?: string | number | null;
   /** Current verse to retain across language/display changes; never highlighted as a deep link. */
   restoreVerse?: string | number | null;
+  /** Identifies this HTML generation so stale iframe/WebView messages are ignored. */
+  readerId?: string;
 }) {
   const safeFontSize = Math.max(12, Number(fontSize) || 18);
   const effectiveSelectText = Boolean(selectText) && !isSlideshow;
@@ -346,6 +349,7 @@ export function buildBibleChapterHtml({
         var initialVerse = ${JSON.stringify(initialVerse === null || initialVerse === undefined ? '' : String(initialVerse))};
         var restoreVerse = ${JSON.stringify(restoreVerse === null || restoreVerse === undefined ? '' : String(restoreVerse))};
         var initialAnchorVerse = restoreVerse || initialVerse;
+        var readerId = ${JSON.stringify(readerId)};
         var lastReportedVerse = '';
         function reportVerse(verse) {
           verse = String(verse || '');
@@ -370,6 +374,7 @@ export function buildBibleChapterHtml({
         var pendingResizeAnchor = null;
 
         function post(message) {
+          message.readerId = readerId;
           var payload = JSON.stringify(message);
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
             window.ReactNativeWebView.postMessage(payload);

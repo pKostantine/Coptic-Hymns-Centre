@@ -197,6 +197,20 @@ export default function BibleChapterDocument() {
   latestSettingsSignatureRef.current = settingsSignature;
   const focusedRef = useRef(true);
   const blurredSnapshotRef = useRef<{ verse: string | null; signature: string } | null>(null);
+  // Language buttons live INSIDE the verse selector. Keep its opening verse
+  // fixed across every chapter HTML replacement until the selector closes.
+  const selectorAnchorRef = useRef<string | null>(null);
+  const selectorOpenRef = useRef(false);
+  const openVerseSelector = useCallback(() => {
+    selectorAnchorRef.current = currentVerseRef.current;
+    selectorOpenRef.current = true;
+    setIsSelectorOpen(true);
+  }, []);
+  const closeVerseSelector = useCallback(() => {
+    selectorOpenRef.current = false;
+    selectorAnchorRef.current = null;
+    setIsSelectorOpen(false);
+  }, []);
 
   // This chapter can stay mounted underneath Book Settings. Never let a
   // background iframe/WebView scroll report replace the frozen verse.
@@ -223,6 +237,8 @@ export default function BibleChapterDocument() {
     if (chapterIdentityRef.current !== `${bookKey}:${chapter}:${psalmNumbering}`) {
       chapterIdentityRef.current = `${bookKey}:${chapter}:${psalmNumbering}`;
       currentVerseRef.current = verseParam || null;
+      selectorAnchorRef.current = null;
+      selectorOpenRef.current = false;
       restoreGuardRef.current = null;
       setRestoreVerse(null);
       settingsSignatureRef.current = settingsSignature;
@@ -290,6 +306,7 @@ export default function BibleChapterDocument() {
   const chapterListLoaded = chapterKeys !== null;
   const chapterCount = chapterKeys?.length || 0;
 
+  const readerId = JSON.stringify([verseRequestKey, effectiveLanguageKeys, fontSize, effectiveSelectText, preferences.slideshowMode, restoreVerse, targetVerse]);
   const chapterHtml = useMemo(() => {
     if (!verses || !copticFontDataUri) return null;
     return buildBibleChapterHtml({
@@ -302,11 +319,12 @@ export default function BibleChapterDocument() {
       preface,
       initialVerse: targetVerse,
       restoreVerse,
+      readerId,
       // Now Playing is an overlay in slideshow mode. It must never shorten
       // the page or change where Bible verses split.
       bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, nowPlayingInset]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -314,20 +332,21 @@ export default function BibleChapterDocument() {
   const goToChapter = useCallback(
     (targetChapter: number | null) => {
       if (targetChapter === null) return;
-      setIsSelectorOpen(false);
+      closeVerseSelector();
       setTargetVerse(null);
       currentVerseRef.current = null;
       restoreGuardRef.current = null;
       setRestoreVerse(null);
       router.setParams({ chapter: String(targetChapter), verse: '' });
     },
-    [router],
+    [router, closeVerseSelector],
   );
 
   function selectVerse(verse: number | string) {
-    setIsSelectorOpen(false);
+    closeVerseSelector();
     currentVerseRef.current = String(verse);
     restoreGuardRef.current = null;
+    setRestoreVerse(String(verse));
     bibleWebViewRef.current?.selectVerse(verse);
   }
 
@@ -335,9 +354,14 @@ export default function BibleChapterDocument() {
     const next = { ...enabledLanguages, [language]: !enabledLanguages[language] };
     const activeCount = availableLanguages.filter((item) => next[item]).length;
     if (activeCount) {
-      if (currentVerseRef.current) {
-        restoreGuardRef.current = currentVerseRef.current;
-        setRestoreVerse(currentVerseRef.current);
+      // A language toggle must use the ORIGINAL verse from opening this
+      // selector, not a transient scroll report from the reloading chapter.
+      const anchor = selectorAnchorRef.current || currentVerseRef.current;
+      if (anchor) {
+        selectorAnchorRef.current = anchor;
+        currentVerseRef.current = anchor;
+        restoreGuardRef.current = anchor;
+        setRestoreVerse(anchor);
       }
       setBibleVisibleLanguages(next);
     }
@@ -396,7 +420,7 @@ export default function BibleChapterDocument() {
         onBack={goBackALevel}
         rightIcon="list-outline"
         rightAccessibilityLabel={selectorText.openSelector}
-        onRightPress={() => setIsSelectorOpen(true)}
+        onRightPress={openVerseSelector}
         rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
         onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
       />
@@ -416,11 +440,11 @@ export default function BibleChapterDocument() {
             selectText={effectiveSelectText}
             onAction={(action) => {
               if (action.type === 'currentVerse' && action.verse) {
-                if (!focusedRef.current) return;
+                if (action.readerId !== readerId || !focusedRef.current || selectorOpenRef.current) return;
                 if (restoreGuardRef.current && restoreGuardRef.current !== action.verse) return;
                 restoreGuardRef.current = null;
                 currentVerseRef.current = action.verse;
-              } else if (action.type === 'openSelector') setIsSelectorOpen(true);
+              } else if (action.type === 'openSelector') openVerseSelector();
               else if (action.type === 'previousLevel') goBackALevel();
             }}
           />
@@ -429,11 +453,11 @@ export default function BibleChapterDocument() {
             animationType="none"
             transparent
             visible={isSelectorOpen}
-            onRequestClose={() => setIsSelectorOpen(false)}
+            onRequestClose={closeVerseSelector}
             supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
           >
             <View style={styles.selectorOverlay}>
-              <Pressable accessibilityLabel={selectorText.closeSelector} style={styles.selectorBackdrop} onPress={() => setIsSelectorOpen(false)} />
+              <Pressable accessibilityLabel={selectorText.closeSelector} style={styles.selectorBackdrop} onPress={closeVerseSelector} />
               <Animated.View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top, transform: [{ translateX: selectorSlide.interpolate({ inputRange: [0, 1], outputRange: [0, selectorPanelWidth] }) }] }]}>
                 <View style={styles.selectorHeader}>
                   {preferences.appLanguage === 'ar' ? (
@@ -537,9 +561,10 @@ export default function BibleChapterDocument() {
                     accessibilityLabel={selectorText.openBibleSettings}
                     style={styles.selectorIconButton}
                     onPress={() => {
-                      setIsSelectorOpen(false);
+                      const anchor = selectorAnchorRef.current || currentVerseRef.current;
+                      closeVerseSelector();
                       blurredSnapshotRef.current = {
-                        verse: currentVerseRef.current,
+                        verse: anchor,
                         signature: latestSettingsSignatureRef.current,
                       };
                       router.push('/book-settings');
