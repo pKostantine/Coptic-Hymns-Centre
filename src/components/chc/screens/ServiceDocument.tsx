@@ -30,8 +30,8 @@ import {
 } from '../../../utils/sectionRestore';
 import { goBack } from '../../../utils/navigation';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
+import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
 import { getUserConditionFlags } from '../../../utils/userConditionFlags';
-import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import {
   createSermonHighlight,
   getSermonPlannerReferences,
@@ -75,8 +75,7 @@ interface AntiphonaryModalTarget {
  * difference, not a gap to close: the header is web's only affordance for
  * "how do I get back/open the content list" since a phone browser has no
  * native swipe-back gesture of its own to conflict with. The swipe gestures
- * themselves are still enabled on narrow web (isCompactViewport) since they
- * don't remove anything the header already provides.
+ * are native-only: web always uses the visible header and never swipe-exits.
  */
 export default function ServiceDocument({ schema, table, title, arabic, extraContext, entryId, backHref }: ServiceDocumentProps) {
   const router = useRouter();
@@ -105,7 +104,6 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
-  const isCompactViewport = isMobileDocument || screenWidth < MOBILE_WEB_BREAKPOINT;
   // Qualified by the entry point only where the document is reachable from
   // more than one, so bookmarks for every other document keep their existing
   // ids. Without this, a bookmark made in Vespers and one made in Matins were
@@ -550,7 +548,12 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     router.replace(destination.href as Href);
   };
 
+  const pencilGestureActiveRef = useRef(false);
   const handleAction = (action: DocumentAction) => {
+    if (isSermonPlanner && action.type === 'sermonPencilGesture') {
+      pencilGestureActiveRef.current = Boolean(action.active);
+      return;
+    }
     if (isSermonPlanner && action.type === 'createSermonHighlights') {
       const color = action.color === 'rose' || action.color === 'blue' || action.color === 'green'
         ? action.color
@@ -706,8 +709,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
 
   const gesturePanResponder = useMemo(
     () => {
-      const shouldHandleEdgeSwipe = (gestureState: { x0: number; dx: number; dy: number }) => {
-        if (isCoveredByModal) return false;
+      const shouldHandleEdgeSwipe = (event: unknown, gestureState: { x0: number; dx: number; dy: number }) => {
+        if (isCoveredByModal || isStylusGestureEvent(event) || pencilGestureActiveRef.current) return false;
         const startsInRightEdge = gestureState.x0 >= selectorSwipeStartX;
         const startsInLeftEdge = gestureState.x0 < 56;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
@@ -715,10 +718,10 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       };
 
       return PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_, gestureState) => shouldHandleEdgeSwipe(gestureState),
-        onMoveShouldSetPanResponder: (_, gestureState) => shouldHandleEdgeSwipe(gestureState),
-        onPanResponderRelease: (_, gestureState) => {
-          if (isCoveredByModal) return;
+        onMoveShouldSetPanResponderCapture: (event, gestureState) => shouldHandleEdgeSwipe(event, gestureState),
+        onMoveShouldSetPanResponder: (event, gestureState) => shouldHandleEdgeSwipe(event, gestureState),
+        onPanResponderRelease: (event, gestureState) => {
+          if (isCoveredByModal || isStylusGestureEvent(event) || pencilGestureActiveRef.current) return;
           if (gestureState.x0 >= selectorSwipeStartX && gestureState.dx <= -36) {
             setSelectorOpen(true);
             return;
@@ -736,7 +739,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     <SafeAreaView
       edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
       style={styles.safeArea}
-      {...(isCompactViewport ? gesturePanResponder.panHandlers : {})}
+      {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}
     >
       {/* The native stack's own default edge-swipe-to-go-back gesture isn't
           scoped to whether a subdocument modal is currently covering this
