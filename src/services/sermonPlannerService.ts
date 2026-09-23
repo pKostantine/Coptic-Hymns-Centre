@@ -27,7 +27,7 @@ export async function loadCloudSermonPlan(
 ): Promise<SermonPlan | null> {
   const { data, error } = await supabase
     .from('sermon_plans')
-    .select('document_key, service_date, general_notes, highlights, updated_at')
+    .select('document_key, service_date, general_notes, highlights, highlight_deletions, updated_at')
     .eq('document_key', documentKey)
     .eq('service_date', serviceDate)
     .maybeSingle();
@@ -39,6 +39,7 @@ export async function loadCloudSermonPlan(
     serviceDate: data.service_date,
     generalNotes: data.general_notes,
     highlights: data.highlights,
+    highlightDeletions: data.highlight_deletions,
     updatedAt: data.updated_at,
   }, documentKey, serviceDate);
 }
@@ -50,8 +51,8 @@ export async function saveCloudSermonPlan(userId: string, plan: SermonPlan): Pro
     service_date: plan.serviceDate,
     general_notes: plan.generalNotes,
     highlights: plan.highlights,
+    highlight_deletions: plan.highlightDeletions,
     updated_at: plan.updatedAt,
   }, { onConflict: 'user_id,document_key,service_date' });
   if (error) throw new Error(error.message || 'Unable to save sermon notes.');
 }
-

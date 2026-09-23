@@ -26,6 +26,7 @@ export interface SermonPlan {
   serviceDate: string;
   generalNotes: string;
   highlights: SermonHighlight[];
+  highlightDeletions: Record<string, string>;
   updatedAt: string;
 }
 
@@ -36,4 +37,3 @@ export interface SermonReadingReference {
   verseId: string;
   kind: 'scripture' | 'synaxarium';
 }
-

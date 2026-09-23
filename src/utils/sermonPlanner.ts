@@ -10,6 +10,7 @@ import {
 } from '@/types/sermonPlanner';
 
 const MAX_HIGHLIGHTS = 1000;
+const MAX_HIGHLIGHT_DELETIONS = 1000;
 const MAX_NOTE_LENGTH = 100_000;
 
 function cleanText(value: unknown, maxLength = MAX_NOTE_LENGTH): string {
@@ -39,6 +40,16 @@ export function isSermonHighlightAnchor(value: unknown): value is SermonHighligh
 
 function cleanIsoDate(value: unknown, fallback: string): string {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? value : fallback;
+}
+
+function normalizeHighlightDeletions(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([id, deletedAt]) => id.length > 0 && id.length <= 120 && typeof deletedAt === 'string' && !Number.isNaN(Date.parse(deletedAt)))
+      .sort(([, left], [, right]) => Date.parse(String(right)) - Date.parse(String(left)))
+      .slice(0, MAX_HIGHLIGHT_DELETIONS),
+  );
 }
 
 export function normalizeSermonHighlight(value: unknown): SermonHighlight | null {
@@ -75,6 +86,7 @@ export function emptySermonPlan(documentKey: string, serviceDate: string): Sermo
     serviceDate,
     generalNotes: '',
     highlights: [],
+    highlightDeletions: {},
     updatedAt: new Date(0).toISOString(),
   };
 }
@@ -93,6 +105,7 @@ export function normalizeSermonPlan(
     highlights: Array.isArray(plan.highlights)
       ? plan.highlights.map(normalizeSermonHighlight).filter((item): item is SermonHighlight => Boolean(item)).slice(0, MAX_HIGHLIGHTS)
       : [],
+    highlightDeletions: normalizeHighlightDeletions(plan.highlightDeletions),
     updatedAt: cleanIsoDate(plan.updatedAt, fallback.updatedAt),
   };
 }
@@ -105,13 +118,27 @@ export function mergeSermonPlans(local: SermonPlan, cloud: SermonPlan): SermonPl
       byId.set(highlight.id, highlight);
     }
   }
+  const highlightDeletions: Record<string, string> = {};
+  for (const deletions of [cloud.highlightDeletions, local.highlightDeletions]) {
+    for (const [id, deletedAt] of Object.entries(deletions)) {
+      const current = highlightDeletions[id];
+      if (!current || Date.parse(deletedAt) >= Date.parse(current)) highlightDeletions[id] = deletedAt;
+    }
+  }
   const localIsNewer = Date.parse(local.updatedAt) >= Date.parse(cloud.updatedAt);
   return {
     version: 1,
     documentKey: local.documentKey,
     serviceDate: local.serviceDate,
     generalNotes: localIsNewer ? local.generalNotes : cloud.generalNotes,
-    highlights: [...byId.values()].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)).slice(0, MAX_HIGHLIGHTS),
+    highlights: [...byId.values()]
+      .filter((highlight) => {
+        const deletedAt = highlightDeletions[highlight.id];
+        return !deletedAt || Date.parse(highlight.updatedAt) > Date.parse(deletedAt);
+      })
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+      .slice(0, MAX_HIGHLIGHTS),
+    highlightDeletions: normalizeHighlightDeletions(highlightDeletions),
     updatedAt: localIsNewer ? local.updatedAt : cloud.updatedAt,
   };
 }

@@ -22,23 +22,28 @@ export function useSermonPlanner(
   const [loadedIdentity, setLoadedIdentity] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SermonPlanSyncStatus>('local');
   const cloudSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const activeIdentityRef = useRef(identity);
 
   useEffect(() => {
+    activeIdentityRef.current = identity;
     let cancelled = false;
     if (!enabled) {
-      setPlan(emptySermonPlan(documentKey, serviceDate));
-      setLoadedIdentity(identity);
-      setSyncStatus('local');
-      return () => { cancelled = true; };
+      const timer = setTimeout(() => {
+        if (cancelled) return;
+        setPlan(emptySermonPlan(documentKey, serviceDate));
+        setLoadedIdentity(identity);
+        setSyncStatus('local');
+      }, 0);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
     }
-    setLoadedIdentity(null);
-    setPlan(emptySermonPlan(documentKey, serviceDate));
-    setSyncStatus(userId ? 'syncing' : 'local');
-
     const load = async () => {
       const local = await loadLocalSermonPlan(documentKey, serviceDate);
       let next = local;
       if (userId) {
+        if (!cancelled) setSyncStatus('syncing');
         try {
           const cloud = await loadCloudSermonPlan(documentKey, serviceDate);
           next = cloud ? mergeSermonPlans(local, cloud) : local;
@@ -51,6 +56,8 @@ export function useSermonPlanner(
           console.warn('Unable to synchronize sermon notes:', error);
           if (!cancelled) setSyncStatus('error');
         }
+      } else if (!cancelled) {
+        setSyncStatus('local');
       }
       if (cancelled) return;
       setPlan(next);
@@ -64,10 +71,7 @@ export function useSermonPlanner(
   useEffect(() => {
     if (!enabled || loadedIdentity !== identity) return;
     void saveLocalSermonPlan(plan);
-    if (!userId) {
-      setSyncStatus('local');
-      return;
-    }
+    if (!userId) return;
 
     const snapshot = plan;
     const timer = setTimeout(() => {
@@ -75,10 +79,12 @@ export function useSermonPlanner(
       cloudSaveQueueRef.current = cloudSaveQueueRef.current
         .catch(() => undefined)
         .then(() => saveCloudSermonPlan(userId, snapshot))
-        .then(() => setSyncStatus('synced'))
+        .then(() => {
+          if (activeIdentityRef.current === identity) setSyncStatus('synced');
+        })
         .catch((error) => {
           console.warn('Unable to save sermon notes:', error);
-          setSyncStatus('error');
+          if (activeIdentityRef.current === identity) setSyncStatus('error');
         });
     }, 700);
     return () => clearTimeout(timer);
@@ -93,7 +99,15 @@ export function useSermonPlanner(
 
   const addHighlights = useCallback((highlights: SermonHighlight[]) => {
     if (!highlights.length) return;
-    updatePlan((current) => ({ ...current, highlights: [...current.highlights, ...highlights].slice(0, 1000) }));
+    updatePlan((current) => {
+      const highlightDeletions = { ...current.highlightDeletions };
+      highlights.forEach((highlight) => delete highlightDeletions[highlight.id]);
+      return {
+        ...current,
+        highlights: [...current.highlights, ...highlights].slice(0, 1000),
+        highlightDeletions,
+      };
+    });
   }, [updatePlan]);
 
   const updateHighlight = useCallback((id: string, patch: Partial<Pick<SermonHighlight, 'note' | 'color'>>) => {
@@ -107,9 +121,11 @@ export function useSermonPlanner(
   }, [updatePlan]);
 
   const deleteHighlight = useCallback((id: string) => {
+    const deletedAt = new Date().toISOString();
     updatePlan((current) => ({
       ...current,
       highlights: current.highlights.filter((highlight) => highlight.id !== id),
+      highlightDeletions: { ...current.highlightDeletions, [id]: deletedAt },
     }));
   }, [updatePlan]);
 
@@ -122,7 +138,7 @@ export function useSermonPlanner(
   }, [updateHighlight]);
 
   return {
-    plan,
+    plan: loadedIdentity === identity ? plan : emptySermonPlan(documentKey, serviceDate),
     ready: loadedIdentity === identity,
     syncStatus,
     addHighlights,

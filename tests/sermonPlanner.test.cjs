@@ -165,6 +165,53 @@ test('Highlight citations retain the exact reading and verse number', () => {
   assert.equal(labels['unrelated::v0'], undefined, 'Do not attach an unrelated previous citation');
 });
 
+test('A synced highlight deletion wins over an older copy from another device', () => {
+  const utilSource = fs.readFileSync('src/utils/sermonPlanner.ts', 'utf8');
+  const start = utilSource.indexOf('export function mergeSermonPlans(');
+  const end = utilSource.indexOf('\nexport function createSermonHighlight(', start);
+  assert.ok(start >= 0 && end > start);
+  const compiled = utilSource.slice(start, end)
+    .replace(
+      'export function mergeSermonPlans(local: SermonPlan, cloud: SermonPlan): SermonPlan {',
+      'function mergeSermonPlans(local, cloud) {',
+    )
+    .replace('const byId = new Map<string, SermonHighlight>();', 'const byId = new Map();')
+    .replace('const highlightDeletions: Record<string, string> = {};', 'const highlightDeletions = {};');
+  const normalizeHighlightDeletions = (value) => value;
+  const merge = new Function(
+    'normalizeHighlightDeletions',
+    'MAX_HIGHLIGHTS',
+    `${compiled}\nreturn mergeSermonPlans;`,
+  )(normalizeHighlightDeletions, 1000);
+  const old = '2026-09-23T10:00:00.000Z';
+  const removed = '2026-09-23T11:00:00.000Z';
+  const base = {
+    version: 1,
+    documentKey: 'liturgy.sermon_planner',
+    serviceDate: '2026-09-23',
+    generalNotes: '',
+  };
+  const highlight = {
+    id: 'shared-highlight',
+    sectionId: 'gospel',
+    verseId: 'gospel::v1',
+    language: 'english',
+    startOffset: 0,
+    endOffset: 4,
+    quote: 'Word',
+    color: 'gold',
+    note: '',
+    createdAt: old,
+    updatedAt: old,
+  };
+  const merged = merge(
+    { ...base, highlights: [], highlightDeletions: { [highlight.id]: removed }, updatedAt: removed },
+    { ...base, highlights: [highlight], highlightDeletions: {}, updatedAt: old },
+  );
+  assert.deepEqual(merged.highlights, []);
+  assert.equal(merged.highlightDeletions[highlight.id], removed);
+});
+
 test('Sermon selection snaps across complete English, Arabic and Coptic words', () => {
   const html = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
   const start = html.indexOf('function expandToWholeWords(text, start, end)');
