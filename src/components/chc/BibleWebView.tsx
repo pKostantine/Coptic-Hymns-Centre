@@ -9,19 +9,23 @@ export interface BibleWebViewHandle {
 }
 
 export interface BibleWebViewAction {
-  type: 'openSelector' | 'previousLevel';
+  type: 'openSelector' | 'previousLevel' | 'currentVerse';
+  verse?: string;
 }
 
 interface BibleWebViewProps {
   html: string;
+  restoreVerse?: string | null;
   scrollEnabled?: boolean;
   selectText?: boolean;
   onAction?: (action: BibleWebViewAction) => void;
 }
 
 /** Native (iOS/Android) Bible chapter renderer — see bibleDocumentHtml.ts for the shared HTML builder. BibleWebView.web.tsx is the web counterpart (plain iframe). */
-const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, scrollEnabled = true, selectText = false, onAction }, ref) => {
+const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, scrollEnabled = true, selectText = false, onAction }, ref) => {
   const webviewRef = useRef<WebView>(null);
+  const restoreVerseRef = useRef(restoreVerse);
+  restoreVerseRef.current = restoreVerse;
 
   useImperativeHandle(ref, () => ({
     selectVerse: (verse: number | string) => {
@@ -50,6 +54,10 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
       javaScriptEnabled
       textInteractionEnabled={selectText}
       onMessage={handleMessage}
+      onLoadEnd={() => {
+        const verse = restoreVerseRef.current;
+        if (verse) webviewRef.current?.injectJavaScript(`window.selectBibleVerse && window.selectBibleVerse(${JSON.stringify(verse)}); true;`);
+      }}
     />
   );
 });
