@@ -44,6 +44,7 @@ export function buildBibleChapterHtml({
   copticFontDataUri,
   selectText = false,
   isSlideshow = false,
+  nativeSwipeNavigation = false,
   preface = null,
   initialVerse = null,
   restoreVerse = null,
@@ -56,6 +57,8 @@ export function buildBibleChapterHtml({
   copticFontDataUri: string;
   selectText?: boolean;
   isSlideshow?: boolean;
+  /** Browser and PWA readers must not swipe back out of a chapter. */
+  nativeSwipeNavigation?: boolean;
   preface?: BiblePreface | null;
   /** Extra bottom clearance for app-level floating chrome, in CSS pixels. */
   bottomContentInset?: number;
@@ -922,7 +925,7 @@ export function buildBibleChapterHtml({
         }, { passive: true });
         document.addEventListener('touchend', function (event) {
           var touch = event.changedTouches && event.changedTouches[0];
-          if (!touch) return;
+          if (!touch || touch.touchType === 'stylus') return;
           var dx = touch.clientX - startX;
           var dy = touch.clientY - startY;
           if (Math.abs(dx) < 36 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
@@ -930,7 +933,7 @@ export function buildBibleChapterHtml({
           // one swipe advances here and then advances a second time through
           // the transparent tap-zone button underneath it.
           suppressClickUntil = Date.now() + 500;
-          if (startX < Math.min(96, Math.max(56, window.innerWidth * 0.16)) && dx > 60) {
+          if (${JSON.stringify(nativeSwipeNavigation)} && startX < Math.min(96, Math.max(56, window.innerWidth * 0.16)) && dx > 60) {
             post({ type: 'previousLevel' });
             return;
           }
