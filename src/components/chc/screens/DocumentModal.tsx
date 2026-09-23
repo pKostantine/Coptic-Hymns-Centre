@@ -6,7 +6,7 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
-import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
+import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
 import GlobalNowPlayingOverlay from '../../playback/GlobalNowPlayingOverlay';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
@@ -91,10 +91,9 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
   const documentRef = useRef<DocumentWebViewHandle>(null);
   const { width: screenWidth } = useWindowDimensions();
-  // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
-  // get the same swipe-to-close gesture as the native app, same as
-  // ServiceDocument.tsx/lectionary/index.tsx.
-  const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
+  // Browser navigation always uses the visible header; only native touch
+  // should ever close a subdocument by swiping from its edge.
+  const isMobileDocument = Platform.OS !== 'web';
 
   // Anything stacked over this document: a deeper subdocument, the content
   // selector, or one of the overlay screens above. While any of them is up,
@@ -224,35 +223,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     else documentRef.current?.scrollToSection(introSection.id);
   }
 
-  const safeAreaRef = useRef<any>(null);
-
-  // Desktop-web left-edge swipe: attaches to the SafeAreaView's DOM node so
-  // pointer drags that start outside the iframe (e.g. in the header) also
-  // close the modal. Drags starting *inside* the iframe are handled by the
-  // swipeBack script embedded in documentHtml.ts.
-  useEffect(() => {
-    if (Platform.OS !== 'web' || isMobileDocument || !visible) return;
-    const el = safeAreaRef.current as HTMLElement | null;
-    if (!el || typeof el.addEventListener !== 'function') return;
-    let startX: number | null = null;
-    const onDown = (e: PointerEvent) => {
-      if (isCovered || e.clientX >= 56) return;
-      startX = e.clientX;
-    };
-    const onUp = (e: PointerEvent) => {
-      if (startX === null) return;
-      const dx = e.clientX - startX;
-      startX = null;
-      if (dx > 60) onClose();
-    };
-    el.addEventListener('pointerdown', onDown);
-    document.addEventListener('pointerup', onUp);
-    return () => {
-      el.removeEventListener('pointerdown', onDown);
-      document.removeEventListener('pointerup', onUp);
-    };
-  }, [visible, isMobileDocument, isCovered, onClose]);
-
   // Capture-phase gesture handler for the two screen-edge swipes: left-edge
   // right-swipe closes this modal; right-edge left-swipe opens the content
   // selector. Using onMoveShouldSetPanResponderCapture (not the plain non-
@@ -265,7 +235,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
     return PanResponder.create({
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        if (isCovered) return false;
+        if (isCovered || isStylusGestureEvent(_)) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal) return false;
         const isCloseSwipe = gestureState.x0 < 56 && gestureState.dx > 12;
@@ -274,8 +244,8 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           gestureState.dx < -12;
         return isCloseSwipe || isSelectorSwipe;
       },
-      onPanResponderRelease: (_, gestureState) => {
-        if (isCovered) return;
+      onPanResponderRelease: (event, gestureState) => {
+        if (isCovered || isStylusGestureEvent(event)) return;
         if (gestureState.x0 < 56 && gestureState.dx > 60) {
           onClose();
           return;
@@ -291,7 +261,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
       <SafeAreaView
-        ref={safeAreaRef}
         edges={['left', 'right', 'bottom']}
         style={styles.screen}
         {...(isMobileDocument ? swipeGesturePanResponder.panHandlers : {})}

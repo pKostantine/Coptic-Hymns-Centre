@@ -137,3 +137,80 @@ test('Sermon Planner omits only the Synaxarium date and priest introduction', ()
     'The standard Lectionary Synaxarium must retain the date and introduction',
   );
 });
+
+
+test('Highlight citations retain the exact reading and verse number', () => {
+  const utilSource = fs.readFileSync('src/utils/sermonPlanner.ts', 'utf8');
+  const start = utilSource.indexOf('export function getSermonHighlightVerseReferences(');
+  const end = utilSource.indexOf('\nexport function getSermonPlannerReferences(', start);
+  assert.ok(start >= 0 && end > start);
+  const compiled = utilSource.slice(start, end).replace(
+    'export function getSermonHighlightVerseReferences(sections: DocumentSection[]): Record<string, string> {',
+    'function getSermonHighlightVerseReferences(sections) {',
+  ).replace('const result: Record<string, string> = {};', 'const result = {};');
+  const getReferences = new Function(compiled + '\nreturn getSermonHighlightVerseReferences;')();
+  const labels = getReferences([
+    { id: 'gospel', verses: [
+      { type: 'readingReference', english: 'John 1:1–18' },
+      { type: 'text', bibleVerseNumber: '1' },
+      { type: 'text', bibleVerseNumber: '2' },
+    ] },
+    { id: 'synaxarium', sourceGroupKey: 'SYNAXARIUM', verses: [{ type: 'text', english: 'A saint' }] },
+    { id: 'unrelated', verses: [{ type: 'text', english: 'A hymn' }] },
+  ]);
+  assert.equal(labels['gospel::v0'], 'John 1:1–18');
+  assert.equal(labels['gospel::v1'], 'John 1:1–18 · v. 1');
+  assert.equal(labels['gospel::v2'], 'John 1:1–18 · v. 2');
+  assert.equal(labels['synaxarium::v0'], 'Synaxarium');
+  assert.equal(labels['unrelated::v0'], undefined, 'Do not attach an unrelated previous citation');
+});
+
+test('Sermon selection snaps across complete English, Arabic and Coptic words', () => {
+  const html = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
+  const start = html.indexOf('function expandToWholeWords(text, start, end)');
+  const end = html.indexOf('function anchorsFromSelection(selection)', start);
+  assert.ok(start >= 0 && end > start);
+  // This helper is embedded in a TS template string; unescape its regex
+  // before running the same JavaScript in isolation.
+  const definition = html.slice(start, end).replaceAll('\\\\p', '\\p');
+  const expand = new Function(definition + '\nreturn expandToWholeWords;')();
+  const cases = [
+    ['Let your light shine', 1, 2, 'Let'],
+    ['We cannot serve', 4, 6, 'cannot'],
+    ['باسم الآب', 1, 3, 'باسم'],
+    ['Ⲡⲓⲱⲟⲩ', 1, 3, 'Ⲡⲓⲱⲟⲩ'],
+  ];
+  for (const [text, first, last, expected] of cases) {
+    const range = expand(text, first, last);
+    assert.equal(text.slice(range.start, range.end), expected, text);
+  }
+  const withoutSegmenter = new Function('Intl', definition + '\nreturn expandToWholeWords;')({});
+  const fallback = withoutSegmenter('باسم الآب', 1, 3);
+  assert.equal('باسم الآب'.slice(fallback.start, fallback.end), 'باسم');
+});
+
+test('Sermon notes open on highlighted text, not an eye icon', () => {
+  const drawer = fs.readFileSync('src/components/chc/ui/SermonPlannerDrawer.tsx', 'utf8');
+  assert.match(drawer, /verseReferences\[highlight\.verseId\]/);
+  assert.match(drawer, /accessibilityLabel=\{\`Go to highlighted verse/);
+  assert.match(drawer, /onJumpToHighlight\(highlight\)/);
+  assert.doesNotMatch(drawer, /name="eye-outline"/);
+});
+
+test('Web documents and Bible never attach app swipe-exit gestures', () => {
+  const html = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
+  const nativeView = fs.readFileSync('src/components/chc/DocumentWebView.tsx', 'utf8');
+  const service = fs.readFileSync('src/components/chc/screens/ServiceDocument.tsx', 'utf8');
+  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  const bible = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
+  const bibleHtml = fs.readFileSync('src/components/chc/bibleDocumentHtml.ts', 'utf8');
+  assert.match(html, /if \(!\$\{JSON\.stringify\(nativeSwipeNavigation\)\}\) return;/);
+  assert.match(nativeView, /nativeSwipeNavigation: true/);
+  assert.match(service, /isMobileDocument \? gesturePanResponder\.panHandlers/);
+  assert.match(modal, /isMobileDocument \? swipeGesturePanResponder\.panHandlers/);
+  assert.doesNotMatch(modal, /pointerup', onUp/);
+  assert.match(bible, /Platform\.OS !== 'web' \? gesturePanResponder\.panHandlers/);
+  assert.match(bibleHtml, /nativeSwipeNavigation/);
+  assert.match(service, /pencilGestureActiveRef\.current/);
+  assert.match(bible, /isStylusGestureEvent\(event\)/);
+});

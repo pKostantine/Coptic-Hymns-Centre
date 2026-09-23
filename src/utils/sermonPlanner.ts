@@ -132,6 +132,29 @@ export function createSermonHighlight(
   };
 }
 
+/**
+ * Resolve a highlight's exact source reading without guessing from the most
+ * recently seen unrelated hymn. Citation rows and their numbered verses live
+ * together in hydrated reading sections; Synaxarium sections carry a group key.
+ */
+export function getSermonHighlightVerseReferences(sections: DocumentSection[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const section of sections) {
+    let citation = section.sourceGroupKey === 'SYNAXARIUM' ? 'Synaxarium' : '';
+    for (let index = 0; index < section.verses.length; index += 1) {
+      const verse = section.verses[index];
+      if (verse.type === 'readingReference') {
+        citation = String(verse.english || verse.arabic || '').trim();
+      }
+      if (!citation) continue;
+      const number = String(verse.bibleVerseNumber || '').trim();
+      result[`${section.id}::v${index}`] =
+        number && verse.type !== 'readingReference' ? `${citation} · v. ${number}` : citation;
+    }
+  }
+  return result;
+}
+
 export function getSermonPlannerReferences(sections: DocumentSection[]): SermonReadingReference[] {
   const references: SermonReadingReference[] = [];
   const seen = new Set<string>();

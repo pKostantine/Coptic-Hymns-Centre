@@ -28,6 +28,7 @@ import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
 import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
+import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
 
 type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
 type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
@@ -316,6 +317,7 @@ export default function BibleChapterDocument() {
       copticFontDataUri,
       selectText: effectiveSelectText,
       isSlideshow: preferences.slideshowMode,
+      nativeSwipeNavigation: Platform.OS !== 'web',
       preface,
       initialVerse: targetVerse,
       restoreVerse,
@@ -388,14 +390,16 @@ export default function BibleChapterDocument() {
   const gesturePanResponder = useMemo(() => {
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
     return PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
+      onMoveShouldSetPanResponder: (event, gestureState) => {
+        if (isStylusGestureEvent(event)) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
         if (!isHorizontal) return false;
         const isBackSwipe = gestureState.x0 < 56 && gestureState.dx > 24;
         const isSelectorSwipe = !isSelectorOpen && gestureState.x0 > screenWidth - selectorEdgeWidth && gestureState.dx < -24;
         return isBackSwipe || isSelectorSwipe;
       },
-      onPanResponderRelease: (_, gestureState) => {
+      onPanResponderRelease: (event, gestureState) => {
+        if (isStylusGestureEvent(event)) return;
         const selectorEdge = Math.min(240, Math.max(128, screenWidth * 0.18));
         if (gestureState.x0 < 56 && gestureState.dx > 60) {
           goBackALevel();
@@ -407,7 +411,7 @@ export default function BibleChapterDocument() {
   }, [goBackALevel, screenWidth, isSelectorOpen]);
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}>
       <Head>
         <title>{`CHC ${headerTitleEnglish || 'Bible'}`}</title>
       </Head>
