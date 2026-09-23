@@ -228,10 +228,10 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   const openResult = (result: UnifiedSearchResult) => {
     switch (result.kind) {
       case 'music_artist':
-        router.push('/music/artist/' + result.entityId);
+        router.push({ pathname: '/music/artist/[id]', params: { id: result.entityId } });
         return;
       case 'music_release':
-        router.push('/music/release/' + result.entityId);
+        router.push({ pathname: '/music/release/[id]', params: { id: result.entityId } });
         return;
       case 'music_track': {
         if (musicPlayer.currentItem?.track.id === result.entityId) {
@@ -242,20 +242,23 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
         return;
       }
       case 'learning_cantor':
-        router.push('/learn/cantor/' + result.entityId);
+        router.push({ pathname: '/learn/cantor/[id]', params: { id: result.entityId } });
         return;
       case 'learning_season':
-        router.push('/learn/season/' + result.entityId);
+        router.push({ pathname: '/learn/season/[id]', params: { id: result.entityId } });
         return;
       case 'learning_hymn':
-        router.push('/learn/hymn/' + result.entityId);
+        router.push({ pathname: '/learn/hymn/[id]', params: { id: result.entityId } });
         return;
       case 'learning_album':
-        router.push('/learn/album/' + result.entityId);
+        router.push({ pathname: '/learn/album/[id]', params: { id: result.entityId } });
         return;
       case 'learning_lesson': {
         if (result.metadata.mediaType === 'video') {
-          router.push('/learn/lesson/' + result.entityId + '?setId=' + result.metadata.lessonSetId);
+          router.push({
+            pathname: '/learn/lesson/[id]',
+            params: { id: result.entityId, setId: result.metadata.lessonSetId },
+          });
           return;
         }
         if (learningPlayer.currentItem?.id === result.entityId) {
@@ -281,7 +284,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   };
 
   const openTrackPage = (result: Extract<UnifiedSearchResult, { kind: 'music_track' }>) => {
-    router.push('/music/track/' + result.entityId);
+    router.push({ pathname: '/music/track/[id]', params: { id: result.entityId } });
   };
 
   const hasQuery = Boolean(query.trim());

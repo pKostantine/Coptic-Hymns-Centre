@@ -46,7 +46,7 @@ export default function LearningSeasonsScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.list}>
           {seasons?.map((season, index) => (
-            <Pressable key={season.id} style={styles.card} onPress={() => router.push('/learn/season/' + season.id)}>
+            <Pressable key={season.id} style={styles.card} onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: season.id } })}>
               <View style={styles.number}><Text style={styles.numberText}>{String(index + 1).padStart(2, '0')}</Text></View>
               <View style={styles.info}>
                 <Text style={[styles.title, isArabic && styles.arabic]}>{season.title}</Text>

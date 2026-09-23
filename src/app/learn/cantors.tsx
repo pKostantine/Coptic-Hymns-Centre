@@ -47,7 +47,7 @@ export default function LearningCantorsScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.grid}>
           {cantors?.map((cantor) => (
-            <Pressable key={cantor.id} style={styles.card} onPress={() => router.push('/learn/cantor/' + cantor.id)}>
+            <Pressable key={cantor.id} style={styles.card} onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: cantor.id } })}>
               <LearningArtwork asset={cantor.profileImageAsset} size={82} rounded label={cantor.displayName} />
               <View style={styles.info}>
                 <Text style={[styles.name, isArabic && styles.arabic]}>{cantor.displayName}</Text>

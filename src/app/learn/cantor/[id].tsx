@@ -65,7 +65,7 @@ export default function LearningCantorScreen() {
                 description={album.description}
                 meta={isArabic ? 'ألبوم تعلّم' : 'Learning album'}
                 isArabic={isArabic}
-                onPress={() => router.push('/learn/album/' + album.id)}
+                onPress={() => router.push({ pathname: '/learn/album/[id]', params: { id: album.id } })}
               />
             ))}
             {!cantor.albums.length ? <Empty text={isArabic ? 'لا توجد ألبومات منشورة بعد.' : 'No published learning albums yet.'} /> : null}
@@ -85,7 +85,7 @@ export default function LearningCantorScreen() {
                 description={lessonSet.description}
                 meta={isArabic ? 'منهج لحن' : 'Hymn course'}
                 isArabic={isArabic}
-                onPress={() => router.push('/learn/lesson-set/' + lessonSet.id)}
+                onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: lessonSet.id } })}
               />
             ))}
             {!cantor.lessonSets.length ? <Empty text={isArabic ? 'لا توجد مجموعات دروس منشورة بعد.' : 'No published lesson sets yet.'} /> : null}

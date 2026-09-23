@@ -60,11 +60,11 @@ export default function LearningAlbumScreen() {
             <View style={styles.heroInfo}>
               <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{isArabic ? 'ألبوم تعلّم' : 'LEARNING ALBUM'}</Text>
               <Text style={[styles.title, isArabic && styles.arabic]}>{album.title}</Text>
-              <Pressable onPress={() => router.push('/learn/cantor/' + album.cantor.id)}>
+              <Pressable onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: album.cantor.id } })}>
                 <Text style={[styles.cantor, isArabic && styles.arabic]}>{album.cantor.displayName}</Text>
               </Pressable>
               {album.season ? (
-                <Pressable onPress={() => router.push('/learn/season/' + album.season?.id)}>
+                <Pressable onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: album.season!.id } })}>
                   <Text style={[styles.season, isArabic && styles.arabic]}>{album.season.title}</Text>
                 </Pressable>
               ) : null}

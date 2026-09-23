@@ -90,7 +90,10 @@ export default function LearningPlaylistScreen() {
 
   const openItem = (item: LearningPlaylistItem) => {
     if (item.kind === 'lesson' && item.lesson.mediaType === 'video') {
-      router.push('/learn/lesson/' + item.lesson.id + '?setId=' + item.lesson.lessonSetId);
+      router.push({
+        pathname: '/learn/lesson/[id]',
+        params: { id: item.lesson.id, setId: item.lesson.lessonSetId },
+      });
       return;
     }
     const id = item.kind === 'album_recording' ? item.recording.id : item.lesson.id;

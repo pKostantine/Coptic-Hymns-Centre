@@ -68,7 +68,7 @@ export default function LearningHymnScreen() {
                 description={lessonSet.description}
                 meta={isArabic ? 'دروس مرتبة' : 'Structured lessons'}
                 isArabic={isArabic}
-                onPress={() => router.push('/learn/lesson-set/' + lessonSet.id)}
+                onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: lessonSet.id } })}
               />
             ))}
             {!hymn.lessonSets.length ? <Empty text={isArabic ? 'لا توجد دروس منشورة لهذا اللحن بعد.' : 'No published lessons for this hymn yet.'} /> : null}
@@ -79,7 +79,7 @@ export default function LearningHymnScreen() {
               <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'يُرتّل في' : 'Belongs to'}</Text>
               <View style={styles.chips}>
                 {hymn.seasons.map((season) => (
-                  <Pressable key={season.id} style={styles.chip} onPress={() => router.push('/learn/season/' + season.id)}>
+                  <Pressable key={season.id} style={styles.chip} onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: season.id } })}>
                     <Text style={[styles.chipText, isArabic && styles.arabic]}>{season.title}</Text>
                   </Pressable>
                 ))}
@@ -92,7 +92,7 @@ export default function LearningHymnScreen() {
               <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'ألحان مرتبطة' : 'Related Hymns'}</Text>
               <View style={styles.relatedList}>
                 {hymn.relatedHymns.map((related) => (
-                  <Pressable key={related.id} style={styles.related} onPress={() => router.push('/learn/hymn/' + related.id)}>
+                  <Pressable key={related.id} style={styles.related} onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: related.id } })}>
                     <View style={styles.relatedInfo}>
                       <Text style={[styles.relatedTitle, isArabic && styles.arabic]}>{related.title}</Text>
                       <Text style={[styles.relatedType, isArabic && styles.arabic]}>{related.relationshipType.replace(/_/g, ' ')}</Text>

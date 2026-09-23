@@ -64,6 +64,26 @@ describe('audio_delivery', () => {
     assert.match(result.probe.output.format.format_name, /mp4|m4a/);
   });
 
+  it('extracts a standalone audio rendition from a video lesson', async () => {
+    const source = path.join(workDir, 'lesson-with-audio.mp4');
+    await run(ffmpegPath, [
+      '-y', '-hide_banner', '-loglevel', 'error',
+      '-f', 'lavfi', '-i', 'color=c=black:s=320x240:d=1',
+      '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-shortest', source,
+    ]);
+
+    const result = await handleAudioDelivery(source, workDir);
+    const audio = streamOf(result.probe.output, 'audio');
+    const video = streamOf(result.probe.output, 'video');
+
+    assert.equal(result.mimeType, 'audio/mp4');
+    assert.equal(audio.codec_name, 'aac');
+    assert.equal(video, undefined);
+    assert.match(result.probe.output.format.format_name, /mp4|m4a/);
+  });
+
   it('rejects a source with no audio stream', async () => {
     const source = path.join(workDir, 'silent.mp4');
     await run(ffmpegPath, [

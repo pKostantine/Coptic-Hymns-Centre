@@ -146,7 +146,7 @@ export default function LearningLessonScreen() {
                 : (isArabic ? 'درس صوتي' : 'AUDIO LESSON')}
             </Text>
             <Text style={[styles.title, isArabic && styles.arabic]}>{data.lesson.title}</Text>
-            <Pressable onPress={() => router.push('/learn/lesson-set/' + data.lessonSet.id)}>
+            <Pressable onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: data.lessonSet.id } })}>
               <Text style={[styles.setTitle, isArabic && styles.arabic]}>{data.lessonSet.title}</Text>
             </Pressable>
             <Text style={[styles.cantor, isArabic && styles.arabic]}>{data.lessonSet.cantor.displayName}</Text>

@@ -53,7 +53,7 @@ export default function LearningSeasonScreen() {
           <SectionTitle title={isArabic ? 'منهج الألحان' : 'Hymn Curriculum'} isArabic={isArabic} />
           <View style={styles.hymnList}>
             {season.hymns.map((hymn, index) => (
-              <Pressable key={hymn.id} style={styles.hymn} onPress={() => router.push('/learn/hymn/' + hymn.id)}>
+              <Pressable key={hymn.id} style={styles.hymn} onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: hymn.id } })}>
                 <View style={styles.hymnNumber}><Text style={styles.hymnNumberText}>{index + 1}</Text></View>
                 <View style={styles.hymnInfo}>
                   <Text style={[styles.hymnTitle, isArabic && styles.arabic]}>{hymn.title}</Text>
@@ -75,7 +75,7 @@ export default function LearningSeasonScreen() {
                 meta={album.cantorName}
                 artwork={album.coverAsset}
                 isArabic={isArabic}
-                onPress={() => router.push('/learn/album/' + album.id)}
+                onPress={() => router.push({ pathname: '/learn/album/[id]', params: { id: album.id } })}
               />
             ))}
             {!season.albums.length ? <Empty text={isArabic ? 'لا توجد ألبومات منشورة.' : 'No published albums for this season.'} /> : null}
@@ -91,7 +91,7 @@ export default function LearningSeasonScreen() {
                 meta={lessonSet.cantorName}
                 artwork={lessonSet.coverAsset}
                 isArabic={isArabic}
-                onPress={() => router.push('/learn/lesson-set/' + lessonSet.id)}
+                onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: lessonSet.id } })}
               />
             ))}
             {!season.lessonSets.length ? <Empty text={isArabic ? 'لا توجد مجموعات دروس منشورة.' : 'No published lesson sets for this season.'} /> : null}

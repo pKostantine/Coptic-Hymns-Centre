@@ -447,3 +447,28 @@ returns jsonb language sql stable security invoker set search_path=pg_catalog,pu
   where ls.id=p_lesson_set_id and ls.publication_status='published';
 $$;
 grant execute on function public.get_published_learning_lesson_set(uuid,text) to anon,authenticated;
+
+create or replace function public.get_track_lyric_language_draft(p_track_id uuid,p_locale text)
+returns jsonb language plpgsql stable security definer set search_path to '' as $function$
+declare draft music.lyric_edit_drafts%rowtype; lyric_set music.lyric_sets%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Authentication required' using errcode='28000'; end if;
+  if not private.music_track_is_editable(p_track_id) then raise exception 'Track not found or not editable' using errcode='42501'; end if;
+  select * into draft from music.lyric_edit_drafts where track_id=p_track_id and locale=p_locale;
+  select * into lyric_set from music.lyric_sets where track_id=p_track_id and locale=p_locale and kind='original'::music.lyric_kind;
+  if draft.track_id is not null then
+    return jsonb_build_object('id',lyric_set.id,'trackId',p_track_id,'locale',p_locale,
+      'description',draft.description,'publicationStatus',coalesce(lyric_set.publication_status,'draft'::media.publication_status),
+      'hasDraft',true,'syncPrecision',coalesce(lyric_set.sync_precision,'line'::music.lyric_sync_precision),'lines',draft.lines);
+  end if;
+  if lyric_set.id is null then return null; end if;
+  return jsonb_build_object('id',lyric_set.id,'trackId',p_track_id,'locale',p_locale,
+    'description',lyric_set.description,'publicationStatus',lyric_set.publication_status,
+    'hasDraft',false,'syncPrecision',lyric_set.sync_precision,
+    'lines',coalesce((select jsonb_agg(jsonb_build_object('id',line.id,'sequence',line.sequence,
+      'startMs',line.start_ms,'endMs',line.end_ms,'text',line.text) order by line.sequence)
+      from music.lyric_lines line where line.lyric_set_id=lyric_set.id),'[]'::jsonb));
+end;
+$function$;
+revoke all on function public.get_track_lyric_language_draft(uuid,text) from public,anon;
+grant execute on function public.get_track_lyric_language_draft(uuid,text) to authenticated;

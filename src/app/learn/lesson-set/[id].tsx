@@ -53,7 +53,7 @@ export default function LearningLessonSetScreen() {
   const openLesson = (lessonId: string, mediaType: 'audio' | 'video') => {
     if (!lessonSet) return;
     if (mediaType === 'video') {
-      router.push('/learn/lesson/' + lessonId + '?setId=' + lessonSet.id);
+      router.push({ pathname: '/learn/lesson/[id]', params: { id: lessonId, setId: lessonSet.id } });
       return;
     }
     const audioIndex = audioQueue.findIndex((item) => item.id === lessonId);
@@ -73,14 +73,14 @@ export default function LearningLessonSetScreen() {
             <View style={styles.heroInfo}>
               <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{isArabic ? 'منهج لحن' : 'HYMN COURSE'}</Text>
               <Text style={[styles.title, isArabic && styles.arabic]}>{lessonSet.title}</Text>
-              <Pressable onPress={() => router.push('/learn/hymn/' + lessonSet.hymn.id)}>
+              <Pressable onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: lessonSet.hymn.id } })}>
                 <Text style={[styles.hymn, isArabic && styles.arabic]}>{lessonSet.hymn.title}</Text>
               </Pressable>
-              <Pressable onPress={() => router.push('/learn/cantor/' + lessonSet.cantor.id)}>
+              <Pressable onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: lessonSet.cantor.id } })}>
                 <Text style={[styles.cantor, isArabic && styles.arabic]}>{lessonSet.cantor.displayName}</Text>
               </Pressable>
               {lessonSet.season ? (
-                <Pressable onPress={() => router.push('/learn/season/' + lessonSet.season?.id)}>
+                <Pressable onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: lessonSet.season!.id } })}>
                   <Text style={[styles.season, isArabic && styles.arabic]}>{lessonSet.season.title}</Text>
                 </Pressable>
               ) : null}
