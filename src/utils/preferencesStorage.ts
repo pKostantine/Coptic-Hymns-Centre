@@ -1,4 +1,14 @@
-import { Platform } from 'react-native';
+import * as Device from 'expo-device';
+import { Dimensions, Platform } from 'react-native';
+
+import {
+  classifyReadingDevice,
+  DEFAULT_READING_FONT_LEVEL,
+  MAX_READING_FONT_LEVEL,
+  migrateReadingFontLevel,
+  MIN_READING_FONT_LEVEL,
+  readingFontSizeForLevel,
+} from './readingFontSize';
 
 export interface VisibleLanguages {
   english: boolean;
@@ -25,8 +35,8 @@ export type AppLanguage = 'en' | 'ar';
 export interface ReadingPreferences {
   visibleLanguages: VisibleLanguages;
   bibleVisibleLanguages: BibleVisibleLanguages;
-  fontScale: number; // integer 0-20, see MIN_FONT_SCALE/MAX_FONT_SCALE
-  /** Persisted range marker used to migrate the former 0-10 scale without changing its rendered size. */
+  fontScale: number; // integer 1-10, see MIN_FONT_SCALE/MAX_FONT_SCALE
+  /** Persisted range marker used to migrate earlier CHC font-size scales. */
   fontScaleRangeMax: number;
   orientationMode: OrientationMode;
   selectText: boolean;
@@ -66,7 +76,7 @@ export type SyncedReadingPreferences = Pick<ReadingPreferences,
   | 'appLanguage'
 >;
 
-// Matches the old app's DEFAULT_READING_PREFERENCES exactly (preferencesStorage.js).
+// New installations start at the comfortable middle of the 1-10 scale.
 export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   visibleLanguages: {
     english: true,
@@ -84,8 +94,8 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
     arabicFromCoptic: false,
     french: false,
   },
-  fontScale: 2,
-  fontScaleRangeMax: 20,
+  fontScale: DEFAULT_READING_FONT_LEVEL,
+  fontScaleRangeMax: MAX_READING_FONT_LEVEL,
   orientationMode: 'auto',
   selectText: false,
   slideshowMode: false,
@@ -107,23 +117,28 @@ export function getCurrentAppLanguage(): AppLanguage {
 }
 
 /** Lowest selectable font scale. */
-export const MIN_FONT_SCALE = 0;
+export const MIN_FONT_SCALE = MIN_READING_FONT_LEVEL;
 /** Highest selectable font scale. */
-export const MAX_FONT_SCALE = 20;
+export const MAX_FONT_SCALE = MAX_READING_FONT_LEVEL;
 
-// Keep the existing 18-78px bounds while doubling the number of selectable
-// intervals. Each step is now 3px instead of 6px, giving the control finer
-// adjustment without making its smallest or largest text any smaller/larger.
-const MIN_FONT_SIZE = 18;
-const MAX_FONT_SIZE = 78;
-const LEGACY_MAX_FONT_SCALE = 10;
+const screen = Dimensions.get('screen');
+export type ReadingDeviceClass = 'phone' | 'tablet' | 'desktop';
 
-/** Maps the 0-20 integer font scale onto a pixel size for the document WebView. */
+// Capture the physical device class once. Rotation can change the live window
+// dimensions used for wrapping and pagination, but never this font-size input.
+export const READING_DEVICE_CLASS = classifyReadingDevice({
+  platform: Platform.OS,
+  deviceType: Device.deviceType,
+  osName: Device.osName,
+  screenWidth: screen.width,
+  screenHeight: screen.height,
+  userAgent: Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+  maxTouchPoints: Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0,
+}) as ReadingDeviceClass;
+
+/** Maps the selected 1-10 level to a stable logical pixel size for this device. */
 export function fontScaleToPx(fontScale: number) {
-  const clamped = Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, fontScale));
-  return Math.round(
-    MIN_FONT_SIZE + (clamped * (MAX_FONT_SIZE - MIN_FONT_SIZE)) / (MAX_FONT_SCALE - MIN_FONT_SCALE),
-  );
+  return readingFontSizeForLevel(fontScale, READING_DEVICE_CLASS);
 }
 
 const STORAGE_KEY = 'chc-reading-preferences';
@@ -145,18 +160,9 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   if (!ORIENTATION_MODES.includes(merged.orientationMode)) {
     merged.orientationMode = 'auto';
   }
-  // Values saved before the 0-20 range did not have a range marker. Doubling
-  // those 0-10 values preserves the exact rendered size the user selected.
   const storedFontScale = stored?.fontScale;
-  const migratedFontScale =
-    stored && typeof storedFontScale === 'number' && Number.isFinite(storedFontScale)
-      ? stored.fontScaleRangeMax === MAX_FONT_SCALE
-        ? storedFontScale
-        : (storedFontScale * MAX_FONT_SCALE) / LEGACY_MAX_FONT_SCALE
-      : merged.fontScale;
-  const roundedFontScale = Math.round(migratedFontScale);
-  merged.fontScale = Number.isFinite(roundedFontScale)
-    ? Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, roundedFontScale))
+  merged.fontScale = stored && typeof storedFontScale === 'number' && Number.isFinite(storedFontScale)
+    ? migrateReadingFontLevel(storedFontScale, stored.fontScaleRangeMax, READING_DEVICE_CLASS)
     : DEFAULT_READING_PREFERENCES.fontScale;
   merged.fontScaleRangeMax = MAX_FONT_SCALE;
   if (merged.appLanguage !== 'en' && merged.appLanguage !== 'ar') {

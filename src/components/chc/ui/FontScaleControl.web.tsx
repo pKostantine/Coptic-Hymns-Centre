@@ -8,7 +8,7 @@ import type { FontScaleControlProps } from './FontScaleControl';
 /**
  * Web font-size control: the original -/+ step buttons.
  *
- * A pointer hits a discrete button more precisely than it drags a 21-stop
+ * A pointer hits a discrete button more precisely than it drags a 10-stop
  * track, and keeping @expo/ui's slider off this path also keeps it out of the
  * web bundle. The native build gets FontScaleControl.tsx.
  */
