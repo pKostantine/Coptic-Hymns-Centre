@@ -201,14 +201,15 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // automatic live-calendar rollover while this screen itself is focused.
   // This layout effect runs before a new WebView can report a reflowed position.
   useLayoutEffect(() => {
-    const changed = lastSettingsSignatureRef.current !== restoreSettingsSignature;
+    const previousSignature = lastSettingsSignatureRef.current;
+    const changed = previousSignature !== restoreSettingsSignature;
     lastSettingsSignatureRef.current = restoreSettingsSignature;
     if (!changed || !readerFocused || !sections) return;
     captureDocumentRestore(
       documentPositionKey,
       currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
       sections.map(section => section.id),
-      lastSettingsSignatureRef.current,
+      previousSignature,
     );
     markPendingDocumentRestoresDirty();
   }, [restoreSettingsSignature, readerFocused, sections, documentPositionKey]);
