@@ -132,6 +132,8 @@ export const READING_DEVICE_CLASS = classifyReadingDevice({
   osName: Device.osName,
   screenWidth: screen.width,
   screenHeight: screen.height,
+  userAgent: Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+  maxTouchPoints: Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0,
 }) as ReadingDeviceClass;
 
 /** Maps the selected 1-10 level to a stable logical pixel size for this device. */
