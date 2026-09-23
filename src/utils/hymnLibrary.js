@@ -542,6 +542,11 @@ async function resolveSynaxariumSections(isoDate) {
   return sections;
 }
 
+/** The Sermon Planner needs only the commemorations, not the Synaxarium date or priest's introduction. */
+function omitSynaxariumPreamble(sections) {
+  return sections.filter(({ id }) => id !== "synaxarium-intro" && !id.startsWith("synaxarium-date-"));
+}
+
 /** Same as resolveReadingSentinelVerses but wraps the result as a titled section (for Subdocument/order-table-level Inline placements, which need a section object, not a bare verse list). The computed Bible citation is prepended to the verses as its own readingReference line — right before the actual reading text, never before the calling table's own intro/conclusion rows, which sit outside this section entirely. */
 async function resolveReadingSentinelSection(section, isoDate) {
   const { verses, citation } = await resolveReadingSentinelVerses(section.hymn_key, isoDate);
@@ -1467,7 +1472,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       // Sermon Planner's Synaxarium is intentionally inline rather than the
       // button used by Lectionary Liturgy. Keep the same day resolution.
       if (section.hymn_key === "SYNAXARIUM" && isoDate) {
-        const synaxariumSections = await resolveSynaxariumSections(isoDate);
+        const synaxariumSections = omitSynaxariumPreamble(await resolveSynaxariumSections(isoDate));
         hydrated.push(...buildWholeTableInlineSections(synaxariumSections, section));
         continue;
       }
