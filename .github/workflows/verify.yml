@@ -52,5 +52,8 @@ jobs:
         run: npm run test:slideshow
       - name: Reading font-size and migration tests
         run: npm run test:reading
+      - name: Validate media processor (including multi-GB video)
+        working-directory: workers/media-processor
+        run: npm ci --no-audit --no-fund && npm test
       - name: Web export
         run: npx expo export -p web

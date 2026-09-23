@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { mkdir, rm, stat } from 'node:fs/promises';
+import { pipeline } from 'node:stream/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { maybeRunStreamedMediaJob } from './streamed-media.mjs';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
-import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client, UploadPartCommand } from '@aws-sdk/client-s3';
 
 const AUDIO_OUTPUT_MIME_TYPE = 'audio/mp4';
 const AUDIO_BITRATE = '256k';
@@ -149,25 +151,14 @@ export function getS3Client() {
   });
 }
 
-async function streamToBuffer(stream) {
-  if (typeof stream?.transformToByteArray === 'function') {
-    return Buffer.from(await stream.transformToByteArray());
-  }
-
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  return Buffer.concat(chunks);
-}
-
-async function downloadObject(config, bucket, key, destinationPath) {
+export async function downloadObject(config, bucket, key, destinationPath, s3Client = null) {
   if (config.r2Driver === 's3') {
-    const client = getS3Client();
+    const client = s3Client || getS3Client();
     const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-    const data = await streamToBuffer(response.Body);
-    await writeFile(destinationPath, data);
+    if (!response.Body) throw new Error(`R2 returned no body for ${bucket}/${key}`);
+    // Stream the download onto scratch disk. Buffering a multi-GB original in
+    // Node's heap killed the 1 GB Railway worker at the start of every job.
+    await pipeline(response.Body, createWriteStream(destinationPath));
     return;
   }
 
@@ -184,16 +175,70 @@ async function downloadObject(config, bucket, key, destinationPath) {
   ]);
 }
 
+// AWS S3-compatible single PUT is capped at 5 GB and large Node streams
+// cannot fit into the worker heap. Use bounded R2 multipart transfers.
+const DELIVERY_MULTIPART_THRESHOLD = 100 * 1024 * 1024;
+const DELIVERY_PART_BYTES = 64 * 1024 * 1024;
+
+export async function multipartUploadObject(client, bucket, key, sourcePath, sourceSize, contentType) {
+  const created = await client.send(new CreateMultipartUploadCommand({
+    Bucket: bucket,
+    Key: key,
+    ContentType: contentType,
+    CacheControl: 'public, max-age=31536000, immutable',
+  }));
+  if (!created.UploadId) throw new Error('R2 did not return a delivery multipart upload ID');
+
+  try {
+    const partSize = Math.max(DELIVERY_PART_BYTES, Math.ceil(sourceSize / 9500));
+    const count = Math.ceil(sourceSize / partSize);
+    const parts = [];
+    // A single bounded 64 MB part in flight keeps peak memory low on a
+    // 1 GB processor even when a several-hour lesson is more than 5 GB.
+    for (let partNumber = 1; partNumber <= count; partNumber += 1) {
+      const start = (partNumber - 1) * partSize;
+      const end = Math.min(start + partSize, sourceSize) - 1;
+      const response = await client.send(new UploadPartCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: created.UploadId,
+        PartNumber: partNumber,
+        Body: createReadStream(sourcePath, { start, end }),
+        ContentLength: end - start + 1,
+      }));
+      if (!response.ETag) throw new Error(`R2 did not return an ETag for delivery part ${partNumber}`);
+      parts.push({ PartNumber: partNumber, ETag: response.ETag });
+    }
+    await client.send(new CompleteMultipartUploadCommand({
+      Bucket: bucket,
+      Key: key,
+      UploadId: created.UploadId,
+      MultipartUpload: { Parts: parts },
+    }));
+  } catch (error) {
+    await client.send(new AbortMultipartUploadCommand({
+      Bucket: bucket, Key: key, UploadId: created.UploadId,
+    })).catch(() => undefined);
+    throw error;
+  }
+}
+
 async function uploadObject(config, bucket, key, sourcePath, contentType) {
   if (config.r2Driver === 's3') {
     const client = getS3Client();
-    await client.send(new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: createReadStream(sourcePath),
-      ContentType: contentType,
-      CacheControl: 'public, max-age=31536000, immutable',
-    }));
+    const file = await stat(sourcePath);
+    if (file.size >= DELIVERY_MULTIPART_THRESHOLD) {
+      await multipartUploadObject(client, bucket, key, sourcePath, file.size, contentType);
+    } else {
+      await client.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: createReadStream(sourcePath),
+        ContentLength: file.size,
+        ContentType: contentType,
+        CacheControl: 'public, max-age=31536000, immutable',
+      }));
+    }
     return;
   }
 
@@ -267,9 +312,10 @@ export async function listStorageObjects(config, bucket) {
   return objects;
 }
 
-async function sha256File(filePath) {
-  const data = await readFile(filePath);
-  return createHash('sha256').update(data).digest('hex');
+export async function sha256File(filePath) {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
+  return hash.digest('hex');
 }
 
 async function probeMedia(filePath) {
@@ -411,7 +457,11 @@ async function transcodeToMp4(inputPath, outputPath) {
     '-c:v',
     'libx264',
     '-preset',
-    'medium',
+    'fast',
+    '-threads',
+    '2',
+    '-filter_threads',
+    '1',
     '-crf',
     VIDEO_CRF,
     '-profile:v',
@@ -579,6 +629,13 @@ async function runJob(config, job) {
   if (!handler) {
     throw new Error(`No handler for job type ${job.job_type}`);
   }
+
+  // R2 HTTP Range input and stdout multipart output bypass the 1 GB Railway
+  // scratch-disk and RAM limits for multi-hour video and extracted audio.
+  const streamed = await maybeRunStreamedMediaJob(config, job, {
+    getS3Client, callRpc, deleteObject,
+  });
+  if (streamed) return streamed;
 
   const jobDir = path.join(config.workDir, `chc-media-job-${job.job_id}`);
   const inputPath = path.join(jobDir, `input${sourceExtension(job.input_path)}`);
