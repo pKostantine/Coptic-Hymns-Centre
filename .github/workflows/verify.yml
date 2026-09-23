@@ -48,5 +48,9 @@ jobs:
         run: npm run test:playback
       - name: Offline request tests
         run: npm run test:offline
+      - name: Slideshow and Bible regression tests
+        run: npm run test:slideshow
+      - name: Reading font-size and migration tests
+        run: npm run test:reading
       - name: Web export
         run: npx expo export -p web
