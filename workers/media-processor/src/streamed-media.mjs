@@ -109,7 +109,7 @@ export async function openR2RangeServer(client, bucket, key, info) {
   };
 }
 
-async function probeUrl(url) {
+export async function probeUrl(url) {
   const args = ['-v', 'error', '-show_format', '-show_streams', '-print_format', 'json', url];
   const child = spawn(ffprobeStatic.path, args, { shell: false, windowsHide: true });
   let stdout = '';
@@ -263,7 +263,7 @@ export async function streamTranscodeToR2(client, inputUrl, inputProbe, jobType,
 }
 
 /** Return null for small files that still use the ordinary FFmpeg pipeline. */
-export async function maybeRunStreamedMediaJob(config, job, operations) {
+export async function maybeRunStreamedMediaJob(config, job, operations, thresholdBytes = STREAMING_THRESHOLD_BYTES) {
   if (config.r2Driver !== 's3' || !['video_delivery', 'audio_delivery'].includes(job.job_type)) {
     return null;
   }
@@ -273,7 +273,7 @@ export async function maybeRunStreamedMediaJob(config, job, operations) {
     Bucket: job.input_bucket,
     Key: job.input_path,
   }));
-  if (Number(head.ContentLength || 0) < STREAMING_THRESHOLD_BYTES) return null;
+  if (Number(head.ContentLength || 0) < thresholdBytes) return null;
 
   const source = await openR2RangeServer(client, job.input_bucket, job.input_path, head);
   let outputExists = false;
