@@ -103,6 +103,7 @@ export const SERVICES_BY_CATEGORY: Record<string, ServiceDef[]> = {
     { id: 'vespers', schema: 'liturgy', table: 'lectionary_vespers', title: 'Vespers', arabic: 'العشية', extraContext: { Vespers: true } },
     { id: 'matins', schema: 'liturgy', table: 'lectionary_matins', title: 'Matins', arabic: 'الباكر', extraContext: { Matins: true } },
     { id: 'liturgy', schema: 'liturgy', table: 'lectionary_liturgy', title: 'Liturgy', arabic: 'قداس الكلمة', extraContext: { Liturgy: true } },
+    { id: 'sermon_planner', schema: 'liturgy', table: 'sermon_planner', title: 'Sermon Planner', arabic: 'مخطط العظة' },
   ],
   psalmody: [
     { id: 'vespers_praises', schema: 'psalmody', table: 'vespers_praises', title: 'Vespers Praises', arabic: 'تسبحة عشية' },
