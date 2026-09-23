@@ -484,7 +484,7 @@ export default function SlideshowContainer({
     // An explicit post-settings jump overrides the previous verse anchor.
     // The layout effect above owns this request; don't let the ordinary
     // "preserve exact verse on repagination" path cancel its pending jump.
-    if (restoreRequest && lastAppliedRestoreTokenRef.current === restoreRequest.token) return;
+    if (restoreRequest && lastAppliedRestoreTokenRef.current === restoreRequest.token && !hasFreshExplicitSelection) return;
 
     // Measurement, a resize, or a font/language change can rebuild every
     // page. If the precise row/line anchor survived, it is strictly better
