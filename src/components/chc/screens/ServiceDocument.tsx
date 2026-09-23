@@ -187,15 +187,27 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   // "we're back and focused" event, since this screen has no such signal.
   const navigatingAwayRef = useRef(Boolean(getPendingDocumentRestore(documentPositionKey)));
   const lastSettingsSignatureRef = useRef(restoreSettingsSignature);
+  const latestSettingsSignatureRef = useRef(restoreSettingsSignature);
+  latestSettingsSignatureRef.current = restoreSettingsSignature;
+  const latestSectionOrderRef = useRef<string[]>([]);
+  if (readySections) latestSectionOrderRef.current = readySections.map(section => section.id);
   // Blur is authoritative; never trust background scroll/page callbacks while
   // Settings or Calendar is covering the reader, even on a slow device.
   useFocusEffect(useCallback(() => {
     setReaderFocused(true);
     return () => {
+      // Covers alternate routes to Settings/Calendar as well as the in-book
+      // selector. Capturing on blur is harmless if no settings change occurs.
+      captureDocumentRestore(
+        documentPositionKey,
+        currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
+        latestSectionOrderRef.current,
+        latestSettingsSignatureRef.current,
+      );
       navigatingAwayRef.current = true;
       setReaderFocused(false);
     };
-  }, []));
+  }, [documentPositionKey]));
 
   // Also handle preference changes made from the in-document controls and
   // automatic live-calendar rollover while this screen itself is focused.
@@ -479,6 +491,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       restoreSettingsSignature,
     );
     navigatingAwayRef.current = true;
+    setSelectorOpen(false);
     router.push(href);
   };
 
