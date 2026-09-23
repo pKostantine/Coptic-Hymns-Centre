@@ -306,6 +306,7 @@ export default function BibleChapterDocument() {
   const chapterListLoaded = chapterKeys !== null;
   const chapterCount = chapterKeys?.length || 0;
 
+  const readerId = JSON.stringify([verseRequestKey, effectiveLanguageKeys, fontSize, effectiveSelectText, preferences.slideshowMode, restoreVerse, targetVerse]);
   const chapterHtml = useMemo(() => {
     if (!verses || !copticFontDataUri) return null;
     return buildBibleChapterHtml({
@@ -318,11 +319,12 @@ export default function BibleChapterDocument() {
       preface,
       initialVerse: targetVerse,
       restoreVerse,
+      readerId,
       // Now Playing is an overlay in slideshow mode. It must never shorten
       // the page or change where Bible verses split.
       bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, nowPlayingInset]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -438,7 +440,7 @@ export default function BibleChapterDocument() {
             selectText={effectiveSelectText}
             onAction={(action) => {
               if (action.type === 'currentVerse' && action.verse) {
-                if (!focusedRef.current || selectorOpenRef.current) return;
+                if (action.readerId !== readerId || !focusedRef.current || selectorOpenRef.current) return;
                 if (restoreGuardRef.current && restoreGuardRef.current !== action.verse) return;
                 restoreGuardRef.current = null;
                 currentVerseRef.current = action.verse;
