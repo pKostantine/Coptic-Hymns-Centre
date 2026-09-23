@@ -22,11 +22,12 @@ export interface PendingDocumentRestore {
   sectionId: string;
   originalSectionIds: string[];
   dirty: boolean;
+  signature?: string;
 }
 const pendingRestores = new Map<string, PendingDocumentRestore>();
 let nextRestoreSequence = 0;
 
-export function captureDocumentRestore(key: string, sectionId: string | null | undefined, sectionIds: readonly string[]): void {
+export function captureDocumentRestore(key: string, sectionId: string | null | undefined, sectionIds: readonly string[], signature?: string): void {
   if (pendingRestores.has(key) || !sectionId || !sectionIds.length) return;
   pendingRestores.set(key, {
     sequence: ++nextRestoreSequence,
@@ -34,6 +35,7 @@ export function captureDocumentRestore(key: string, sectionId: string | null | u
     sectionId,
     originalSectionIds: [...sectionIds],
     dirty: false,
+    signature,
   });
   // Use the frozen position until it is deliberately restored. A WebView
   // that reflows behind Settings must not overwrite it with a stray report.
