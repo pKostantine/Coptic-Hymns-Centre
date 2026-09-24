@@ -80,9 +80,29 @@ interface AntiphonaryModalTarget {
 export default function ServiceDocument({ schema, table, title, arabic, extraContext, entryId, backHref }: ServiceDocumentProps) {
   const router = useRouter();
   const { user } = useAuth();
-  const { preferences, isBookmarked, toggleBookmark, toggleBishopPresent, toggleCopticGospelRite } = useReadingPreferences();
+  const {
+    preferences,
+    isBookmarked,
+    toggleBookmark,
+    toggleBishopPresent,
+    toggleCopticGospelRite,
+    toggleSermonPlannerLanguage,
+  } = useReadingPreferences();
   const { effectiveDate, vespersEffectiveDate } = useCalendar();
   const isSermonPlanner = schema === 'liturgy' && table === 'sermon_planner';
+  const documentPreferences = useMemo(() => {
+    if (!isSermonPlanner) return preferences;
+    return {
+      ...preferences,
+      visibleLanguages: {
+        ...preferences.visibleLanguages,
+        english: preferences.sermonPlannerVisibleLanguages.english,
+        coptic: preferences.sermonPlannerVisibleLanguages.coptic,
+        copticRecitedPrayers: preferences.sermonPlannerVisibleLanguages.coptic,
+        arabic: preferences.sermonPlannerVisibleLanguages.arabic,
+      },
+    };
+  }, [isSermonPlanner, preferences]);
   const sermonServiceDate = effectiveDate.toISOString().slice(0, 10);
   const sermonPlanner = useSermonPlanner(
     `${schema}.${table}`,
@@ -142,7 +162,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
   const [loadedConditionsKey, setLoadedConditionsKey] = useState<string | null>(null);
   const readySections = loadedConditionsKey === conditionsKey ? sections : null;
   const restoreSettingsSignature = JSON.stringify([
-    preferences.visibleLanguages, preferences.fontScale, preferences.orientationMode,
+    documentPreferences.visibleLanguages, preferences.fontScale, preferences.orientationMode,
     preferences.selectText, preferences.slideshowMode, preferences.displayComments,
     preferences.displaySilentPrayers, preferences.displayNowPlayingBar,
     preferences.bishopPresent, preferences.copticGospelRite, preferences.inMonastery,
@@ -776,7 +796,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
           <DocumentSurface
             ref={documentRef}
             sections={readySections}
-            preferences={preferences}
+            preferences={documentPreferences}
             restoreRequest={restoreRequest}
             collapseMemoryScope={documentPositionKey}
             onAction={handleAction}
@@ -815,6 +835,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
               activeHighlightId={activeSermonHighlightId}
               syncStatus={sermonPlanner.syncStatus}
               signedIn={Boolean(user)}
+              visibleLanguages={preferences.sermonPlannerVisibleLanguages}
+              onToggleLanguage={toggleSermonPlannerLanguage}
               onClose={() => setSelectorOpen(false)}
               onSelectReference={(reference) => documentRef.current?.scrollToVerse(reference.verseId)}
               onJumpToHighlight={(highlight) => documentRef.current?.scrollToSermonHighlight(highlight.id)}

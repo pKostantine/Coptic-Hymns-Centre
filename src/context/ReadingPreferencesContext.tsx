@@ -13,6 +13,7 @@ import {
     OrientationMode,
     ReadingPreferences,
     saveReadingPreferences,
+    SermonPlannerVisibleLanguages,
     syncedReadingPreferences,
     VisibleLanguages,
 } from '../utils/preferencesStorage';
@@ -27,6 +28,7 @@ interface ReadingPreferencesContextValue {
   contentSyncStatus: ContentSyncStatus;
   toggleLanguage: (key: keyof VisibleLanguages) => void;
   setBibleVisibleLanguages: (updater: SetStateAction<BibleVisibleLanguages>) => void;
+  toggleSermonPlannerLanguage: (key: keyof SermonPlannerVisibleLanguages) => void;
   setFontScale: (delta: number) => void;
   /** Sets the font scale outright rather than nudging it — what the slider needs. */
   setFontScaleValue: (value: number) => void;
@@ -231,6 +233,17 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     });
   }, []);
 
+  const toggleSermonPlannerLanguage = useCallback((key: keyof SermonPlannerVisibleLanguages) => {
+    setPreferences((prev) => {
+      const next = {
+        ...prev.sermonPlannerVisibleLanguages,
+        [key]: !prev.sermonPlannerVisibleLanguages[key],
+      };
+      if (!Object.values(next).some(Boolean)) return prev;
+      return { ...prev, sermonPlannerVisibleLanguages: next };
+    });
+  }, []);
+
   const setFontScale = useCallback((delta: number) => {
     setPreferences((prev) => ({ ...prev, fontScale: clampFontScale(prev.fontScale + delta) }));
   }, []);
@@ -325,6 +338,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       contentSyncStatus,
       toggleLanguage,
       setBibleVisibleLanguages,
+      toggleSermonPlannerLanguage,
       setFontScale,
       setFontScaleValue,
       setOrientationMode,
@@ -349,6 +363,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       contentSyncStatus,
       toggleLanguage,
       setBibleVisibleLanguages,
+      toggleSermonPlannerLanguage,
       setFontScale,
       setFontScaleValue,
       setOrientationMode,

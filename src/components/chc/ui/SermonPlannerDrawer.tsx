@@ -24,6 +24,7 @@ import type {
 } from '@/types/sermonPlanner';
 import type { SermonPlanSyncStatus } from '@/hooks/useSermonPlanner';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
+import type { SermonPlannerVisibleLanguages } from '@/utils/preferencesStorage';
 import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import Icon from './Icon';
 
@@ -34,6 +35,12 @@ const HIGHLIGHT_COLORS: Record<SermonHighlightColor, string> = {
   green: '#4AAA73',
 };
 
+const LANGUAGE_OPTIONS: { key: keyof SermonPlannerVisibleLanguages; label: string }[] = [
+  { key: 'english', label: 'English' },
+  { key: 'coptic', label: 'Coptic' },
+  { key: 'arabic', label: 'Arabic' },
+];
+
 interface SermonPlannerDrawerProps {
   visible: boolean;
   references: SermonReadingReference[];
@@ -43,8 +50,10 @@ interface SermonPlannerDrawerProps {
   activeHighlightId?: string | null;
   syncStatus: SermonPlanSyncStatus;
   signedIn: boolean;
+  visibleLanguages: SermonPlannerVisibleLanguages;
   bookmarked?: boolean;
   onClose: () => void;
+  onToggleLanguage: (language: keyof SermonPlannerVisibleLanguages) => void;
   onSelectReference: (reference: SermonReadingReference) => void;
   onJumpToHighlight: (highlight: SermonHighlight) => void;
   onChangeGeneralNotes: (value: string) => void;
@@ -78,8 +87,10 @@ export default function SermonPlannerDrawer({
   activeHighlightId,
   syncStatus,
   signedIn,
+  visibleLanguages,
   bookmarked,
   onClose,
+  onToggleLanguage,
   onSelectReference,
   onJumpToHighlight,
   onChangeGeneralNotes,
@@ -98,6 +109,7 @@ export default function SermonPlannerDrawer({
   const scrollRef = useRef<ScrollView>(null);
   const noteRefs = useRef<Record<string, TextInput | null>>({});
   const [highlightLayouts, setHighlightLayouts] = useState<Record<string, number>>({});
+  const visibleLanguageCount = Object.values(visibleLanguages).filter(Boolean).length;
 
   useEffect(() => {
     Animated.timing(slide, {
@@ -154,6 +166,29 @@ export default function SermonPlannerDrawer({
             <Pressable accessibilityLabel="Close sermon notes" style={styles.closeButton} onPress={onClose}>
               <Icon name="close" size={22} color={COLORS.muted} />
             </Pressable>
+          </View>
+
+          <View style={styles.languageBar}>
+            {LANGUAGE_OPTIONS.map(({ key, label }) => {
+              const selected = visibleLanguages[key];
+              const isLastVisibleLanguage = selected && visibleLanguageCount === 1;
+              return (
+                <Pressable
+                  accessibilityLabel={label}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isLastVisibleLanguage, selected }}
+                  disabled={isLastVisibleLanguage}
+                  key={key}
+                  onPress={() => onToggleLanguage(key)}
+                  style={[
+                    styles.languageButton,
+                    selected ? styles.languageButtonSelected : styles.languageButtonUnselected,
+                  ]}
+                >
+                  <Text style={[styles.languageText, selected && styles.languageTextSelected]}>{label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           <ScrollView
@@ -327,6 +362,27 @@ const styles = StyleSheet.create({
   closeButton: { alignItems: 'center', height: 40, justifyContent: 'center', width: 40 },
   scroll: { flex: 1 },
   scrollContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
+  languageBar: {
+    borderBottomColor: 'rgba(201, 162, 39, 0.18)',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  languageButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: SPACING.sm,
+  },
+  languageButtonSelected: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
+  languageButtonUnselected: { backgroundColor: COLORS.surface, borderColor: COLORS.border },
+  languageText: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
+  languageTextSelected: { color: COLORS.black },
   sectionHeadingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   sectionHeading: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '800' },
   sectionCount: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },

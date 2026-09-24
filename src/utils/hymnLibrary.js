@@ -143,10 +143,11 @@ export const READING_SENTINELS = new Set([
   "VESPERS_GOSPEL_WITHOUT_COPTIC",
   "VESPERS_PSALM_WITH_COPTIC",
   "VESPERS_PSALM_WITHOUT_COPTIC",
-  // The with-Coptic key is normalized to the same all-caps convention as
-  // the other reading sentinels. The without-Coptic source remains mixed-case.
+  // Liturgy Gospel keys use the same all-caps convention as every other
+  // reading sentinel. Lookup normalization below keeps older mixed-case rows
+  // working while the database finishes converging on the canonical keys.
   "LITURGY_GOSPEL_WITH_COPTIC",
-  "Liturgy_GOSPEL_WITHOUT_COPTIC",
+  "LITURGY_GOSPEL_WITHOUT_COPTIC",
   // The actual scripture-text sentinels nested inside readings.pauline_epistle/
   // catholic_epistle/praxis/coptic_* (see SUBDOCUMENT_MAP) — everything
   // around them (intro/conclusion, title, minimization) now comes from
@@ -185,8 +186,16 @@ const READING_SENTINEL_MAP = {
   VESPERS_PSALM_WITH_COPTIC: { service: "Vespers", readingType: "Psalm", withCoptic: true },
   VESPERS_PSALM_WITHOUT_COPTIC: { service: "Vespers", readingType: "Psalm", withCoptic: false },
   LITURGY_GOSPEL_WITH_COPTIC: { service: "Liturgy", readingType: "Gospel", withCoptic: true },
-  "Liturgy_GOSPEL_WITHOUT_COPTIC": { service: "Liturgy", readingType: "Gospel", withCoptic: false },
+  LITURGY_GOSPEL_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Gospel", withCoptic: false },
 };
+
+function normalizeReadingSentinel(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function isReadingSentinel(value) {
+  return READING_SENTINELS.has(normalizeReadingSentinel(value));
+}
 
 let readingsForDateCache = null; // { isoDate, promise }
 let synaxariumCache = null; // { isoDate, promise }
@@ -357,7 +366,7 @@ async function buildReadingCitation(readingRow) {
 }
 
 async function resolveReadingSentinelVerses(sentinel, isoDate) {
-  const mapping = READING_SENTINEL_MAP[sentinel];
+  const mapping = READING_SENTINEL_MAP[normalizeReadingSentinel(sentinel)];
   if (!mapping) return { verses: [], citation: null };
   const readings = await getReadingsForDate(isoDate);
   const match = readings.find((r) => r.service === mapping.service && r.reading_type === mapping.readingType);
@@ -1409,7 +1418,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
           });
           continue;
         }
-        if (READING_SENTINELS.has(section.hymn_key) && isoDate) {
+        if (isReadingSentinel(section.hymn_key) && isoDate) {
           const readingSection = await resolveReadingSentinelSection(section, isoDate);
           if (readingSection) {
             hydrated.push({
@@ -1482,7 +1491,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       // conclusion rows) needs the day's actual scripture text, not a
       // schema.table lookup — same live resolution as the Subdocument branch
       // above, just producing an inline section instead of a button.
-      if (READING_SENTINELS.has(section.hymn_key) && isoDate) {
+      if (isReadingSentinel(section.hymn_key) && isoDate) {
         const readingSection = await resolveReadingSentinelSection(section, isoDate);
         if (readingSection) hydrated.push(readingSection);
         continue;
@@ -1555,7 +1564,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         // top-level Minimizable/Minimized unit here (its own order-table row
         // carries that), so a second, nested collapse just for this splice
         // would wrongly split it off as if it were its own separate hymn.
-        if (READING_SENTINELS.has(verse.inlineHymnKey) && isoDate) {
+        if (isReadingSentinel(verse.inlineHymnKey) && isoDate) {
           const spliced = await resolveReadingSentinelSplice(verse.inlineHymnKey, isoDate, false, null, `${section.id}-inline-${verse.inlineHymnKey}`);
           if (spliced) verses.push(...spliced.verses);
           continue;
@@ -1939,7 +1948,7 @@ async function resolveInlineHymnVerses(
     if (!rowVisibility.visible) continue;
 
     if (row.inline_hymn_key && isInlineLineItem(row.item_type)) {
-      if (READING_SENTINELS.has(row.inline_hymn_key) && isoDate) {
+      if (isReadingSentinel(row.inline_hymn_key) && isoDate) {
         const spliced = await resolveReadingSentinelSplice(
           row.inline_hymn_key,
           isoDate,

@@ -28,6 +28,12 @@ export interface BibleVisibleLanguages {
   french: boolean;
 }
 
+export interface SermonPlannerVisibleLanguages {
+  english: boolean;
+  coptic: boolean;
+  arabic: boolean;
+}
+
 export type OrientationMode = 'auto' | 'landscape' | 'reverseLandscape' | 'portrait';
 
 export type AppLanguage = 'en' | 'ar';
@@ -35,6 +41,7 @@ export type AppLanguage = 'en' | 'ar';
 export interface ReadingPreferences {
   visibleLanguages: VisibleLanguages;
   bibleVisibleLanguages: BibleVisibleLanguages;
+  sermonPlannerVisibleLanguages: SermonPlannerVisibleLanguages;
   fontScale: number; // integer 1-10, see MIN_FONT_SCALE/MAX_FONT_SCALE
   /** Persisted range marker used to migrate earlier CHC font-size scales. */
   fontScaleRangeMax: number;
@@ -67,6 +74,7 @@ export interface ReadingPreferences {
 export type SyncedReadingPreferences = Pick<ReadingPreferences,
   | 'visibleLanguages'
   | 'bibleVisibleLanguages'
+  | 'sermonPlannerVisibleLanguages'
   | 'displayComments'
   | 'displaySilentPrayers'
   | 'bishopPresent'
@@ -93,6 +101,11 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
     arabic: true,
     arabicFromCoptic: false,
     french: false,
+  },
+  sermonPlannerVisibleLanguages: {
+    english: true,
+    coptic: true,
+    arabic: true,
   },
   fontScale: DEFAULT_READING_FONT_LEVEL,
   fontScaleRangeMax: MAX_READING_FONT_LEVEL,
@@ -143,6 +156,19 @@ export function fontScaleToPx(fontScale: number) {
 
 const STORAGE_KEY = 'chc-reading-preferences';
 
+function normalizeSermonPlannerVisibleLanguages(
+  value: unknown,
+  fallback: SermonPlannerVisibleLanguages,
+): SermonPlannerVisibleLanguages {
+  const record = recordValue(value);
+  const normalized = {
+    english: booleanValue(record.english, fallback.english),
+    coptic: booleanValue(record.coptic, fallback.coptic),
+    arabic: booleanValue(record.arabic, fallback.arabic),
+  };
+  return Object.values(normalized).some(Boolean) ? normalized : { ...fallback };
+}
+
 function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined): ReadingPreferences {
   const ORIENTATION_MODES: OrientationMode[] = ['auto', 'landscape', 'reverseLandscape', 'portrait'];
   const merged: ReadingPreferences = {
@@ -156,6 +182,10 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
       ...DEFAULT_READING_PREFERENCES.bibleVisibleLanguages,
       ...stored?.bibleVisibleLanguages,
     },
+    sermonPlannerVisibleLanguages: normalizeSermonPlannerVisibleLanguages(
+      stored?.sermonPlannerVisibleLanguages,
+      DEFAULT_READING_PREFERENCES.sermonPlannerVisibleLanguages,
+    ),
   };
   if (!ORIENTATION_MODES.includes(merged.orientationMode)) {
     merged.orientationMode = 'auto';
@@ -189,6 +219,7 @@ export function syncedReadingPreferences(preferences: ReadingPreferences): Synce
   return {
     visibleLanguages: preferences.visibleLanguages,
     bibleVisibleLanguages: preferences.bibleVisibleLanguages,
+    sermonPlannerVisibleLanguages: preferences.sermonPlannerVisibleLanguages,
     displayComments: preferences.displayComments,
     displaySilentPrayers: preferences.displaySilentPrayers,
     bishopPresent: preferences.bishopPresent,
@@ -207,6 +238,10 @@ export function applySyncedReadingPreferences(
   const cloud = recordValue(cloudValue);
   const visible = recordValue(cloud.visibleLanguages);
   const bible = recordValue(cloud.bibleVisibleLanguages);
+  const sermonPlannerVisibleLanguages = normalizeSermonPlannerVisibleLanguages(
+    cloud.sermonPlannerVisibleLanguages,
+    local.sermonPlannerVisibleLanguages,
+  );
   const saintTokens = Array.isArray(cloud.selectedSaintHymns)
     ? [...new Set(cloud.selectedSaintHymns.filter((token): token is string => (
       typeof token === 'string' && token.includes(':') && token.length <= 256
@@ -231,6 +266,7 @@ export function applySyncedReadingPreferences(
       arabicFromCoptic: booleanValue(bible.arabicFromCoptic, local.bibleVisibleLanguages.arabicFromCoptic),
       french: booleanValue(bible.french, local.bibleVisibleLanguages.french),
     },
+    sermonPlannerVisibleLanguages,
     displayComments: booleanValue(cloud.displayComments, local.displayComments),
     displaySilentPrayers: booleanValue(cloud.displaySilentPrayers, local.displaySilentPrayers),
     bishopPresent: booleanValue(cloud.bishopPresent, local.bishopPresent),

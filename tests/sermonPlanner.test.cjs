@@ -5,6 +5,8 @@ const test = require('node:test');
 const hymnLibrarySource = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
 const manifestSource = fs.readFileSync('src/constants/manifest.ts', 'utf8');
 const documentSource = fs.readFileSync('src/components/chc/screens/ServiceDocument.tsx', 'utf8');
+const drawerSource = fs.readFileSync('src/components/chc/ui/SermonPlannerDrawer.tsx', 'utf8');
+const preferencesSource = fs.readFileSync('src/utils/preferencesStorage.ts', 'utf8');
 
 function extractFunction(startMarker, endMarker) {
   const start = hymnLibrarySource.indexOf(startMarker);
@@ -103,6 +105,36 @@ test('Only Sermon Planner includes the Gospel Rite in hymn-key fallback lookups'
 test('Liturgy Gospel with Coptic uses the normalized all-caps sentinel', () => {
   assert.match(hymnLibrarySource, /"LITURGY_GOSPEL_WITH_COPTIC"/);
   assert.doesNotMatch(hymnLibrarySource, /"Liturgy_GOSPEL_WITH_COPTIC"/);
+});
+
+test('Both Liturgy Gospel variants resolve canonical all-caps and legacy mixed-case keys', () => {
+  const start = hymnLibrarySource.indexOf('export const READING_SENTINELS');
+  const end = hymnLibrarySource.indexOf('\nlet readingsForDateCache', start);
+  assert.ok(start >= 0 && end > start);
+  const definition = hymnLibrarySource.slice(start, end).replace('export const', 'const');
+  const { isReadingSentinel, normalizeReadingSentinel, readingMap } = new Function(
+    `${definition}\nreturn { isReadingSentinel, normalizeReadingSentinel, readingMap: READING_SENTINEL_MAP };`,
+  )();
+
+  assert.equal(isReadingSentinel('LITURGY_GOSPEL_WITH_COPTIC'), true);
+  assert.equal(isReadingSentinel('LITURGY_GOSPEL_WITHOUT_COPTIC'), true);
+  assert.equal(isReadingSentinel('Liturgy_GOSPEL_WITHOUT_COPTIC'), true);
+  assert.equal(normalizeReadingSentinel('Liturgy_GOSPEL_WITHOUT_COPTIC'), 'LITURGY_GOSPEL_WITHOUT_COPTIC');
+  assert.deepEqual(readingMap.LITURGY_GOSPEL_WITHOUT_COPTIC, {
+    service: 'Liturgy', readingType: 'Gospel', withCoptic: false,
+  });
+  assert.match(hymnLibrarySource, /READING_SENTINEL_MAP\[normalizeReadingSentinel\(sentinel\)\]/);
+  assert.match(hymnLibrarySource, /if \(isReadingSentinel\(section\.hymn_key\) && isoDate\)/);
+});
+
+test('Sermon Planner owns persisted language choices and exposes them in its notes drawer', () => {
+  assert.match(preferencesSource, /sermonPlannerVisibleLanguages: SermonPlannerVisibleLanguages/);
+  assert.match(preferencesSource, /\| 'sermonPlannerVisibleLanguages'/);
+  assert.match(documentSource, /preferences\.sermonPlannerVisibleLanguages\.english/);
+  assert.match(documentSource, /preferences=\{documentPreferences\}/);
+  assert.match(drawerSource, /const LANGUAGE_OPTIONS:/);
+  assert.match(drawerSource, /onToggleLanguage\(key\)/);
+  assert.match(drawerSource, /visibleLanguageCount === 1/);
 });
 
 test('Inline Synaxarium and regular inline Gospel hymns are both supported', () => {
