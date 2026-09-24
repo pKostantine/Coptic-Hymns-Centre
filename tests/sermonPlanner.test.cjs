@@ -131,8 +131,11 @@ test('Sermon Planner owns persisted language choices and exposes them in its not
   assert.match(preferencesSource, /sermonPlannerVisibleLanguages: SermonPlannerVisibleLanguages/);
   assert.match(preferencesSource, /\| 'sermonPlannerVisibleLanguages'/);
   assert.match(documentSource, /preferences\.sermonPlannerVisibleLanguages\.english/);
+  assert.match(documentSource, /coptic: false/);
+  assert.match(documentSource, /copticRecitedPrayers: false/);
   assert.match(documentSource, /preferences=\{documentPreferences\}/);
   assert.match(drawerSource, /const LANGUAGE_OPTIONS:/);
+  assert.doesNotMatch(drawerSource, /\{ key: 'coptic', label: 'Coptic' \}/);
   assert.match(drawerSource, /onToggleLanguage\(key\)/);
   assert.match(drawerSource, /visibleLanguageCount === 1/);
 });
@@ -179,20 +182,28 @@ test('Highlight citations retain the exact reading and verse number', () => {
   const compiled = utilSource.slice(start, end).replace(
     'export function getSermonHighlightVerseReferences(sections: DocumentSection[]): Record<string, string> {',
     'function getSermonHighlightVerseReferences(sections) {',
+  ).replace(
+    'const exactReference = (citation: string, chapter: string, verse: string) => {',
+    'const exactReference = (citation, chapter, verse) => {',
   ).replace('const result: Record<string, string> = {};', 'const result = {};');
   const getReferences = new Function(compiled + '\nreturn getSermonHighlightVerseReferences;')();
   const labels = getReferences([
     { id: 'gospel', verses: [
-      { type: 'readingReference', english: 'John 1:1–18' },
-      { type: 'text', bibleVerseNumber: '1' },
-      { type: 'text', bibleVerseNumber: '2' },
+      { type: 'readingReference', english: '2 Peter 1:1–11' },
+      { type: 'text', bibleChapterNumber: '1', bibleVerseNumber: '1' },
+      { type: 'text', bibleChapterNumber: '1', bibleVerseNumber: '2' },
+    ] },
+    { id: 'cross-chapter', verses: [
+      { type: 'readingReference', english: '2 Timothy 3:10–17, 4:1–22' },
+      { type: 'text', bibleChapterNumber: '4', bibleVerseNumber: '1' },
     ] },
     { id: 'synaxarium', sourceGroupKey: 'SYNAXARIUM', verses: [{ type: 'text', english: 'A saint' }] },
     { id: 'unrelated', verses: [{ type: 'text', english: 'A hymn' }] },
   ]);
-  assert.equal(labels['gospel::v0'], 'John 1:1–18');
-  assert.equal(labels['gospel::v1'], 'John 1:1–18 · v. 1');
-  assert.equal(labels['gospel::v2'], 'John 1:1–18 · v. 2');
+  assert.equal(labels['gospel::v0'], '2 Peter 1:1–11');
+  assert.equal(labels['gospel::v1'], '2 Peter 1:1');
+  assert.equal(labels['gospel::v2'], '2 Peter 1:2');
+  assert.equal(labels['cross-chapter::v1'], '2 Timothy 4:1');
   assert.equal(labels['synaxarium::v0'], 'Synaxarium');
   assert.equal(labels['unrelated::v0'], undefined, 'Do not attach an unrelated previous citation');
 });

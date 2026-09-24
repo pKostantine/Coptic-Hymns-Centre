@@ -754,6 +754,7 @@ async function buildReadingSection(rule: ReadingRule): Promise<{ section: Docume
             coptic: v.coptic || '',
             arabic: v.arabic,
             type: 'text',
+            bibleChapterNumber: String(v.displayChapter),
             bibleVerseNumber: String(v.displayVerse),
           })),
         )),

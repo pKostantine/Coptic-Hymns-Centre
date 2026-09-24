@@ -26,6 +26,8 @@ export interface DocumentVerse {
   nonCopticGospelRiteOnly?: boolean;
   /** Readings only: "chapter:verse" gold badge prefixed before this verse's text in every visible language column. */
   bibleVerseNumber?: string;
+  /** Readings only: source chapter retained for exact Sermon Planner highlight references. */
+  bibleChapterNumber?: string;
   /** Keeps authored Western digits in Coptic text when a source requires them. */
   preserveCopticDigits?: boolean;
   /** Pre-Refrain lines only — forces italic on top of whatever color/role the verse naturally resolves to, without changing that role. */

@@ -37,7 +37,6 @@ const HIGHLIGHT_COLORS: Record<SermonHighlightColor, string> = {
 
 const LANGUAGE_OPTIONS: { key: keyof SermonPlannerVisibleLanguages; label: string }[] = [
   { key: 'english', label: 'English' },
-  { key: 'coptic', label: 'Coptic' },
   { key: 'arabic', label: 'Arabic' },
 ];
 

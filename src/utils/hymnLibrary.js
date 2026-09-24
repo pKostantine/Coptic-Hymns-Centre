@@ -260,6 +260,7 @@ function buildReadingVerses(readingRow, withCoptic, isPsalm) {
       coptic: withCoptic ? v.coptic || "" : "",
       arabic: v.arabic || "",
       type: "text",
+      bibleChapterNumber: String(v.chapter_number),
       bibleVerseNumber: String(v.verse_number),
     })),
   );

@@ -165,6 +165,11 @@ export function createSermonHighlight(
  * together in hydrated reading sections; Synaxarium sections carry a group key.
  */
 export function getSermonHighlightVerseReferences(sections: DocumentSection[]): Record<string, string> {
+  const exactReference = (citation: string, chapter: string, verse: string) => {
+    const match = citation.match(/^(.+?)\s+(\d+):/);
+    if (!match) return citation;
+    return `${match[1]} ${chapter || match[2]}:${verse}`;
+  };
   const result: Record<string, string> = {};
   for (const section of sections) {
     let citation = section.sourceGroupKey === 'SYNAXARIUM' ? 'Synaxarium' : '';
@@ -174,9 +179,10 @@ export function getSermonHighlightVerseReferences(sections: DocumentSection[]): 
         citation = String(verse.english || verse.arabic || '').trim();
       }
       if (!citation) continue;
+      const chapter = String(verse.bibleChapterNumber || '').trim();
       const number = String(verse.bibleVerseNumber || '').trim();
       result[`${section.id}::v${index}`] =
-        number && verse.type !== 'readingReference' ? `${citation} · v. ${number}` : citation;
+        number && verse.type !== 'readingReference' ? exactReference(citation, chapter, number) : citation;
     }
   }
   return result;

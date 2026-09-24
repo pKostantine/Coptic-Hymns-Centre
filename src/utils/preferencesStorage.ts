@@ -30,7 +30,6 @@ export interface BibleVisibleLanguages {
 
 export interface SermonPlannerVisibleLanguages {
   english: boolean;
-  coptic: boolean;
   arabic: boolean;
 }
 
@@ -104,7 +103,6 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   },
   sermonPlannerVisibleLanguages: {
     english: true,
-    coptic: true,
     arabic: true,
   },
   fontScale: DEFAULT_READING_FONT_LEVEL,
@@ -163,7 +161,6 @@ function normalizeSermonPlannerVisibleLanguages(
   const record = recordValue(value);
   const normalized = {
     english: booleanValue(record.english, fallback.english),
-    coptic: booleanValue(record.coptic, fallback.coptic),
     arabic: booleanValue(record.arabic, fallback.arabic),
   };
   return Object.values(normalized).some(Boolean) ? normalized : { ...fallback };

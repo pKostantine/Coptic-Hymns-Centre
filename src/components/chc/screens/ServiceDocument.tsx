@@ -97,8 +97,8 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       visibleLanguages: {
         ...preferences.visibleLanguages,
         english: preferences.sermonPlannerVisibleLanguages.english,
-        coptic: preferences.sermonPlannerVisibleLanguages.coptic,
-        copticRecitedPrayers: preferences.sermonPlannerVisibleLanguages.coptic,
+        coptic: false,
+        copticRecitedPrayers: false,
         arabic: preferences.sermonPlannerVisibleLanguages.arabic,
       },
     };
