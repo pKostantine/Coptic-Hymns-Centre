@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { contentDataClient as supabase } from '../services/contentDataClient';
 import { computeMovableFeastDates, FIXED_FEASTS } from './fixedFeasts';
 import { toIsoDate } from './dateUtils';
 

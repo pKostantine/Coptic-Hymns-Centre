@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { contentDataClient as supabase } from "../services/contentDataClient";
 
 const PSALMS_CALENDAR_NUMBER = 19;
 const BIBLE_VERSE_FIELDS = "chapter_number, verse_number, english, coptic, arabic";

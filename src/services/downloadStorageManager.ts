@@ -29,7 +29,7 @@ export async function isDownloadRequestStale(request: OfflineDownloadRequest): P
 export async function listDownloads(): Promise<OfflineDownloadProgress[]> {
   const db = await getOfflineDatabase();
   const rows = await db.getAllAsync<{
-    package_key: string; domain: 'music' | 'learning'; entity_type: OfflineDownloadProgress['entityType']; entity_id: string;
+    package_key: string; domain: 'music' | 'learning' | 'books'; entity_type: OfflineDownloadProgress['entityType']; entity_id: string;
     title: string; status: OfflineDownloadProgress['status']; progress: number; bytes_written: number; total_bytes: number | null;
     error: string | null; updated_at: string;
   }>('SELECT package_key, domain, entity_type, entity_id, title, status, progress, bytes_written, total_bytes, error, updated_at FROM offline_packages ORDER BY updated_at DESC');
@@ -40,16 +40,17 @@ export async function listDownloads(): Promise<OfflineDownloadProgress[]> {
 export async function getDownloadStorageSummary(): Promise<OfflineStorageSummary> {
   const db = await getOfflineDatabase();
   const packages = await listDownloads();
-  const sizes = await db.getAllAsync<{ domain: 'music' | 'learning'; bytes: number }>(
+  const sizes = await db.getAllAsync<{ domain: 'music' | 'learning' | 'books'; bytes: number }>(
     `SELECT p.domain, COALESCE(SUM(f.bytes_written), 0) AS bytes FROM offline_files f
        JOIN offline_package_files pf ON pf.file_key = f.file_key JOIN offline_packages p ON p.package_key = pf.package_key
       WHERE f.status = 'complete' GROUP BY p.domain`,
   );
   const musicBytes = sizes.find((row) => row.domain === 'music')?.bytes ?? 0;
   const learningBytes = sizes.find((row) => row.domain === 'learning')?.bytes ?? 0;
+  const bookBytes = sizes.find((row) => row.domain === 'books')?.bytes ?? 0;
   return { packageCount: packages.length, completeCount: packages.filter((item) => item.status === 'complete').length,
     failedCount: packages.filter((item) => item.status === 'failed' || item.status === 'cancelled').length,
-    totalBytes: musicBytes + learningBytes, musicBytes, learningBytes };
+    totalBytes: musicBytes + learningBytes + bookBytes, musicBytes, learningBytes, bookBytes };
 }
 
 export async function validateDownloadedFiles(): Promise<OfflineIntegrityResult> {
@@ -91,7 +92,9 @@ export async function cleanupIncompleteDownloads(): Promise<number> {
 }
 
 export async function removeAllDownloadRecords(): Promise<string[]> {
-  const packages = await listDownloads();
+  // This is the legacy Music/Learning "Remove all" operation. Book packages
+  // are reference-counted and must only be removed through the book manager.
+  const packages = (await listDownloads()).filter((pkg) => pkg.domain !== 'books');
   const uris: string[] = [];
   for (const pkg of packages) {
     const files = await getPackageFiles(pkg.packageKey);

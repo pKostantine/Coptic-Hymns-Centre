@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { contentDataClient as supabase } from '../services/contentDataClient';
 
 const MESORE_MONTH = 12;
 export const NESI_MONTH = 13;

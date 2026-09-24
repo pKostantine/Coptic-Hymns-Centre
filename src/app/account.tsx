@@ -494,7 +494,7 @@ function AppSettingsSection() {
       </View>
       <SettingsLink label="Book settings" description="Reading languages, text, slideshow, and display" onPress={() => router.push('/book-settings')} />
       {Platform.OS !== 'web' ? (
-        <SettingsLink label="Downloads and storage" description="Manage music and learning saved offline" onPress={() => router.push('/downloads')} />
+        <SettingsLink label="Downloads and storage" description="Manage books, music, and learning saved offline" onPress={() => router.push('/downloads')} />
       ) : null}
     </View>
   );

@@ -4,7 +4,7 @@ import { FIXED_FEASTS } from './fixedFeasts';
 import { hydrateSupabaseServiceHymn } from './hymnLibrary';
 import { stripAlleluiaFromPsalmVerse } from './psalmReadingText';
 import { NESI_MONTH, shouldUseNesiSundayReadings } from './readingCalendarRules';
-import { supabase } from './supabase';
+import { contentDataClient as supabase } from '../services/contentDataClient';
 import { formatVerses } from './verseFormatting';
 
 // calendar.reading_rules stores Psalm references (calendar book number 19)

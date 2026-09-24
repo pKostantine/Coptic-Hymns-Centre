@@ -3,7 +3,7 @@ import { toIsoDate as toIsoDateString } from "./dateUtils";
 import { stripAlleluiaFromPsalmVerse } from "./psalmReadingText";
 import { loadReadingRuleRowsForDate } from "./readingCalendarRules";
 import { resolveBibleReadingReference } from "./readingReferenceResolver";
-import { supabase } from "./supabase";
+import { contentDataClient as supabase } from "../services/contentDataClient";
 import { formatVerses } from "./verseFormatting";
 
 // ─── Subdocument sentinel → schema.table registry ────────────────────────────

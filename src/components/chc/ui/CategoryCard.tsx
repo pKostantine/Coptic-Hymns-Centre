@@ -20,10 +20,13 @@ interface CategoryCardProps {
   /** Both default true — the main menu's App Language setting passes only one of these, so the card shows a single centered title instead of the normal bilingual pair. */
   showEnglish?: boolean;
   showArabic?: boolean;
+  downloadStatus?: string;
+  downloadProgress?: number;
+  onDownloadPress?: () => void;
 }
 
 /** CHC CategoryCard — main-menu row with a single open-book icon chip. */
-export default function CategoryCard({ title, arabic, onPress, showEnglish = true, showArabic: showArabicProp = true }: CategoryCardProps) {
+export default function CategoryCard({ title, arabic, onPress, showEnglish = true, showArabic: showArabicProp = true, downloadStatus, downloadProgress = 0, onDownloadPress }: CategoryCardProps) {
   const showArabic = showArabicProp && Boolean(arabic);
   const showEnglishTitle = showEnglish;
   const visibleTitleCount = (showEnglishTitle ? 1 : 0) + (showArabic ? 1 : 0);
@@ -42,7 +45,18 @@ export default function CategoryCard({ title, arabic, onPress, showEnglish = tru
             <Text style={[styles.title, styles.arabicTitle, visibleTitleCount === 1 && styles.centeredTitle]}>{formatArabicNumbers(arabic!)}</Text>
           ) : null}
         </View>
+        {downloadStatus ? <Text style={styles.downloadStatus}>{downloadStatus === 'downloading' ? `Downloading ${Math.round(downloadProgress * 100)}%` : downloadStatus.replaceAll('_', ' ')}</Text> : null}
       </View>
+      {onDownloadPress ? (
+        <Pressable
+          accessibilityLabel={`${downloadStatus === 'installed' ? 'Manage' : 'Download'} ${title}`}
+          hitSlop={8}
+          style={styles.downloadButton}
+          onPress={(event) => { event.stopPropagation(); onDownloadPress(); }}
+        >
+          <Icon name={downloadStatus === 'installed' ? 'checkmark' : downloadStatus === 'downloading' ? 'pause' : 'download-outline'} size={20} color={COLORS.gold} />
+        </Pressable>
+      ) : null}
       <Icon name="chevron-forward" size={22} color={COLORS.gold} />
     </Pressable>
   );
@@ -61,6 +75,8 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
   },
   content: { flex: 1 },
+  downloadButton: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 18, borderWidth: 1, height: 38, justifyContent: 'center', width: 38 },
+  downloadStatus: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 3, textTransform: 'capitalize' },
   iconWrap: {
     alignItems: 'center',
     backgroundColor: 'rgba(201, 162, 39, 0.13)',

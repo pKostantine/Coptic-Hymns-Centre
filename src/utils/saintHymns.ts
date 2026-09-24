@@ -1,6 +1,6 @@
 import type { DocumentSection, DocumentVerse } from '../components/chc/documentHtml';
 import { buildVerseFromTextRow, formatDocumentHymnSection } from './hymnLibrary';
-import { supabase } from './supabase';
+import { contentDataClient as supabase } from '../services/contentDataClient';
 
 /**
  * Saint hymn conditions are hierarchical: a base token names the saint

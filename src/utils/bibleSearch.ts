@@ -1,5 +1,5 @@
 import { BibleBook, getBibleBooks } from './bibleService';
-import { supabase } from './supabase';
+import { contentDataClient as supabase } from '../services/contentDataClient';
 
 /**
  * Search over the Bible.

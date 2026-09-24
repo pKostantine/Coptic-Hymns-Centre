@@ -11,11 +11,11 @@ import type {
 import type { PlaybackEntityKind } from '@/types/playback';
 
 const DATABASE_NAME = 'chc-offline.db';
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 
 interface PackageRow {
   package_key: string;
-  domain: 'music' | 'learning';
+  domain: 'music' | 'learning' | 'books';
   entity_type: OfflineDownloadEntityType;
   entity_id: string;
   locale: string;
@@ -35,7 +35,7 @@ export interface OfflineFileRow {
   file_key: string;
   remote_uri: string;
   local_uri: string | null;
-  role: 'media' | 'artwork';
+  role: 'media' | 'artwork' | 'content';
   mime_type: string | null;
   file_size_bytes: number | null;
   checksum: string | null;
@@ -59,15 +59,15 @@ function nowIso(): string {
 }
 
 async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
+  // Both pragmas are connection-scoped, so they must be enabled even when
+  // this database has already reached the latest schema version.
+  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const currentVersion = row?.user_version ?? 0;
   if (currentVersion >= DATABASE_VERSION) return;
 
   if (currentVersion === 0) {
     await db.execAsync(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA foreign_keys = ON;
-
       CREATE TABLE IF NOT EXISTS offline_packages (
         package_key TEXT PRIMARY KEY NOT NULL,
         domain TEXT NOT NULL,
@@ -137,6 +137,90 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
     `);
   }
 
+  if (currentVersion < 2) {
+    // Published book content is deliberately isolated from user-created
+    // state and the existing media tables. A resource version is populated
+    // while inactive, then content_resources.active_version is switched in
+    // one exclusive transaction after every chunk has passed integrity
+    // validation. Shared resources are referenced by multiple book rows.
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS content_resources (
+        resource_id TEXT PRIMARY KEY NOT NULL,
+        active_version TEXT,
+        state TEXT NOT NULL DEFAULT 'not_downloaded',
+        system_owned INTEGER NOT NULL DEFAULT 0,
+        bytes INTEGER NOT NULL DEFAULT 0,
+        error TEXT,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS content_books (
+        book_key TEXT PRIMARY KEY NOT NULL,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'not_downloaded',
+        progress REAL NOT NULL DEFAULT 0,
+        bytes_written INTEGER NOT NULL DEFAULT 0,
+        total_bytes INTEGER,
+        error TEXT,
+        installed_at TEXT,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS content_book_resources (
+        book_key TEXT NOT NULL REFERENCES content_books(book_key) ON DELETE CASCADE,
+        resource_id TEXT NOT NULL REFERENCES content_resources(resource_id) ON DELETE RESTRICT,
+        PRIMARY KEY (book_key, resource_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS content_book_pending_resources (
+        book_key TEXT NOT NULL REFERENCES content_books(book_key) ON DELETE CASCADE,
+        resource_id TEXT NOT NULL REFERENCES content_resources(resource_id) ON DELETE RESTRICT,
+        PRIMARY KEY (book_key, resource_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS content_rows (
+        resource_id TEXT NOT NULL,
+        version TEXT NOT NULL,
+        schema_name TEXT NOT NULL,
+        table_name TEXT NOT NULL,
+        chunk_id TEXT NOT NULL,
+        row_order INTEGER NOT NULL,
+        row_json TEXT NOT NULL,
+        PRIMARY KEY (resource_id, version, schema_name, table_name, chunk_id, row_order)
+      );
+      CREATE INDEX IF NOT EXISTS content_rows_lookup_idx
+        ON content_rows(schema_name, table_name, resource_id, version);
+
+      CREATE TABLE IF NOT EXISTS content_rpc_results (
+        resource_id TEXT NOT NULL,
+        version TEXT NOT NULL,
+        schema_name TEXT NOT NULL,
+        function_name TEXT NOT NULL,
+        args_key TEXT NOT NULL,
+        result_json TEXT NOT NULL,
+        PRIMARY KEY (resource_id, version, schema_name, function_name, args_key)
+      );
+      CREATE INDEX IF NOT EXISTS content_rpc_lookup_idx
+        ON content_rpc_results(schema_name, function_name, args_key, resource_id, version);
+
+      CREATE TABLE IF NOT EXISTS content_resource_chunks (
+        resource_id TEXT NOT NULL,
+        version TEXT NOT NULL,
+        chunk_id TEXT NOT NULL,
+        package_key TEXT NOT NULL,
+        imported INTEGER NOT NULL DEFAULT 0,
+        row_count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (resource_id, version, chunk_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS content_settings (
+        setting_key TEXT PRIMARY KEY NOT NULL,
+        setting_value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+  }
+
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }
 
@@ -158,6 +242,18 @@ export async function getOfflineDatabase(): Promise<SQLite.SQLiteDatabase> {
           `UPDATE offline_files
              SET status = 'paused', updated_at = ?
            WHERE status IN ('queued', 'downloading')`,
+          now,
+        );
+        await db.runAsync(
+          `UPDATE content_books
+             SET status = 'paused', updated_at = ?
+           WHERE status IN ('queued', 'downloading')`,
+          now,
+        );
+        await db.runAsync(
+          `UPDATE content_resources
+             SET state = 'paused', updated_at = ?
+           WHERE active_version IS NULL AND state IN ('queued', 'downloading')`,
           now,
         );
         return db;

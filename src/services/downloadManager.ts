@@ -15,8 +15,9 @@ function inferExtension(resource: OfflineDownloadResource): string {
   const mime = resource.mimeType?.toLowerCase() ?? '';
   if (mime.includes('mpeg')) return '.mp3'; if (mime.includes('mp4')) return '.mp4'; if (mime.includes('m4a') || mime.includes('aac')) return '.m4a';
   if (mime.includes('wav')) return '.wav'; if (mime.includes('webm')) return '.webm'; if (mime.includes('jpeg')) return '.jpg'; if (mime.includes('png')) return '.png'; if (mime.includes('webp')) return '.webp';
+  if (mime.includes('json')) return '.json';
   try { const match = new URL(resource.remoteUri).pathname.match(/\.[a-zA-Z0-9]{1,8}$/); if (match) return match[0].toLowerCase(); } catch { /* extension is optional */ }
-  return resource.role === 'artwork' ? '.img' : '.media';
+  return resource.role === 'artwork' ? '.img' : resource.role === 'content' ? '.json' : '.media';
 }
 function destinationFor(resource: OfflineDownloadResource): File { DOWNLOAD_DIRECTORY.create({ idempotent: true, intermediates: true }); return new File(DOWNLOAD_DIRECTORY, `${sanitizeFilePart(resource.fileKey)}${inferExtension(resource)}`); }
 function isUsableLocalFile(uri: string | null, expectedSize?: number | null): boolean { if (!uri) return false; try { const file = new File(uri); return file.exists && file.size > 0 && (expectedSize == null || expectedSize <= 0 || file.size === expectedSize); } catch { return false; } }

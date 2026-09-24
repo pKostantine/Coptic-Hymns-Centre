@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { contentDataClient as supabase } from '../services/contentDataClient';
 
 export interface BibleBook {
   bookKey: string;

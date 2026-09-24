@@ -1,10 +1,10 @@
 import type { PlaybackEntityKind } from '@/types/playback';
 
-export type OfflineDownloadDomain = 'music' | 'learning';
-export type OfflineDownloadEntityType = 'music_track' | 'music_release' | 'music_playlist' | 'music_liked_songs' | 'learning_recording' | 'learning_lesson' | 'learning_album' | 'learning_lesson_set' | 'learning_playlist';
+export type OfflineDownloadDomain = 'music' | 'learning' | 'books';
+export type OfflineDownloadEntityType = 'music_track' | 'music_release' | 'music_playlist' | 'music_liked_songs' | 'learning_recording' | 'learning_lesson' | 'learning_album' | 'learning_lesson_set' | 'learning_playlist' | 'book_resource';
 export type OfflineSnapshotEntityType = OfflineDownloadEntityType | 'music_lyrics' | 'music_library';
 export type OfflineDownloadStatus = 'idle' | 'queued' | 'downloading' | 'paused' | 'complete' | 'failed' | 'cancelled';
-export type OfflineResourceRole = 'media' | 'artwork';
+export type OfflineResourceRole = 'media' | 'artwork' | 'content';
 
 export interface OfflineEntitySnapshot<T = unknown> { key: string; entityType: OfflineSnapshotEntityType; entityId: string; locale: string; data: T; }
 export interface OfflineDownloadResource {
@@ -21,7 +21,7 @@ export interface OfflineDownloadProgress {
   status: OfflineDownloadStatus; progress: number; bytesWritten: number; totalBytes: number | null; error: string | null; updatedAt: string;
 }
 export interface OfflineStorageSummary {
-  packageCount: number; completeCount: number; failedCount: number; totalBytes: number; musicBytes: number; learningBytes: number;
+  packageCount: number; completeCount: number; failedCount: number; totalBytes: number; musicBytes: number; learningBytes: number; bookBytes: number;
 }
 export interface OfflineIntegrityResult { checked: number; invalid: number; }
 

@@ -63,7 +63,7 @@ function loadEngine(backendFlagsByDate = {}) {
   source = source.replace(
     'import { toIsoDate } from "./dateUtils";',
     'const toIsoDate = (date) => typeof date === "string" ? date : date.toISOString().slice(0, 10);',
-  ).replace('import { supabase } from "./supabase";', '')
+  ).replace('import { contentDataClient as supabase } from "../services/contentDataClient";', '')
     .replace(/^export /gm, '');
 
   return new Function('supabase', source + '\nreturn { getContextFlags };')(supabase);

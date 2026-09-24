@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import NotificationBootstrap from '@/components/NotificationBootstrap';
+import BookSyncBootstrap from '@/components/BookSyncBootstrap';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
@@ -86,6 +87,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <NotificationBootstrap />
+        <BookSyncBootstrap />
         <ReadingPreferencesProvider>
           <CalendarProvider>
             <MusicPlayerProvider>

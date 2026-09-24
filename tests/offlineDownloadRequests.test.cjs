@@ -83,11 +83,11 @@ test('track downloads live in the native-only overflow menu', () => {
 });
 
 test('download routes are absent from the website', () => {
-  const downloadsScreen = fs.readFileSync('src/app/downloads.tsx', 'utf8');
+  const downloadsScreen = fs.readFileSync('src/app/downloads.web.tsx', 'utf8');
   const libraryScreen = fs.readFileSync('src/app/music/library.tsx', 'utf8');
   const librarySectionScreen = fs.readFileSync('src/app/music/library/[section].tsx', 'utf8');
 
-  assert.match(downloadsScreen, /Platform\.OS === 'web'.*<Redirect href="\/account"/s);
+  assert.match(downloadsScreen, /<Redirect href=.*\/account/);
   assert.match(libraryScreen, /Platform\.OS !== 'web' \|\| folder\.id !== 'downloads'/);
   assert.match(librarySectionScreen, /isWebDownloadsRoute.*<Redirect href="\/music\/library"/s);
 });

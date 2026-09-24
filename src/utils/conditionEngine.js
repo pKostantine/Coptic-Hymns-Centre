@@ -1,5 +1,5 @@
 import { toIsoDate } from "./dateUtils";
-import { supabase } from "./supabase";
+import { contentDataClient as supabase } from "../services/contentDataClient";
 
 // ─── Condition string evaluator ────────────────────────────────────────────
 // Parses a stored condition string (e.g. "Lent && !Saturday", "FeastOfTheCross

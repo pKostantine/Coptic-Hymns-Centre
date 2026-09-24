@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "chc-content-packages",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-20",
+  "workers_dev": true,
+  "vars": {
+    "SUPABASE_URL": "https://wtuujmeinzqfikvuofmh.supabase.co"
+  },
+  "r2_buckets": [
+    {
+      "binding": "CHC_CONTENT",
+      "bucket_name": "chc-content"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
@@ -10,6 +11,8 @@ import CategoryCard from '@/components/chc/ui/CategoryCard';
 import Icon from '@/components/chc/ui/Icon';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { CATEGORIES } from '@/constants/manifest';
+import { bookDownloadManager } from '@/services/bookDownloadManager';
+import type { BookDownloadProgress, DownloadableBookKey } from '@/types/bookDownloads';
 import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
@@ -27,6 +30,23 @@ export default function BooksHome() {
   const showEnglish = preferences.appLanguage === 'en';
   const showArabic = preferences.appLanguage === 'ar';
   const appTitle = showArabic ? 'الكتب' : 'Books';
+  const downloadRevision = useSyncExternalStore(bookDownloadManager.subscribe, bookDownloadManager.getRevision, bookDownloadManager.getRevision);
+  const [downloads, setDownloads] = useState<BookDownloadProgress[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void bookDownloadManager.listBooks().then((items) => { if (active) setDownloads(items); });
+    return () => { active = false; };
+  }, [downloadRevision]);
+
+  const downloadAction = (book: BookDownloadProgress) => {
+    const action = book.status === 'downloading' || book.status === 'queued'
+      ? bookDownloadManager.pause(book.bookKey)
+      : book.status === 'installed'
+        ? Promise.resolve(router.push('/downloads'))
+        : bookDownloadManager.install(book.bookKey);
+    void action.catch((error) => Alert.alert('Download', error instanceof Error ? error.message : 'Unable to download this book.'));
+  };
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -81,6 +101,10 @@ export default function BooksHome() {
               showEnglish={showEnglish}
               showArabic={showArabic}
               onPress={() => router.push(`/${item.id}`)}
+              {...(() => {
+                const book = downloads.find((entry) => entry.bookKey === item.id as DownloadableBookKey);
+                return book ? { downloadStatus: book.status, downloadProgress: book.progress, onDownloadPress: () => downloadAction(book) } : {};
+              })()}
             />
           </View>
         )}

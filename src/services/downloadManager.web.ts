@@ -17,7 +17,7 @@ class WebDownloadManager implements OfflineDownloadManager {
   removeAll(): Promise<void> { return Promise.resolve(); }
   cleanupIncomplete(): Promise<number> { return Promise.resolve(0); }
   validateIntegrity(): Promise<OfflineIntegrityResult> { return Promise.resolve({ checked: 0, invalid: 0 }); }
-  getStorageSummary(): Promise<OfflineStorageSummary> { return Promise.resolve({ packageCount: 0, completeCount: 0, failedCount: 0, totalBytes: 0, musicBytes: 0, learningBytes: 0 }); }
+  getStorageSummary(): Promise<OfflineStorageSummary> { return Promise.resolve({ packageCount: 0, completeCount: 0, failedCount: 0, totalBytes: 0, musicBytes: 0, learningBytes: 0, bookBytes: 0 }); }
   listDownloads(): Promise<OfflineDownloadProgress[]> { return Promise.resolve([]); }
   getProgress(_packageKey: string): Promise<OfflineDownloadProgress | null> { return Promise.resolve(null); }
   isDownloaded(_entityType: OfflineDownloadRequest['entityType'], _entityId: string): Promise<boolean> { return Promise.resolve(false); }

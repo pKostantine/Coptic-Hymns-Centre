@@ -1,12 +1,12 @@
 import { COLORS, SPACING } from '../../constants/theme';
-import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
-import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
-import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
-import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from './documentPresentationMetrics';
 import type {
   SermonHighlightAnchor,
   SermonHighlightColor,
 } from '../../types/sermonPlanner';
+import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
+import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
+import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
+import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from './documentPresentationMetrics';
 
 export interface DocumentVerse {
   english: string;
@@ -1696,7 +1696,7 @@ function formatArabicDigits(text: string) {
   return String(text || '').replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit);
 }
 
-const COPTIC_DIGITS: Record<number, string> = { 1: 'ⲁ̅', 2: 'ⲃ̅', 3: 'ⲅ̅', 4: 'ⲇ̅', 5: 'ⲉ̅', 6: 'Ⲋ', 7: 'ⲍ̅', 8: 'ⲏ̅', 9: 'ⲑ̅' };
+const COPTIC_DIGITS: Record<number, string> = { 1: 'ⲁ̅', 2: 'ⲃ̅', 3: 'ⲅ̅', 4: 'ⲇ̅', 5: 'ⲉ̅', 6: 'ⲋ', 7: 'ⲍ̅', 8: 'ⲏ̅', 9: 'ⲑ̅' };
 const COPTIC_TENS: Record<number, string> = { 1: 'ⲓ̅', 2: 'ⲕ̅', 3: 'ⲗ̅', 4: 'ⲙ̅', 5: 'ⲛ̅', 6: 'ⲝ̅', 7: 'ⲟ̅', 8: 'ⲡ̅', 9: 'ϥ̅' };
 const COPTIC_HUNDREDS: Record<number, string> = { 1: 'ⲣ̅', 2: 'ⲥ̅', 3: 'ⲧ̅', 4: 'ⲩ̅', 5: 'ⲫ̅', 6: 'ⲭ̅', 7: 'ⲯ̅', 8: 'ⲱ̅', 9: 'ϣ̅' };
 
