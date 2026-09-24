@@ -179,6 +179,13 @@ async function fetchContextFlags(isoDate, extraContext) {
         delete flags.Joyful29thOfTheMonth;
         flags.Fasts = true;
       }
+      // The actually celebrated 29th (not the raw Coptic day-29 marker) is a
+      // festive observance. Normalize the aggregate alias client-side as well
+      // so an already-downloaded Calendar package gains the corrected
+      // condition before its next package refresh.
+      if (flags.Joyful29 || flags.Joyful29thOfTheMonth) {
+        flags.Feasts = true;
+      }
       return flags;
     })();
     rememberInCache(contextFlagsCache, key, cached);

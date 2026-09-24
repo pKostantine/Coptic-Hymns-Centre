@@ -113,3 +113,20 @@ test('normal days outside Lent retain the conditions returned by the RPC', async
   assert.equal(flags.NormalFastingDays, true);
   assert.equal(Boolean(flags.Lent), false);
 });
+
+test('Joyful 29 activates the aggregate Feasts condition', async () => {
+  const { getContextFlags } = loadEngine({
+    '2026-08-22': { Joyful29: true, Joyful29thOfTheMonth: true },
+  });
+  const flags = await getContextFlags('2026-08-22');
+  assert.equal(flags.Joyful29, true);
+  assert.equal(flags.Feasts, true);
+});
+
+test('the raw Coptic day-29 marker alone is not treated as Joyful 29', async () => {
+  const { getContextFlags } = loadEngine({
+    '2026-01-07': { TwentyNinthCopticMonth: true, Joyful29thOfTheMonthRaw: true },
+  });
+  const flags = await getContextFlags('2026-01-07');
+  assert.equal(Boolean(flags.Feasts), false);
+});
