@@ -19,7 +19,13 @@ interface AppHeaderProps {
   rightAccessibilityLabel?: string;
   visibleLanguages?: { english: boolean; arabic: boolean };
   showBrowserFullscreen?: boolean;
+  /** A book's own colour in place of the navy bar, so the header runs straight into the band at the top of its menu. */
+  tint?: string;
+  /** False while the page shows the same title larger just below (a book's band); the header then names it only once that scrolls away. */
+  titleVisible?: boolean;
 }
+
+const ICON_BUTTON_SIZE = 40;
 
 /** CHC Header — ported 1:1 from Header.js/Header.web.js: generic icon-toolbar chrome shared by every screen. */
 export default function AppHeader({
@@ -34,6 +40,8 @@ export default function AppHeader({
   rightAccessibilityLabel = 'Open settings',
   visibleLanguages,
   showBrowserFullscreen = true,
+  tint,
+  titleVisible = true,
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
   const { preferences } = useReadingPreferences();
@@ -54,19 +62,23 @@ export default function AppHeader({
   const effectiveRightLeadingPress = rightLeadingIcon ? onRightLeadingPress : defaultRightLeadingPress;
   const hasRightLeadingAction = Boolean(effectiveRightLeadingIcon && effectiveRightLeadingPress);
   const hasRightAction = Boolean(rightIcon && onRightPress);
+  // Both sides take the width of the busier one, so the title stays centred
+  // on the header however many buttons sit either side of it.
+  const slots = Math.max(1, canGoBack ? 1 : 0, (hasRightLeadingAction ? 1 : 0) + (hasRightAction ? 1 : 0));
+  const sideWidth = slots * ICON_BUTTON_SIZE + (slots - 1) * SPACING.sm;
 
   return (
-    <View style={[styles.container, { paddingTop: SPACING.sm + insets.top }]}>
+    <View style={[styles.container, tint ? { backgroundColor: tint, borderBottomColor: tint } : null, { paddingTop: SPACING.sm + insets.top }]}>
       <View style={styles.topRow}>
-        {canGoBack ? (
-          <Pressable accessibilityLabel="Go back" style={styles.iconButton} onPress={onBack}>
-            <Icon name="chevron-back" size={24} color={COLORS.gold} />
-          </Pressable>
-        ) : (
-          <View style={styles.iconSpacer} />
-        )}
+        <View style={[styles.side, { width: sideWidth }]}>
+          {canGoBack ? (
+            <Pressable accessibilityLabel="Go back" style={styles.iconButton} onPress={onBack}>
+              <Icon name="chevron-back" size={24} color={COLORS.gold} />
+            </Pressable>
+          ) : null}
+        </View>
 
-        <View style={styles.titleGroup}>
+        <View style={[styles.titleGroup, !titleVisible && styles.titleHidden]} aria-hidden={!titleVisible}>
           {showEnglish ? (
             <Text style={[styles.title, styles.centeredTitle]} numberOfLines={1}>
               {formatEnglishDisplayText(titleParts.english || titleParts.arabic)}
@@ -79,26 +91,22 @@ export default function AppHeader({
           ) : null}
         </View>
 
-        {hasRightLeadingAction || hasRightAction ? (
-          <View style={styles.rightActions}>
-            {hasRightLeadingAction ? (
-              <Pressable
-                accessibilityLabel={rightLeadingAccessibilityLabel}
-                style={styles.iconButton}
-                onPress={effectiveRightLeadingPress}
-              >
-                <Icon name={effectiveRightLeadingIcon as IconName} size={23} color={COLORS.gold} />
-              </Pressable>
-            ) : null}
-            {hasRightAction ? (
-              <Pressable accessibilityLabel={rightAccessibilityLabel} style={styles.iconButton} onPress={onRightPress}>
-                <Icon name={rightIcon as IconName} size={23} color={COLORS.gold} />
-              </Pressable>
-            ) : null}
-          </View>
-        ) : (
-          <View style={styles.iconSpacer} />
-        )}
+        <View style={[styles.side, styles.sideEnd, { width: sideWidth }]}>
+          {hasRightLeadingAction ? (
+            <Pressable
+              accessibilityLabel={rightLeadingAccessibilityLabel}
+              style={styles.iconButton}
+              onPress={effectiveRightLeadingPress}
+            >
+              <Icon name={effectiveRightLeadingIcon as IconName} size={23} color={COLORS.gold} />
+            </Pressable>
+          ) : null}
+          {hasRightAction ? (
+            <Pressable accessibilityLabel={rightAccessibilityLabel} style={styles.iconButton} onPress={onRightPress}>
+              <Icon name={rightIcon as IconName} size={23} color={COLORS.gold} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -126,18 +134,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
   },
-  iconSpacer: {
-    height: 40,
-    width: 40,
-  },
-  rightActions: {
+  side: {
     flexDirection: 'row',
     gap: SPACING.sm,
+  },
+  sideEnd: {
+    justifyContent: 'flex-end',
   },
   titleGroup: {
     flex: 1,
     flexDirection: 'row',
     gap: SPACING.sm,
+  },
+  titleHidden: {
+    opacity: 0,
   },
   title: {
     color: '#FFFFFF',

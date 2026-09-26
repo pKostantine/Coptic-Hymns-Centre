@@ -1,4 +1,3 @@
-import { contentDataClient as supabase } from '../services/contentDataClient';
 import { getSeasonRanges } from './calendarService';
 import { addUtcDays, toIsoDate } from './dateUtils';
 
@@ -16,12 +15,10 @@ export const HOLY_WEEK_DAY_IDS = ['palm-sunday', 'monday', 'tuesday', 'wednesday
 const EVE_IDS_BY_DAY_INDEX: (string | null)[] = [null, 'monday-eve', 'tuesday-eve', 'wednesday-eve', 'thursday-eve', 'friday-eve', null];
 
 export interface HolyWeekSchedule {
-  /** Palm Sunday of the Holy Week shown — the current one while it runs, otherwise the next. */
+  /** Palm Sunday of the Holy Week in progress. */
   palmSunday: Date;
-  /** The day or eve being prayed right now (liturgical time), or null outside Holy Week. */
-  currentDayId: string | null;
-  /** Whole days from the liturgical date to Palm Sunday; negative once it has begun. */
-  daysUntil: number;
+  /** The day or eve being prayed right now (liturgical time). */
+  currentDayId: string;
 }
 
 function parseIsoDate(value: string): Date {
@@ -47,21 +44,18 @@ export function currentHolyWeekDayId(palmSunday: Date, effectiveDate: Date, isEv
   return EVE_IDS_BY_DAY_INDEX[index] ?? HOLY_WEEK_DAY_IDS[index];
 }
 
-/** The Holy Week the menus should show for a liturgical date: the one in progress, else the next. */
+/**
+ * The Holy Week in progress at a liturgical moment, or null outside it. Only
+ * the current Pascha is ever shown — there is no looking ahead to the next.
+ */
 export async function loadHolyWeekSchedule(effectiveDate: Date, isEvening: boolean): Promise<HolyWeekSchedule | null> {
-  const from = toIsoDate(addUtcDays(effectiveDate, -8));
-  const to = toIsoDate(addUtcDays(effectiveDate, 400));
-  const ranges = await getSeasonRanges(from, to);
-  const range = ranges
-    .filter((entry) => entry.rangeKey === 'holy-week')
-    .find((entry) => parseIsoDate(entry.endDate).getTime() >= effectiveDate.getTime());
+  const day = toIsoDate(effectiveDate);
+  const ranges = await getSeasonRanges(day, day);
+  const range = ranges.find((entry) => entry.rangeKey === 'holy-week');
   if (!range) return null;
   const palmSunday = addUtcDays(parseIsoDate(range.startDate), 1) as Date;
-  return {
-    palmSunday,
-    currentDayId: currentHolyWeekDayId(palmSunday, effectiveDate, isEvening),
-    daysUntil: dayDifference(effectiveDate, palmSunday),
-  };
+  const currentDayId = currentHolyWeekDayId(palmSunday, effectiveDate, isEvening);
+  return currentDayId ? { palmSunday, currentDayId } : null;
 }
 
 const WEEKDAYS = {
@@ -105,55 +99,4 @@ export function formatMonthDay(date: Date): string {
 
 export function weekdayName(index: number, arabic: boolean): string {
   return (arabic ? WEEKDAYS.arabic : WEEKDAYS.english)[index % 7];
-}
-
-export interface HourGospelSummary {
-  english: string;
-  arabic: string;
-}
-
-/** Drops the verse reference: "Matthew 27:27-45" → "Matthew". */
-function bookOf(citation: string): string {
-  return citation.replace(/\s+[\d:,\-–\s]+$/, '').trim();
-}
-
-/** "Matthew, Mark, Luke & John" / "متى، مرقس، لوقا ويوحنا" — the Arabic "و" attaches to the word after it. */
-function joinNames(names: string[], comma: string, and: string): string {
-  if (names.length <= 1) return names[0] || '';
-  const conjunction = and === 'و' ? ' و' : ` ${and} `;
-  return `${names.slice(0, -1).join(comma)}${conjunction}${names[names.length - 1]}`;
-}
-
-/**
- * Each hour's Gospel, for the hour lists: the citation when there is one
- * ("Mark 11:12-24"), or the evangelists when several are read ("Matthew,
- * Mark, Luke & John"). Keyed by reading_rules.hour_key, which is every Holy
- * Week hour's own id.
- */
-export async function loadHourGospelSummaries(hourKeys: string[]): Promise<Record<string, HourGospelSummary>> {
-  if (!hourKeys.length) return {};
-  const { data, error } = await supabase
-    .schema('holy_week')
-    .from('reading_rules')
-    .select('hour_key, title_english, title_arabic, sort_order')
-    .in('hour_key', hourKeys)
-    .eq('reading_type', 'Gospel')
-    .order('sort_order', { ascending: true });
-  if (error) throw new Error(error.message);
-  const byHour = new Map<string, { english: string; arabic: string }[]>();
-  for (const row of (data || []) as { hour_key: string; title_english: string | null; title_arabic: string | null }[]) {
-    const list = byHour.get(row.hour_key) || [];
-    list.push({ english: row.title_english || '', arabic: row.title_arabic || '' });
-    byHour.set(row.hour_key, list);
-  }
-  const summaries: Record<string, HourGospelSummary> = {};
-  for (const [hourKey, gospels] of byHour) {
-    summaries[hourKey] = gospels.length === 1
-      ? { english: gospels[0].english, arabic: toArabicDigits(gospels[0].arabic || gospels[0].english) }
-      : {
-        english: joinNames(gospels.map((gospel) => bookOf(gospel.english)), ', ', '&'),
-        arabic: joinNames(gospels.map((gospel) => bookOf(gospel.arabic || gospel.english)), '، ', 'و'),
-      };
-  }
-  return summaries;
 }

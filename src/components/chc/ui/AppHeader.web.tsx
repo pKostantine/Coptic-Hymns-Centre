@@ -20,6 +20,10 @@ interface AppHeaderProps {
   rightAccessibilityLabel?: string;
   visibleLanguages?: { english: boolean; arabic: boolean };
   showBrowserFullscreen?: boolean;
+  /** A book's own colour in place of the navy bar, so the header runs straight into the band at the top of its menu. */
+  tint?: string;
+  /** False while the page shows the same title larger just below (a book's band); the header then names it only once that scrolls away. */
+  titleVisible?: boolean;
 }
 
 /** CHC web header, with room for the safe area in edge-to-edge browsers. */
@@ -35,6 +39,8 @@ export default function AppHeader({
   rightAccessibilityLabel = 'Open settings',
   visibleLanguages,
   showBrowserFullscreen = true,
+  tint,
+  titleVisible = true,
 }: AppHeaderProps) {
   const { preferences } = useReadingPreferences();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
@@ -54,6 +60,11 @@ export default function AppHeader({
   const hasRightLeadingAction = Boolean(effectiveRightLeadingIcon && effectiveRightLeadingPress);
   const hasRightAction = Boolean(rightIcon && onRightPress);
   const isMobileWeb = useIsMobileWeb();
+  // Both sides take the width of the busier one, so the title stays centred
+  // on the header however many buttons sit either side of it.
+  const buttonSize = isMobileWeb ? 40 : 48;
+  const slots = Math.max(1, canGoBack ? 1 : 0, (hasRightLeadingAction ? 1 : 0) + (hasRightAction ? 1 : 0));
+  const sideWidth = slots * buttonSize + (slots - 1) * SPACING.sm;
   const insets = useSafeAreaInsets();
   const iconButtonStyle = [styles.iconButton, isMobileWeb && styles.iconButtonMobile];
   const iconSize = isMobileWeb ? 23 : 26;
@@ -63,19 +74,20 @@ export default function AppHeader({
       style={[
         styles.container,
         isMobileWeb && styles.containerMobile,
+        tint ? { backgroundColor: tint, borderBottomColor: tint } : null,
         { paddingTop: (isMobileWeb ? SPACING.sm : SPACING.lg + 4) + insets.top },
       ]}
     >
       <View style={styles.topRow}>
-        {canGoBack ? (
-          <Pressable accessibilityLabel="Go back" style={iconButtonStyle} onPress={onBack}>
-            <Icon name="chevron-back" size={isMobileWeb ? 24 : 28} color={COLORS.gold} />
-          </Pressable>
-        ) : (
-          <View style={[styles.iconSpacer, isMobileWeb && styles.iconSpacerMobile]} />
-        )}
+        <View style={[styles.side, { width: sideWidth }]}>
+          {canGoBack ? (
+            <Pressable accessibilityLabel="Go back" style={iconButtonStyle} onPress={onBack}>
+              <Icon name="chevron-back" size={isMobileWeb ? 24 : 28} color={COLORS.gold} />
+            </Pressable>
+          ) : null}
+        </View>
 
-        <View style={styles.titleGroup}>
+        <View style={[styles.titleGroup, !titleVisible && styles.titleHidden]} aria-hidden={!titleVisible}>
           {showEnglish ? (
             <Text
               style={[styles.title, isMobileWeb && styles.titleMobile, styles.centeredTitle]}
@@ -99,26 +111,22 @@ export default function AppHeader({
           ) : null}
         </View>
 
-        {hasRightLeadingAction || hasRightAction ? (
-          <View style={styles.rightActions}>
-            {hasRightLeadingAction ? (
-              <Pressable
-                accessibilityLabel={rightLeadingAccessibilityLabel}
-                style={iconButtonStyle}
-                onPress={effectiveRightLeadingPress}
-              >
-                <Icon name={effectiveRightLeadingIcon as IconName} size={iconSize} color={COLORS.gold} />
-              </Pressable>
-            ) : null}
-            {hasRightAction ? (
-              <Pressable accessibilityLabel={rightAccessibilityLabel} style={iconButtonStyle} onPress={onRightPress}>
-                <Icon name={rightIcon as IconName} size={iconSize} color={COLORS.gold} />
-              </Pressable>
-            ) : null}
-          </View>
-        ) : (
-          <View style={[styles.iconSpacer, isMobileWeb && styles.iconSpacerMobile]} />
-        )}
+        <View style={[styles.side, styles.sideEnd, { width: sideWidth }]}>
+          {hasRightLeadingAction ? (
+            <Pressable
+              accessibilityLabel={rightLeadingAccessibilityLabel}
+              style={iconButtonStyle}
+              onPress={effectiveRightLeadingPress}
+            >
+              <Icon name={effectiveRightLeadingIcon as IconName} size={iconSize} color={COLORS.gold} />
+            </Pressable>
+          ) : null}
+          {hasRightAction ? (
+            <Pressable accessibilityLabel={rightAccessibilityLabel} style={iconButtonStyle} onPress={onRightPress}>
+              <Icon name={rightIcon as IconName} size={iconSize} color={COLORS.gold} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -159,22 +167,20 @@ const styles = StyleSheet.create({
     height: 40,
     width: 40,
   },
-  iconSpacer: {
-    height: 48,
-    width: 48,
-  },
-  iconSpacerMobile: {
-    height: 40,
-    width: 40,
-  },
-  rightActions: {
+  side: {
     flexDirection: 'row',
     gap: SPACING.sm,
+  },
+  sideEnd: {
+    justifyContent: 'flex-end',
   },
   titleGroup: {
     flex: 1,
     flexDirection: 'row',
     gap: SPACING.sm,
+  },
+  titleHidden: {
+    opacity: 0,
   },
   title: {
     color: '#FFFFFF',

@@ -16,7 +16,7 @@ export default function DivineLiturgyDocument() {
       title={service.title}
       arabic={service.arabic}
       entryId={service.id}
-      backHref="/liturgy/divine-liturgy"
+      backHref="/liturgy"
     />
   );
 }

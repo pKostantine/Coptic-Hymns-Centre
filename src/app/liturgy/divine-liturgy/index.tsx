@@ -1,14 +1,5 @@
-import ServiceSubmenu from '@/components/chc/screens/ServiceSubmenu';
-import { DIVINE_LITURGY_SERVICES } from '@/constants/manifest';
+import LiturgyMenu from '@/components/chc/screens/LiturgyMenu';
 
-export default function DivineLiturgySubmenu() {
-  return (
-    <ServiceSubmenu
-      basePath="liturgy/divine-liturgy"
-      title="The Divine Liturgy"
-      arabic="القداس الإلهي"
-      services={DIVINE_LITURGY_SERVICES}
-      backHref="/liturgy"
-    />
-  );
+export default function DivineLiturgyMenu() {
+  return <LiturgyMenu section="divine-liturgy" />;
 }

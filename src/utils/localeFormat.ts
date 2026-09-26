@@ -64,6 +64,22 @@ const COPTIC_MONTHS_AR: Record<string, string> = {
   Nesi: 'النسيء',
 };
 
+export const WEEKDAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export const WEEKDAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+
+/** A date-only value (UTC midnight) as "Saturday, September 26" / "السبت ٢٦ سبتمبر". */
+export function formatWeekdayDate(date: Date, isArabic: boolean) {
+  const weekday = date.getUTCDay();
+  if (isArabic) return `${WEEKDAYS_AR[weekday]} ${toEasternArabicDigits(date.getUTCDate())} ${GREGORIAN_MONTHS_AR[date.getUTCMonth()]}`;
+  return `${WEEKDAYS_EN[weekday]}, ${GREGORIAN_MONTHS_EN[date.getUTCMonth()]} ${date.getUTCDate()}`;
+}
+
+/** A Coptic date as "Thoout 16, 1743" / "١٦ توت ١٧٤٣". */
+export function formatCopticDate(monthName: string, day: number, year: number, isArabic: boolean) {
+  if (isArabic) return `${toEasternArabicDigits(day)} ${formatCopticMonthName(monthName, true)} ${toEasternArabicDigits(year)}`;
+  return `${monthName} ${day}, ${year}`;
+}
+
 export function toEasternArabicDigits(value: number | string) {
   return String(value).replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit);
 }

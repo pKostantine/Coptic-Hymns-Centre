@@ -1,12 +1,12 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
-import HymnCard from '@/components/chc/ui/HymnCard';
+import MenuRow, { menuRowPosition } from '@/components/chc/ui/MenuRow';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { bookmarkKeyFor, CATEGORIES, DIVINE_LITURGY_SERVICES, HOLY_WEEK_HOURS, holyWeekHourHref, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
 import { goBack } from '@/utils/navigation';
@@ -149,13 +149,13 @@ export default function BookmarksScreen() {
           contentContainerStyle={styles.listContent}
           data={entries}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <HymnCard
+          renderItem={({ item, index }) => (
+            <MenuRow
               title={item.title}
               arabic={item.arabic}
               showEnglish={showEnglish}
               showArabic={showArabic}
-              isBookmarked
+              position={menuRowPosition(index, entries.length)}
               onPress={() => router.push(item.href as never)}
             />
           )}
@@ -169,5 +169,5 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   emptyState: { flex: 1, justifyContent: 'center', padding: SPACING.lg },
   emptyText: { fontFamily: TYPOGRAPHY.title, fontSize: 20, textAlign: 'center', color: COLORS.white },
-  listContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
+  listContent: { alignSelf: 'center', maxWidth: 640, padding: SPACING.md, paddingBottom: SPACING.xl, width: '100%' },
 });

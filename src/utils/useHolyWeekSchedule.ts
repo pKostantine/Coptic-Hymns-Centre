@@ -4,9 +4,9 @@ import { useCalendar } from '../context/CalendarContext';
 import { loadHolyWeekSchedule, type HolyWeekSchedule } from './holyWeek';
 
 /**
- * The Holy Week in progress (or the next one) for the app's liturgical date,
- * or null while loading or when the calendar can't be read — the Holy Week
- * menus treat dates as a nicety and work without them.
+ * The Holy Week in progress for the app's liturgical date — null outside
+ * Holy Week, while loading, or when the calendar can't be read. The menus
+ * only use it to date the week and mark what is being prayed now.
  */
 export function useHolyWeekSchedule(): HolyWeekSchedule | null {
   const { effectiveDate, liturgicalDayPeriod } = useCalendar();

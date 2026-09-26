@@ -73,13 +73,13 @@ test('artist artwork is circular and tab headers no longer carry the logo', () =
   const folder = read('src/app/music/library/[section].tsx');
   const nativeHeader = read('src/components/chc/ui/AppHeader.tsx');
   const webHeader = read('src/components/chc/ui/AppHeader.web.tsx');
-  const booksWeb = read('src/app/books/index.web.tsx');
+  const books = read('src/app/books/index.tsx');
   const home = read('src/components/chc/screens/HomeScreen.tsx');
 
   assert.match(folder, /profileImageAsset[^\n]*size=\{58\} rounded/);
   assert.doesNotMatch(nativeHeader, /CHC_sm/);
   assert.doesNotMatch(webHeader, /CHC_sm_web/);
-  assert.doesNotMatch(booksWeb, /CHC_sm_web/);
+  assert.doesNotMatch(books, /CHC_sm/);
   assert.match(home, /assets\/images\/CHC\.png/);
   assert.match(home, /width \* 0\.31/);
 });

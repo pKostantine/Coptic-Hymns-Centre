@@ -1,6 +1,7 @@
 import { contentDataClient as supabase } from '../services/contentDataClient';
 import { computeMovableFeastDates, FIXED_FEASTS } from './fixedFeasts';
 import { toIsoDate } from './dateUtils';
+import { getSeasonIndicatorName } from '../constants/seasonNames';
 
 export interface CalendarDay {
   gregorianDate: string;
@@ -61,30 +62,37 @@ export async function getCopticMonthGrid(copticYear: number, copticMonth: number
   }));
 }
 
-/** Looks up the Coptic (year, month, monthName) for a given Gregorian date — used to seed the Coptic month view. */
+export interface CopticDate {
+  monthName: string;
+  day: number;
+  year: number;
+}
+
 /**
- * The Coptic date label for a day, e.g. "Thoout 16, 1743".
+ * The Coptic date of a day — month name as the database spells it
+ * ("Thoout"), day and year — for the Books menu's date line.
  *
- * Returns null rather than throwing when it cannot be read: the Books menu
- * shows this as a nicety on top of the Gregorian date it already knows, and an
- * offline phone should still get its menu.
+ * Returns null rather than throwing when it cannot be read: the menu shows it
+ * on top of the Gregorian date it already knows, and an offline phone should
+ * still get its menu.
  */
-export async function getCopticDateLabel(date: Date): Promise<string | null> {
+export async function getCopticDate(date: Date): Promise<CopticDate | null> {
   try {
     const { data, error } = await supabase
       .schema('calendar')
       .from('coptic_date_conversions')
-      .select('coptic_date_label')
+      .select('coptic_month_name, coptic_day, coptic_year')
       .eq('gregorian_date', toIsoDate(date))
       .maybeSingle();
 
-    if (error) return null;
-    return data?.coptic_date_label ?? null;
+    if (error || !data) return null;
+    return { monthName: data.coptic_month_name, day: data.coptic_day, year: data.coptic_year };
   } catch {
     return null;
   }
 }
 
+/** Looks up the Coptic (year, month, monthName) for a given Gregorian date — used to seed the Coptic month view. */
 export async function getCopticMonthForDate(date: Date) {
   const { data, error } = await supabase
     .schema('calendar')
@@ -284,4 +292,49 @@ export async function getSingleDayEventsForCopticYear(copticYear: number, period
   return [...fixed, ...movable, ...kiahkSundays]
     .filter((event): event is SingleDayEvent => Boolean(event))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+const yearIndicatorSources = new Map<number, Promise<{ seasons: SeasonRange[]; events: SingleDayEvent[] }>>();
+
+/** A Coptic year's season ranges and single-day feasts, loaded once per year per session. */
+function getYearIndicatorSources(copticYear: number) {
+  let cached = yearIndicatorSources.get(copticYear);
+  if (!cached) {
+    cached = (async () => {
+      const { startDate, endDate } = await getGregorianRangeForCopticYear(copticYear);
+      const seasons = await getSeasonRanges(startDate, endDate);
+      const events = await getSingleDayEventsForCopticYear(copticYear, seasons);
+      return { seasons, events };
+    })();
+    cached.catch(() => yearIndicatorSources.delete(copticYear));
+    yearIndicatorSources.set(copticYear, cached);
+  }
+  return cached;
+}
+
+/**
+ * The season pill for one liturgical day — the same seasons, feasts and
+ * context periods the calendar screen's indicator weighs, so the Books menu
+ * and the calendar always name the day alike. Null when it can't be read.
+ */
+export async function getSeasonIndicatorLabel(isoDate: string): Promise<string | null> {
+  try {
+    const copticYear = await getCopticYearForDate(new Date(`${isoDate}T00:00:00Z`));
+    if (copticYear === null) return null;
+    const [{ seasons, events }, contextKeys] = await Promise.all([
+      getYearIndicatorSources(copticYear),
+      getContextIndicatorKeys(isoDate),
+    ]);
+    const activeSeasons = [
+      ...seasons.filter((season) => season.startDate <= isoDate && season.endDate >= isoDate).map((season) => ({ key: season.rangeKey })),
+      ...contextKeys.filter((key) => key.endsWith('-period')).map((key) => ({ key })),
+    ];
+    const activeEvents = [
+      ...events.filter((event) => event.date === isoDate).map((event) => ({ key: event.key })),
+      ...contextKeys.filter((key) => !key.endsWith('-period')).map((key) => ({ key })),
+    ];
+    return getSeasonIndicatorName(activeSeasons, activeEvents);
+  } catch {
+    return null;
+  }
 }

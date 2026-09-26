@@ -1,198 +1,213 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import Head from 'expo-router/head';
-import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import AppHeader from '../ui/AppHeader';
+import BookMenuScaffold, { TileRow } from './BookMenuScaffold';
+import CopticCross from '../ui/CopticCross';
 import Icon from '../ui/Icon';
-import { CopticCross } from './HolyWeekMenu';
+import JewelTile from '../ui/JewelTile';
+import { PASCHA_TILE_THEMES, type BookTheme } from '../../../constants/bookTheme';
 import { bookmarkKeyFor, HOLY_WEEK_ROWS, holyWeekHourHref, type HolyWeekDayDef, type HolyWeekHourDef } from '../../../constants/manifest';
-import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
-import { formatLongDate, formatMonthDay, holyWeekRowDate, loadHourGospelSummaries, toArabicDigits, weekdayName, type HourGospelSummary } from '../../../utils/holyWeek';
-import { goBack } from '../../../utils/navigation';
+import { formatLongDate, formatMonthDay, holyWeekRowDate, toArabicDigits, weekdayName } from '../../../utils/holyWeek';
 import { useHolyWeekSchedule } from '../../../utils/useHolyWeekSchedule';
 
-const MAX_FONT_SCALE = 1.3;
+const MAX_FONT_SCALE = 1.25;
 
-/** The line under the day's title: when it is prayed. An eve belongs to the evening before its day. */
-function whenLine(day: HolyWeekDayDef, rowIndex: number, palmSunday: Date | null, arabic: boolean): string {
-  const eve = day.id.endsWith('-eve');
-  if (palmSunday) {
-    const date = holyWeekRowDate(palmSunday, rowIndex);
-    if (!eve) return formatLongDate(date, arabic);
-    return arabic ? `مساء ${formatLongDate(date, true)}` : `${weekdayName(rowIndex, false)} evening · ${formatMonthDay(date)}`;
+type Block = { kind: 'hours'; hours: HolyWeekHourDef[] } | { kind: 'service'; hour: HolyWeekHourDef };
+
+/** The date the day or eve is prayed on — only while the week is in progress; otherwise its name says it all. */
+function whenLine(day: HolyWeekDayDef, rowIndex: number, palmSunday: Date | null, arabic: boolean): string | undefined {
+  if (!palmSunday) return undefined;
+  const date = holyWeekRowDate(palmSunday, rowIndex);
+  if (!day.id.endsWith('-eve')) return formatLongDate(date, arabic);
+  // An eve belongs to the evening before its day.
+  return arabic ? `مساء ${formatLongDate(date, true)}` : `${weekdayName(rowIndex, false)} evening · ${formatMonthDay(date)}`;
+}
+
+/** Runs of consecutive hours become grids; the services that aren't hours stand on their own, all in prayer order. */
+function blocksOf(hours: HolyWeekHourDef[]): Block[] {
+  const blocks: Block[] = [];
+  for (const hour of hours) {
+    const last = blocks[blocks.length - 1];
+    if (!hour.hourNumber) blocks.push({ kind: 'service', hour });
+    else if (last?.kind === 'hours') last.hours.push(hour);
+    else blocks.push({ kind: 'hours', hours: [hour] });
   }
-  if (!eve) return weekdayName(rowIndex, arabic);
-  return arabic ? `مساء ${weekdayName(rowIndex, true)}` : `${weekdayName(rowIndex, false)} evening`;
+  return blocks;
 }
 
-interface HourRowProps {
-  hour: HolyWeekHourDef;
-  accent: string;
-  accentSoft: string;
-  accentLine: string;
-  isArabic: boolean;
-  isBookmarked: boolean;
-  gospel?: HourGospelSummary;
-  onPress: () => void;
+/** At most three hours to a row, spread evenly: four as two pairs, five as three and two. */
+function gridRows(hours: HolyWeekHourDef[]): HolyWeekHourDef[][] {
+  const size = Math.ceil(hours.length / Math.ceil(hours.length / 3));
+  const rows: HolyWeekHourDef[][] = [];
+  for (let i = 0; i < hours.length; i += size) rows.push(hours.slice(i, i + size));
+  return rows;
 }
 
-function HourRow({ hour, accent, accentSoft, accentLine, isArabic, isBookmarked, gospel, onPress }: HourRowProps) {
-  const subtitle = gospel ? (isArabic ? gospel.arabic : gospel.english) : '';
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${isArabic ? hour.shortArabic : hour.shortTitle}${subtitle ? `, ${subtitle}` : ''}`}
-      onPress={onPress}
-      style={({ pressed }) => [styles.hourRow, isArabic && styles.rowReverse, pressed && styles.hourRowPressed]}
-    >
-      <View style={styles.rail}>
-        <View style={[styles.badge, { backgroundColor: accentSoft, borderColor: accentLine }]}>
-          {hour.hourNumber ? (
-            <Text style={[styles.badgeText, { color: accent }]} maxFontSizeMultiplier={1.15}>
-              {isArabic ? toArabicDigits(hour.hourNumber) : hour.hourNumber}
-            </Text>
-          ) : (
-            <CopticCross size={18} color={accent} />
-          )}
-        </View>
-      </View>
-
-      <View style={styles.hourText}>
-        <Text style={[styles.hourTitle, isArabic && styles.arabicTitle]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-          {isArabic ? hour.shortArabic : hour.shortTitle}
-        </Text>
-        {subtitle ? (
-          <Text style={[styles.hourSubtitle, isArabic && styles.arabicText]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-
-      {isBookmarked ? <Icon name="bookmark" size={16} color={COLORS.gold} /> : null}
-      <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={18} color={accent} style={styles.hourChevron} />
-    </Pressable>
-  );
-}
-
-/** One Holy Week day or eve: its hours in prayer order, each with the Gospel it reads. */
+/**
+ * One Holy Week day or eve: its hours as numbered tiles — crimson by day,
+ * midnight blue by night — and the services that aren't hours (the General
+ * Funeral Prayer, the Liturgy of the Waters, the Divine Liturgy) as rows
+ * marked with the cross, all in the order they are prayed.
+ */
 export default function HolyWeekDay({ day }: { day: HolyWeekDayDef }) {
   const router = useRouter();
   const { preferences, isBookmarked } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
   const schedule = useHolyWeekSchedule();
-  const [gospels, setGospels] = useState<Record<string, HourGospelSummary>>({});
 
   const eve = day.id.endsWith('-eve');
-  const accent = eve ? COLORS.night : COLORS.gold;
-  const accentSoft = eve ? COLORS.nightSoft : COLORS.goldSoft;
-  const accentLine = eve ? COLORS.nightLine : COLORS.goldLine;
   const rowIndex = Math.max(0, HOLY_WEEK_ROWS.findIndex((row) => row.days.some((entry) => entry.id === day.id)));
   const isCurrent = schedule?.currentDayId === day.id;
-  const hourKeys = day.hours.map((hour) => hour.id).join(',');
+  // The band carries the colour of this day's tile on the Holy Week menu.
+  const bandTheme = day.id === 'good-friday'
+    ? PASCHA_TILE_THEMES.goodFriday
+    : day.id === 'bright-saturday'
+      ? PASCHA_TILE_THEMES.brightSaturday
+      : eve ? PASCHA_TILE_THEMES.eveNow : PASCHA_TILE_THEMES.dayNow;
+  const tileTheme = day.id === 'good-friday' ? PASCHA_TILE_THEMES.goodFriday : eve ? PASCHA_TILE_THEMES.eve : PASCHA_TILE_THEMES.day;
+  const kind = eve ? (isArabic ? 'ليلة' : 'EVE') : (isArabic ? 'نهار' : 'DAY');
+  const now = eve ? (isArabic ? 'الليلة' : 'TONIGHT') : (isArabic ? 'الآن' : 'NOW');
 
-  useEffect(() => {
-    let active = true;
-    loadHourGospelSummaries(hourKeys.split(','))
-      .then((next) => { if (active) setGospels(next); })
-      // The Gospel lines are a preview; the hours open fine without them.
-      .catch(() => undefined);
-    return () => { active = false; };
-  }, [hourKeys]);
+  const bookmarked = (hour: HolyWeekHourDef) => isBookmarked(bookmarkKeyFor(hour.schema, hour.table, hour.id));
+  const open = (hour: HolyWeekHourDef) => router.push(holyWeekHourHref(hour) as never);
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <Head>
-        <title>{`CHC ${day.title}`}</title>
-      </Head>
-      <AppHeader
-        title={{ english: day.title, arabic: day.arabic }}
-        canGoBack
-        onBack={() => goBack(router, '/holy-week')}
-        visibleLanguages={{ english: !isArabic, arabic: isArabic }}
-      />
-      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.column}>
-          <View style={[styles.intro, isArabic && styles.rowReverse]}>
-            <View style={[styles.introIcon, { backgroundColor: accentSoft, borderColor: accentLine }]}>
-              <Icon name={eve ? 'moon' : 'sunny'} size={22} color={accent} />
-            </View>
-            <View style={styles.introText}>
-              <View style={[styles.introOverlineRow, isArabic && styles.rowReverse]}>
-                <Text style={[styles.introOverline, { color: accent }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                  {eve ? (isArabic ? 'ليلة' : 'EVE') : (isArabic ? 'نهار' : 'DAY')}
-                </Text>
-                {isCurrent ? (
-                  <View style={[styles.nowPill, { backgroundColor: accent }]}>
-                    <Text style={styles.nowText} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                      {eve ? (isArabic ? 'الليلة' : 'TONIGHT') : (isArabic ? 'اليوم' : 'TODAY')}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text style={[styles.introWhen, isArabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                {whenLine(day, rowIndex, schedule?.palmSunday ?? null, isArabic)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.card, { borderColor: eve ? COLORS.nightLine : COLORS.cardLine }, eve && styles.cardEve]}>
-            {day.hours.map((hour, index) => (
-              <View key={hour.id}>
-                {index > 0 ? <View style={[styles.separator, isArabic ? styles.separatorArabic : null]} /> : null}
-                <HourRow
-                  hour={hour}
-                  accent={accent}
-                  accentSoft={accentSoft}
-                  accentLine={accentLine}
-                  isArabic={isArabic}
-                  isBookmarked={isBookmarked(bookmarkKeyFor(hour.schema, hour.table, hour.id))}
-                  gospel={gospels[hour.id]}
-                  onPress={() => router.push(holyWeekHourHref(hour) as never)}
-                />
-              </View>
+    <BookMenuScaffold
+      theme={bandTheme}
+      title={{ english: day.title, arabic: day.arabic }}
+      overline={isCurrent ? `${kind} · ${now}` : kind}
+      description={whenLine(day, rowIndex, schedule?.palmSunday ?? null, isArabic)}
+      arabic={isArabic}
+      backHref="/holy-week"
+    >
+      {blocksOf(day.hours).map((block) =>
+        block.kind === 'hours' && block.hours.length === 1 ? (
+          // An hour standing alone between services reads as a row like them, its number in the ring.
+          <JewelTile
+            key={block.hours[0].id}
+            layout="row"
+            gradient={tileTheme.gradient}
+            accent={tileTheme.accent}
+            leading={<NumberBadge hour={block.hours[0]} accent={tileTheme.accent} arabic={isArabic} />}
+            title={isArabic ? block.hours[0].shortArabic : block.hours[0].shortTitle}
+            minHeight={72}
+            arabic={isArabic}
+            bookmarked={bookmarked(block.hours[0])}
+            onPress={() => open(block.hours[0])}
+          />
+        ) : block.kind === 'service' ? (
+          <JewelTile
+            key={block.hour.id}
+            layout="row"
+            gradient={PASCHA_TILE_THEMES.dayNow.gradient}
+            accent={PASCHA_TILE_THEMES.dayNow.accent}
+            leading={<CrossBadge accent={PASCHA_TILE_THEMES.dayNow.accent} />}
+            title={isArabic ? block.hour.shortArabic : block.hour.shortTitle}
+            minHeight={72}
+            arabic={isArabic}
+            outlined
+            bookmarked={bookmarked(block.hour)}
+            onPress={() => open(block.hour)}
+          />
+        ) : (
+          <View key={block.hours[0].id} style={styles.grid}>
+            {gridRows(block.hours).map((row) => (
+              <TileRow key={row[0].id} arabic={isArabic}>
+                {row.map((hour) => (
+                  <HourTile
+                    key={hour.id}
+                    hour={hour}
+                    theme={tileTheme}
+                    eve={eve}
+                    arabic={isArabic}
+                    bookmarked={bookmarked(hour)}
+                    onPress={() => open(hour)}
+                  />
+                ))}
+              </TileRow>
             ))}
           </View>
-        </View>
-      </NowPlayingAwareScrollView>
-    </SafeAreaView>
+        ),
+      )}
+    </BookMenuScaffold>
   );
 }
 
-const RAIL_WIDTH = 44;
+/** The cross in a ring, marking the services that aren't hours. */
+function CrossBadge({ accent }: { accent: string }) {
+  return (
+    <View style={[styles.badge, { borderColor: `${accent}66` }]}>
+      <CopticCross size={20} color={accent} />
+    </View>
+  );
+}
+
+/** An hour's number in the same ring. */
+function NumberBadge({ hour, accent, arabic }: { hour: HolyWeekHourDef; accent: string; arabic: boolean }) {
+  return (
+    <View style={[styles.badge, { borderColor: `${accent}66` }]}>
+      <Text style={[styles.badgeNumber, { color: accent }]} maxFontSizeMultiplier={1.15}>
+        {arabic ? toArabicDigits(hour.hourNumber ?? '') : hour.hourNumber}
+      </Text>
+    </View>
+  );
+}
+
+interface HourTileProps {
+  hour: HolyWeekHourDef;
+  theme: BookTheme;
+  eve: boolean;
+  arabic: boolean;
+  bookmarked: boolean;
+  onPress: () => void;
+}
+
+/** An hour of the day or eve: its number set large, its name beneath — as the Agpeya's hours are. */
+function HourTile({ hour, theme, eve, arabic, bookmarked, onPress }: HourTileProps) {
+  const title = arabic ? hour.shortArabic : hour.shortTitle;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      onPress={onPress}
+      style={({ pressed }) => [styles.hourTile, { borderColor: eve ? 'rgba(156, 201, 255, 0.22)' : 'rgba(255, 255, 255, 0.08)' }, pressed && styles.pressed]}
+    >
+      <LinearGradient colors={theme.gradient} start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 1 }} style={[StyleSheet.absoluteFill, styles.fill]} />
+      <View style={[styles.hourTop, arabic && styles.rowReverse]}>
+        <Text style={[styles.hourNumber, { color: theme.accent }]} maxFontSizeMultiplier={1.15}>
+          {arabic ? toArabicDigits(hour.hourNumber ?? '') : hour.hourNumber}
+        </Text>
+        {/* Wrapped so it stacks above the gradient on web, where a bare SVG paints beneath positioned siblings. */}
+        {bookmarked ? <View><Icon name="bookmark" size={14} color={COLORS.gold} /></View> : null}
+      </View>
+      <Text style={[styles.hourTitle, arabic && styles.arabicText]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.black },
-  content: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: SPACING.xl * 2 },
-  column: { alignSelf: 'center', maxWidth: 640, width: '100%' },
+  grid: { gap: 10 },
   rowReverse: { flexDirection: 'row-reverse' },
   arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  arabicTitle: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-
-  intro: { alignItems: 'center', flexDirection: 'row', gap: 14, marginBottom: SPACING.md, paddingHorizontal: 4 },
-  introIcon: { alignItems: 'center', borderRadius: 16, borderWidth: 1, height: 48, justifyContent: 'center', width: 48 },
-  introText: { flex: 1 },
-  introOverlineRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  introOverline: { fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
-  introWhen: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700', marginTop: 3 },
-  nowPill: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
-  nowText: { color: COLORS.navyDark, fontFamily: TYPOGRAPHY.body, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
-
-  card: { backgroundColor: COLORS.surface, borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
-  cardEve: { backgroundColor: COLORS.nightSurface },
-  separator: { backgroundColor: 'rgba(255, 255, 255, 0.07)', height: StyleSheet.hairlineWidth, marginLeft: 14 + RAIL_WIDTH + 12 },
-  separatorArabic: { marginLeft: 0, marginRight: 14 + RAIL_WIDTH + 12 },
-
-  hourRow: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 72, paddingHorizontal: 14 },
-  hourRowPressed: { backgroundColor: 'rgba(255, 255, 255, 0.04)' },
-  rail: { alignItems: 'center', justifyContent: 'center', width: RAIL_WIDTH },
-  badge: { alignItems: 'center', borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
-  badgeText: { fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700' },
-  hourText: { flex: 1, paddingVertical: 12 },
-  hourTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700' },
-  hourSubtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 3 },
-  hourChevron: { opacity: 0.85 },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
+  fill: { borderRadius: 17 },
+  badge: { alignItems: 'center', borderRadius: 19, borderWidth: 1, height: 38, justifyContent: 'center', width: 38 },
+  badgeNumber: { fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '700' },
+  hourTile: {
+    borderRadius: 18,
+    borderWidth: 1,
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    minHeight: 104,
+    overflow: 'hidden',
+    padding: 12,
+  },
+  hourTop: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
+  hourNumber: { fontFamily: TYPOGRAPHY.title, fontSize: 34, fontWeight: '700', lineHeight: 38 },
+  hourTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', marginTop: 8 },
 });

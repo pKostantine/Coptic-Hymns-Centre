@@ -1,24 +1,21 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import Head from 'expo-router/head';
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Platform, Pressable, StyleSheet, Text, View, type ViewToken } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { NowPlayingAwareScrollView, NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
-import HymnCard from '@/components/chc/ui/HymnCard';
+import BibleTestamentMenu from '@/components/chc/screens/BibleTestamentMenu';
+import BookMenuScaffold from '@/components/chc/screens/BookMenuScaffold';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
+import { TESTAMENTS } from '@/constants/bibleTestaments';
+import { getBookTheme } from '@/constants/bookTheme';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { getBibleBook, getBibleBooks, getBibleChapterDisplayLabel, getBibleChapterKeys, getBibleSpecialChapterTitle, getCachedBibleChapterKeys, isBibleLxxAdditionChapter, PsalmNumbering } from '@/utils/bibleService';
+import { getBibleBook, getBibleChapterDisplayLabel, getBibleChapterKeys, getBibleSpecialChapterTitle, getCachedBibleChapterKeys, isBibleLxxAdditionChapter, PsalmNumbering, type BibleBook } from '@/utils/bibleService';
 import { goBack } from '@/utils/navigation';
-import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 
 const CHIP_SIZE = 58;
 
-type BibleBookList = Awaited<ReturnType<typeof getBibleBooks>>;
-type BibleListBook = BibleBookList[number];
-type LoadedBibleBooks = { requestKey: string; books: BibleBookList };
 type LoadedBibleChapters = { requestKey: string; chapters: number[] };
 type BibleLoadError = { requestKey: string; message: string };
 
@@ -27,65 +24,32 @@ const PSALM_NUMBERING_OPTIONS: { key: PsalmNumbering; label: string; arabic: str
   { key: 'masoretic', label: 'Masoretic', arabic: 'العبري' },
 ];
 
-const TESTAMENT_ROUTE_LABELS = {
-  OT: { title: 'Old Testament', arabic: 'العهد القديم' },
-  NT: { title: 'New Testament', arabic: 'العهد الجديد' },
-} as const;
-
-function prefetchBookChapters(book: BibleListBook) {
-  // Speculative failures are shown by the destination page if its retry fails.
-  void getBibleChapterKeys(book.bookKey).catch(() => {});
-}
-
-function prefetchVisibleBookChapters({ viewableItems }: { viewableItems: ViewToken<BibleListBook>[] }) {
-  viewableItems.forEach(({ item }) => prefetchBookChapters(item));
-}
-
+/** `/bible/OT` and `/bible/NT` list a testament's books; any other key is a book, and lists its chapters. */
 export default function BibleNestedList() {
-  const router = useRouter();
   const { bookKey } = useLocalSearchParams<{ bookKey: string }>();
-  const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
+  if (bookKey === 'OT' || bookKey === 'NT') return <BibleTestamentMenu testament={bookKey} />;
+  return <BibleChapterList key={bookKey} bookKey={bookKey ?? ''} />;
+}
+
+/** A book's chapters as a grid of numbers, under a band in its testament's bronze. */
+function BibleChapterList({ bookKey }: { bookKey: string }) {
+  const router = useRouter();
   const { preferences } = useReadingPreferences();
-  const showEnglish = preferences.appLanguage === 'en';
   const showArabic = preferences.appLanguage === 'ar';
-  const testament = bookKey === 'OT' || bookKey === 'NT' ? bookKey : null;
   const isPsalms = bookKey === 'psalms';
   const isEsther = bookKey === 'esther';
-  const [loadedBooks, setLoadedBooks] = useState<LoadedBibleBooks | null>(null);
-  const [loadedBook, setLoadedBook] = useState<BibleListBook | null>(null);
+  const [loadedBook, setLoadedBook] = useState<BibleBook | null>(null);
   const [loadedChapters, setLoadedChapters] = useState<LoadedBibleChapters | null>(null);
   const [psalmNumbering, setPsalmNumbering] = useState<PsalmNumbering>('septuagint');
   const [loadError, setLoadError] = useState<BibleLoadError | null>(null);
 
-  const booksRequestKey = testament ? `books:${testament}` : '';
-  const chaptersRequestKey = bookKey && !testament ? `chapters:${bookKey}:${psalmNumbering}` : '';
-  const activeRequestKey = booksRequestKey || chaptersRequestKey;
-  const books = loadedBooks?.requestKey === booksRequestKey ? loadedBooks.books : null;
+  const chaptersRequestKey = `chapters:${bookKey}:${psalmNumbering}`;
   const chapters = loadedChapters?.requestKey === chaptersRequestKey
     ? loadedChapters.chapters
-    : bookKey && !testament ? getCachedBibleChapterKeys(bookKey, psalmNumbering) : null;
-  const error = loadError?.requestKey === activeRequestKey ? loadError.message : null;
+    : getCachedBibleChapterKeys(bookKey, psalmNumbering);
+  const error = loadError?.requestKey === chaptersRequestKey ? loadError.message : null;
 
   useEffect(() => {
-    if (!testament) return;
-    let cancelled = false;
-    const requestKey = `books:${testament}`;
-
-    getBibleBooks()
-      .then((allBooks) => {
-        if (!cancelled) setLoadedBooks({ requestKey, books: allBooks.filter((book) => book.testament === testament).sort((a, b) => a.bookOrder - b.bookOrder) });
-      })
-      .catch((err) => {
-        if (!cancelled) setLoadError({ requestKey, message: err.message });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [testament]);
-
-  useEffect(() => {
-    if (!bookKey || testament) return;
     let cancelled = false;
     const requestKey = `chapters:${bookKey}:${psalmNumbering}`;
 
@@ -100,18 +64,14 @@ export default function BibleNestedList() {
     return () => {
       cancelled = true;
     };
-  }, [bookKey, testament, psalmNumbering]);
+  }, [bookKey, psalmNumbering]);
 
   useEffect(() => {
-    if (!bookKey || testament) return;
     getBibleBook(bookKey).then(setLoadedBook).catch((err) => setLoadError({ requestKey: `book:${bookKey}`, message: err.message }));
-  }, [bookKey, testament]);
-
-  const title = testament ? TESTAMENT_ROUTE_LABELS[testament].title : loadedBook?.titleEnglish || bookKey || '';
-  const arabic = testament ? TESTAMENT_ROUTE_LABELS[testament].arabic : loadedBook?.titleArabic || '';
+  }, [bookKey]);
 
   useEffect(() => {
-    if (!bookKey || testament || !chapters || chapters.length !== 1) return;
+    if (!chapters || chapters.length !== 1) return;
     router.replace({
       pathname: '/bible/[bookKey]/[chapter]',
       params: {
@@ -120,188 +80,144 @@ export default function BibleNestedList() {
         numbering: isPsalms ? psalmNumbering : undefined,
       },
     });
-  }, [bookKey, chapters, isPsalms, psalmNumbering, router, testament]);
+  }, [bookKey, chapters, isPsalms, psalmNumbering, router]);
 
-  const openBook = useCallback(
-    (book: BibleListBook) => {
-      const bookChapters = getCachedBibleChapterKeys(book.bookKey);
-      if (bookChapters?.length === 1) {
-        router.push({
-          pathname: '/bible/[bookKey]/[chapter]',
-          params: { bookKey: book.bookKey, chapter: String(bookChapters[0]) },
-        });
-        return;
-      }
+  const title = { english: loadedBook?.titleEnglish || bookKey, arabic: loadedBook?.titleArabic || '' };
+  const testament = loadedBook ? TESTAMENTS[loadedBook.testament] : null;
+  const theme = testament?.theme ?? getBookTheme('bible');
+  const accent = theme.accent;
 
-      // Open the page on the tap; an uncached chapter list loads on that page.
-      router.push({
-        pathname: '/bible/[bookKey]',
-        params: { bookKey: book.bookKey },
-      });
-    },
-    [router],
-  );
+  // A one-chapter book opens straight onto its text; until then (or while
+  // the chapter list loads) the page holds the splash rather than an empty grid.
+  if (!error && (!chapters || chapters.length === 1)) {
+    return (
+      <SafeAreaView edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : []} style={styles.screen}>
+        <AppHeader title={title} canGoBack onBack={() => goBack(router, '/bible')} tint={theme.gradient[0]} titleVisible={false} />
+        <View style={styles.loadingArea}>
+          <LoadingScreen />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : []} style={styles.screen}>
-      <Head>
-        <title>{`CHC ${title || bookKey || 'Bible'}`}</title>
-      </Head>
-      <AppHeader
-        title={{ english: title || bookKey || '', arabic: arabic || '' }}
-        canGoBack
-        onBack={() => goBack(router, '/bible')}
-        visibleLanguages={{ english: showEnglish, arabic: showArabic }}
-        rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
-        onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
-      />
-      <View style={styles.content}>
-        {error ? (
-          <View style={styles.center}>
-            <Text style={styles.error}>{error}</Text>
-          </View>
-        ) : testament ? (
-          !books ? (
-            <LoadingScreen />
-          ) : (
-            <NowPlayingAwareFlatList
-              style={styles.bookList}
-              contentContainerStyle={styles.list}
-              data={books}
-              keyExtractor={(book) => book.bookKey}
-              onViewableItemsChanged={prefetchVisibleBookChapters}
-              renderItem={({ item: book }) => (
-                <HymnCard
-                  title={book.titleEnglish}
-                  arabic={book.titleArabic}
-                  showEnglish={showEnglish}
-                  showArabic={showArabic}
-                  onPressIn={() => prefetchBookChapters(book)}
-                  onHoverIn={() => prefetchBookChapters(book)}
-                  onPress={() => openBook(book)}
-                />
-              )}
-            />
-          )
-        ) : !chapters ? (
-          <LoadingScreen />
-        ) : chapters.length === 1 ? (
-          <LoadingScreen />
-        ) : (
-          <NowPlayingAwareScrollView contentContainerStyle={styles.chapterContent}>
-            {isPsalms ? (
-              <View style={styles.psalmNumberingDeck}>
-                {PSALM_NUMBERING_OPTIONS.map((option) => {
-                  const isSelected = psalmNumbering === option.key;
-                  const label = showArabic ? option.arabic : option.label;
-                  return (
-                    <Pressable
-                      key={option.key}
-                      accessibilityLabel={label}
-                      style={[
-                        styles.psalmNumberingButton,
-                        { backgroundColor: isSelected ? COLORS.gold : COLORS.surface, borderColor: isSelected ? COLORS.gold : COLORS.border },
-                      ]}
-                      onPress={() => setPsalmNumbering(option.key)}
-                    >
-                      <Text style={[styles.psalmNumberingText, showArabic && styles.psalmNumberingArabic, { color: isSelected ? COLORS.black : COLORS.white }]}>
-                        {label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-            {isEsther ? (
-              <View style={styles.estherDisclaimer}>
-                {showArabic ? (
-                  <Text style={[styles.estherDisclaimerText, styles.estherDisclaimerArabic]}>
-                    الأصحاحات والآيات الملوَّنة باللون الأحمر لا تَرِد إلا في مخطوطات الترجمة السبعينية اليونانية، وتظهر فيها كإضافة إلى سفر أستير.
-                  </Text>
-                ) : (
-                  <Text style={styles.estherDisclaimerText}>
-                    Chapters and verses coloured red occur only in the Greek Septuagint (LXX) manuscripts and appear there as an addition to the Book of Esther.
-                  </Text>
-                )}
-              </View>
-            ) : null}
-            <View style={styles.grid}>
-              {chapters.map((chapterNumber) => {
-                const isSpecialChapter = Boolean(getBibleSpecialChapterTitle(bookKey, chapterNumber));
-                const isLxxAdditionChapter = isBibleLxxAdditionChapter(bookKey, chapterNumber);
-                const chapterLabel = getBibleChapterDisplayLabel(bookKey, chapterNumber, preferences.appLanguage);
-
+    <BookMenuScaffold
+      theme={theme}
+      title={title}
+      overline={testament ? (showArabic ? testament.arabic : testament.english.toUpperCase()) : undefined}
+      arabic={showArabic}
+      backHref={loadedBook ? `/bible/${loadedBook.testament}` : '/bible'}
+    >
+      {error ? (
+        <Text style={styles.error}>{error}</Text>
+      ) : (
+        <>
+          {isPsalms ? (
+            <View style={[styles.segmented, { borderColor: `${accent}33` }, showArabic && styles.rowReverse]}>
+              {PSALM_NUMBERING_OPTIONS.map((option) => {
+                const isSelected = psalmNumbering === option.key;
+                const label = showArabic ? option.arabic : option.label;
                 return (
                   <Pressable
-                    key={chapterNumber}
-                    accessibilityLabel={chapterLabel}
-                    style={({ pressed }) => [
-                      styles.chip,
-                      isSpecialChapter && styles.namedChip,
-                      isLxxAdditionChapter && styles.lxxAdditionChip,
-                      pressed && styles.chipPressed,
-                    ]}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/bible/[bookKey]/[chapter]',
-                        params: {
-                          bookKey: bookKey!,
-                          chapter: String(chapterNumber),
-                          numbering: isPsalms ? psalmNumbering : undefined,
-                        },
-                      })
-                    }
+                    key={option.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={label}
+                    style={[styles.segment, isSelected && { backgroundColor: accent }]}
+                    onPress={() => setPsalmNumbering(option.key)}
                   >
-                    <Text
-                      numberOfLines={isSpecialChapter ? 2 : 1}
-                      style={[
-                        styles.chipText,
-                        isSpecialChapter && styles.namedChipText,
-                        isSpecialChapter && showArabic && styles.namedChipArabic,
-                        isLxxAdditionChapter && styles.lxxAdditionChipText,
-                      ]}
-                    >
-                      {chapterLabel}
+                    <Text style={[styles.segmentText, showArabic && styles.segmentArabic, { color: isSelected ? '#1E1604' : accent }]}>
+                      {label}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
-          </NowPlayingAwareScrollView>
-        )}
-      </View>
-    </SafeAreaView>
+          ) : null}
+          {isEsther ? (
+            <View style={styles.estherDisclaimer}>
+              {showArabic ? (
+                <Text style={[styles.estherDisclaimerText, styles.estherDisclaimerArabic]}>
+                  الأصحاحات والآيات الملوَّنة باللون الأحمر لا تَرِد إلا في مخطوطات الترجمة السبعينية اليونانية، وتظهر فيها كإضافة إلى سفر أستير.
+                </Text>
+              ) : (
+                <Text style={styles.estherDisclaimerText}>
+                  Chapters and verses coloured red occur only in the Greek Septuagint (LXX) manuscripts and appear there as an addition to the Book of Esther.
+                </Text>
+              )}
+            </View>
+          ) : null}
+          <View style={[styles.grid, showArabic && styles.rowReverse]}>
+            {chapters!.map((chapterNumber) => {
+              const isSpecialChapter = Boolean(getBibleSpecialChapterTitle(bookKey, chapterNumber));
+              const isLxxAdditionChapter = isBibleLxxAdditionChapter(bookKey, chapterNumber);
+              const chapterLabel = getBibleChapterDisplayLabel(bookKey, chapterNumber, preferences.appLanguage);
+
+              return (
+                <Pressable
+                  key={chapterNumber}
+                  accessibilityLabel={chapterLabel}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    { backgroundColor: `${accent}0F`, borderColor: `${accent}2E` },
+                    isSpecialChapter && styles.namedChip,
+                    isLxxAdditionChapter && styles.lxxAdditionChip,
+                    pressed && { backgroundColor: `${accent}2E`, borderColor: `${accent}80` },
+                  ]}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/bible/[bookKey]/[chapter]',
+                      params: {
+                        bookKey,
+                        chapter: String(chapterNumber),
+                        numbering: isPsalms ? psalmNumbering : undefined,
+                      },
+                    })
+                  }
+                >
+                  <Text
+                    numberOfLines={isSpecialChapter ? 2 : 1}
+                    style={[
+                      styles.chipText,
+                      { color: accent },
+                      isSpecialChapter && styles.namedChipText,
+                      isSpecialChapter && showArabic && styles.namedChipArabic,
+                      isLxxAdditionChapter && styles.lxxAdditionChipText,
+                    ]}
+                  >
+                    {chapterLabel}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      )}
+    </BookMenuScaffold>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
-  content: { flex: 1, overflow: 'hidden' },
-  bookList: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
-  loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
-  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17, textAlign: 'center' },
-  list: { padding: SPACING.md, paddingBottom: SPACING.xl },
-  chapterContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
-  psalmNumberingDeck: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
-  psalmNumberingButton: {
-    alignItems: 'center',
-    borderRadius: 8,
+  loadingArea: { flex: 1, overflow: 'hidden' },
+  rowReverse: { flexDirection: 'row-reverse' },
+  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17, marginTop: SPACING.lg, textAlign: 'center' },
+  segmented: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
     borderWidth: 1,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 58,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.sm,
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
   },
-  psalmNumberingText: { fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', textAlign: 'center' },
-  psalmNumberingArabic: { fontFamily: 'Arial', fontSize: 14, fontWeight: '700', textAlign: 'right', writingDirection: 'rtl' },
+  segment: { alignItems: 'center', borderRadius: 10, flex: 1, justifyContent: 'center', minHeight: 42, paddingHorizontal: SPACING.sm },
+  segmentText: { fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  segmentArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 15, fontWeight: '700', writingDirection: 'rtl' },
   estherDisclaimer: {
     backgroundColor: 'rgba(214, 69, 69, 0.08)',
     borderColor: 'rgba(214, 69, 69, 0.42)',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: SPACING.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
   },
@@ -322,29 +238,23 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.sm,
+    gap: 10,
     justifyContent: 'center',
+    marginTop: 4,
   },
   chip: {
-    width: CHIP_SIZE,
-    height: CHIP_SIZE,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.surface,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
+    height: CHIP_SIZE,
+    justifyContent: 'center',
     paddingHorizontal: SPACING.xs,
+    width: CHIP_SIZE,
   },
   namedChip: {
-    width: 206,
-    height: CHIP_SIZE,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-  },
-  chipPressed: {
-    backgroundColor: COLORS.surfaceSoft,
-    borderColor: COLORS.goldLine,
+    width: 206,
   },
   lxxAdditionChip: {
     borderColor: 'rgba(214, 69, 69, 0.72)',
@@ -353,7 +263,6 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.title,
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.gold,
     textAlign: 'center',
   },
   lxxAdditionChipText: {

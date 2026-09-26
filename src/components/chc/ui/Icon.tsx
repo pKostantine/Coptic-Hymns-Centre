@@ -25,6 +25,8 @@ export type IconName =
   | 'download-outline'
   | 'trash-outline'
   | 'sunny'
+  | 'sunrise'
+  | 'sunset'
   | 'moon'
   | 'close-fullscreen'
   | 'open-in-full'
@@ -42,10 +44,7 @@ export type IconName =
   | 'heart'
   | 'heart-outline'
   | 'share-outline'
-  | 'musical-notes'
-  | 'cross'
-  | 'chalice'
-  | 'sparkle';
+  | 'musical-notes';
 
 interface IconProps {
   name: IconName;
@@ -200,26 +199,6 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
           <Path d="M400 256H112" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
-    case 'cross':
-      return (
-        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
-          <Rect x={228} y={40} width={56} height={432} rx={16} fill={color} />
-          <Rect x={124} y={144} width={264} height={56} rx={16} fill={color} />
-        </Svg>
-      );
-    case 'chalice':
-      return (
-        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
-          <Path d="M136 88h240c0 76-54 138-120 138S136 164 136 88Z" fill="none" stroke={color} strokeWidth={30} strokeLinejoin="round" />
-          <Path d="M256 226v150M176 400h160" fill="none" stroke={color} strokeWidth={30} strokeLinecap="round" />
-        </Svg>
-      );
-    case 'sparkle':
-      return (
-        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
-          <Path d="M256 48c22 112 58 148 170 170-112 22-148 58-170 170-22-112-58-148-170-170 112-22 148-58 170-170Z" fill={color} />
-        </Svg>
-      );
     case 'book':
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
@@ -324,6 +303,21 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
           <Path
             d="M256 118a22 22 0 0 1-22-22V48a22 22 0 0 1 44 0v48a22 22 0 0 1-22 22M256 486a22 22 0 0 1-22-22v-48a22 22 0 0 1 44 0v48a22 22 0 0 1-22 22M369.14 164.86a22 22 0 0 1-15.56-37.55l33.94-33.94a22 22 0 0 1 31.11 31.11l-33.94 33.94a21.93 21.93 0 0 1-15.55 6.44M108.92 425.08a22 22 0 0 1-15.55-37.56l33.94-33.94a22 22 0 1 1 31.11 31.11l-33.94 33.94a21.94 21.94 0 0 1-15.56 6.45M464 278h-48a22 22 0 0 1 0-44h48a22 22 0 0 1 0 44M96 278H48a22 22 0 0 1 0-44h48a22 22 0 0 1 0 44M403.08 425.08a21.94 21.94 0 0 1-15.56-6.45l-33.94-33.94a22 22 0 0 1 31.11-31.11l33.94 33.94a22 22 0 0 1-15.55 37.56M142.86 164.86a21.9 21.9 0 0 1-15.55-6.44l-33.94-33.94a22 22 0 0 1 31.11-31.11l33.94 33.94a22 22 0 0 1-15.56 37.55M256 358a102 102 0 1 1 102-102 102.12 102.12 0 0 1-102 102"
             fill={color}
+          />
+        </Svg>
+      );
+    case 'sunrise':
+    case 'sunset':
+      // A sun half over the horizon, the arrow above it rising or setting.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+          <Path
+            d={`M2.5 19h19M6.5 19a5.5 5.5 0 0 1 11 0M3.8 12.8l1.5 1.5M20.2 12.8l-1.5 1.5M12 2.8v6${name === 'sunrise' ? 'M9.2 5.4 12 2.6l2.8 2.8' : 'M9.2 6.4 12 9.2l2.8-2.8'}`}
+            fill="none"
+            stroke={color}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </Svg>
       );

@@ -803,6 +803,74 @@ export async function getSundayMessageForDate(date: Date): Promise<string | null
   return message || null;
 }
 
+export type LectionaryService = 'Vespers' | 'Matins' | 'Liturgy';
+export type LectionaryReadingKind = 'Psalm' | 'Gospel' | 'Prophecy' | 'Pauline' | 'Catholic' | 'Praxis';
+
+export interface ReadingCitation {
+  kind: LectionaryReadingKind;
+  english: string;
+  arabic: string;
+}
+
+/** Each service's readings in the order they are read, as `calendar.reading_rules` files them (the Liturgy's epistles and Acts under services of their own). */
+const SERVICE_READINGS: Record<LectionaryService, { service: string; readingType: string; kind: LectionaryReadingKind }[]> = {
+  Vespers: [
+    { service: 'Vespers', readingType: 'Psalm', kind: 'Psalm' },
+    { service: 'Vespers', readingType: 'Gospel', kind: 'Gospel' },
+  ],
+  Matins: [
+    { service: 'Matins', readingType: 'Psalm', kind: 'Psalm' },
+    { service: 'Matins', readingType: 'Gospel', kind: 'Gospel' },
+    { service: 'Matins', readingType: 'Prophecy', kind: 'Prophecy' },
+  ],
+  Liturgy: [
+    { service: 'Pauline', readingType: 'Pauline Epistle', kind: 'Pauline' },
+    { service: 'Catholic', readingType: 'Catholic Epistle', kind: 'Catholic' },
+    { service: 'Praxis', readingType: 'Praxis', kind: 'Praxis' },
+    { service: 'Liturgy', readingType: 'Psalm', kind: 'Psalm' },
+    { service: 'Liturgy', readingType: 'Gospel', kind: 'Gospel' },
+  ],
+};
+
+async function citeReadingRule(rule: ReadingRule, kind: LectionaryReadingKind): Promise<ReadingCitation | null> {
+  const bookTitle = await getReadingBookTitle(parseSegment(splitReadingReference(rule.reading_reference)[0]).bookNum);
+  const citation = bookTitle ? buildReadingCitation(rule.reading_reference, bookTitle, kind === 'Psalm') : null;
+  if (!citation) return null;
+  // A psalm is already named by its label ("Psalm 92:1-2" under "PSALM"), so it keeps just its numbers.
+  if (kind === 'Psalm') {
+    return { kind, english: citation.english.replace(/^Psalm\s+/, ''), arabic: citation.arabic.replace(/^مزمور\s+/, '') };
+  }
+  return { kind, ...citation };
+}
+
+/**
+ * Every reading of each of the day's services as a citation ("Luke 4:1-13"),
+ * in reading order — the Lectionary menu's preview of what each service
+ * reads. A reading the day doesn't have (a Prophecy outside Lent) is simply
+ * absent; one whose reference can't be cited is skipped rather than failing
+ * the rest.
+ */
+export async function getServiceReadingCitations(date: Date): Promise<Record<LectionaryService, ReadingCitation[]>> {
+  const isoDate = toIsoDateString(date);
+  const activeFlags = await getActiveFlags(isoDate);
+  const rules = await resolveReadingRules(isoDate, activeFlags);
+  const byKey = new Map(rules.map((rule) => [`${rule.service}|${rule.reading_type}`, rule]));
+
+  const citeService = async (service: LectionaryService) => {
+    const citations = await Promise.all(
+      SERVICE_READINGS[service].map(async ({ service: ruleService, readingType, kind }) => {
+        const rule = byKey.get(`${ruleService}|${readingType}`);
+        if (!rule?.reading_reference) return null;
+        return citeReadingRule(rule, kind).catch(() => null);
+      }),
+    );
+    return citations.filter((citation): citation is ReadingCitation => citation !== null);
+  };
+
+  const [Vespers, Matins, Liturgy] = await Promise.all([citeService('Vespers'), citeService('Matins'), citeService('Liturgy')]);
+  return { Vespers, Matins, Liturgy };
+}
+
 // ─── Orchestrator ───────────────────────────────────────────────────────────
 
 export interface ReadingsResult {

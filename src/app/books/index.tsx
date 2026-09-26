@@ -1,36 +1,42 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/chc/ui/AppHeader';
+import BookCover from '@/components/chc/ui/BookCover';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
-import CategoryCard from '@/components/chc/ui/CategoryCard';
-import Icon from '@/components/chc/ui/Icon';
-import TodayCard from '@/components/chc/ui/TodayCard';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { CATEGORIES } from '@/constants/manifest';
+import SeasonSpotlight from '@/components/chc/ui/SeasonSpotlight';
+import { getBookTheme } from '@/constants/bookTheme';
+import { CATEGORIES, holyWeekDayHref, type CategoryDef } from '@/constants/manifest';
+import { COLORS, SPACING } from '@/constants/theme';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { bookDownloadManager } from '@/services/bookDownloadManager';
 import type { BookDownloadProgress } from '@/types/bookDownloads';
-import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { useHolyWeekSchedule } from '@/utils/useHolyWeekSchedule';
 
-/** Below this the cards stay in one column; above it there is room for two. */
-const TWO_COLUMN_WIDTH = 700;
+/** How many covers sit side by side: two on a phone, more as the window widens. */
+function columnsFor(width: number): number {
+  if (width >= 1000) return 4;
+  if (width >= 700) return 3;
+  return 2;
+}
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+  return rows;
+}
 
-/** Main menu: the day, a toolbar, then the books. */
+/** The Books menu: the day in a spotlight, then the library as a shelf of jewel-coloured covers. */
 export default function BooksHome() {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
   const { width } = useWindowDimensions();
-  // A wide window — a tablet, a sideways phone, a desktop browser — pairs the
-  // cards up rather than running one tall column down the middle of the screen.
-  const columns = width >= TWO_COLUMN_WIDTH ? 2 : 1;
-  const showEnglish = preferences.appLanguage === 'en';
-  const showArabic = preferences.appLanguage === 'ar';
-  const appTitle = showArabic ? 'الكتب' : 'Books';
+  const arabic = preferences.appLanguage === 'ar';
+  const holyWeek = useHolyWeekSchedule();
   const downloadRevision = useSyncExternalStore(bookDownloadManager.subscribe, bookDownloadManager.getRevision, bookDownloadManager.getRevision);
   const [downloads, setDownloads] = useState<BookDownloadProgress[]>([]);
 
@@ -49,66 +55,63 @@ export default function BooksHome() {
     void action.catch((error) => Alert.alert('Download', error instanceof Error ? error.message : 'Unable to download this book.'));
   };
 
-  const toolbar = (
-    <View style={styles.toolbar}>
-      <Pressable accessibilityLabel="Open bookmarks" style={styles.toolButton} onPress={() => router.push('/bookmarks')}>
-        <Icon name="bookmark-outline" size={20} color={COLORS.gold} />
-      </Pressable>
-      <Pressable accessibilityLabel="Open calendar" style={styles.toolButton} onPress={() => router.push('/calendar')}>
-        <Icon name="calendar-outline" size={20} color={COLORS.gold} />
-      </Pressable>
-      <Pressable accessibilityLabel="Open settings" style={styles.toolButton} onPress={() => router.push('/book-settings')}>
-        <Icon name="settings-outline" size={20} color={COLORS.gold} />
-      </Pressable>
-    </View>
-  );
+  // While Pascha is being prayed the spotlight is the way into Holy Week, so
+  // its cover steps off the shelf rather than showing the same book twice.
+  const books = holyWeek ? CATEGORIES.filter((item) => item.id !== 'holy-week') : CATEGORIES;
+  const columns = columnsFor(width);
+
+  const renderCover = (item: CategoryDef, wide: boolean) => {
+    const book = item.downloadKey ? downloads.find((entry) => entry.bookKey === item.downloadKey) : undefined;
+    return (
+      <BookCover
+        key={item.id}
+        title={arabic ? item.arabic : item.title}
+        description={arabic ? item.metaArabic : item.meta}
+        theme={getBookTheme(item.id)}
+        arabic={arabic}
+        wide={wide}
+        overline={item.id === 'holy-week' ? (arabic ? 'البصخة المقدسة' : 'PASCHA') : undefined}
+        onPress={() => router.push(`/${item.id}`)}
+        {...(book ? { downloadStatus: book.status, downloadProgress: book.progress, onDownloadPress: () => downloadAction(book) } : {})}
+      />
+    );
+  };
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
-        <title>{appTitle}</title>
+        <title>{arabic ? 'الكتب' : 'Books'}</title>
       </Head>
       <AppHeader
         title={{ english: 'Books', arabic: 'الكتب' }}
-        visibleLanguages={{ english: showEnglish, arabic: showArabic }}
+        visibleLanguages={{ english: !arabic, arabic }}
+        rightLeadingIcon="bookmark-outline"
+        onRightLeadingPress={() => router.push('/bookmarks')}
+        rightLeadingAccessibilityLabel="Open bookmarks"
+        rightIcon="settings-outline"
+        onRightPress={() => router.push('/book-settings')}
+        rightAccessibilityLabel="Open settings"
       />
 
-      <NowPlayingAwareFlatList
-        /* FlatList can't switch column count on an existing instance, so the
-           count doubles as its key and a rotation remounts the list. */
-        key={columns}
-        columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <TodayCard arabic={showArabic} onOpenReadings={() => router.push('/lectionary')} />
-            {toolbar}
-            <Text style={[styles.sectionLabel, showArabic && styles.sectionLabelArabic]}>
-              {showArabic ? 'كل الكتب' : 'All books'}
-            </Text>
+      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.column}>
+          <SeasonSpotlight
+            arabic={arabic}
+            holyWeek={holyWeek}
+            onOpenCalendar={() => router.push('/calendar')}
+            onOpenHolyWeekDay={(day) => router.push(holyWeekDayHref(day) as never)}
+            onOpenHolyWeek={() => router.push('/holy-week')}
+          />
+          <View style={styles.shelf}>
+            {chunk(books, columns).map((row) => (
+              // A short last row stretches its covers across the shelf.
+              <View key={row[0].id} style={[styles.shelfRow, arabic && styles.rowReverse]}>
+                {row.map((item) => renderCover(item, row.length < columns && row.length === 1))}
+              </View>
+            ))}
           </View>
-        }
-        data={CATEGORIES}
-        keyExtractor={(item) => item.id}
-        numColumns={columns}
-        renderItem={({ item }) => (
-          <View style={columns > 1 ? styles.gridCell : undefined}>
-            <CategoryCard
-              categoryId={item.id}
-              title={item.title}
-              arabic={item.arabic}
-              subtitle={showArabic ? item.metaArabic : item.meta}
-              showEnglish={showEnglish}
-              showArabic={showArabic}
-              onPress={() => router.push(`/${item.id}`)}
-              {...(() => {
-                const book = item.downloadKey ? downloads.find((entry) => entry.bookKey === item.downloadKey) : undefined;
-                return book ? { downloadStatus: book.status, downloadProgress: book.progress, onDownloadPress: () => downloadAction(book) } : {};
-              })()}
-            />
-          </View>
-        )}
-      />
+        </View>
+      </NowPlayingAwareScrollView>
       <BottomTabBar active="books" />
     </SafeAreaView>
   );
@@ -116,48 +119,10 @@ export default function BooksHome() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  header: { gap: SPACING.md, marginBottom: SPACING.xs },
-  toolbar: {
-    alignSelf: 'center',
-    backgroundColor: COLORS.surface,
-    maxWidth: 420,
-    borderColor: COLORS.cardLine,
-    borderRadius: RADII.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 5,
-    width: '100%',
-  },
-  toolButton: {
-    alignItems: 'center',
-    borderRadius: RADII.pill,
-    flex: 1,
-    height: 38,
-    justifyContent: 'center',
-  },
-  sectionLabel: {
-    color: COLORS.muted,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  sectionLabelArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 12, letterSpacing: 0, lineHeight: 20, textAlign: 'right', textTransform: 'none' },
-  listContent: {
-    alignSelf: 'center',
-    // A desktop browser is far wider than these cards want to be; past this the
-    // column stops stretching and centres instead.
-    maxWidth: 980,
-    padding: SPACING.md,
-    paddingBottom: SPACING.xl,
-    width: '100%',
-  },
-  gridRow: {
-    justifyContent: 'space-between',
-  },
-  gridCell: {
-    width: '49%',
-  },
+  content: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: SPACING.xl },
+  // A desktop browser is far wider than the shelf wants to be; past this it centres.
+  column: { alignSelf: 'center', gap: SPACING.md + 4, maxWidth: 980, width: '100%' },
+  rowReverse: { flexDirection: 'row-reverse' },
+  shelf: { gap: 12 },
+  shelfRow: { flexDirection: 'row', gap: 12 },
 });

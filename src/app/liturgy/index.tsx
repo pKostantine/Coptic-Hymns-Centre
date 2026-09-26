@@ -1,6 +1,5 @@
-import ServiceSubmenu from '@/components/chc/screens/ServiceSubmenu';
-import { LITURGY_GROUPS } from '@/constants/manifest';
+import LiturgyMenu from '@/components/chc/screens/LiturgyMenu';
 
-export default function LiturgySubmenu() {
-  return <ServiceSubmenu basePath="liturgy" title="Liturgy" arabic="القداس" services={LITURGY_GROUPS} backHref="/books" />;
+export default function LiturgyIndex() {
+  return <LiturgyMenu />;
 }

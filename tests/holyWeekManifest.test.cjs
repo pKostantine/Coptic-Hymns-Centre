@@ -135,7 +135,7 @@ test('homily and interpretation titles name their holy_week hymns', () => {
 function loadCurrentDay() {
   const source = fs.readFileSync('src/utils/holyWeek.ts', 'utf8');
   const start = source.indexOf('export const HOLY_WEEK_DAY_IDS');
-  const end = source.indexOf('/** The Holy Week the menus should show');
+  const end = source.indexOf('export async function loadHolyWeekSchedule');
   assert.ok(start >= 0 && end > start, 'currentHolyWeekDayId not found');
   const snippet = source.slice(start, end).replace(/export /g, '')
     + '\nfunction dayDifference(from, to) { return Math.round((to.getTime() - from.getTime()) / 86400000); }';

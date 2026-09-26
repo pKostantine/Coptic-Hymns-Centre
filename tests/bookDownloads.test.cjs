@@ -153,10 +153,14 @@ test('web variants do not initialize SQLite or expose download UI', () => {
   const bootstrap = fs.readFileSync('src/components/BookSyncBootstrap.web.tsx', 'utf8');
   const route = fs.readFileSync('src/app/downloads.web.tsx', 'utf8');
   const nativeRoute = fs.readFileSync('src/app/downloads.tsx', 'utf8');
-  const booksWeb = fs.readFileSync('src/app/books/index.web.tsx', 'utf8');
+  // The Books screen is shared with web; it only draws a download control for a
+  // book the manager lists, and the web manager never lists any.
+  const books = fs.readFileSync('src/app/books/index.tsx', 'utf8');
+  const webManager = fs.readFileSync('src/services/bookDownloadManager.web.ts', 'utf8');
   assert.doesNotMatch(provider, /sqlite|bookDownloadManager/i);
   assert.match(bootstrap, /return null/);
   assert.match(route, /Redirect href=.*\/account/);
   assert.match(nativeRoute, /Platform\.OS === 'web'.*Redirect/s);
-  assert.doesNotMatch(booksWeb, /bookDownloadManager|downloadStatus|onDownloadPress/);
+  assert.match(webManager, /listBooks\(\): Promise<BookDownloadProgress\[\]> \{ return Promise\.resolve\(\[\]\); \}/);
+  assert.match(books, /const book = item\.downloadKey \? downloads\.find[\s\S]*?\.\.\.\(book \? \{ downloadStatus/);
 });

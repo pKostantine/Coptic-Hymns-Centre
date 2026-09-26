@@ -1,6 +1,3 @@
-import ServiceSubmenu from '@/components/chc/screens/ServiceSubmenu';
-import { SERVICES_BY_CATEGORY } from '@/constants/manifest';
+import PsalmodyMenu from '@/components/chc/screens/PsalmodyMenu';
 
-export default function PsalmodySubmenu() {
-  return <ServiceSubmenu basePath="psalmody" title="Psalmody" arabic="الإبصلمودية" services={SERVICES_BY_CATEGORY.psalmody} backHref="/books" />;
-}
+export default PsalmodyMenu;
