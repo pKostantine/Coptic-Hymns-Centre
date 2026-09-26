@@ -17,6 +17,8 @@ function formatArabicNumbers(text: string) {
 interface CategoryCardProps {
   title: string;
   arabic?: string;
+  /** A short line under the title describing what the book holds, in the language being shown. */
+  subtitle?: string;
   onPress?: () => void;
   /** Both default true — the main menu's App Language setting passes only one of these, so the row shows a single title instead of the normal English-left/Arabic-right pair. */
   showEnglish?: boolean;
@@ -30,9 +32,10 @@ interface CategoryCardProps {
  * English and Arabic side by side without truncating either one, so the two
  * stack instead — same row, just taller.
  */
-export default function CategoryCard({ title, arabic, onPress, showEnglish = true, showArabic: showArabicProp = true }: CategoryCardProps) {
+export default function CategoryCard({ title, arabic, subtitle, onPress, showEnglish = true, showArabic: showArabicProp = true }: CategoryCardProps) {
   const isMobileWeb = useIsMobileWeb();
   const showArabic = showArabicProp && Boolean(arabic);
+  const arabicOnly = showArabic && !showEnglish;
 
   return (
     <Pressable
@@ -42,6 +45,7 @@ export default function CategoryCard({ title, arabic, onPress, showEnglish = tru
       <View style={[styles.iconWrap, isMobileWeb && styles.iconWrapMobile]}>
         <Icon name="book" size={isMobileWeb ? 24 : 26} color={COLORS.gold} />
       </View>
+      <View style={styles.textColumn}>
       <View style={[styles.titleGroup, isMobileWeb && styles.titleGroupMobile]}>
         {showEnglish ? (
           <Text
@@ -59,6 +63,12 @@ export default function CategoryCard({ title, arabic, onPress, showEnglish = tru
             {formatArabicNumbers(arabic!)}
           </Text>
         ) : null}
+      </View>
+      {subtitle ? (
+        <Text style={[styles.subtitle, isMobileWeb && styles.subtitleMobile, arabicOnly && styles.subtitleArabic]} numberOfLines={1}>
+          {subtitle}
+        </Text>
+      ) : null}
       </View>
       <Icon name="chevron-forward" size={isMobileWeb ? 22 : 24} color={COLORS.gold} style={styles.chevron} />
     </Pressable>
@@ -106,11 +116,15 @@ const styles = StyleSheet.create({
     marginRight: SPACING.md,
     width: 48,
   },
+  textColumn: { flex: 1 },
   titleGroup: {
     alignItems: 'center',
-    flex: 1,
     flexDirection: 'row',
   },
+  // Centred under the title, which the Books menu always shows on its own (a single app language).
+  subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, marginTop: 4, textAlign: 'center' },
+  subtitleMobile: { fontSize: 13, marginTop: 3 },
+  subtitleArabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   titleGroupMobile: {
     alignItems: 'flex-start',
     flexDirection: 'column',

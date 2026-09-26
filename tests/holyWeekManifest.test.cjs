@@ -131,6 +131,37 @@ test('homily and interpretation titles name their holy_week hymns', () => {
   assert.equal(paschaHymnKeyForTitle('Interpretation – John 13:1-17'), 'interpretationJohn13_1_17');
 });
 
+/** currentHolyWeekDayId and its tables, lifted out of utils/holyWeek.ts. */
+function loadCurrentDay() {
+  const source = fs.readFileSync('src/utils/holyWeek.ts', 'utf8');
+  const start = source.indexOf('export const HOLY_WEEK_DAY_IDS');
+  const end = source.indexOf('/** The Holy Week the menus should show');
+  assert.ok(start >= 0 && end > start, 'currentHolyWeekDayId not found');
+  const snippet = source.slice(start, end).replace(/export /g, '')
+    + '\nfunction dayDifference(from, to) { return Math.round((to.getTime() - from.getTime()) / 86400000); }';
+  const { outputText } = ts.transpileModule(snippet, { compilerOptions: { target: ts.ScriptTarget.ES2020 } });
+  return new Function(`${outputText}\nreturn { currentHolyWeekDayId, HOLY_WEEK_DAY_IDS };`)();
+}
+
+test('the menu marks the day or eve being prayed, rolling to the eve after 5pm', () => {
+  const { currentHolyWeekDayId, HOLY_WEEK_DAY_IDS } = loadCurrentDay();
+  const { HOLY_WEEK_ROWS } = manifest;
+  // The helper's day ids are the menu rows' first (day) entries, in order.
+  assert.deepEqual([...HOLY_WEEK_DAY_IDS], HOLY_WEEK_ROWS.map((row) => row.days[0].id));
+  const palmSunday = new Date(Date.UTC(2027, 3, 25));
+  const day = (offset) => new Date(Date.UTC(2027, 3, 25 + offset));
+  assert.equal(currentHolyWeekDayId(palmSunday, day(0), false), 'palm-sunday');
+  // Sunday evening: the effective date has rolled to Monday, and Monday Eve is being prayed.
+  assert.equal(currentHolyWeekDayId(palmSunday, day(1), true), 'monday-eve');
+  assert.equal(currentHolyWeekDayId(palmSunday, day(4), false), 'holy-thursday');
+  assert.equal(currentHolyWeekDayId(palmSunday, day(5), true), 'friday-eve');
+  assert.equal(currentHolyWeekDayId(palmSunday, day(6), true), 'bright-saturday');
+  // Lazarus Saturday evening rolls onto Palm Sunday, which has no eve here.
+  assert.equal(currentHolyWeekDayId(palmSunday, day(0), true), 'palm-sunday');
+  assert.equal(currentHolyWeekDayId(palmSunday, day(-1), false), null);
+  assert.equal(currentHolyWeekDayId(palmSunday, day(7), false), null);
+});
+
 test('pascha_hour bookmarks keep the hour they were made in', () => {
   const { bookmarkKeyFor } = manifest;
   assert.equal(bookmarkKeyFor('holy_week', 'pascha_hour', 'monday_1st'), 'holy_week:pascha_hour@monday_1st');

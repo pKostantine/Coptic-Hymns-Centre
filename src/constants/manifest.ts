@@ -9,6 +9,7 @@ export interface CategoryDef {
   title: string;
   arabic: string;
   meta: string;
+  metaArabic: string;
   /** The offline package this entry installs, when it is a downloadable book. */
   downloadKey?: DownloadableBookKey;
   /** Category screen behavior: 'submenu' shows a list of services; 'direct' opens the single service immediately; 'bible' has its own book/chapter flow; 'lectionary' opens the readings screen directly. */
@@ -45,6 +46,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Psalmody',
     arabic: 'الإبصلمودية',
     meta: 'Vespers · Midnight · Morning',
+    metaArabic: 'عشية · نصف الليل · باكر',
     downloadKey: 'psalmody',
     kind: 'submenu',
     schema: 'psalmody',
@@ -54,6 +56,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Liturgy',
     arabic: 'القداس',
     meta: 'Raising of Incense · Divine Liturgy',
+    metaArabic: 'رفع البخور · القداس الإلهي',
     downloadKey: 'liturgy',
     kind: 'submenu',
     schema: 'liturgy',
@@ -63,6 +66,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Veneration',
     arabic: 'تمجيد',
     meta: 'Doxologies of the saints',
+    metaArabic: 'تماجيد القديسين',
     downloadKey: 'veneration',
     kind: 'direct',
     schema: 'veneration',
@@ -73,6 +77,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Lectionary',
     arabic: 'القطمارس',
     meta: "Today's readings",
+    metaArabic: 'قراءات اليوم',
     kind: 'lectionary',
   },
   {
@@ -80,6 +85,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Agpeya',
     arabic: 'الأجبية',
     meta: 'The book of the seven hours',
+    metaArabic: 'صلوات السواعي السبع',
     downloadKey: 'agpeya',
     kind: 'submenu',
     schema: 'agpeya',
@@ -89,6 +95,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Bible',
     arabic: 'الكتاب المقدس',
     meta: 'Old & New Testament',
+    metaArabic: 'العهدان القديم والجديد',
     downloadKey: 'bible',
     kind: 'bible',
   },
@@ -96,7 +103,8 @@ export const CATEGORIES: CategoryDef[] = [
     id: 'holy-week',
     title: 'Holy Week',
     arabic: 'أسبوع الآلام',
-    meta: 'Pascha · Covenant Thursday · Good Friday',
+    meta: 'Palm Sunday to Bright Saturday',
+    metaArabic: 'من أحد الشعانين إلى سبت الفرح',
     downloadKey: 'holy_week',
     kind: 'submenu',
     schema: 'holy_week',
@@ -153,7 +161,7 @@ export const SERVICES_BY_CATEGORY: Record<string, ServiceDef[]> = {
 const HOLY_WEEK_DAY_TOKENS = ['PalmSunday', 'HolyMonday', 'HolyTuesday', 'HolyWednesday', 'HolyThursday', 'GoodFriday'] as const;
 type HolyWeekDayToken = (typeof HOLY_WEEK_DAY_TOKENS)[number];
 
-type PaschaHourNumber = 1 | 3 | 6 | 9 | 11 | 12;
+export type PaschaHourNumber = 1 | 3 | 6 | 9 | 11 | 12;
 const PASCHA_HOUR_TOKENS: Record<PaschaHourNumber, string> = {
   1: 'FirstHour',
   3: 'ThirdHour',
@@ -177,6 +185,8 @@ export interface HolyWeekHourDef extends ServiceDef {
   /** The hour's name within its day's list ("First Hour"); `title` carries the day too, for the document header and bookmarks. */
   shortTitle: string;
   shortArabic: string;
+  /** Which canonical hour this is, for the hours of the day and eve; absent on the other services (General Funeral Prayer, Liturgy of the Waters, the Divine Liturgy, Bright Saturday). */
+  hourNumber?: PaschaHourNumber;
   /** This hour's HYPERLINK_TARGETS key (HW_<ID>), i.e. how the previous hour links on to it. */
   hyperlinkKey: string;
   /** HYPERLINK_TARGETS key of the next service in Holy Week order; absent on the last one. */
@@ -218,6 +228,7 @@ function paschaHour(
     table,
     shortTitle: name.english,
     shortArabic: name.arabic,
+    hourNumber: hour,
     extraContext: holyWeekContext(day, {
       [part === 'Eve' ? 'PaschaEveHour' : 'PaschaDayHour']: true,
       [PASCHA_HOUR_TOKENS[hour]]: true,
@@ -320,7 +331,11 @@ function holyWeekHyperlinkKey(hourId: string): string {
   return `HW_${hourId.toUpperCase()}`;
 }
 
-/** Every Holy Week service in the order it is prayed — each one links on to the next. */
+/**
+ * Every Holy Week service in the order it is prayed — each one links on to the
+ * next. An hour's id is also its holy_week.reading_rules hour_key
+ * (monday_eve_1st, liturgy_of_the_waters, …).
+ */
 export const HOLY_WEEK_HOURS: HolyWeekHourDef[] = HOLY_WEEK_ROW_SEEDS.flat().flatMap((day) =>
   day.hours.map((hour) => ({
     ...hour,

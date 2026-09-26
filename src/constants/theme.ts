@@ -52,6 +52,18 @@ export const COLORS = {
   subdocSoft: 'rgba(142, 197, 255, 0.13)',
   subdocLine: 'rgba(142, 197, 255, 0.45)',
 
+  // Night (eve) accent — Holy Week's eve offices, set against the gold of
+  // the daytime hours. Same soft/line/base shape as the other accent
+  // families, plus a deeper surface so an eve reads as night at a glance.
+  night: '#9CC9FF',
+  nightSoft: 'rgba(156, 201, 255, 0.12)',
+  nightLine: 'rgba(156, 201, 255, 0.32)',
+  nightSurface: '#050E1D',
+
+  // Card outlines tinted to the navy family rather than the neutral `border`
+  // gray, so a card on black reads as part of the brand's blue.
+  cardLine: 'rgba(142, 197, 255, 0.14)',
+
   // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',
   bishop: '#D64545',

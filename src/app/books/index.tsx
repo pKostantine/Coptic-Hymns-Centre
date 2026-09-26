@@ -98,6 +98,7 @@ export default function BooksHome() {
             <CategoryCard
               title={item.title}
               arabic={item.arabic}
+              subtitle={showArabic ? item.metaArabic : item.meta}
               showEnglish={showEnglish}
               showArabic={showArabic}
               onPress={() => router.push(`/${item.id}`)}

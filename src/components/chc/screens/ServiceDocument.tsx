@@ -54,7 +54,7 @@ interface ServiceDocumentProps {
   appendHyperlinkKey?: string;
 }
 
-/** Appends a "Next: …" hyperlink button section after a hydrated document. The same section shape hymnLibrary builds for an order row whose item_type is Hyperlink. */
+/** Appends a hyperlink button to the next service, labelled with that service's own name, after a hydrated document. The same section shape hymnLibrary builds for an order row whose item_type is Hyperlink. */
 function withAppendedHyperlink(sections: DocumentSection[], hyperlinkKey?: string): DocumentSection[] {
   const destination = hyperlinkKey ? HYPERLINK_TARGETS[hyperlinkKey] : undefined;
   if (!hyperlinkKey || !destination) return sections;
@@ -62,7 +62,7 @@ function withAppendedHyperlink(sections: DocumentSection[], hyperlinkKey?: strin
     ...sections,
     {
       id: `next-${hyperlinkKey}`,
-      title: { english: `Next: ${destination.title}`, arabic: destination.arabic ? `التالي: ${destination.arabic}` : '' },
+      title: { english: destination.title, arabic: destination.arabic },
       verses: [],
       isHyperlinkButton: true,
       hyperlinkKey,
