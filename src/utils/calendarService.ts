@@ -62,6 +62,29 @@ export async function getCopticMonthGrid(copticYear: number, copticMonth: number
 }
 
 /** Looks up the Coptic (year, month, monthName) for a given Gregorian date — used to seed the Coptic month view. */
+/**
+ * The Coptic date label for a day, e.g. "Thoout 16, 1743".
+ *
+ * Returns null rather than throwing when it cannot be read: the Books menu
+ * shows this as a nicety on top of the Gregorian date it already knows, and an
+ * offline phone should still get its menu.
+ */
+export async function getCopticDateLabel(date: Date): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .schema('calendar')
+      .from('coptic_date_conversions')
+      .select('coptic_date_label')
+      .eq('gregorian_date', toIsoDate(date))
+      .maybeSingle();
+
+    if (error) return null;
+    return data?.coptic_date_label ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCopticMonthForDate(date: Date) {
   const { data, error } = await supabase
     .schema('calendar')

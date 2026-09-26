@@ -42,7 +42,10 @@ export type IconName =
   | 'heart'
   | 'heart-outline'
   | 'share-outline'
-  | 'musical-notes';
+  | 'musical-notes'
+  | 'cross'
+  | 'chalice'
+  | 'sparkle';
 
 interface IconProps {
   name: IconName;
@@ -195,6 +198,26 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="M400 256H112" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'cross':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Rect x={228} y={40} width={56} height={432} rx={16} fill={color} />
+          <Rect x={124} y={144} width={264} height={56} rx={16} fill={color} />
+        </Svg>
+      );
+    case 'chalice':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M136 88h240c0 76-54 138-120 138S136 164 136 88Z" fill="none" stroke={color} strokeWidth={30} strokeLinejoin="round" />
+          <Path d="M256 226v150M176 400h160" fill="none" stroke={color} strokeWidth={30} strokeLinecap="round" />
+        </Svg>
+      );
+    case 'sparkle':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M256 48c22 112 58 148 170 170-112 22-148 58-170 170-22-112-58-148-170-170 112-22 148-58 170-170Z" fill={color} />
         </Svg>
       );
     case 'book':
