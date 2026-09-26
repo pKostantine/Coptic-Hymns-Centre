@@ -39,6 +39,7 @@ const BOOK_PATH_PREFIXES = [
   '/psalmody',
   '/liturgy',
   '/agpeya',
+  '/holy-week',
   '/lectionary',
   '/veneration',
   '/bookmarks',

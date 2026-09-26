@@ -15,8 +15,8 @@ changing the package contract.
 
 ## Model
 
-A user installs one of five book identities: Psalmody, Liturgy, Veneration,
-Agpeya, or Bible. Internally, a book references shared content resources. A
+A user installs one of six book identities: Psalmody, Liturgy, Veneration,
+Agpeya, Bible, or Holy Week. Internally, a book references shared content resources. A
 resource currently maps to one published Supabase schema and has its own
 version and chunks. Public is forced into every book graph. Calendar is a
 system-owned resource and is never removed with an optional book.
@@ -97,7 +97,7 @@ reading results, and Synaxarium results use their materialized published RPC
 outputs, keeping seasonal conditions and offline date changes aligned with
 the server.
 
-## Adding Holy Week, Weddings, or another book
+## Adding Weddings or another book
 
 1. Register its resource/schema in `offline_content.resources`. Use an explicit
    table allowlist if the schema also contains administrative data.
@@ -105,7 +105,8 @@ the server.
    new sentinel to the reader registry and its corresponding resource edge.
 3. Add the book row with one or more root resources.
 4. Mirror the book key and dependency fallback in
-   `bookDependencyRegistry.ts`, then add the native home route/card.
+   `bookDependencyRegistry.ts`, then add the native home route/card and set
+   its `downloadKey` in `src/constants/manifest.ts`.
 5. Run `offline_content.refresh_change_triggers()`, publish, and run the
    offline tests. Unknown resources and missing manifest chunks fail closed.
 

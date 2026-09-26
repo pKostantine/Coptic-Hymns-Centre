@@ -1,18 +1,16 @@
-/**
- * CHC main-menu + submenu manifest. The six top-level categories match the
- * six icon files provided in assets/images/chc-app-symbols (psalmody,
- * liturgy, veneration, lectionary, agpeya, bible) — that icon set is the
- * source of truth for what belongs on the main menu.
- */
+/** CHC main-menu + submenu manifest. */
 
-export type CategoryId = 'psalmody' | 'liturgy' | 'veneration' | 'lectionary' | 'agpeya' | 'bible';
+import type { DownloadableBookKey } from '@/types/bookDownloads';
+
+export type CategoryId = 'psalmody' | 'liturgy' | 'veneration' | 'lectionary' | 'agpeya' | 'bible' | 'holy-week';
 
 export interface CategoryDef {
   id: CategoryId;
   title: string;
   arabic: string;
   meta: string;
-  icon: number; // require() asset id
+  /** The offline package this entry installs, when it is a downloadable book. */
+  downloadKey?: DownloadableBookKey;
   /** Category screen behavior: 'submenu' shows a list of services; 'direct' opens the single service immediately; 'bible' has its own book/chapter flow; 'lectionary' opens the readings screen directly. */
   kind: 'submenu' | 'direct' | 'bible' | 'lectionary';
   schema?: string;
@@ -47,7 +45,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Psalmody',
     arabic: 'الإبصلمودية',
     meta: 'Vespers · Midnight · Morning',
-    icon: require('../../assets/images/chc-app-symbols/psalmody.png'),
+    downloadKey: 'psalmody',
     kind: 'submenu',
     schema: 'psalmody',
   },
@@ -56,7 +54,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Liturgy',
     arabic: 'القداس',
     meta: 'Raising of Incense · Divine Liturgy',
-    icon: require('../../assets/images/chc-app-symbols/liturgy.png'),
+    downloadKey: 'liturgy',
     kind: 'submenu',
     schema: 'liturgy',
   },
@@ -65,7 +63,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Veneration',
     arabic: 'تمجيد',
     meta: 'Doxologies of the saints',
-    icon: require('../../assets/images/chc-app-symbols/veneration.png'),
+    downloadKey: 'veneration',
     kind: 'direct',
     schema: 'veneration',
     table: 'veneration',
@@ -75,7 +73,6 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Lectionary',
     arabic: 'القطمارس',
     meta: "Today's readings",
-    icon: require('../../assets/images/chc-app-symbols/lectionary.png'),
     kind: 'lectionary',
   },
   {
@@ -83,7 +80,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Agpeya',
     arabic: 'الأجبية',
     meta: 'The book of the seven hours',
-    icon: require('../../assets/images/chc-app-symbols/agpeya.png'),
+    downloadKey: 'agpeya',
     kind: 'submenu',
     schema: 'agpeya',
   },
@@ -92,8 +89,17 @@ export const CATEGORIES: CategoryDef[] = [
     title: 'Bible',
     arabic: 'الكتاب المقدس',
     meta: 'Old & New Testament',
-    icon: require('../../assets/images/chc-app-symbols/bible.png'),
+    downloadKey: 'bible',
     kind: 'bible',
+  },
+  {
+    id: 'holy-week',
+    title: 'Holy Week',
+    arabic: 'أسبوع الآلام',
+    meta: 'Pascha · Covenant Thursday · Good Friday',
+    downloadKey: 'holy_week',
+    kind: 'submenu',
+    schema: 'holy_week',
   },
 ];
 
@@ -124,6 +130,17 @@ export const SERVICES_BY_CATEGORY: Record<string, ServiceDef[]> = {
     { id: 'midnight_hour', schema: 'agpeya', table: 'midnight_hour', title: 'Midnight Hour', arabic: 'ساعة نصف الليل' },
     { id: 'prayer_of_the_veil', schema: 'agpeya', table: 'prayer_of_the_veil', title: 'Prayer of the Veil', arabic: 'صلاة الستار' },
     { id: 'other_prayers', schema: 'agpeya', table: 'other_prayers', title: 'Other Prayers', arabic: 'صلوات أخرى' },
+  ],
+  // Each document is only ever prayed on its own day, so it forces that day's
+  // flag (the source sheets' "Data Control" row) rather than depending on the
+  // calendar — otherwise opening it outside Holy Week would hide most of it.
+  'holy-week': [
+    { id: 'general_funeral_prayer', schema: 'holy_week', table: 'general_funeral_prayer', title: 'General Funeral Prayer', arabic: 'صلاة الجناز العام', extraContext: { GeneralFuneralPrayer: true } },
+    { id: 'pascha_common_hymns', schema: 'holy_week', table: 'pascha_common_hymns', title: 'Pascha Week Common Hymns', arabic: 'الألحان المشتركة لأسبوع البصخة', extraContext: { HolyWeek: true } },
+    { id: 'liturgy_of_the_waters', schema: 'holy_week', table: 'liturgy_of_the_waters', title: 'Liturgy of the Waters', arabic: 'قداس اللقان', extraContext: { HolyWeek: true, LiturgyOfTheWaters: true } },
+    { id: 'covenant_thursday', schema: 'holy_week', table: 'covenant_thursday', title: 'Covenant Thursday', arabic: 'خميس العهد', extraContext: { HolyWeek: true, CovenantThursday: true, Matins: true } },
+    { id: 'good_friday', schema: 'holy_week', table: 'good_friday', title: 'Good Friday', arabic: 'الجمعة العظيمة', extraContext: { HolyWeek: true, GoodFriday: true } },
+    { id: 'bright_saturday', schema: 'holy_week', table: 'bright_saturday', title: 'Bright Saturday', arabic: 'سبت الفرح', extraContext: { HolyWeek: true, BrightSaturday: true } },
   ],
 };
 

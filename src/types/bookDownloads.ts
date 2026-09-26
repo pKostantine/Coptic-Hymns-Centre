@@ -1,4 +1,4 @@
-export type DownloadableBookKey = 'psalmody' | 'liturgy' | 'veneration' | 'agpeya' | 'bible';
+export type DownloadableBookKey = 'psalmody' | 'liturgy' | 'veneration' | 'agpeya' | 'bible' | 'holy_week';
 
 export type BookDownloadStatus =
   | 'not_downloaded'

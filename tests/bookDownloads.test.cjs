@@ -25,7 +25,7 @@ test('all initial books include public through the recursive registry', () => {
 test('a Public revision impacts every installed book graph', () => {
   const registry = loadRegistry();
   const impacted = registry.DOWNLOADABLE_BOOK_KEYS.filter((bookKey) => registry.resourcesForBook(bookKey).includes('public'));
-  assert.deepEqual(new Set(impacted), new Set(['psalmody', 'liturgy', 'veneration', 'agpeya', 'bible']));
+  assert.deepEqual(new Set(impacted), new Set(['psalmody', 'liturgy', 'veneration', 'agpeya', 'bible', 'holy_week']));
 });
 
 test('Psalmody and Liturgy share one dependency identity', () => {
@@ -53,6 +53,24 @@ test('dependency registry covers every explicit cross-schema reader target', () 
     const source = fs.readFileSync(path, 'utf8');
     const targets = [...source.matchAll(/schema\s*:\s*["']([a-z0-9_]+)["']/g)].map((match) => match[1]);
     for (const target of targets) assert.ok(declared.has(target), `${path} references unregistered ${target}`);
+  }
+});
+
+test('Holy Week packages every schema the reader searches for its hymn keys', () => {
+  const { resourcesForBook } = loadRegistry();
+  const holyWeek = new Set(resourcesForBook('holy_week'));
+  const reader = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
+  const fallback = /HYMN_KEY_FALLBACK_SCHEMAS = \[([^\]]+)\]/.exec(reader);
+  assert.ok(fallback, 'HYMN_KEY_FALLBACK_SCHEMAS not found');
+  for (const schema of fallback[1].match(/[a-z_]+/g)) assert.ok(holyWeek.has(schema), `missing ${schema}`);
+  assert.ok(holyWeek.has('calendar'));
+});
+
+test('offline book registry migrations mirror the client book keys', () => {
+  const { DOWNLOADABLE_BOOK_KEYS } = loadRegistry();
+  const migrations = fs.readdirSync('supabase/migrations').map((name) => fs.readFileSync(`supabase/migrations/${name}`, 'utf8')).join('\n');
+  for (const bookKey of DOWNLOADABLE_BOOK_KEYS) {
+    assert.match(migrations, new RegExp(`insert into offline_content\\.books[^;]*\\('${bookKey}'`), `no offline_content.books row for ${bookKey}`);
   }
 });
 

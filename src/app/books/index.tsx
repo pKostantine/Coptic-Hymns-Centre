@@ -12,7 +12,7 @@ import Icon from '@/components/chc/ui/Icon';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { CATEGORIES } from '@/constants/manifest';
 import { bookDownloadManager } from '@/services/bookDownloadManager';
-import type { BookDownloadProgress, DownloadableBookKey } from '@/types/bookDownloads';
+import type { BookDownloadProgress } from '@/types/bookDownloads';
 import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
@@ -102,7 +102,7 @@ export default function BooksHome() {
               showArabic={showArabic}
               onPress={() => router.push(`/${item.id}`)}
               {...(() => {
-                const book = downloads.find((entry) => entry.bookKey === item.id as DownloadableBookKey);
+                const book = item.downloadKey ? downloads.find((entry) => entry.bookKey === item.downloadKey) : undefined;
                 return book ? { downloadStatus: book.status, downloadProgress: book.progress, onDownloadPress: () => downloadAction(book) } : {};
               })()}
             />

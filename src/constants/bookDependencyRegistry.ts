@@ -35,6 +35,11 @@ export const CONTENT_RESOURCE_DEPENDENCIES: Readonly<Record<string, readonly str
     'gospel_responses', 'agpeya', 'hymn_of_the_intercessions', 'readings',
     'praxis_response', 'litanies', 'synaxarium', 'psalmody', 'veneration', 'calendar',
   ],
+  // Every Holy Week hymn key resolves inside holy_week itself, but the reader
+  // still queries each schema in hymnLibrary's HYMN_KEY_FALLBACK_SCHEMAS for
+  // every document, and an uninstalled schema falls through to the network.
+  // Those schemas must therefore be local for the book to open offline.
+  holy_week: ['public', 'liturgy', 'psalmody', 'agpeya', 'veneration', 'doxologies', 'calendar'],
 });
 
 export const DOWNLOADABLE_BOOKS: Readonly<Record<DownloadableBookKey, {
@@ -47,6 +52,7 @@ export const DOWNLOADABLE_BOOKS: Readonly<Record<DownloadableBookKey, {
   veneration: { title: 'Veneration', titleArabic: 'تمجيد', roots: ['veneration'] },
   agpeya: { title: 'Agpeya', titleArabic: 'الأجبية', roots: ['agpeya'] },
   bible: { title: 'Bible', titleArabic: 'الكتاب المقدس', roots: ['bible'] },
+  holy_week: { title: 'Holy Week', titleArabic: 'أسبوع الآلام', roots: ['holy_week'] },
 });
 
 export const DOWNLOADABLE_BOOK_KEYS = Object.freeze(Object.keys(DOWNLOADABLE_BOOKS) as DownloadableBookKey[]);
