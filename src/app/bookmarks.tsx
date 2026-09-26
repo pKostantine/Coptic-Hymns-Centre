@@ -8,7 +8,7 @@ import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareSc
 import AppHeader from '@/components/chc/ui/AppHeader';
 import HymnCard from '@/components/chc/ui/HymnCard';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { bookmarkKeyFor, CATEGORIES, DIVINE_LITURGY_SERVICES, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
+import { bookmarkKeyFor, CATEGORIES, DIVINE_LITURGY_SERVICES, HOLY_WEEK_HOURS, holyWeekHourHref, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
 import { goBack } from '@/utils/navigation';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { getBibleChapterDisplayLabel, getBibleBooks, type BibleBook } from '@/utils/bibleService';
@@ -64,6 +64,10 @@ function buildBookmarkIndex(): Record<string, BookmarkEntry> {
 
   for (const service of DIVINE_LITURGY_SERVICES) {
     register(service.schema, service.table, service.id, service.title, service.arabic, `/liturgy/divine-liturgy/${service.id}`);
+  }
+
+  for (const hour of HOLY_WEEK_HOURS) {
+    register(hour.schema, hour.table, hour.id, hour.title, hour.arabic, holyWeekHourHref(hour));
   }
 
   return index;

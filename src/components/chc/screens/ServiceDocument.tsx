@@ -50,6 +50,26 @@ interface ServiceDocumentProps {
   entryId?: string;
   /** Where "back" should land when there's no navigation history to pop (direct deep link, page reload). */
   backHref: Href;
+  /** A HYPERLINK_TARGETS key to link on to after the document's own content (e.g. each Holy Week hour's next hour), for documents shared by several entries whose next step differs. */
+  appendHyperlinkKey?: string;
+}
+
+/** Appends a "Next: …" hyperlink button section after a hydrated document. The same section shape hymnLibrary builds for an order row whose item_type is Hyperlink. */
+function withAppendedHyperlink(sections: DocumentSection[], hyperlinkKey?: string): DocumentSection[] {
+  const destination = hyperlinkKey ? HYPERLINK_TARGETS[hyperlinkKey] : undefined;
+  if (!hyperlinkKey || !destination) return sections;
+  return [
+    ...sections,
+    {
+      id: `next-${hyperlinkKey}`,
+      title: { english: `Next: ${destination.title}`, arabic: destination.arabic ? `التالي: ${destination.arabic}` : '' },
+      verses: [],
+      isHyperlinkButton: true,
+      hyperlinkKey,
+      alternateEvery: null,
+      forceWhiteVerses: true,
+    },
+  ];
 }
 
 interface SubdocumentModalTarget {
@@ -77,7 +97,7 @@ interface AntiphonaryModalTarget {
  * native swipe-back gesture of its own to conflict with. The swipe gestures
  * are native-only: web always uses the visible header and never swipe-exits.
  */
-export default function ServiceDocument({ schema, table, title, arabic, extraContext, entryId, backHref }: ServiceDocumentProps) {
+export default function ServiceDocument({ schema, table, title, arabic, extraContext, entryId, backHref, appendHyperlinkKey }: ServiceDocumentProps) {
   const router = useRouter();
   const { user } = useAuth();
   const {
@@ -329,7 +349,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       )
       .then((result) => {
         if (!cancelled) {
-          const newSections = result as DocumentSection[];
+          const newSections = withAppendedHyperlink(result as DocumentSection[], appendHyperlinkKey);
           setSections(newSections);
           setLoadedConditionsKey(conditionsKey);
           // If a subdocument is open, refresh its sections from the new hydration
@@ -357,7 +377,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey]);
+  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey]);
 
   // A single post-change request is issued only when the new document has
   // hydrated AND the reader has focus again. No intermediate settings toggle

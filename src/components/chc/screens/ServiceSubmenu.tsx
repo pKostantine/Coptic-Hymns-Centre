@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '../ui/AppHeader';
 import HymnCard from '../ui/HymnCard';
+import { bookmarkKeyFor } from '../../../constants/manifest';
 import { COLORS, SPACING } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { goBack } from '../../../utils/navigation';
@@ -52,7 +53,7 @@ export default function ServiceSubmenu({ basePath, title, arabic, services, back
             arabic={item.arabic}
             showEnglish={showEnglish}
             showArabic={showArabic}
-            isBookmarked={item.schema && item.table ? isBookmarked(`${item.schema}:${item.table}`) : false}
+            isBookmarked={item.schema && item.table ? isBookmarked(bookmarkKeyFor(item.schema, item.table, item.id)) : false}
             onPress={() => router.push(`/${basePath}/${item.id}` as never)}
           />
         )}
