@@ -1,13 +1,16 @@
 import { Href, useLocalSearchParams } from 'expo-router';
 
 import ServiceDocument from '@/components/chc/screens/ServiceDocument';
-import { HOLY_WEEK_HOURS } from '@/constants/manifest';
+import { HOLY_WEEK_DAYS, HOLY_WEEK_HOURS } from '@/constants/manifest';
 
 export default function HolyWeekHourDocument() {
   const { dayId, hourId } = useLocalSearchParams<{ dayId: string; hourId: string }>();
   const hour = HOLY_WEEK_HOURS.find((entry) => entry.id === hourId && entry.dayId === dayId);
 
   if (!hour) return null;
+
+  // A day that is a single service (Bright Saturday) opens straight from the menu, so back returns there.
+  const isOnlyService = HOLY_WEEK_DAYS.find((day) => day.id === hour.dayId)?.hours.length === 1;
 
   return (
     <ServiceDocument
@@ -18,7 +21,7 @@ export default function HolyWeekHourDocument() {
       extraContext={hour.extraContext}
       entryId={hour.id}
       appendHyperlinkKey={hour.nextHyperlinkKey}
-      backHref={`/holy-week/${hour.dayId}` as Href}
+      backHref={(isOnlyService ? '/holy-week' : `/holy-week/${hour.dayId}`) as Href}
     />
   );
 }

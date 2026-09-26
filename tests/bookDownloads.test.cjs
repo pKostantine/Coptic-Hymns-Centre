@@ -64,10 +64,10 @@ test('installed books search only installed schemas for hymn keys', () => {
   assert.match(web, /isContentSchemaInstalled[\s\S]*return false/);
 });
 
-test('Agpeya and Holy Week are self-contained apart from Public', () => {
+test('Agpeya needs only Public; Holy Week adds the Bible for its hour readings', () => {
   const { CONTENT_RESOURCE_DEPENDENCIES } = loadRegistry();
   assert.deepEqual([...CONTENT_RESOURCE_DEPENDENCIES.agpeya], ['public']);
-  assert.deepEqual([...CONTENT_RESOURCE_DEPENDENCIES.holy_week], ['public', 'calendar']);
+  assert.deepEqual([...CONTENT_RESOURCE_DEPENDENCIES.holy_week], ['public', 'bible', 'calendar']);
 });
 
 test('offline book registry migrations mirror the client book keys', () => {

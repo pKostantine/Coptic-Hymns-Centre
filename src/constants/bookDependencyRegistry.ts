@@ -35,9 +35,9 @@ export const CONTENT_RESOURCE_DEPENDENCIES: Readonly<Record<string, readonly str
     'gospel_responses', 'agpeya', 'hymn_of_the_intercessions', 'readings',
     'praxis_response', 'litanies', 'synaxarium', 'psalmody', 'veneration', 'calendar',
   ],
-  // Every Holy Week hymn key resolves inside holy_week itself; its all-caps
-  // rows are plain section headers that open no other order table.
-  holy_week: ['public', 'calendar'],
+  // Holy Week's hymns live in holy_week and public; each hour's prophecies,
+  // epistles and gospels are read from bible via holy_week.reading_rules.
+  holy_week: ['public', 'bible', 'calendar'],
 });
 
 export const DOWNLOADABLE_BOOKS: Readonly<Record<DownloadableBookKey, {

@@ -134,21 +134,23 @@ export const SERVICES_BY_CATEGORY: Record<string, ServiceDef[]> = {
 };
 
 /**
- * Holy Week (Pascha) — the category opens a submenu of days, and each day a
- * submenu of its hours, in the order they are prayed. The eve hours are
- * prayed on the evening before their day, so they sit at the end of the
- * previous day's list (Palm Sunday ends with the Eve of Monday) while still
- * counting as their own day for every condition.
+ * Holy Week (Pascha). The category opens a menu of rows, one per day: the
+ * day itself beside the eve prayed on its evening (Palm Sunday | Monday Eve,
+ * Monday | Tuesday Eve, … Holy Thursday | Friday Eve), then Good Friday and
+ * Bright Saturday on their own. Each day and each eve opens only its own
+ * hours.
  *
  * Nearly every hour opens the same holy_week.pascha_hour document and is told
  * apart purely by its extraContext: exactly one day token (PalmSunday …
  * GoodFriday, all the others forced false so the calendar date can't leak one
  * in), PaschaEveHour or PaschaDayHour, and one hour token (FirstHour …
- * TwelfthHour). Covenant Thursday's 1st hour and Good Friday's 6th, 9th and
- * 12th hours differ too much from that shape and have tables of their own.
- * Each hour ends with a link on to the next one (nextHyperlinkKey).
+ * TwelfthHour). An eve counts as the day it leads into — Monday Eve's hours
+ * are HolyMonday's eve hours, exactly as holy_week.reading_rules keys them.
+ * Holy Thursday's 1st hour and Good Friday's 6th, 9th and 12th hours differ
+ * too much from that shape and have tables of their own. Each hour ends with
+ * a link on to the next one (nextHyperlinkKey).
  */
-const HOLY_WEEK_DAY_TOKENS = ['PalmSunday', 'HolyMonday', 'HolyTuesday', 'HolyWednesday', 'CovenantThursday', 'GoodFriday'] as const;
+const HOLY_WEEK_DAY_TOKENS = ['PalmSunday', 'HolyMonday', 'HolyTuesday', 'HolyWednesday', 'HolyThursday', 'GoodFriday'] as const;
 type HolyWeekDayToken = (typeof HOLY_WEEK_DAY_TOKENS)[number];
 
 type PaschaHourNumber = 1 | 3 | 6 | 9 | 11 | 12;
@@ -168,40 +170,34 @@ const PASCHA_HOUR_NAMES: Record<PaschaHourNumber, { english: string; arabic: str
   11: { english: 'Eleventh Hour', arabic: 'الساعة الحادية عشرة' },
   12: { english: 'Twelfth Hour', arabic: 'الساعة الثانية عشرة' },
 };
-const PASCHA_DAY_NAMES: Record<HolyWeekDayToken, { english: string; arabic: string }> = {
-  PalmSunday: { english: 'Palm Sunday', arabic: 'أحد الشعانين' },
-  HolyMonday: { english: 'Monday', arabic: 'يوم الاثنين' },
-  HolyTuesday: { english: 'Tuesday', arabic: 'يوم الثلاثاء' },
-  HolyWednesday: { english: 'Wednesday', arabic: 'يوم الأربعاء' },
-  CovenantThursday: { english: 'Covenant Thursday', arabic: 'خميس العهد' },
-  GoodFriday: { english: 'Good Friday', arabic: 'الجمعة العظيمة' },
-};
-const PASCHA_EVE_NAMES: Record<HolyWeekDayToken, { english: string; arabic: string }> = {
-  PalmSunday: { english: 'Eve of Palm Sunday', arabic: 'ليلة أحد الشعانين' },
-  HolyMonday: { english: 'Eve of Monday', arabic: 'ليلة الاثنين' },
-  HolyTuesday: { english: 'Eve of Tuesday', arabic: 'ليلة الثلاثاء' },
-  HolyWednesday: { english: 'Eve of Wednesday', arabic: 'ليلة الأربعاء' },
-  CovenantThursday: { english: 'Eve of Thursday', arabic: 'ليلة الخميس' },
-  GoodFriday: { english: 'Eve of Friday', arabic: 'ليلة الجمعة' },
-};
 
 export interface HolyWeekHourDef extends ServiceDef {
-  /** The day submenu this hour is listed under (a HOLY_WEEK_DAYS id). */
+  /** The day or eve this hour is listed under (a HOLY_WEEK_DAYS id). */
   dayId: string;
+  /** The hour's name within its day's list ("First Hour"); `title` carries the day too, for the document header and bookmarks. */
+  shortTitle: string;
+  shortArabic: string;
   /** This hour's HYPERLINK_TARGETS key (HW_<ID>), i.e. how the previous hour links on to it. */
   hyperlinkKey: string;
   /** HYPERLINK_TARGETS key of the next service in Holy Week order; absent on the last one. */
   nextHyperlinkKey?: string;
 }
 
+/** A day or an eve — opens a list of just its own hours. */
 export interface HolyWeekDayDef extends ServiceGroupDef {
   hours: HolyWeekHourDef[];
 }
 
-type HolyWeekHourSeed = Omit<HolyWeekHourDef, 'dayId' | 'hyperlinkKey' | 'nextHyperlinkKey'>;
+/** One row of the Holy Week menu: a day and, beside it, the eve prayed that evening. */
+export interface HolyWeekRowDef {
+  id: string;
+  days: HolyWeekDayDef[];
+}
+
+type HolyWeekHourSeed = Omit<HolyWeekHourDef, 'dayId' | 'title' | 'arabic' | 'hyperlinkKey' | 'nextHyperlinkKey'>;
 
 /** One day token true, every other Holy Week day token false — so the date the reader happens to open it on can't switch on another day's hymns. */
-function holyWeekContext(day: HolyWeekDayToken, extra: Record<string, boolean> = {}): Record<string, boolean> {
+function holyWeekContext(day: HolyWeekDayToken | null, extra: Record<string, boolean> = {}): Record<string, boolean> {
   const flags: Record<string, boolean> = { HolyWeek: true, BrightSaturday: false };
   for (const token of HOLY_WEEK_DAY_TOKENS) flags[token] = token === day;
   return { ...flags, ...extra };
@@ -215,14 +211,13 @@ function paschaHour(
   table = 'pascha_hour',
   extra: Record<string, boolean> = {},
 ): HolyWeekHourSeed {
-  const dayName = part === 'Eve' ? PASCHA_EVE_NAMES[day] : PASCHA_DAY_NAMES[day];
-  const hourName = PASCHA_HOUR_NAMES[hour];
+  const name = PASCHA_HOUR_NAMES[hour];
   return {
     id,
     schema: 'holy_week',
     table,
-    title: `${dayName.english} – ${hourName.english}`,
-    arabic: `${hourName.arabic} من ${dayName.arabic}`,
+    shortTitle: name.english,
+    shortArabic: name.arabic,
     extraContext: holyWeekContext(day, {
       [part === 'Eve' ? 'PaschaEveHour' : 'PaschaDayHour']: true,
       [PASCHA_HOUR_TOKENS[hour]]: true,
@@ -231,82 +226,94 @@ function paschaHour(
   };
 }
 
+function hourSuffix(hour: PaschaHourNumber): string {
+  return `${hour}${hour === 1 ? 'st' : hour === 3 ? 'rd' : 'th'}`;
+}
+
 /** The five hours of an eve (1st, 3rd, 6th, 9th, 11th), all on the shared pascha_hour document. */
 function paschaEveHours(prefix: string, day: HolyWeekDayToken): HolyWeekHourSeed[] {
-  return ([1, 3, 6, 9, 11] as const).map((hour) => paschaHour(`${prefix}_eve_${hour}${hour === 1 ? 'st' : hour === 3 ? 'rd' : 'th'}`, day, 'Eve', hour));
+  return ([1, 3, 6, 9, 11] as const).map((hour) => paschaHour(`${prefix}_eve_${hourSuffix(hour)}`, day, 'Eve', hour));
 }
 
 /** The daytime hours (1st, 3rd, 6th, 9th, 11th) on the shared pascha_hour document. */
 function paschaDayHours(prefix: string, day: HolyWeekDayToken): HolyWeekHourSeed[] {
-  return ([1, 3, 6, 9, 11] as const).map((hour) => paschaHour(`${prefix}_${hour}${hour === 1 ? 'st' : hour === 3 ? 'rd' : 'th'}`, day, 'Day', hour));
+  return ([1, 3, 6, 9, 11] as const).map((hour) => paschaHour(`${prefix}_${hourSuffix(hour)}`, day, 'Day', hour));
 }
 
-const HOLY_WEEK_DAY_SEEDS: (ServiceGroupDef & { hours: HolyWeekHourSeed[] })[] = [
-  {
-    id: 'palm-sunday',
-    title: 'Palm Sunday',
-    arabic: 'أحد الشعانين',
-    hours: [
-      { id: 'general_funeral_prayer', schema: 'holy_week', table: 'general_funeral_prayer', title: 'General Funeral Prayer', arabic: 'صلاة الجناز العام', extraContext: { GeneralFuneralPrayer: true } },
-      paschaHour('sunday_9th', 'PalmSunday', 'Day', 9),
-      paschaHour('sunday_11th', 'PalmSunday', 'Day', 11),
-      ...paschaEveHours('monday', 'HolyMonday'),
-    ],
-  },
-  {
-    id: 'holy-monday',
-    title: 'Holy Monday',
-    arabic: 'اثنين البصخة',
-    hours: [...paschaDayHours('monday', 'HolyMonday'), ...paschaEveHours('tuesday', 'HolyTuesday')],
-  },
-  {
-    id: 'holy-tuesday',
-    title: 'Holy Tuesday',
-    arabic: 'ثلاثاء البصخة',
-    hours: [...paschaDayHours('tuesday', 'HolyTuesday'), ...paschaEveHours('wednesday', 'HolyWednesday')],
-  },
-  {
-    id: 'holy-wednesday',
-    title: 'Holy Wednesday',
-    arabic: 'أربعاء البصخة',
-    hours: [...paschaDayHours('wednesday', 'HolyWednesday'), ...paschaEveHours('thursday', 'CovenantThursday')],
-  },
-  {
-    id: 'covenant-thursday',
-    title: 'Covenant Thursday',
-    arabic: 'خميس العهد',
-    hours: [
-      paschaHour('thursday_1st', 'CovenantThursday', 'Day', 1, 'thursday_first_hour', { Matins: true }),
-      paschaHour('thursday_3rd', 'CovenantThursday', 'Day', 3),
-      paschaHour('thursday_6th', 'CovenantThursday', 'Day', 6),
-      paschaHour('thursday_9th', 'CovenantThursday', 'Day', 9),
-      { id: 'liturgy_of_the_waters', schema: 'holy_week', table: 'liturgy_of_the_waters', title: 'Liturgy of the Waters', arabic: 'قداس اللقان', extraContext: { HolyWeek: true, LiturgyOfTheWaters: true } },
-      { id: 'covenant_thursday_liturgy', schema: 'holy_week', table: 'covenant_thursday_liturgy', title: 'Covenant Thursday Liturgy', arabic: 'قداس خميس العهد', extraContext: holyWeekContext('CovenantThursday') },
-      paschaHour('thursday_11th', 'CovenantThursday', 'Day', 11, 'pascha_hour', { CovenantThursday11thHour: true }),
-      ...paschaEveHours('friday', 'GoodFriday'),
-    ],
-  },
-  {
-    id: 'good-friday',
-    title: 'Good Friday',
-    arabic: 'الجمعة العظيمة',
-    hours: [
-      paschaHour('friday_1st', 'GoodFriday', 'Day', 1),
-      paschaHour('friday_3rd', 'GoodFriday', 'Day', 3),
-      paschaHour('friday_6th', 'GoodFriday', 'Day', 6, 'good_friday_sixth_hour'),
-      paschaHour('friday_9th', 'GoodFriday', 'Day', 9, 'good_friday_ninth_hour'),
-      paschaHour('friday_11th', 'GoodFriday', 'Day', 11),
-      paschaHour('friday_12th', 'GoodFriday', 'Day', 12, 'good_friday_twelfth_hour'),
-    ],
-  },
-  {
-    id: 'bright-saturday',
-    title: 'Bright Saturday',
-    arabic: 'سبت الفرح',
-    hours: [
-      { id: 'bright_saturday', schema: 'holy_week', table: 'bright_saturday', title: 'Bright Saturday', arabic: 'سبت الفرح', extraContext: { HolyWeek: true, BrightSaturday: true } },
-    ],
-  },
+/** A standalone Holy Week service (its own table, not an hour of pascha_hour). */
+function holyWeekService(id: string, table: string, english: string, arabic: string, extraContext: Record<string, boolean>): HolyWeekHourSeed {
+  return { id, schema: 'holy_week', table, shortTitle: english, shortArabic: arabic, extraContext };
+}
+
+type HolyWeekDaySeed = ServiceGroupDef & { hours: HolyWeekHourSeed[] };
+
+/** Menu rows in prayer order. Within a row the day comes first, then the eve prayed on its evening. */
+const HOLY_WEEK_ROW_SEEDS: HolyWeekDaySeed[][] = [
+  [
+    {
+      id: 'palm-sunday',
+      title: 'Palm Sunday',
+      arabic: 'أحد الشعانين',
+      hours: [
+        holyWeekService('general_funeral_prayer', 'general_funeral_prayer', 'General Funeral Prayer', 'صلاة الجناز العام', holyWeekContext('PalmSunday', { GeneralFuneralPrayer: true })),
+        paschaHour('sunday_9th', 'PalmSunday', 'Day', 9),
+        paschaHour('sunday_11th', 'PalmSunday', 'Day', 11),
+      ],
+    },
+    { id: 'monday-eve', title: 'Monday Eve', arabic: 'ليلة الاثنين', hours: paschaEveHours('monday', 'HolyMonday') },
+  ],
+  [
+    { id: 'monday', title: 'Monday', arabic: 'يوم الاثنين', hours: paschaDayHours('monday', 'HolyMonday') },
+    { id: 'tuesday-eve', title: 'Tuesday Eve', arabic: 'ليلة الثلاثاء', hours: paschaEveHours('tuesday', 'HolyTuesday') },
+  ],
+  [
+    { id: 'tuesday', title: 'Tuesday', arabic: 'يوم الثلاثاء', hours: paschaDayHours('tuesday', 'HolyTuesday') },
+    { id: 'wednesday-eve', title: 'Wednesday Eve', arabic: 'ليلة الأربعاء', hours: paschaEveHours('wednesday', 'HolyWednesday') },
+  ],
+  [
+    { id: 'wednesday', title: 'Wednesday', arabic: 'يوم الأربعاء', hours: paschaDayHours('wednesday', 'HolyWednesday') },
+    { id: 'thursday-eve', title: 'Thursday Eve', arabic: 'ليلة الخميس', hours: paschaEveHours('thursday', 'HolyThursday') },
+  ],
+  [
+    {
+      id: 'holy-thursday',
+      title: 'Holy Thursday',
+      arabic: 'خميس العهد',
+      hours: [
+        paschaHour('thursday_1st', 'HolyThursday', 'Day', 1, 'thursday_first_hour', { Matins: true }),
+        paschaHour('thursday_3rd', 'HolyThursday', 'Day', 3),
+        paschaHour('thursday_6th', 'HolyThursday', 'Day', 6),
+        paschaHour('thursday_9th', 'HolyThursday', 'Day', 9),
+        holyWeekService('liturgy_of_the_waters', 'liturgy_of_the_waters', 'Liturgy of the Waters', 'قداس اللقان', holyWeekContext('HolyThursday', { LiturgyOfTheWaters: true })),
+        holyWeekService('holy_thursday_liturgy', 'holy_thursday_liturgy', 'Divine Liturgy', 'القداس الإلهي', holyWeekContext('HolyThursday', { Liturgy: true })),
+        paschaHour('thursday_11th', 'HolyThursday', 'Day', 11, 'pascha_hour', { CovenantThursday11thHour: true }),
+      ],
+    },
+    { id: 'friday-eve', title: 'Friday Eve', arabic: 'ليلة الجمعة', hours: paschaEveHours('friday', 'GoodFriday') },
+  ],
+  [
+    {
+      id: 'good-friday',
+      title: 'Good Friday',
+      arabic: 'الجمعة العظيمة',
+      hours: [
+        paschaHour('friday_1st', 'GoodFriday', 'Day', 1),
+        paschaHour('friday_3rd', 'GoodFriday', 'Day', 3),
+        paschaHour('friday_6th', 'GoodFriday', 'Day', 6, 'good_friday_sixth_hour'),
+        paschaHour('friday_9th', 'GoodFriday', 'Day', 9, 'good_friday_ninth_hour'),
+        paschaHour('friday_11th', 'GoodFriday', 'Day', 11),
+        paschaHour('friday_12th', 'GoodFriday', 'Day', 12, 'good_friday_twelfth_hour'),
+      ],
+    },
+  ],
+  [
+    {
+      id: 'bright-saturday',
+      title: 'Bright Saturday',
+      arabic: 'سبت الفرح',
+      hours: [holyWeekService('bright_saturday', 'bright_saturday', 'Bright Saturday', 'سبت الفرح', holyWeekContext(null, { BrightSaturday: true }))],
+    },
+  ],
 ];
 
 function holyWeekHyperlinkKey(hourId: string): string {
@@ -314,19 +321,33 @@ function holyWeekHyperlinkKey(hourId: string): string {
 }
 
 /** Every Holy Week service in the order it is prayed — each one links on to the next. */
-export const HOLY_WEEK_HOURS: HolyWeekHourDef[] = HOLY_WEEK_DAY_SEEDS.flatMap((day) =>
-  day.hours.map((hour) => ({ ...hour, dayId: day.id, hyperlinkKey: holyWeekHyperlinkKey(hour.id) })),
+export const HOLY_WEEK_HOURS: HolyWeekHourDef[] = HOLY_WEEK_ROW_SEEDS.flat().flatMap((day) =>
+  day.hours.map((hour) => ({
+    ...hour,
+    dayId: day.id,
+    // A day whose only service is the day itself (Bright Saturday) doesn't repeat its name.
+    title: day.hours.length === 1 ? day.title : `${day.title} – ${hour.shortTitle}`,
+    arabic: day.hours.length === 1 ? day.arabic : `${hour.shortArabic} – ${day.arabic}`,
+    hyperlinkKey: holyWeekHyperlinkKey(hour.id),
+  })),
 ).map((hour, index, all) => (index + 1 < all.length ? { ...hour, nextHyperlinkKey: all[index + 1].hyperlinkKey } : hour));
 
-export const HOLY_WEEK_DAYS: HolyWeekDayDef[] = HOLY_WEEK_DAY_SEEDS.map((day) => ({
-  id: day.id,
-  title: day.title,
-  arabic: day.arabic,
-  hours: HOLY_WEEK_HOURS.filter((hour) => hour.dayId === day.id),
-}));
+function holyWeekDay(seed: HolyWeekDaySeed): HolyWeekDayDef {
+  return { id: seed.id, title: seed.title, arabic: seed.arabic, hours: HOLY_WEEK_HOURS.filter((hour) => hour.dayId === seed.id) };
+}
+
+export const HOLY_WEEK_ROWS: HolyWeekRowDef[] = HOLY_WEEK_ROW_SEEDS.map((row) => ({ id: row[0].id, days: row.map(holyWeekDay) }));
+
+/** Every day and eve, flattened — what the /holy-week/[dayId] route looks up. */
+export const HOLY_WEEK_DAYS: HolyWeekDayDef[] = HOLY_WEEK_ROWS.flatMap((row) => row.days);
 
 export function holyWeekHourHref(hour: Pick<HolyWeekHourDef, 'dayId' | 'id'>): string {
   return `/holy-week/${hour.dayId}/${hour.id}`;
+}
+
+/** Where a day or eve opens: straight into its service when it has only one (Bright Saturday), otherwise its list of hours. */
+export function holyWeekDayHref(day: HolyWeekDayDef): string {
+  return day.hours.length === 1 ? holyWeekHourHref(day.hours[0]) : `/holy-week/${day.id}`;
 }
 
 /** Liturgy top-level submenu: Raising of Incense (its own nested submenu) and the Divine Liturgy (its own list of services). */

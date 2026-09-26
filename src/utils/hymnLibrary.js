@@ -575,6 +575,162 @@ async function resolveReadingSentinelSection(section, isoDate) {
   });
 }
 
+// ─── Holy Week (Pascha) hour readings ───────────────────────────────────────
+// holy_week.pascha_hour (and the hour tables shaped like it) splice each
+// hour's readings in through these Inline sentinels. Which hour is being
+// prayed is already in the document's flags — one day token, PaschaDayHour or
+// PaschaEveHour, one hour token (see HOLY_WEEK_HOURS in constants/manifest.ts)
+// — and holy_week.reading_rules keys every reading by exactly that
+// (day_key, part, hour), in the order it is read.
+
+const PASCHA_READING_SENTINELS = new Set([
+  "PASCHA_PROPHECIES",
+  "PASCHA_HOMILIES",
+  "PASCHA_PAULINE_EPISTLE",
+  "MOURNFUL_GOSPEL_RITE",
+  // reading_rules has no exposition rows yet, so this resolves to nothing.
+  "PASCHA_EXPOSITION",
+]);
+const PASCHA_DAY_FLAGS = ["PalmSunday", "HolyMonday", "HolyTuesday", "HolyWednesday", "HolyThursday", "GoodFriday"];
+const PASCHA_HOUR_FLAGS = { FirstHour: 1, ThirdHour: 3, SixthHour: 6, NinthHour: 9, EleventhHour: 11, TwelfthHour: 12 };
+const PASCHA_READING_TITLES = {
+  Prophecy: { english: "Prophecy", arabic: "النبوة" },
+  "Pauline Epistle": { english: "Pauline Epistle", arabic: "البولس" },
+  Gospel: { english: "Gospel", arabic: "الإنجيل" },
+};
+
+/** The (day_key, part, hour) of the Holy Week hour a document's flags describe, or null outside one. */
+function paschaHourOf(flags) {
+  const day = PASCHA_DAY_FLAGS.find((flag) => flags?.[flag] === true);
+  const part = flags?.PaschaEveHour ? "Eve" : flags?.PaschaDayHour ? "Day" : null;
+  const hourFlag = Object.keys(PASCHA_HOUR_FLAGS).find((flag) => flags?.[flag] === true);
+  return day && part && hourFlag ? { day, part, hour: PASCHA_HOUR_FLAGS[hourFlag] } : null;
+}
+
+/**
+ * Picks one sentinel's readings out of an hour's reading_rules rows (already
+ * in reading order). An Interpretation belongs with what it follows: before
+ * the Psalm it explains a prophecy, after it a Gospel.
+ */
+function selectPaschaReadings(sentinel, rows) {
+  const psalmIndex = rows.findIndex((row) => row.reading_type === "Psalm");
+  const beforePsalm = (index) => psalmIndex < 0 || index < psalmIndex;
+  return rows.filter((row, index) => {
+    switch (sentinel) {
+      case "PASCHA_PROPHECIES":
+        return row.reading_type === "Prophecy" || (row.reading_type === "Interpretation" && beforePsalm(index));
+      case "PASCHA_HOMILIES":
+        return row.reading_type === "Homily";
+      case "PASCHA_PAULINE_EPISTLE":
+        return row.reading_type === "Pauline Epistle";
+      case "MOURNFUL_GOSPEL_RITE":
+        return row.reading_type === "Psalm" || row.reading_type === "Gospel" || (row.reading_type === "Interpretation" && !beforePsalm(index));
+      default:
+        return false;
+    }
+  });
+}
+
+/**
+ * Homilies and interpretations have no Bible reference — their text, where
+ * it exists, is a holy_week hymn named after the reading's title
+ * ("Homily of Abba Shenouda the Archimandrite" → homilyOfAbbaShenoudaTheArchimandrite,
+ * "Interpretation – John 13:1-17" → interpretationJohn13_1_17).
+ */
+function paschaHymnKeyForTitle(title) {
+  const words = String(title || "")
+    .split(/\s+/)
+    .filter((word) => word && !/^[–—-]+$/.test(word))
+    .map((word) => word.replace(/[:\-–,]/g, "_").replace(/[^A-Za-z0-9_]/g, ""))
+    .filter(Boolean);
+  return words
+    .map((word, index) => (index === 0 ? word.charAt(0).toLowerCase() : word.charAt(0).toUpperCase()) + word.slice(1))
+    .join("");
+}
+
+const paschaReadingsCache = new Map();
+
+function getPaschaHourReadings({ day, part, hour }) {
+  const key = `${day}:${part}:${hour}`;
+  let cached = paschaReadingsCache.get(key);
+  if (!cached) {
+    cached = (async () => {
+      const { data, error } = await supabase
+        .schema("holy_week")
+        .from("reading_rules")
+        .select("reading_rule_id, reading_type, title_english, title_arabic, reading_reference, psalm_hymn_key, sort_order")
+        .eq("day_key", day)
+        .eq("part", part)
+        .eq("hour", hour)
+        .order("sort_order", { ascending: true });
+      if (error) throw createReadableSupabaseError(error, "holy_week.reading_rules");
+      return data || [];
+    })();
+    cached.catch(() => paschaReadingsCache.delete(key));
+    paschaReadingsCache.set(key, cached);
+  }
+  return cached;
+}
+
+/** A holy_week hymn (a Psalm, homily, or interpretation) as its own titled section, its lines filtered by the document's flags. */
+async function buildPaschaHymnSection(hymnKey, flags, id) {
+  const [rows, title] = await Promise.all([fetchInlineHymnVerses("holy_week", hymnKey), fetchInlineHymnTitle("holy_week", hymnKey)]);
+  const titlePrayerType = title?.prayer_type || null;
+  const verses = rows.flatMap((row) => {
+    const visibility = evaluateBishopAwareVisibility(row.condition, flags);
+    if (!visibility.visible) return [];
+    return [{ ...buildVerseFromTextRow(row, titlePrayerType), bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }];
+  });
+  if (!verses.length) return null;
+  return formatDocumentHymnSection({
+    id,
+    hymn_key: hymnKey,
+    hymnKey,
+    title: { english: title?.title_english || "", arabic: title?.title_arabic || "" },
+    titlePrayerType,
+    collapsible: false,
+    defaultCollapsed: false,
+    verses,
+  });
+}
+
+/** Resolves one Pascha sentinel into its readings for the hour being prayed: Bible readings with their citation, Psalms (and any homily/interpretation text) as their hymns. */
+async function resolvePaschaReadingSections(section, flags) {
+  const hour = paschaHourOf(flags);
+  if (!hour) return [];
+  const rows = selectPaschaReadings(section.hymn_key, await getPaschaHourReadings(hour));
+  const sections = [];
+  for (const row of rows) {
+    const id = `${section.id}-${row.reading_rule_id}`;
+    if (row.psalm_hymn_key || !row.reading_reference) {
+      const hymnKey = row.psalm_hymn_key || paschaHymnKeyForTitle(row.title_english);
+      const hymnSection = hymnKey ? await buildPaschaHymnSection(hymnKey, flags, id) : null;
+      if (hymnSection) sections.push(hymnSection);
+      continue;
+    }
+    const { resolvedSegments } = await resolveBibleReadingReference(row.reading_reference);
+    const reading = { ...row, resolved_verses: resolvedSegments };
+    // Only the Gospel is read in Coptic as well during Pascha.
+    const verses = buildReadingVerses(reading, row.reading_type === "Gospel", false);
+    if (!verses.length) continue;
+    const citation = await buildReadingCitation(reading);
+    const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, coptic: "" }] : [];
+    sections.push(applyCopticCaseToSection({
+      id,
+      hymn_key: section.hymn_key,
+      title: PASCHA_READING_TITLES[row.reading_type] || { english: row.reading_type || "", arabic: "" },
+      titlePrayerType: null,
+      collapsible: false,
+      defaultCollapsed: false,
+      verses: [...citationVerse, ...verses],
+      prayerType: null,
+      alternateEvery: null,
+      forceWhiteVerses: true,
+    }));
+  }
+  return sections;
+}
+
 /** Merges every nested section's verses into ONE flat list under the calling section's own title/prayer_type — see the isInlinePlacement branch in hydrateWithFlags for why. */
 function mergeNestedSectionsAsOneHymn(callingSection, nestedSections) {
   const verses = applyInheritedPreRefrainItalic(
@@ -1493,6 +1649,12 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
           ...nestedSection,
           sourceGroupKey: "SYNAXARIUM",
         })));
+        continue;
+      }
+
+      // A Holy Week hour's readings, picked by the hour its flags describe.
+      if (PASCHA_READING_SENTINELS.has(section.hymn_key)) {
+        hydrated.push(...(await resolvePaschaReadingSections(section, flags)));
         continue;
       }
 
