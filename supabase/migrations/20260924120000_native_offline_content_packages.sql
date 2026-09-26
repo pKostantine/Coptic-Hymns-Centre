@@ -94,7 +94,7 @@ on conflict (resource_key) do update set
   include_tables = excluded.include_tables;
 
 insert into offline_content.resource_dependencies(resource_key, dependency_key) values
-  ('bible','public'), ('agpeya','public'), ('agpeya','bible'), ('canons','public'), ('doxologies','public'),
+  ('bible','public'), ('agpeya','public'), ('canons','public'), ('doxologies','public'),
   ('gospel_rite','public'), ('gospel_rite','bible'), ('gospel_rite','calendar'),
   ('gospel_responses','public'), ('hymn_of_the_intercessions','public'), ('litanies','public'),
   ('praxis_response','public'), ('readings','public'), ('readings','bible'), ('readings','calendar'),

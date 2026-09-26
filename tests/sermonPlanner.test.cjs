@@ -91,15 +91,27 @@ test('Unrelated Lectionary services retain the ordinary one-context hydrator', a
   assert.equal(received[2].Matins, true);
 });
 
-test('Only Sermon Planner includes the Gospel Rite in hymn-key fallback lookups', () => {
-  const definition = extractFunction('function getHymnKeyLookupSchemas(', '\nexport async function fetchServiceRows(');
-  const getLookups = new Function(
+function loadLookupSchemas(installedSchemas) {
+  const definition = extractFunction('async function getHymnKeyLookupSchemas(', '\nexport async function fetchServiceRows(');
+  return new Function(
     'HYMN_KEY_FALLBACK_SCHEMAS',
+    'isContentSchemaInstalled',
     definition + '\nreturn getHymnKeyLookupSchemas;',
-  )(['public', 'liturgy', 'psalmody']);
-  assert.ok(getLookups('liturgy', 'sermon_planner').includes('gospel_rite'));
-  assert.ok(!getLookups('liturgy', 'lectionary_liturgy').includes('gospel_rite'));
-  assert.equal(getLookups('liturgy', 'sermon_planner')[0], 'liturgy');
+  )(['public', 'liturgy', 'psalmody'], async (schema) => installedSchemas.includes(schema));
+}
+
+test('Only Sermon Planner includes the Gospel Rite in hymn-key fallback lookups', async () => {
+  const getLookups = loadLookupSchemas([]);
+  assert.ok((await getLookups('liturgy', 'sermon_planner')).includes('gospel_rite'));
+  assert.ok(!(await getLookups('liturgy', 'lectionary_liturgy')).includes('gospel_rite'));
+  assert.equal((await getLookups('liturgy', 'sermon_planner'))[0], 'liturgy');
+});
+
+test('An installed book searches only the fallback schemas installed with it', async () => {
+  const getLookups = loadLookupSchemas(['agpeya', 'public']);
+  assert.deepEqual(await getLookups('agpeya', 'first_hour'), ['agpeya', 'public']);
+  // A document read online keeps the full fallback order.
+  assert.deepEqual(await getLookups('holy_week', 'good_friday'), ['holy_week', 'public', 'liturgy', 'psalmody']);
 });
 
 test('Liturgy Gospel with Coptic uses the normalized all-caps sentinel', () => {

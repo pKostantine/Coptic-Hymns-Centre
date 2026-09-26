@@ -2,9 +2,7 @@
 --
 -- Every hymn key in holy_week resolves inside the schema itself; its only
 -- all-caps rows are plain section headers (no Subdocument/Inline item_type),
--- so it opens no other order tables. The reader nevertheless searches
--- hymnLibrary's HYMN_KEY_FALLBACK_SCHEMAS for every document, and condition
--- flags come from Calendar, so those resources are declared as dependencies.
+-- so it opens no other order tables. Condition flags come from Calendar.
 -- Mirrors CONTENT_RESOURCE_DEPENDENCIES/DOWNLOADABLE_BOOKS in
 -- src/constants/bookDependencyRegistry.ts.
 
@@ -15,8 +13,7 @@ on conflict (resource_key) do update set
   include_tables = excluded.include_tables;
 
 insert into offline_content.resource_dependencies(resource_key, dependency_key) values
-  ('holy_week','public'), ('holy_week','liturgy'), ('holy_week','psalmody'), ('holy_week','agpeya'),
-  ('holy_week','veneration'), ('holy_week','doxologies'), ('holy_week','calendar')
+  ('holy_week','public'), ('holy_week','calendar')
 on conflict do nothing;
 
 insert into offline_content.books(book_key, title_english, title_arabic, root_resources) values

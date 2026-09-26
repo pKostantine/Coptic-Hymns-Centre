@@ -14,7 +14,7 @@ export const CONTENT_RESOURCE_DEPENDENCIES: Readonly<Record<string, readonly str
   public: [],
   calendar: [],
   bible: ['public'],
-  agpeya: ['public', 'bible'],
+  agpeya: ['public'],
   canons: ['public'],
   doxologies: ['public'],
   gospel_rite: ['public', 'bible', 'calendar'],
@@ -35,11 +35,9 @@ export const CONTENT_RESOURCE_DEPENDENCIES: Readonly<Record<string, readonly str
     'gospel_responses', 'agpeya', 'hymn_of_the_intercessions', 'readings',
     'praxis_response', 'litanies', 'synaxarium', 'psalmody', 'veneration', 'calendar',
   ],
-  // Every Holy Week hymn key resolves inside holy_week itself, but the reader
-  // still queries each schema in hymnLibrary's HYMN_KEY_FALLBACK_SCHEMAS for
-  // every document, and an uninstalled schema falls through to the network.
-  // Those schemas must therefore be local for the book to open offline.
-  holy_week: ['public', 'liturgy', 'psalmody', 'agpeya', 'veneration', 'doxologies', 'calendar'],
+  // Every Holy Week hymn key resolves inside holy_week itself; its all-caps
+  // rows are plain section headers that open no other order table.
+  holy_week: ['public', 'calendar'],
 });
 
 export const DOWNLOADABLE_BOOKS: Readonly<Record<DownloadableBookKey, {

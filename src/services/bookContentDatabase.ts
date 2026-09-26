@@ -117,13 +117,14 @@ export async function getActiveResourceVersion(resourceId: string): Promise<stri
 
 export async function hasLocalSchema(schema: string): Promise<boolean> {
   const db = await getOfflineDatabase();
-  const row = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) AS count FROM content_rows cr
+  const row = await db.getFirstAsync<{ found: number }>(
+    `SELECT 1 AS found FROM content_rows cr
        JOIN content_resources r ON r.resource_id = cr.resource_id AND r.active_version = cr.version
-      WHERE cr.schema_name = ? AND r.state IN ('installed', 'update_available')`,
+      WHERE cr.schema_name = ? AND r.state IN ('installed', 'update_available')
+      LIMIT 1`,
     schema,
   );
-  return (row?.count ?? 0) > 0;
+  return row != null;
 }
 
 export async function readLocalTable(schema: string, table: string): Promise<Record<string, unknown>[] | null> {

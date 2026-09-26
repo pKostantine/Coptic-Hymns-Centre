@@ -3,7 +3,7 @@ import { toIsoDate as toIsoDateString } from "./dateUtils";
 import { stripAlleluiaFromPsalmVerse } from "./psalmReadingText";
 import { loadReadingRuleRowsForDate } from "./readingCalendarRules";
 import { resolveBibleReadingReference } from "./readingReferenceResolver";
-import { contentDataClient as supabase } from "../services/contentDataClient";
+import { contentDataClient as supabase, isContentSchemaInstalled } from "../services/contentDataClient";
 import { formatVerses } from "./verseFormatting";
 
 // ─── Subdocument sentinel → schema.table registry ────────────────────────────
@@ -631,12 +631,21 @@ const SCHEMAS_WITHOUT_HYMN_TITLES = new Set([
 // these, it stays first and is skipped later in the fallback list.
 const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "psalmody", "agpeya", "veneration", "doxologies"];
 
-function getHymnKeyLookupSchemas(schema, table) {
+// A document read from an installed offline book resolves its hymn keys only
+// from resources installed on the device. Its book's dependency graph
+// (bookDependencyRegistry.ts) already declares every schema its content
+// really comes from, so a fallback schema that isn't installed can't hold
+// anything it needs — querying it would only send the lookup to the network
+// and fail the whole document offline.
+async function getHymnKeyLookupSchemas(schema, table) {
   // Sermon Planner reuses the existing Gospel Rite's Psalm/Gospel framing
   // hymns. Only its document needs this extra lookup; avoid querying the
   // gospel_rite schema for every other service in CHC.
   const extraSchemas = schema === "liturgy" && table === "sermon_planner" ? ["gospel_rite"] : [];
-  return [...new Set([schema, ...HYMN_KEY_FALLBACK_SCHEMAS, ...extraSchemas].filter(Boolean))];
+  const schemas = [...new Set([schema, ...HYMN_KEY_FALLBACK_SCHEMAS, ...extraSchemas].filter(Boolean))];
+  if (!(await isContentSchemaInstalled(schema))) return schemas;
+  const installed = await Promise.all(schemas.slice(1).map((lookupSchema) => isContentSchemaInstalled(lookupSchema)));
+  return [schema, ...schemas.slice(1).filter((_, index) => installed[index])];
 }
 
 export async function fetchServiceRows(schema, table) {
@@ -644,7 +653,7 @@ export async function fetchServiceRows(schema, table) {
   if (!orderRows.length) return [];
 
   const hymnKeys = uniqueNonEmpty(orderRows.map((row) => row.hymn_key));
-  const lookupSchemas = getHymnKeyLookupSchemas(schema, table);
+  const lookupSchemas = await getHymnKeyLookupSchemas(schema, table);
   const [titleRowsBySchema, textRowsBySchema] = await Promise.all([
     Promise.all(lookupSchemas.map((lookupSchema) => fetchSchemaTitlesByKeys(lookupSchema, hymnKeys))),
     Promise.all(lookupSchemas.map((lookupSchema) => fetchSchemaTextRowsByKeys(lookupSchema, hymnKeys))),
@@ -1873,7 +1882,7 @@ const INLINE_TEXT_FIELDS =
   "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
 
 async function fetchInlineHymnVerses(schema, hymnKey) {
-  for (const lookupSchema of getHymnKeyLookupSchemas(schema)) {
+  for (const lookupSchema of await getHymnKeyLookupSchemas(schema)) {
     const { data, error } = await supabase
       .schema(lookupSchema)
       .from("hymn_texts")
@@ -2019,7 +2028,7 @@ const INLINE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, prayer_type"
 
 /** Whether an inline-spliced hymn should be treated as its own hymn (own title, own alternation, restarted person-type indicators) hinges entirely on whether it has a row in hymn_titles — same schema search order as fetchInlineHymnVerses. Returns null if no title row exists anywhere. */
 async function fetchInlineHymnTitle(schema, hymnKey) {
-  for (const lookupSchema of getHymnKeyLookupSchemas(schema)) {
+  for (const lookupSchema of await getHymnKeyLookupSchemas(schema)) {
     if (SCHEMAS_WITHOUT_HYMN_TITLES.has(lookupSchema)) continue;
     const { data, error } = await supabase
       .schema(lookupSchema)

@@ -56,14 +56,18 @@ test('dependency registry covers every explicit cross-schema reader target', () 
   }
 });
 
-test('Holy Week packages every schema the reader searches for its hymn keys', () => {
-  const { resourcesForBook } = loadRegistry();
-  const holyWeek = new Set(resourcesForBook('holy_week'));
+test('installed books search only installed schemas for hymn keys', () => {
   const reader = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
-  const fallback = /HYMN_KEY_FALLBACK_SCHEMAS = \[([^\]]+)\]/.exec(reader);
-  assert.ok(fallback, 'HYMN_KEY_FALLBACK_SCHEMAS not found');
-  for (const schema of fallback[1].match(/[a-z_]+/g)) assert.ok(holyWeek.has(schema), `missing ${schema}`);
-  assert.ok(holyWeek.has('calendar'));
+  assert.match(reader, /async function getHymnKeyLookupSchemas[\s\S]*?isContentSchemaInstalled\(schema\)[\s\S]*?filter/);
+  assert.doesNotMatch(reader, /(?<!await |function )getHymnKeyLookupSchemas\(/, 'every lookup must await the installed-schema filter');
+  const web = fs.readFileSync('src/services/contentDataClient.web.ts', 'utf8');
+  assert.match(web, /isContentSchemaInstalled[\s\S]*return false/);
+});
+
+test('Agpeya and Holy Week are self-contained apart from Public', () => {
+  const { CONTENT_RESOURCE_DEPENDENCIES } = loadRegistry();
+  assert.deepEqual([...CONTENT_RESOURCE_DEPENDENCIES.agpeya], ['public']);
+  assert.deepEqual([...CONTENT_RESOURCE_DEPENDENCIES.holy_week], ['public', 'calendar']);
 });
 
 test('offline book registry migrations mirror the client book keys', () => {

@@ -222,6 +222,11 @@ function schemaClient(schemaName: string) {
   };
 }
 
+/** Whether a schema's rows are served from an installed offline book on this device. */
+export function isContentSchemaInstalled(schemaName: string): Promise<boolean> {
+  return hasLocalSchema(schemaName);
+}
+
 export const contentDataClient: typeof supabase = {
   schema: (schemaName: string) => schemaClient(schemaName),
   from: (tableName: string) => new HybridQuery('public', tableName),
