@@ -4,7 +4,7 @@ import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AppHeader from '../ui/AppHeader';
+import DocumentTopBar from '../ui/DocumentTopBar';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import SermonPlannerDrawer from '../ui/SermonPlannerDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
@@ -793,15 +793,16 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
         <title>{`CHC ${title}`}</title>
       </Head>
       {!isMobileDocument ? (
-        <AppHeader
+        <DocumentTopBar
           title={{ english: title, arabic }}
-          canGoBack
           onBack={() => leaveDocument()}
-          rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
-          onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
-          rightIcon={isSermonPlanner ? 'document-text-outline' : 'list-outline'}
-          rightAccessibilityLabel={isSermonPlanner ? 'Open sermon notes' : 'Open content list'}
-          onRightPress={() => setSelectorOpen(true)}
+          backAccessibilityLabel="Leave document"
+          leadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+          onLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
+          leadingAccessibilityLabel={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+          trailingIcon={isSermonPlanner ? 'document-text-outline' : 'list-outline'}
+          trailingAccessibilityLabel={isSermonPlanner ? 'Open sermon notes' : 'Open content list'}
+          onTrailingPress={() => setSelectorOpen(true)}
         />
       ) : null}
       {error ? (

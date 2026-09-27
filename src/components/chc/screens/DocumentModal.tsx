@@ -11,7 +11,7 @@ import GlobalNowPlayingOverlay from '../../playback/GlobalNowPlayingOverlay';
 import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
-import AppHeader from '../ui/AppHeader';
+import DocumentTopBar from '../ui/DocumentTopBar';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
 import CalendarScreen from './CalendarScreen';
@@ -91,8 +91,8 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
   const documentRef = useRef<DocumentWebViewHandle>(null);
   const { width: screenWidth } = useWindowDimensions();
-  // Browser navigation always uses the visible header; only native touch
-  // should ever close a subdocument by swiping from its edge.
+  // The app closes and navigates a subdocument entirely by edge swipe and so
+  // shows no top bar; a browser has no such gesture and keeps the bar instead.
   const isMobileDocument = Platform.OS !== 'web';
 
   // Anything stacked over this document: a deeper subdocument, the content
@@ -261,25 +261,29 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
       <SafeAreaView
-        edges={['left', 'right', 'bottom']}
+        // Same split as ServiceDocument: on web the bar below supplies the top
+        // inset itself, while the app has no bar and must inset for the notch.
+        edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
         style={styles.screen}
         {...(isMobileDocument ? swipeGesturePanResponder.panHandlers : {})}
       >
-        {/* Web already always shows this header regardless of width (see
-            ServiceDocument.tsx's doc comment), but unlike those screens this
-            one is never hidden on the NATIVE APP either -- outside Slideshow
-            Mode, the list icon here is still the most discoverable way to
-            open ContentSelectorDrawer; mobile edge swipes are an additional
-            gesture path. isMobileDocument still applies to the swipe
-            gestures below. */}
-        <AppHeader
-          title={title || ''}
-          canGoBack
-          onBack={onClose}
-          rightIcon="list-outline"
-          rightAccessibilityLabel="Open content list"
-          onRightPress={() => setSelectorOpen(true)}
-        />
+        {/* A subdocument opens on top of a document the reader is already in,
+            so on the app it gets no bar at all -- same as the document
+            underneath it (see ServiceDocument.tsx). Both of the bar's actions
+            already have native gestures in swipeGesturePanResponder below:
+            swipe in from the left edge to close, in from the right to open
+            ContentSelectorDrawer. A browser has neither gesture, so the web
+            build keeps the bar. */}
+        {!isMobileDocument ? (
+          <DocumentTopBar
+            title={title || ''}
+            onBack={onClose}
+            backAccessibilityLabel="Close subdocument"
+            trailingIcon="list-outline"
+            trailingAccessibilityLabel="Open content list"
+            onTrailingPress={() => setSelectorOpen(true)}
+          />
+        ) : null}
         {isAntiphonary ? (
           <View style={styles.selectorBar}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorContent}>
