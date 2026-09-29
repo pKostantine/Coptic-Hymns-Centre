@@ -52,10 +52,14 @@ const ANTIPHONARY_GROUPS: { key: 'introduction' | 'adam' | 'vatos'; label: strin
 // citation as the visible label.
 const COPTIC_READINGS_SUBDOCUMENT_KEYS = new Set(['COPTIC_PAULINE_EPISTLE', 'COPTIC_CATHOLIC_EPISTLE', 'COPTIC_PRAXIS']);
 
-/** A section's own title, or — for the untitled reading section in a Coptic readings subdocument — its reading-reference citation verse, so the pill row can represent it without ever giving that section a real title (which would render as its own yellow header in the document body). */
+/** A section's own title (with its citation, for a reading titled like one), or — for the untitled reading section in a Coptic readings subdocument — its reading-reference citation verse, so the pill row can represent it without ever giving that section a real title (which would render as its own yellow header in the document body). */
 function getPillLabel(section: DocumentSection, includeReadingReference: boolean): string | null {
-  const title = section.title?.english ? formatEnglishDisplayText(section.title.english) : section.title?.arabic;
-  if (title) return title;
+  if (section.title?.english || section.title?.arabic) {
+    // Named as the content selector names it — a prophecy's pill reads
+    // "Prophecy 2 (Isaiah 1:2-18)", as it does in the parent's list.
+    const selectorTitle = getSectionSelectorTitle(section);
+    return selectorTitle.english ? formatEnglishDisplayText(selectorTitle.english) : selectorTitle.arabic || null;
+  }
   if (!includeReadingReference) return null;
   const reference = section.verses.find((v) => v.type === 'readingReference');
   return reference ? reference.english || reference.arabic || null : null;

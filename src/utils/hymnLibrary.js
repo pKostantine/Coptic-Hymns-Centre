@@ -4,14 +4,17 @@ import { stripAlleluiaFromPsalmVerse } from "./psalmReadingText";
 import { loadReadingRuleRowsForDate } from "./readingCalendarRules";
 import { resolveBibleReadingReference } from "./readingReferenceResolver";
 import { contentDataClient as supabase, isContentSchemaInstalled } from "../services/contentDataClient";
+import { formatArabicDigits } from "./displayText";
 import { formatVerses } from "./verseFormatting";
 
 // ─── Subdocument sentinel → schema.table registry ────────────────────────────
 // Verified against live DB usage (see project memory project_subdocument_registry.md).
 // Entries that are null mean the content hasn't been built yet — skip gracefully.
-// Reading-resolution sentinels (PROPHECIES, PAULINE_EPISTLE, *_WITH_COPTIC, etc.)
+// Reading-resolution sentinels (PAULINE_EPISTLE_WITH_COPTIC, *_WITH_COPTIC, etc.)
 // are NOT schema/table targets — they route through the Lectionary/Bible reader
-// instead, so they're deliberately absent here.
+// instead, so they're deliberately absent here. So are PROPHECY and
+// COPTIC_PROPHECY: a service can read several prophecies, and each is its own
+// hydration of readings.prophecy/coptic_prophecy (see resolveProphecySections).
 
 export const SUBDOCUMENT_MAP = {
   ANTIPHONARY: { schema: "psalmody", table: "antiphonary" },
@@ -129,7 +132,6 @@ function pushWholeTableInlineSections(hydrated, toggleSection, contentSections) 
 // than a schema.table — kept separate so callers can branch before treating
 // an unmapped Subdocument as "not built yet".
 export const READING_SENTINELS = new Set([
-  "PROPHECIES",
   "COPTIC_READINGS",
   "PSALM_RESPONSES",
   "SYNAXARIUM",
@@ -159,6 +161,11 @@ export const READING_SENTINELS = new Set([
   "CATHOLIC_EPISTLE_WITHOUT_COPTIC",
   "PRAXIS_WITH_COPTIC",
   "PRAXIS_WITHOUT_COPTIC",
+  // readings.prophecy/coptic_prophecy's reading row. Unlike the others these
+  // aren't the day's one reading of a type: they resolve to whichever
+  // prophecy the frame is being hydrated for (see CURRENT_PROPHECY).
+  "PROPHECY_WITH_COPTIC",
+  "PROPHECY_WITHOUT_COPTIC",
 ]);
 
 // Maps each reading sentinel to the (service, reading_type) pair it needs
@@ -168,7 +175,6 @@ export const READING_SENTINELS = new Set([
 // memory project_subdocument_registry.md) and are left unmapped — they
 // resolve to nothing rather than guessing wrong.
 const READING_SENTINEL_MAP = {
-  PROPHECIES: { service: "Matins", readingType: "Prophecy", withCoptic: true },
   PAULINE_EPISTLE_WITH_COPTIC: { service: "Pauline", readingType: "Pauline Epistle", withCoptic: true },
   PAULINE_EPISTLE_WITHOUT_COPTIC: { service: "Pauline", readingType: "Pauline Epistle", withCoptic: false },
   CATHOLIC_EPISTLE_WITH_COPTIC: { service: "Catholic", readingType: "Catholic Epistle", withCoptic: true },
@@ -366,7 +372,18 @@ async function buildReadingCitation(readingRow) {
   };
 }
 
-async function resolveReadingSentinelVerses(sentinel, isoDate) {
+async function resolveReadingSentinelVerses(sentinel, isoDate, flags) {
+  const prophecyKey = normalizeReadingSentinel(sentinel);
+  if (Object.prototype.hasOwnProperty.call(PROPHECY_READING_SENTINELS, prophecyKey)) {
+    const reading = flags?.[CURRENT_PROPHECY];
+    const withCoptic = PROPHECY_READING_SENTINELS[prophecyKey];
+    const verses = buildReadingVerses(reading, withCoptic, false);
+    // The Coptic prophecies are the ones there is Coptic for — a reading
+    // bible.verses has no Coptic text of stays out of them rather than
+    // repeating its English there.
+    if (!verses.length || (withCoptic && !verses.some((verse) => verse.coptic))) return { verses: [], citation: null };
+    return { verses, citation: await buildReadingCitation(reading) };
+  }
   const mapping = READING_SENTINEL_MAP[normalizeReadingSentinel(sentinel)];
   if (!mapping) return { verses: [], citation: null };
   const readings = await getReadingsForDate(isoDate);
@@ -401,8 +418,8 @@ const COPTIC_READING_TYPE_TITLES = {
  * inside it, exactly like the flat case), since the citation is a moving
  * per-day value, not a stable name to navigate by.
  */
-async function resolveReadingSentinelSplice(sentinel, isoDate, titleShown, minimization, sectionId) {
-  const { verses, citation } = await resolveReadingSentinelVerses(sentinel, isoDate);
+async function resolveReadingSentinelSplice(sentinel, isoDate, titleShown, minimization, sectionId, flags) {
+  const { verses, citation } = await resolveReadingSentinelVerses(sentinel, isoDate, flags);
   if (!verses.length) return null;
 
   const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, coptic: "" }] : [];
@@ -555,8 +572,8 @@ function omitSynaxariumPreamble(sections) {
 }
 
 /** Same as resolveReadingSentinelVerses but wraps the result as a titled section (for Subdocument/order-table-level Inline placements, which need a section object, not a bare verse list). The computed Bible citation is prepended to the verses as its own readingReference line — right before the actual reading text, never before the calling table's own intro/conclusion rows, which sit outside this section entirely. */
-async function resolveReadingSentinelSection(section, isoDate) {
-  const { verses, citation } = await resolveReadingSentinelVerses(section.hymn_key, isoDate);
+async function resolveReadingSentinelSection(section, isoDate, flags) {
+  const { verses, citation } = await resolveReadingSentinelVerses(section.hymn_key, isoDate, flags);
   if (!verses.length) return null;
   const versesWithCitation = citation
     ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, coptic: "" }, ...verses]
@@ -594,7 +611,6 @@ const PASCHA_READING_SENTINELS = new Set([
 const PASCHA_DAY_FLAGS = ["PalmSunday", "HolyMonday", "HolyTuesday", "HolyWednesday", "HolyThursday", "GoodFriday"];
 const PASCHA_HOUR_FLAGS = { FirstHour: 1, ThirdHour: 3, SixthHour: 6, NinthHour: 9, EleventhHour: 11, TwelfthHour: 12 };
 const PASCHA_READING_TITLES = {
-  Prophecy: { english: "Prophecy", arabic: "النبوة" },
   "Pauline Epistle": { english: "Pauline Epistle", arabic: "البولس" },
   Gospel: { english: "Gospel", arabic: "الإنجيل" },
 };
@@ -658,7 +674,7 @@ function getPaschaHourReadings({ day, part, hour }) {
       const { data, error } = await supabase
         .schema("holy_week")
         .from("reading_rules")
-        .select("reading_rule_id, reading_type, title_english, title_arabic, reading_reference, psalm_hymn_key, sort_order")
+        .select("reading_rule_id, reading_type, title_english, title_arabic, book_key, reading_reference, psalm_hymn_key, sort_order")
         .eq("day_key", day)
         .eq("part", part)
         .eq("hour", hour)
@@ -694,14 +710,29 @@ async function buildPaschaHymnSection(hymnKey, flags, id) {
   });
 }
 
-/** Resolves one Pascha sentinel into its readings for the hour being prayed: Bible readings with their citation, Psalms (and any homily/interpretation text) as their hymns. */
-async function resolvePaschaReadingSections(section, flags) {
+/**
+ * Resolves one Pascha sentinel into its readings for the hour being prayed:
+ * each prophecy framed like every other prophecy (resolveProphecySections),
+ * other Bible readings with their citation, Psalms (and any homily/
+ * interpretation text) as their hymns.
+ */
+async function resolvePaschaReadingSections(section, flags, depth, isoDate) {
   const hour = paschaHourOf(flags);
   if (!hour) return [];
   const rows = selectPaschaReadings(section.hymn_key, await getPaschaHourReadings(hour));
+  // Numbered among all the hour's prophecies, so "Prophecy 3" is the third
+  // one read — the same number it carries in the Coptic prophecies.
+  const prophecyRows = rows.filter((row) => row.reading_type === "Prophecy");
+  const frameRows = prophecyRows.some((row) => row.reading_reference) ? await fetchProphecyFrameRows(false) : null;
   const sections = [];
   for (const row of rows) {
     const id = `${section.id}-${row.reading_rule_id}`;
+    if (row.reading_type === "Prophecy" && row.reading_reference) {
+      const [entry] = await resolveProphecyEntries([row]);
+      const prophecy = await buildProphecySection(entry, prophecyRows.indexOf(row), prophecyRows.length, { coptic: false, flags, depth, isoDate, id, frameRows });
+      if (prophecy) sections.push({ ...prophecy, bishopOnly: section.bishopOnly, priestOnly: section.priestOnly });
+      continue;
+    }
     if (row.psalm_hymn_key || !row.reading_reference) {
       const hymnKey = row.psalm_hymn_key || paschaHymnKeyForTitle(row.title_english);
       const hymnSection = hymnKey ? await buildPaschaHymnSection(hymnKey, flags, id) : null;
@@ -710,7 +741,8 @@ async function resolvePaschaReadingSections(section, flags) {
     }
     const { resolvedSegments } = await resolveBibleReadingReference(row.reading_reference);
     const reading = { ...row, resolved_verses: resolvedSegments };
-    // Only the Gospel is read in Coptic as well during Pascha.
+    // The Gospel is read in Coptic here as well; the prophecies' Coptic has
+    // its own subdocument (COPTIC_PROPHECY), and nothing else is.
     const verses = buildReadingVerses(reading, row.reading_type === "Gospel", false);
     if (!verses.length) continue;
     const citation = await buildReadingCitation(reading);
@@ -727,6 +759,144 @@ async function resolvePaschaReadingSections(section, flags) {
       alternateEvery: null,
       forceWhiteVerses: true,
     }));
+  }
+  return sections;
+}
+
+// ─── Prophecies ─────────────────────────────────────────────────────────────
+// A service can read several prophecies — a Lenten Matins up to twenty-two, a
+// Holy Week hour several — each introduced by name ("A reading from Isaiah
+// the prophet…"). readings.prophecy (English/Arabic) and
+// readings.coptic_prophecy each frame ONE prophecy: introduction, reading,
+// conclusion. So the frame is hydrated once per prophecy, with that
+// prophecy's book flag on (ProphecyIsaiah picks Isaiah's introduction line)
+// and the reading itself handed down under CURRENT_PROPHECY, which the
+// frame's PROPHECY_WITH(OUT)_COPTIC row resolves to. A symbol key rides along
+// in the flags untouched by conditions, which only ever read named flags.
+//
+// Which prophecies: a Holy Week hour's own (holy_week.reading_rules), and
+// everywhere else the day's Matins prophecies (calendar.reading_rules) —
+// Raising of Incense and the Lectionary both read them at Matins.
+
+const CURRENT_PROPHECY = Symbol("currentProphecy");
+/** The frames' reading rows, and whether each keeps the Coptic text. */
+const PROPHECY_READING_SENTINELS = { PROPHECY_WITH_COPTIC: true, PROPHECY_WITHOUT_COPTIC: false };
+const PROPHECY_TITLE = { english: "Prophecy", arabic: "النبوة" };
+const BOOK_KEY_NUMERAL_WORDS = { first: "1", second: "2", third: "3" };
+
+/** isaiah -> ProphecyIsaiah, first_kings -> Prophecy1Kings: the flag readings.hymn_texts's introductions are conditioned on, spelled like the epistles' PaulineEpistle1Corinthians. */
+function prophecyBookFlag(bookKey) {
+  if (!bookKey) return null;
+  const suffix = String(bookKey)
+    .split("_")
+    .map((part) => BOOK_KEY_NUMERAL_WORDS[part] || part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+  return `Prophecy${suffix}`;
+}
+
+function readingCodeNumber(code) {
+  const match = /(\d+)$/.exec(String(code || ""));
+  return match ? Number(match[1]) : 0;
+}
+
+/** "Prophecy" when it is the only one read; otherwise "Prophecy 2" — numbered in reading order. */
+function prophecyTitle(index, total) {
+  if (total <= 1) return PROPHECY_TITLE;
+  return {
+    english: `${PROPHECY_TITLE.english} ${index + 1}`,
+    arabic: formatArabicDigits(`${PROPHECY_TITLE.arabic} ${index + 1}`),
+  };
+}
+
+/** Reading rules as prophecies to frame: each with its resolved verses (null for one with no reference to read) and its book. */
+async function resolveProphecyEntries(rows) {
+  return Promise.all(
+    rows.map(async (row) => {
+      if (!row.reading_reference) return { row, reading: null, bookKey: row.book_key || null };
+      const reading = row.resolved_verses
+        ? row
+        : { ...row, resolved_verses: (await resolveBibleReadingReference(row.reading_reference)).resolvedSegments };
+      return { row, reading, bookKey: row.book_key || reading.resolved_verses?.[0]?.book_key || null };
+    }),
+  );
+}
+
+/** The prophecies read where these flags place the document, in reading order. */
+async function getProphecyEntries(flags, isoDate) {
+  const hour = paschaHourOf(flags);
+  const rows = hour
+    ? (await getPaschaHourReadings(hour)).filter((row) => row.reading_type === "Prophecy")
+    : isoDate
+      ? (await getReadingsForDate(isoDate))
+          .filter((row) => row.service === "Matins" && row.reading_type === "Prophecy")
+          .sort((left, right) => readingCodeNumber(left.reading_code) - readingCodeNumber(right.reading_code))
+      : [];
+  return resolveProphecyEntries(rows);
+}
+
+/**
+ * One prophecy, its frame hydrated around it and gathered into one section —
+ * "Prophecy 2", its introduction, the citation, the reading, the conclusion
+ * — so the content selector lists it as one stop, "Prophecy 2 (Isaiah
+ * 1:2-18)", that opens on its introduction. Null when there is nothing to
+ * read (no reference, or no Coptic for the Coptic frame).
+ */
+async function buildProphecySection(entry, index, total, { coptic, flags, depth, isoDate, id, frameRows }) {
+  if (!entry?.reading || !frameRows) return null;
+  const bookFlag = prophecyBookFlag(entry.bookKey);
+  const frameFlags = { ...flags, [CURRENT_PROPHECY]: entry.reading };
+  if (bookFlag) frameFlags[bookFlag] = true;
+  let nested;
+  try {
+    nested = await hydrateWithFlags("readings", prophecyFrameTable(coptic), frameFlags, depth + 1, isoDate, null, frameRows);
+  } catch (error) {
+    console.warn(`Failed to load prophecy ${entry.row?.reading_code || index + 1}: ${error?.message || error}`);
+    return null;
+  }
+  const hasReading = nested.some((nestedSection) => (nestedSection.verses || []).some((verse) => verse.type === "readingReference"));
+  if (!hasReading) return null;
+  const merged = mergeIntoOneInlineSection(
+    { id, title: prophecyTitle(index, total), titlePrayerType: null, collapsible: false, defaultCollapsed: false },
+    nested,
+  );
+  return { ...merged, hymn_key: "PROPHECY", hymnKey: "PROPHECY" };
+}
+
+function prophecyFrameTable(coptic) {
+  return coptic ? "coptic_prophecy" : "prophecy";
+}
+
+/**
+ * The frame's rows, fetched once for all of a document's prophecies rather
+ * than once per prophecy (a Lenten Matins can read twenty-two). Null when
+ * the frame can't be read — like any nested table that fails, the
+ * prophecies then drop out rather than taking the whole document down.
+ */
+async function fetchProphecyFrameRows(coptic) {
+  try {
+    return await fetchServiceRows("readings", prophecyFrameTable(coptic));
+  } catch (error) {
+    console.warn(`Failed to load nested content readings.${prophecyFrameTable(coptic)}: ${error?.message || error}`);
+    return null;
+  }
+}
+
+/** Every prophecy read here, English/Arabic (PROPHECY) or Coptic (COPTIC_PROPHECY's subdocument). */
+async function resolveProphecySections(section, flags, depth, isoDate, coptic) {
+  const entries = await getProphecyEntries(flags, isoDate);
+  if (!entries.some((entry) => entry.reading)) return [];
+  const frameRows = await fetchProphecyFrameRows(coptic);
+  const sections = [];
+  for (const [index, entry] of entries.entries()) {
+    const prophecy = await buildProphecySection(entry, index, entries.length, {
+      coptic,
+      flags,
+      depth,
+      isoDate,
+      id: `${section.id}-prophecy-${index + 1}`,
+      frameRows,
+    });
+    if (prophecy) sections.push({ ...prophecy, bishopOnly: section.bishopOnly, priestOnly: section.priestOnly });
   }
   return sections;
 }
@@ -1517,8 +1687,10 @@ function dropDuplicateSaintHymns(sections) {
   });
 }
 
-async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, sectionFlagsForRow = null) {
-  const rawRows = await fetchServiceRows(schema, table);
+async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, sectionFlagsForRow = null, preloadedRows = null) {
+  // preloadedRows: the same table's rows already fetched by a caller that
+  // hydrates it many times over (each prophecy in its frame).
+  const rawRows = preloadedRows || (await fetchServiceRows(schema, table));
   const sections = assembleServiceSections(rawRows);
 
   const visibleSections = dropDuplicateSaintHymns(
@@ -1566,6 +1738,28 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
     if (section.isSubdocumentPlaceholder) {
       const target = SUBDOCUMENT_MAP[section.hymn_key];
       if (!target) {
+        // The Coptic prophecies: every prophecy read here that there is Coptic
+        // for, framed in readings.coptic_prophecy, as one subdocument placed
+        // ahead of the first English/Arabic prophecy.
+        if (section.hymn_key === "COPTIC_PROPHECY") {
+          const subdocumentSections = depth >= 3 ? [] : await resolveProphecySections(section, flags, depth, isoDate, true);
+          if (subdocumentSections.length) {
+            hydrated.push({
+              id: section.id,
+              title: { english: section.title.english || humanizeSentinelKey(section.hymn_key), arabic: section.title.arabic },
+              verses: [],
+              isSubdocumentButton: true,
+              subdocumentKey: section.hymn_key,
+              subdocumentTarget: null,
+              subdocumentSections,
+              alternateEvery: null,
+              forceWhiteVerses: true,
+              bishopOnly: section.bishopOnly,
+              priestOnly: section.priestOnly,
+            });
+          }
+          continue;
+        }
         if (section.hymn_key === "SYNAXARIUM" && isoDate) {
           const synaxariumSections = await resolveSynaxariumSections(isoDate);
           const label = section.title?.english || "Synaxarium";
@@ -1585,7 +1779,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
           continue;
         }
         if (isReadingSentinel(section.hymn_key) && isoDate) {
-          const readingSection = await resolveReadingSentinelSection(section, isoDate);
+          const readingSection = await resolveReadingSentinelSection(section, isoDate, flags);
           if (readingSection) {
             hydrated.push({
               ...readingSection,
@@ -1652,9 +1846,15 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         continue;
       }
 
+      // Each prophecy read here, in English/Arabic, as its own section.
+      if (section.hymn_key === "PROPHECY") {
+        if (depth < 3) hydrated.push(...(await resolveProphecySections(section, flags, depth, isoDate, false)));
+        continue;
+      }
+
       // A Holy Week hour's readings, picked by the hour its flags describe.
       if (PASCHA_READING_SENTINELS.has(section.hymn_key)) {
-        hydrated.push(...(await resolvePaschaReadingSections(section, flags)));
+        hydrated.push(...(await resolvePaschaReadingSections(section, flags, depth, isoDate)));
         continue;
       }
 
@@ -1664,7 +1864,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       // schema.table lookup — same live resolution as the Subdocument branch
       // above, just producing an inline section instead of a button.
       if (isReadingSentinel(section.hymn_key) && isoDate) {
-        const readingSection = await resolveReadingSentinelSection(section, isoDate);
+        const readingSection = await resolveReadingSentinelSection(section, isoDate, flags);
         if (readingSection) hydrated.push(readingSection);
         continue;
       }
@@ -1737,7 +1937,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         // carries that), so a second, nested collapse just for this splice
         // would wrongly split it off as if it were its own separate hymn.
         if (isReadingSentinel(verse.inlineHymnKey) && isoDate) {
-          const spliced = await resolveReadingSentinelSplice(verse.inlineHymnKey, isoDate, false, null, `${section.id}-inline-${verse.inlineHymnKey}`);
+          const spliced = await resolveReadingSentinelSplice(verse.inlineHymnKey, isoDate, false, null, `${section.id}-inline-${verse.inlineHymnKey}`, flags);
           if (spliced) verses.push(...spliced.verses);
           continue;
         }
@@ -2127,6 +2327,7 @@ async function resolveInlineHymnVerses(
           row.inline_hymn_title_shown,
           row.inline_hymn_minimization,
           `${hymnKey}-${row.line_order}-${row.inline_hymn_key}`,
+          flags,
         );
         if (spliced?.kind === "section") {
           flushCurrentVerses();

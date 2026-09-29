@@ -9,6 +9,8 @@ import { DocumentSection } from './documentHtml';
  */
 
 const READING_REFERENCE_SELECTOR_TITLES = new Set(['pauline epistle', 'catholic epistle', 'praxis']);
+// A prophecy is "Prophecy", or "Prophecy 2" when several are read (see prophecyTitle in hymnLibrary.js).
+const PROPHECY_SELECTOR_TITLE_PATTERN = /^prophecy( \d+)?$/;
 const READING_REFERENCE_SELECTOR_KEY_PATTERN = /^(PAULINE_EPISTLE|CATHOLIC_EPISTLE|PRAXIS)(_|$)/;
 const READING_REFERENCE_SELECTOR_KEY_TITLES: Record<string, { english: string; arabic: string }> = {
   PAULINE_EPISTLE: { english: 'Pauline Epistle', arabic: 'البولس' },
@@ -27,7 +29,9 @@ function normalizeSelectorTitle(value?: string) {
 function shouldAppendReadingReference(section: DocumentSection, readingReference?: { english?: string; arabic?: string }) {
   if (!readingReference?.english && !readingReference?.arabic) return false;
   const key = String(section.hymnKey || (section as DocumentSection & { hymn_key?: string }).hymn_key || '').toUpperCase();
-  return READING_REFERENCE_SELECTOR_TITLES.has(normalizeSelectorTitle(section.title?.english)) ||
+  const title = normalizeSelectorTitle(section.title?.english);
+  return READING_REFERENCE_SELECTOR_TITLES.has(title) ||
+    PROPHECY_SELECTOR_TITLE_PATTERN.test(title) ||
     READING_REFERENCE_SELECTOR_KEY_PATTERN.test(key);
 }
 

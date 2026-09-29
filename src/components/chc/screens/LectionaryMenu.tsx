@@ -17,12 +17,12 @@ import { getServiceReadingCitations, type LectionaryReadingKind, type Lectionary
 const MAX_FONT_SCALE = 1.25;
 
 type Gradient = readonly [string, string, string];
-type ReadingLine = { kind: LectionaryReadingKind; value: string | null };
+type ReadingLine = { key: string; label: { english: string; arabic: string }; value: string | null; fullRow?: boolean };
 
 const READING_LABELS: Record<LectionaryReadingKind, { english: string; arabic: string }> = {
   Psalm: { english: 'Psalm', arabic: 'المزمور' },
   Gospel: { english: 'Gospel', arabic: 'الإنجيل' },
-  Prophecy: { english: 'Prophecy', arabic: 'النبوات' },
+  Prophecy: { english: 'Prophecy', arabic: 'النبوة' },
   Pauline: { english: 'Pauline', arabic: 'البولس' },
   Catholic: { english: 'Catholic', arabic: 'الكاثوليكون' },
   Praxis: { english: 'Acts', arabic: 'الإبركسيس' },
@@ -38,6 +38,12 @@ const EXPECTED: Record<LectionaryService, LectionaryReadingKind[]> = {
 /** In the Liturgy's two columns the Acts takes a row of its own, between the two epistles and the Psalm with its Gospel. */
 const FULL_ROW: LectionaryReadingKind[] = ['Praxis'];
 
+/** "Prophecy 2" / "النبوة ٢" when several are read. */
+function numberedLabel(label: { english: string; arabic: string }, number: number | null) {
+  if (number === null) return label;
+  return { english: `${label.english} ${number}`, arabic: toEasternArabicDigits(`${label.arabic} ${number}`) };
+}
+
 const SERVICES: Record<LectionaryService, { id: string; gradient: Gradient; accent: string; icon: IconName }> = {
   Vespers: { id: 'vespers', gradient: ['#1A5570', '#0C2E40', '#061821'], accent: '#B5E3EF', icon: 'sunset' },
   Matins: { id: 'matins', gradient: ['#12708A', '#0A4254', '#05212A'], accent: '#C8F0F7', icon: 'sunrise' },
@@ -48,7 +54,7 @@ type DayReadings = { key: string; citations: Record<LectionaryService, ReadingCi
 
 /**
  * The Lectionary: the day's readings service by service. Vespers and Matins
- * each read a Psalm and a Gospel (with the Prophecies on Lenten mornings);
+ * each read a Psalm and a Gospel (a Lenten Matins its prophecies first);
  * the Liturgy of the Word reads the Pauline, Catholic, Acts, Psalm and
  * Gospel — every card lists what its service reads today. Then the books
  * read alongside them: the Antiphonary and the Sermon Planner.
@@ -78,16 +84,28 @@ export default function LectionaryMenu() {
 
   const today = day?.key === dateKey ? day : null;
 
+  const cite = (citation: ReadingCitation) => (arabic ? toEasternArabicDigits(citation.arabic) : citation.english);
+  const prophecies = (today?.citations.Matins ?? []).filter((citation) => citation.kind === 'Prophecy');
+
   /** The service's readings in reading order, falling back to its outline for any not (yet) known. */
-  const linesFor = (service: LectionaryService): ReadingLine[] => {
+  const linesFor = (service: LectionaryService, columns: 1 | 2): ReadingLine[] => {
     const citations = today?.citations[service] ?? [];
-    const kinds = [...EXPECTED[service]];
-    // Lenten mornings add the Prophecies, after the Gospel as the readings document orders them.
-    if (citations.some((citation) => citation.kind === 'Prophecy')) kinds.push('Prophecy');
-    return kinds.map((kind) => {
-      const found = citations.find((citation) => citation.kind === kind);
-      return { kind, value: found ? (arabic ? toEasternArabicDigits(found.arabic) : found.english) : null };
-    });
+    // A Lenten Matins reads its prophecies first, each numbered when there are
+    // several; in two columns an odd last one takes its own row, so the Psalm
+    // and Gospel stay side by side.
+    const prophecyLines: ReadingLine[] = (service === 'Matins' ? prophecies : []).map((citation, index, all) => ({
+      key: `Prophecy-${index + 1}`,
+      label: numberedLabel(READING_LABELS.Prophecy, all.length > 1 ? index + 1 : null),
+      value: cite(citation),
+      fullRow: columns === 2 && all.length % 2 === 1 && index === all.length - 1,
+    }));
+    return [
+      ...prophecyLines,
+      ...EXPECTED[service].map((kind) => {
+        const found = citations.find((citation) => citation.kind === kind);
+        return { key: kind, label: READING_LABELS[kind], value: found ? cite(found) : null, fullRow: FULL_ROW.includes(kind) };
+      }),
+    ];
   };
 
   const card = (service: LectionaryService, columns: 1 | 2) => {
@@ -102,7 +120,7 @@ export default function LectionaryMenu() {
         gradient={look.gradient}
         accent={look.accent}
         icon={look.icon}
-        lines={linesFor(service)}
+        lines={linesFor(service, columns)}
         columns={columns}
         arabic={arabic}
         bookmarked={bookmarked(def)}
@@ -123,10 +141,18 @@ export default function LectionaryMenu() {
       arabic={arabic}
       backHref="/books"
     >
-      <TileRow arabic={arabic}>
-        {card('Vespers', 1)}
-        {card('Matins', 1)}
-      </TileRow>
+      {prophecies.length ? (
+        // A Lenten morning's list of prophecies needs the full width.
+        <>
+          {card('Vespers', 2)}
+          {card('Matins', 2)}
+        </>
+      ) : (
+        <TileRow arabic={arabic}>
+          {card('Vespers', 1)}
+          {card('Matins', 1)}
+        </TileRow>
+      )}
       {card('Liturgy', 2)}
 
       <MenuSectionLabel text={arabic ? 'مع القراءات' : 'With the readings'} arabic={arabic} accent={theme.accent} />
@@ -188,9 +214,9 @@ function ServiceReadingsCard({ title, gradient, accent, icon, lines, columns, ar
       <View style={[styles.rule, { backgroundColor: accent }]} />
       <View style={[styles.lines, arabic && styles.rowReverse]}>
         {lines.map((line) => (
-          <View key={line.kind} style={[styles.line, columns === 2 && !FULL_ROW.includes(line.kind) ? styles.halfLine : styles.fullLine]}>
+          <View key={line.key} style={[styles.line, columns === 2 && !line.fullRow ? styles.halfLine : styles.fullLine]}>
             <Text style={[styles.label, { color: accent }, arabic && styles.arabicLabel]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-              {arabic ? READING_LABELS[line.kind].arabic : READING_LABELS[line.kind].english.toUpperCase()}
+              {arabic ? line.label.arabic : line.label.english.toUpperCase()}
             </Text>
             <Text style={[styles.value, !line.value && styles.valueMissing, arabic && styles.arabicText]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>
               {line.value ?? '—'}

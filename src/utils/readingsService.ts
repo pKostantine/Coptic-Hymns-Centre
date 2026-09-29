@@ -87,7 +87,7 @@ async function getCopticDateInfo(isoDate: string): Promise<CopticDateInfo> {
   };
 }
 
-async function getSeasonRange(isoDate: string, activeSeason: 'Great Fast' | 'Holy 50 Days'): Promise<{ startDate: string; endDate: string } | null> {
+async function getSeasonRange(isoDate: string, activeSeason: 'Holy 50 Days'): Promise<{ startDate: string; endDate: string } | null> {
   const { data, error } = await supabase
     .schema('calendar')
     .from('season_ranges')
@@ -116,12 +116,23 @@ function nextMonday(isoDate: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-async function getLentWeek(isoDate: string, activeFlags: Set<string>): Promise<number | null> {
-  if (!activeFlags.has('Lent')) return null;
-  const range = await getSeasonRange(isoDate, 'Great Fast');
-  if (!range) return null;
-  const lentWeek1Monday = nextMonday(range.startDate);
-  if (isoDate < lentWeek1Monday) return null;
+/** Lent's seven weeks of readings run from its first Monday through Palm Sunday (start + 48), past season_ranges' own end (Lazarus Saturday and Palm Sunday fall in Holy Pascha's range) — the same window public.get_calendar_readings uses. */
+const LENT_READINGS_SPAN_DAYS = 48;
+
+async function getLentWeek(isoDate: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .schema('calendar')
+    .from('season_ranges')
+    .select('start_date')
+    .eq('active_season', 'Lent')
+    .lte('start_date', isoDate)
+    .order('start_date', { ascending: false })
+    .limit(1);
+  if (error) throw new Error(`Unable to load Lent's dates: ${error.message}`);
+  const startDate = (data as { start_date: string }[] | null)?.[0]?.start_date;
+  if (!startDate) return null;
+  const lentWeek1Monday = nextMonday(startDate);
+  if (isoDate < lentWeek1Monday || daysBetween(startDate, isoDate) > LENT_READINGS_SPAN_DAYS) return null;
   return Math.floor(daysBetween(lentWeek1Monday, isoDate) / 7) + 1;
 }
 
@@ -157,11 +168,11 @@ async function queryReadingRules(filters: Record<string, string | number>): Prom
   return (data || []) as unknown as ReadingRule[];
 }
 
-/** Highest-priority rule per (service, reading_type) within a single already-chosen tier — a defensive dedupe in case a tier's query ever returns more than one row for the same reading, never a cross-tier comparison. */
+/** Highest-priority rule per (service, reading_type, reading_code) within a single already-chosen tier — a defensive dedupe in case a tier's query ever returns more than one row for the same reading, never a cross-tier comparison. The code keeps a Lenten Matins' several prophecies (prophecy_1 … prophecy_n) apart. */
 function pickHighestPriorityPerServiceType(rules: ReadingRule[]): ReadingRule[] {
   const resolved = new Map<string, ReadingRule>();
   for (const rule of rules) {
-    const key = `${rule.service}|${rule.reading_type}`;
+    const key = `${rule.service}|${rule.reading_type}|${rule.reading_code}`;
     const existing = resolved.get(key);
     if (!existing || rule.priority > existing.priority) {
       resolved.set(key, rule);
@@ -193,7 +204,7 @@ function pickHighestPriorityPerServiceType(rules: ReadingRule[]): ReadingRule[] 
 async function resolveReadingRules(isoDate: string, activeFlags: Set<string>): Promise<ReadingRule[]> {
   const copticDate = await getCopticDateInfo(isoDate);
   const [lentWeek, pentecostWeek] = await Promise.all([
-    getLentWeek(isoDate, activeFlags),
+    getLentWeek(isoDate),
     getPentecostWeek(isoDate, activeFlags),
   ]);
 
@@ -818,10 +829,12 @@ const SERVICE_READINGS: Record<LectionaryService, { service: string; readingType
     { service: 'Vespers', readingType: 'Psalm', kind: 'Psalm' },
     { service: 'Vespers', readingType: 'Gospel', kind: 'Gospel' },
   ],
+  // A Lenten morning's prophecies come first, ahead of the Psalm and Gospel —
+  // as Raising of Incense and the Lectionary's Matins read them.
   Matins: [
+    { service: 'Matins', readingType: 'Prophecy', kind: 'Prophecy' },
     { service: 'Matins', readingType: 'Psalm', kind: 'Psalm' },
     { service: 'Matins', readingType: 'Gospel', kind: 'Gospel' },
-    { service: 'Matins', readingType: 'Prophecy', kind: 'Prophecy' },
   ],
   Liturgy: [
     { service: 'Pauline', readingType: 'Pauline Epistle', kind: 'Pauline' },
@@ -848,21 +861,22 @@ async function citeReadingRule(rule: ReadingRule, kind: LectionaryReadingKind): 
  * in reading order — the Lectionary menu's preview of what each service
  * reads. A reading the day doesn't have (a Prophecy outside Lent) is simply
  * absent; one whose reference can't be cited is skipped rather than failing
- * the rest.
+ * the rest. A Lenten Matins cites each of its prophecies, in order.
  */
 export async function getServiceReadingCitations(date: Date): Promise<Record<LectionaryService, ReadingCitation[]>> {
   const isoDate = toIsoDateString(date);
   const activeFlags = await getActiveFlags(isoDate);
   const rules = await resolveReadingRules(isoDate, activeFlags);
-  const byKey = new Map(rules.map((rule) => [`${rule.service}|${rule.reading_type}`, rule]));
+  const readingCodeNumber = (code: string) => Number(/(\d+)$/.exec(code || '')?.[1] || 0);
 
   const citeService = async (service: LectionaryService) => {
     const citations = await Promise.all(
-      SERVICE_READINGS[service].map(async ({ service: ruleService, readingType, kind }) => {
-        const rule = byKey.get(`${ruleService}|${readingType}`);
-        if (!rule?.reading_reference) return null;
-        return citeReadingRule(rule, kind).catch(() => null);
-      }),
+      SERVICE_READINGS[service].flatMap(({ service: ruleService, readingType, kind }) =>
+        rules
+          .filter((rule) => rule.service === ruleService && rule.reading_type === readingType && rule.reading_reference)
+          .sort((left, right) => readingCodeNumber(left.reading_code) - readingCodeNumber(right.reading_code))
+          .map((rule) => citeReadingRule(rule, kind).catch(() => null)),
+      ),
     );
     return citations.filter((citation): citation is ReadingCitation => citation !== null);
   };
