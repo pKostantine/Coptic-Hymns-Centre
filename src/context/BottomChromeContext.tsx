@@ -15,6 +15,13 @@ interface BottomChromeContextValue {
    * its own over the app's — so one closing must not clear another's.
    */
   reportNowPlayingInset: (id: string, inset: number | null) => void;
+  /**
+   * Whether the reader has hidden the now-playing bar down to its button.
+   * Shared by every bar, so hiding it once hides it everywhere — a
+   * subdocument's own bar included.
+   */
+  nowPlayingCollapsed: boolean;
+  setNowPlayingCollapsed: (collapsed: boolean) => void;
 }
 
 const BottomChromeContext = createContext<BottomChromeContextValue>({
@@ -22,6 +29,8 @@ const BottomChromeContext = createContext<BottomChromeContextValue>({
   nowPlayingInset: 0,
   reportTabBar: () => undefined,
   reportNowPlayingInset: () => undefined,
+  nowPlayingCollapsed: false,
+  setNowPlayingCollapsed: () => undefined,
 });
 
 /**
@@ -33,6 +42,7 @@ const BottomChromeContext = createContext<BottomChromeContextValue>({
 export function BottomChromeProvider({ children }: { children: ReactNode }) {
   const [insets, setInsets] = useState<Record<string, number>>({});
   const [nowPlayingInsets, setNowPlayingInsets] = useState<Record<string, number>>({});
+  const [nowPlayingCollapsed, setNowPlayingCollapsed] = useState(false);
 
   const reportTabBar = useCallback((id: string, inset: number | null) => {
     setInsets((current) => {
@@ -67,7 +77,9 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
     nowPlayingInset,
     reportTabBar,
     reportNowPlayingInset,
-  }), [insets, nowPlayingInset, reportTabBar, reportNowPlayingInset]);
+    nowPlayingCollapsed,
+    setNowPlayingCollapsed,
+  }), [insets, nowPlayingInset, reportTabBar, reportNowPlayingInset, nowPlayingCollapsed]);
 
   return <BottomChromeContext.Provider value={value}>{children}</BottomChromeContext.Provider>;
 }

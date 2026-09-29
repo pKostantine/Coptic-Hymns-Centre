@@ -52,12 +52,18 @@ export default function GlobalNowPlayingOverlay() {
   const { user } = useAuth();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { tabBarInset, reportNowPlayingInset } = useBottomChrome();
+  // Hidden or shown is one app-wide choice, not each bar's own: a subdocument
+  // mounts a bar of its own, and it must open the way the reader left it.
+  const {
+    tabBarInset,
+    reportNowPlayingInset,
+    nowPlayingCollapsed: isCollapsed,
+    setNowPlayingCollapsed: setIsCollapsed,
+  } = useBottomChrome();
   const overlayId = useId();
   const { preferences } = useReadingPreferences();
   const music = useMusicPlayer();
   const learning = useLearningPlayer();
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedHeight, setExpandedHeight] = useState(60);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [miniLiked, setMiniLiked] = useState(false);

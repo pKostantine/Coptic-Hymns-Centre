@@ -40,6 +40,17 @@ test('collapsed Now Playing control cannot create a full-width slideshow mask', 
   }
 });
 
+// A subdocument mounts its own bar over the app's; hiding either must hide
+// both, so the hidden state lives in the shared context, not in each bar.
+test('hiding Now Playing is one app-wide state shared by every bar', () => {
+  const overlay = fs.readFileSync('src/components/playback/GlobalNowPlayingOverlay.tsx', 'utf8');
+  const chrome = fs.readFileSync('src/context/BottomChromeContext.tsx', 'utf8');
+
+  assert.doesNotMatch(overlay, /\[isCollapsed, setIsCollapsed\]\s*=\s*useState/);
+  assert.match(overlay, /nowPlayingCollapsed: isCollapsed,\s*setNowPlayingCollapsed: setIsCollapsed,\s*\} = useBottomChrome\(\)/);
+  assert.match(chrome, /const \[nowPlayingCollapsed, setNowPlayingCollapsed\] = useState\(false\)/);
+});
+
 // Mobile Safari/Chrome can inflate text when the containing column becomes
 // wider in landscape even with an unchanged CSS font-size. Both production
 // HTML entrypoints must opt only the slideshow subtree out of that behavior.
