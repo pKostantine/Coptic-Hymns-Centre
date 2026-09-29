@@ -184,3 +184,109 @@ test('a reload or a jump never lets the page\'s first "at the top" report replac
   const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
   assert.match(modal, /function jumpToSection\(id: string\) \{[\s\S]*?setCurrentSectionId\(id\);/);
 });
+
+// The document page's own jump hold (documentHtml.ts), run against a minimal
+// window. On the phone the native scroll view can put back its own offset
+// after a jump has landed -- the subdocument "went there and shot back to the
+// top" -- so a jump the app asked for is held briefly against anything that
+// moves the page, but never against the reader.
+function loadJumpHold() {
+  const source = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
+  const start = source.indexOf('      function currentScrollY() {');
+  const end = source.indexOf('      window.scrollToTune = function');
+  assert.ok(start > 0 && end > start, 'jump hold script not found');
+  const script = source.slice(start, end);
+  assert.doesNotMatch(script, /\$\{/, 'the extracted script must not depend on template values');
+
+  const listeners = {};
+  const sectionTops = { a: 0, b: 2000, c: 4000 };
+  const win = {
+    pageYOffset: 0,
+    innerHeight: 800,
+    scrollTo(xOrOptions, y) {
+      const top = typeof xOrOptions === 'object' ? xOrOptions.top : y;
+      win.pageYOffset = top;
+    },
+    addEventListener(type, handler) {
+      (listeners[type] ||= []).push(handler);
+    },
+  };
+  const doc = {
+    documentElement: { scrollHeight: 6000, scrollTop: 0 },
+    getElementById(id) {
+      if (!(id in sectionTops)) return null;
+      return {
+        isConnected: true,
+        getBoundingClientRect: () => ({
+          top: sectionTops[id] - win.pageYOffset,
+          bottom: sectionTops[id] + 1500 - win.pageYOffset,
+        }),
+      };
+    },
+    querySelector: () => null,
+  };
+  new Function('window', 'document', script)(win, doc);
+  const fire = (type) => (listeners[type] || []).forEach((handler) => handler({ type }));
+  // Something outside the page moving it, as the native scroll view does.
+  const moveFromOutside = (top) => {
+    win.pageYOffset = top;
+    fire('scroll');
+  };
+  return { win, fire, moveFromOutside };
+}
+
+test('a jump holds against the page being moved back to the top, but never against the reader', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { win, fire, moveFromOutside } = loadJumpHold();
+
+  assert.equal(win.scrollToSection('b'), true);
+  assert.equal(win.pageYOffset, 1999);
+  moveFromOutside(0);
+  assert.equal(win.pageYOffset, 1999, 'a reset right after the jump is undone');
+
+  // Undone on a schedule too, for a reset that sends no scroll event.
+  win.pageYOffset = 0;
+  t.mock.timers.tick(700);
+  assert.equal(win.pageYOffset, 1999);
+
+  // The reader's own touch ends the hold at once.
+  fire('touchstart');
+  moveFromOutside(350);
+  assert.equal(win.pageYOffset, 350);
+
+  // And it lapses on its own: long after a jump, nothing is pulled back.
+  win.scrollToSection('c');
+  assert.equal(win.pageYOffset, 3999);
+  t.mock.timers.tick(3000);
+  moveFromOutside(10);
+  assert.equal(win.pageYOffset, 10);
+});
+
+test('a restore to a hymn\'s end and a verse jump are held the same way', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { win, moveFromOutside } = loadJumpHold();
+  // Restore candidates, as DocumentWebView's load handler sends them.
+  win.scrollToSection([{ sectionId: 'missing', edge: 'start' }, { sectionId: 'b', edge: 'end' }]);
+  assert.equal(win.pageYOffset, 2000 + 1500 - 800 + 16);
+  moveFromOutside(0);
+  assert.equal(win.pageYOffset, 2716);
+  // A smooth scroll can't be held, and ends an earlier hold rather than
+  // being pulled back to it.
+  win.releaseHeldJump();
+  moveFromOutside(5);
+  assert.equal(win.pageYOffset, 5);
+});
+
+test('a subdocument (and its Settings/Calendar) can be swiped out from a landscape phone\'s notch inset', () => {
+  // The edge swipe starts in the side safe-area padding in landscape, which
+  // the PanResponder was never offered; raw touches there are read instead,
+  // and the PanResponder leaves those starts alone so nothing fires twice.
+  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  assert.match(modal, /function useInsetEdgeSwipe\(/);
+  assert.match(modal, /onTouchStart: \(event: GestureResponderEvent\) => \{[\s\S]*?if \(!startsInInset\(pageX\)\) return;/);
+  assert.match(modal, /if \(start\.edge === 'left' && dx > 60\) onSwipeFromLeft\(\);/);
+  assert.match(modal, /isMobileDocument \? insetEdgeSwipe\.handlers/);
+  assert.match(modal, /isMobileDocument \? overlayInsetEdgeSwipe\.handlers/);
+  assert.match(modal, /isStylusGestureEvent\(_\) \|\| startsInInset\(gestureState\.x0\)\) return false;/);
+  assert.match(modal, /isStylusGestureEvent\(event\) \|\| startsInInset\(gestureState\.x0\)\) return;/);
+});

@@ -565,6 +565,61 @@ export function buildDocumentHtml(
         setTimeout(reportContentHeight, 120);
       });
       window.addEventListener('resize', reportContentHeight);
+      function currentScrollY() {
+        return window.pageYOffset || document.documentElement.scrollTop || 0;
+      }
+      function clampScrollTop(top) {
+        var maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        return Math.min(Math.max(top, 0), maxScroll);
+      }
+      // A jump the app asks for (a pill, the content list, a restore after a
+      // reload) is held for a moment. In a WKWebView the page doesn't own its
+      // scrolling -- the app's native scroll view does, and it can put back
+      // its own position after the page has moved: an animation still
+      // running, or a content height it hasn't caught up with yet. On the
+      // phone that is a jump that lands and then shoots back to the top. So
+      // whatever moves the page off a jump in that moment, the jump is put
+      // back. Anything the reader does themselves ends the hold at once.
+      var heldJump = null;
+      function releaseHeldJump() {
+        heldJump = null;
+      }
+      function enforceHeldJump() {
+        if (!heldJump) return;
+        if (Date.now() > heldJump.until) {
+          heldJump = null;
+          return;
+        }
+        var top = heldJump.resolveTop();
+        if (top === null) {
+          heldJump = null;
+          return;
+        }
+        if (Math.abs(currentScrollY() - top) > 2) window.scrollTo(0, top);
+      }
+      function holdJump(resolveTop) {
+        heldJump = { resolveTop: resolveTop, until: Date.now() + 2500 };
+        // Checked on a schedule as well as on scroll: a scroll view that
+        // quietly keeps its own offset sends no scroll event to answer.
+        [0, 60, 160, 320, 640, 1000, 1500, 2000, 2500].forEach(function (delay) {
+          setTimeout(enforceHeldJump, delay);
+        });
+      }
+      window.releaseHeldJump = releaseHeldJump;
+      window.addEventListener('scroll', enforceHeldJump, { passive: true });
+      ['touchstart', 'mousedown', 'wheel', 'keydown'].forEach(function (type) {
+        window.addEventListener(type, releaseHeldJump, { passive: true, capture: true });
+      });
+      function sectionScrollTop(element, targetEdge) {
+        if (!element.isConnected) return null;
+        // If a calendar/content change removed the original hymn, show
+        // the END of its closest surviving predecessor, not its title.
+        // For a surviving hymn every settings change uses its START.
+        var target = targetEdge === 'end'
+          ? element.getBoundingClientRect().bottom + currentScrollY() - window.innerHeight + 16
+          : element.getBoundingClientRect().top + currentScrollY() - 1;
+        return clampScrollTop(target);
+      }
       window.scrollToSection = function (sectionId, edge) {
         var candidates = Array.isArray(sectionId) ? sectionId : [sectionId];
         for (var i = 0; i < candidates.length; i += 1) {
@@ -573,15 +628,8 @@ export function buildDocumentHtml(
           var targetEdge = typeof candidate === 'string' ? edge : candidate && candidate.edge;
           var element = id && document.getElementById(id);
           if (element) {
-            var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
-            // If a calendar/content change removed the original hymn, show
-            // the END of its closest surviving predecessor, not its title.
-            // For a surviving hymn every settings change uses its START.
-            var target = targetEdge === 'end'
-              ? element.getBoundingClientRect().bottom + scrollY - window.innerHeight + 16
-              : element.getBoundingClientRect().top + scrollY - 1;
-            var maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-            window.scrollTo({ top: Math.min(Math.max(target, 0), maxScroll), behavior: 'auto' });
+            window.scrollTo({ top: sectionScrollTop(element, targetEdge), behavior: 'auto' });
+            holdJump(function () { return sectionScrollTop(element, targetEdge); });
             return true;
           }
         }
@@ -590,13 +638,19 @@ export function buildDocumentHtml(
       window.scrollToVerse = function (verseId) {
         var element = document.querySelector('[data-verse-id="' + verseId + '"]');
         if (!element) return false;
-        var top = element.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0);
-        window.scrollTo({ top: Math.max(top - 1, 0), behavior: 'auto' });
+        var verseTop = function () {
+          return element.isConnected ? clampScrollTop(element.getBoundingClientRect().top + currentScrollY() - 1) : null;
+        };
+        window.scrollTo({ top: verseTop(), behavior: 'auto' });
+        holdJump(verseTop);
         return true;
       };
       window.scrollToTune = function (tune) {
         var element = document.querySelector('[data-tune="' + tune + '"]');
         if (element) {
+          // A smooth scroll moves through every position on its way, so it
+          // can't be held; it only has to stop an earlier hold pulling back.
+          releaseHeldJump();
           element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       };

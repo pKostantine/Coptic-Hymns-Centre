@@ -1,7 +1,7 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type GestureResponderEvent, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
@@ -19,6 +19,7 @@ import CalendarScreen from './CalendarScreen';
 import SeasonSelectorScreen from './SeasonSelectorScreen';
 import SettingsScreen from './SettingsScreen';
 import { getCurrentAppLanguage } from '../../../utils/preferencesStorage';
+import { doxologyPillNames } from '../../../utils/doxologyPillNames';
 
 interface DocumentModalTarget {
   title: { english: string; arabic: string; french?: string };
@@ -67,6 +68,59 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
   const reference = section.verses.find((v) => v.type === 'readingReference');
   if (reference && getCurrentAppLanguage() === 'fr' && reference.french) return reference.french;
   return reference ? reference.english || reference.arabic || null : null;
+}
+
+/**
+ * The edge swipes, for a swipe that starts in the side safe-area inset.
+ *
+ * In landscape a phone insets a document from the notch on both sides, so a
+ * swipe from the screen edge starts in the SafeAreaView's padding, outside
+ * the document itself. The responder system never offered such a swipe to
+ * the PanResponder -- something else had already taken the touch -- so there
+ * was no way to swipe out. Raw touch events still reach the SafeAreaView, so
+ * the swipe is read from those instead. Nothing is claimed: a tap that starts
+ * in the inset (on the end of the Now Playing bar, say) still goes where it
+ * was going. In portrait there is no side inset, so nothing changes there.
+ *
+ * An Android Modal is a dialog that pads its content itself, so there the
+ * strip isn't the SafeAreaView's and this never sees it. Translucent bars
+ * would hand it over, but the dialog then draws dark status bar icons on the
+ * black page; a swipe starting just inside the text works on Android as is.
+ */
+function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwipeFromRight?: () => void) {
+  const { left: leftInset, right: rightInset } = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const startRef = useRef<{ x: number; y: number; edge: 'left' | 'right' } | null>(null);
+
+  const startsInInset = useCallback(
+    (x: number) => (leftInset > 0 && x < leftInset) || (rightInset > 0 && x > screenWidth - rightInset),
+    [leftInset, rightInset, screenWidth],
+  );
+  const touchPoint = (event: GestureResponderEvent) => event.nativeEvent.changedTouches?.[0] ?? event.nativeEvent;
+
+  const handlers = {
+    onTouchStart: (event: GestureResponderEvent) => {
+      startRef.current = null;
+      if (!enabled || isStylusGestureEvent(event) || event.nativeEvent.touches.length > 1) return;
+      const { pageX, pageY } = touchPoint(event);
+      if (!startsInInset(pageX)) return;
+      startRef.current = { x: pageX, y: pageY, edge: pageX < leftInset ? 'left' : 'right' };
+    },
+    onTouchEnd: (event: GestureResponderEvent) => {
+      const start = startRef.current;
+      startRef.current = null;
+      if (!start || !enabled) return;
+      const { pageX, pageY } = touchPoint(event);
+      const dx = pageX - start.x;
+      if (Math.abs(dx) <= Math.abs(pageY - start.y)) return;
+      if (start.edge === 'left' && dx > 60) onSwipeFromLeft();
+      else if (start.edge === 'right' && dx < -36) onSwipeFromRight?.();
+    },
+    onTouchCancel: () => {
+      startRef.current = null;
+    },
+  };
+  return { handlers, startsInInset };
 }
 
 /**
@@ -185,14 +239,23 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   // subdocument specifically, the untitled reading section also gets a pill
   // (via its own readingReference citation as a fallback label) — everywhere
   // else, an untitled section stays exactly that: not a navigable stop.
-  const sectionPills = useMemo(
-    () =>
-      (sections || [])
-        .filter((section) => !(section.bishopOnly && !preferences.bishopPresent) && !(section.priestOnly && preferences.bishopPresent))
-        .map((section) => ({ section, label: getPillLabel(section, isCopticReadingsSubdocument) }))
-        .filter((entry): entry is { section: DocumentSection; label: string } => Boolean(entry.label)),
-    [sections, isCopticReadingsSubdocument, preferences.bishopPresent],
-  );
+  // The Doxologies' pills go by short names (doxologyPillNames.ts); the
+  // content selector keeps the full titles.
+  const sectionPills = useMemo(() => {
+    const pills = (sections || [])
+      .filter((section) => !(section.bishopOnly && !preferences.bishopPresent) && !(section.priestOnly && preferences.bishopPresent))
+      .map((section) => ({ section, label: getPillLabel(section, isCopticReadingsSubdocument) }))
+      .filter((entry): entry is { section: DocumentSection; label: string } => Boolean(entry.label));
+    if (subdocumentKey !== 'DOXOLOGIES') return pills;
+    const shortNames = doxologyPillNames(
+      pills.map(({ section }) => ({ hymnKey: section.hymnKey, title: getSectionSelectorTitle(section) })),
+      preferences.appLanguage === 'fr',
+    );
+    return pills.map((pill, index) => {
+      const shortName = shortNames[index];
+      return shortName ? { ...pill, label: formatEnglishDisplayText(shortName) } : pill;
+    });
+  }, [sections, isCopticReadingsSubdocument, preferences.bishopPresent, preferences.appLanguage, subdocumentKey]);
 
   // Flipping Slideshow Mode swaps one renderer for the other (DocumentSurface
   // renders SlideshowContainer or DocumentWebView, never both), and neither
@@ -244,11 +307,15 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   // AFTER ancestor capture, so SafeAreaView wins the gesture before
   // NavigationOverlay can steal it. Disabled entirely while nestedModal is open
   // so swiping only dismisses the topmost level, not both at once.
+  // A swipe that starts in the side inset of a landscape phone is read by
+  // useInsetEdgeSwipe instead -- never by both.
+  const insetEdgeSwipe = useInsetEdgeSwipe(!isCovered, onClose, () => setSelectorOpen(true));
+  const { startsInInset } = insetEdgeSwipe;
   const swipeGesturePanResponder = useMemo(() => {
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
     return PanResponder.create({
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        if (isCovered || isStylusGestureEvent(_)) return false;
+        if (isCovered || isStylusGestureEvent(_) || startsInInset(gestureState.x0)) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal) return false;
         const isCloseSwipe = gestureState.x0 < 56 && gestureState.dx > 12;
@@ -258,7 +325,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         return isCloseSwipe || isSelectorSwipe;
       },
       onPanResponderRelease: (event, gestureState) => {
-        if (isCovered || isStylusGestureEvent(event)) return;
+        if (isCovered || isStylusGestureEvent(event) || startsInInset(gestureState.x0)) return;
         if (gestureState.x0 < 56 && gestureState.dx > 60) {
           onClose();
           return;
@@ -269,25 +336,29 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         }
       },
     });
-  }, [onClose, isCovered, screenWidth]);
+  }, [onClose, isCovered, screenWidth, startsInInset]);
 
   // Calendar and Settings open over this modal rather than as screens of
   // their own, so they don't get the navigator's swipe-back. The same
   // left-edge swipe closes them here: back into the subdocument, or from the
   // season list back to the calendar it was opened from.
+  const overlayInsetEdgeSwipe = useInsetEdgeSwipe(overlayScreen !== null, () =>
+    setOverlayScreen((screen) => (screen === 'seasons' ? 'calendar' : null)),
+  );
+  const overlayStartsInInset = overlayInsetEdgeSwipe.startsInInset;
   const overlaySwipePanResponder = useMemo(() => {
     const closeOverlay = () => setOverlayScreen((screen) => (screen === 'seasons' ? 'calendar' : null));
     return PanResponder.create({
       onMoveShouldSetPanResponderCapture: (event, gestureState) => {
-        if (isStylusGestureEvent(event)) return false;
+        if (isStylusGestureEvent(event) || overlayStartsInInset(gestureState.x0)) return false;
         return gestureState.x0 < 56 && gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderRelease: (event, gestureState) => {
-        if (isStylusGestureEvent(event)) return;
+        if (isStylusGestureEvent(event) || overlayStartsInInset(gestureState.x0)) return;
         if (gestureState.x0 < 56 && gestureState.dx > 60) closeOverlay();
       },
     });
-  }, []);
+  }, [overlayStartsInInset]);
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
@@ -297,6 +368,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
         style={styles.screen}
         {...(isMobileDocument ? swipeGesturePanResponder.panHandlers : {})}
+        {...(isMobileDocument ? insetEdgeSwipe.handlers : {})}
       >
         {/* A subdocument opens on top of a document the reader is already in,
             so on the app it gets no bar at all -- same as the document
@@ -382,7 +454,11 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           onRequestClose={() => setOverlayScreen(null)}
           supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
         >
-          <View style={styles.overlayFrame} {...(isMobileDocument ? overlaySwipePanResponder.panHandlers : {})}>
+          <View
+            style={styles.overlayFrame}
+            {...(isMobileDocument ? overlaySwipePanResponder.panHandlers : {})}
+            {...(isMobileDocument ? overlayInsetEdgeSwipe.handlers : {})}
+          >
             {overlayScreen === 'calendar' ? (
               <CalendarScreen
                 onClose={() => setOverlayScreen(null)}

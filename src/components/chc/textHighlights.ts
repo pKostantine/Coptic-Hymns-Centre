@@ -254,6 +254,9 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
         window.scrollToSermonHighlight = function (highlightId) {
           var mark = document.querySelector('mark[data-sermon-highlight-id="' + CSS.escape(String(highlightId || '')) + '"]');
           if (!mark) return false;
+          // A document page holds its last jump for a moment (documentHtml.ts);
+          // this smooth scroll must not be pulled back to it.
+          if (window.releaseHeldJump) window.releaseHeldJump();
           mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
           mark.classList.remove('sermon-highlight-pulse');
           void mark.offsetWidth;
