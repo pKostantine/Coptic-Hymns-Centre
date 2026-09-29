@@ -79,9 +79,10 @@ export function getVerseVerticalPadding(item = {}) {
 
 export function getSpeakerRowHeight(item = {}, fontSize = 18, visibleLanguages = {}) {
   if (item.suppressSpeakerLabel || !item.hasSpeakerLabel) return 0;
-  if (!visibleLanguages.english && !visibleLanguages.arabic) return 0;
+  if (!visibleLanguages.english && !visibleLanguages.french && !visibleLanguages.arabic) return 0;
   return Math.max(
     visibleLanguages.english ? getSlideshowLanguageLineHeight('english', item, fontSize) : 0,
+    visibleLanguages.french ? getSlideshowLanguageLineHeight('french', item, fontSize) : 0,
     visibleLanguages.arabic ? getSlideshowLanguageLineHeight('arabic', item, fontSize) : 0,
   );
 }
@@ -140,6 +141,7 @@ export function getItemSignature(item, displayedTitle = "") {
     "verse",
     hashSlideshowText([
       verse.english,
+      verse.french,
       verse.coptic,
       verse.arabic,
       verse.type,
@@ -159,7 +161,7 @@ export function getItemSignature(item, displayedTitle = "") {
 }
 
 function hasVisibleTitleText(title) {
-  return Boolean(title?.english || title?.arabic);
+  return Boolean(title?.english || title?.french || title?.arabic);
 }
 
 function buildPaginationUnits(items) {
@@ -383,14 +385,14 @@ function shouldAvoidTinyFragment(
 }
 
 export function hasMeasuredVerseLines(metric = {}) {
-  return ["english", "coptic", "arabic"].some(
+  return ["english", "french", "coptic", "arabic"].some(
     (language) => Array.isArray(metric[language]?.lines) && metric[language].lines.length,
   );
 }
 
 function createVerseLineState(languageMetric = {}, fontSize, item = {}) {
   return {
-    languages: ["english", "coptic", "arabic"]
+    languages: ["english", "french", "coptic", "arabic"]
       .map((language) => ({
         language,
         lineHeight: getSlideshowLanguageLineHeight(language, item, fontSize),
@@ -453,6 +455,7 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
     arabic: "",
     coptic: "",
     english: "",
+    french: "",
     bibleVerseNumber: item.verse?.bibleVerseNumber,
     slideshowSeasonalPrefixVisible: showSeasonalPrefix,
   };
@@ -519,6 +522,7 @@ function createVerseDecorationSegment(item, state) {
   const verse = {
     ...item.verse,
     english: String(item.verse?.english || "").trimStart().startsWith(prefix) ? prefix : "",
+    french: "",
     coptic: "",
     arabic: String(item.verse?.arabic || "").trimStart().startsWith(prefix) ? prefix : "",
     slideshowBibleNumberLanguages: [],
@@ -626,14 +630,16 @@ function getVerseLanguageLayout(item, visibleLanguages = {}, tableWidth = 0) {
 export function getVisibleVerseLanguages(item, visibleLanguages = {}) {
   const verse = item.verse || {};
   const hasTranslationText = Boolean(
-    (verse.english && verse.english.trim()) || (verse.arabic && verse.arabic.trim()),
+    (verse.english && verse.english.trim()) ||
+      (verse.french && verse.french.trim()) ||
+      (verse.arabic && verse.arabic.trim()),
   );
   if (verse.invincibleCoptic && !hasTranslationText) {
     return String(verse.coptic || "").trim() ? ["coptic"] : [];
   }
 
-  return ["english", "coptic", "arabic"].filter((language) => {
-    if (language === "english" || language === "arabic") {
+  return ["english", "french", "coptic", "arabic"].filter((language) => {
+    if (language !== "coptic") {
       return Boolean(visibleLanguages[language]) &&
         (Boolean(String(verse[language] || "").trim()) || Boolean(item.hasSpeakerLabel));
     }
@@ -719,7 +725,8 @@ export function normalizeLanguageMetric(metric) {
 }
 
 function getMetricLinesForLanguage(lines, language, item = {}) {
-  if (language !== "coptic" || !hasSeasonalPrefixLine(item?.verse)) return lines;
+  // Coptic and French carry the seasonal prefix only as a blank spacer line.
+  if ((language !== "coptic" && language !== "french") || !hasSeasonalPrefixLine(item?.verse)) return lines;
   const prefix = String(item?.verse?.seasonalHoosVersePrefix || "").trim();
   if (!prefix) return lines;
   return lines.filter((line, index) => index !== 0 || String(line?.text || "").trim() !== prefix);

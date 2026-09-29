@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
@@ -16,9 +17,12 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { pickAndUploadProfileAvatar, removeProfileAvatar } from '@/services/profileAvatarService';
 import type { AppLanguage } from '@/utils/preferencesStorage';
 
-const APP_LANGUAGE_OPTIONS: { key: AppLanguage; label: string; arabic: string }[] = [
-  { key: 'en', label: 'English', arabic: 'الإنجليزية' },
-  { key: 'ar', label: 'Arabic', arabic: 'العربية' },
+import { tr } from '../utils/appText';
+// Each language also named in itself, so it can be found whatever the app is showing.
+const APP_LANGUAGE_OPTIONS: { key: AppLanguage; label: string; native: string }[] = [
+  { key: 'en', label: 'English', native: 'English' },
+  { key: 'fr', label: 'French', native: 'Français' },
+  { key: 'ar', label: 'Arabic', native: 'العربية' },
 ];
 
 export default function AccountScreen() {
@@ -30,7 +34,7 @@ export default function AccountScreen() {
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>Account - Coptic Hymns Centre</title></Head>
       <AppHeader
-        title={{ english: 'Account', arabic: 'الحساب' }}
+        title={{ english: 'Account', arabic: 'الحساب', french: 'Compte' }}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
       />
       <NowPlayingAwareScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -140,11 +144,9 @@ function SignedOutAccount() {
 
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'حساب CHC الخاص بك' : 'Your CHC account'}</Text>
+      <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Your CHC account', 'Votre compte CHC', 'حساب CHC الخاص بك')}</Text>
       <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
-        {isArabic
-          ? 'احفظ الإعجابات والمتابعات وقوائم التشغيل وتقدّم التعلّم على أجهزتك.'
-          : 'Keep your likes, follows, playlists, and learning progress with you across devices.'}
+        {tr('Keep your likes, follows, playlists, and learning progress with you across devices.', 'Retrouvez vos favoris, abonnements, playlists et progrès sur tous vos appareils.', 'احفظ الإعجابات والمتابعات وقوائم التشغيل وتقدّم التعلّم على أجهزتك.')}
       </Text>
 
       <View accessibilityRole="tablist" style={styles.segmentedControl}>
@@ -388,9 +390,9 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
       ) : null}
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الملف الشخصي' : 'Profile'}</Text>
+        <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Profile', 'Profil', 'الملف الشخصي')}</Text>
         <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
-          {isArabic ? 'عدّل الاسم الذي يظهر في حساب CHC الخاص بك.' : 'Choose the name that appears on your CHC account.'}
+          {tr('Choose the name that appears on your CHC account.', 'Choisissez le nom qui apparaît sur votre compte CHC.', 'عدّل الاسم الذي يظهر في حساب CHC الخاص بك.')}
         </Text>
         <Field label="Display name">
           <TextInput value={displayName} onChangeText={setDisplayName} style={styles.input} placeholder="Your name" placeholderTextColor={COLORS.muted} />
@@ -404,7 +406,7 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
       </View>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الأمان' : 'Security'}</Text>
+        <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Security', 'Sécurité', 'الأمان')}</Text>
         <Text style={styles.accountDetailLabel}>Sign-in method</Text>
         <Text style={styles.accountDetailValue}>{provider}{user.email_confirmed_at ? ' · Verified' : ''}</Text>
 
@@ -463,18 +465,18 @@ function AppSettingsSection() {
   const { preferences, setAppLanguage, contentSyncStatus } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
   const syncLabel = !user
-    ? (isArabic ? 'على هذا الجهاز' : 'On this device')
+    ? (tr('On this device', 'Sur cet appareil', 'على هذا الجهاز'))
     : contentSyncStatus === 'syncing'
-      ? (isArabic ? 'جارٍ المزامنة' : 'Syncing')
+      ? (tr('Syncing', 'Synchronisation', 'جارٍ المزامنة'))
       : contentSyncStatus === 'error'
-        ? (isArabic ? 'غير متصل' : 'Offline')
-        : (isArabic ? 'تمت المزامنة' : 'Synced');
+        ? (tr('Offline', 'Hors ligne', 'غير متصل'))
+        : (tr('Synced', 'Synchronisé', 'تمت المزامنة'));
 
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeadingRow}>
         <Icon name="settings-outline" size={22} color={COLORS.goldBright} />
-        <Text style={[styles.sectionTitle, styles.sectionHeadingTitle, isArabic && styles.arabic]}>{isArabic ? 'إعدادات التطبيق' : 'App settings'}</Text>
+        <Text style={[styles.sectionTitle, styles.sectionHeadingTitle, isArabic && styles.arabic]}>{tr('App settings', 'Paramètres de l’application', 'إعدادات التطبيق')}</Text>
         <Text style={[styles.syncStatus, user && contentSyncStatus === 'error' && styles.syncStatusError]}>{syncLabel}</Text>
       </View>
       <Text style={styles.fieldLabel}>App language</Text>
@@ -486,7 +488,7 @@ function AppSettingsSection() {
               <View style={[styles.radioOuter, active && styles.radioOuterActive]}>{active ? <View style={styles.radioInner} /> : null}</View>
               <View style={styles.languageTextGroup}>
                 <Text style={styles.languageLabel}>{option.label}</Text>
-                <Text style={styles.languageArabic}>{option.arabic}</Text>
+                <Text style={option.key === 'ar' ? styles.languageArabic : styles.languageNative}>{option.native}</Text>
               </View>
             </Pressable>
           );
@@ -594,6 +596,7 @@ const styles = StyleSheet.create({
   languageTextGroup: { flex: 1 },
   languageLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
   languageArabic: { color: COLORS.muted, fontFamily: TYPOGRAPHY.arabic, fontSize: 12, marginTop: 2, writingDirection: 'rtl' },
+  languageNative: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
   settingsLink: { alignItems: 'center', borderTopColor: COLORS.border, borderTopWidth: 1, flexDirection: 'row', gap: SPACING.md, minHeight: 64, paddingVertical: SPACING.sm },
   settingsLinkText: { flex: 1 },
   settingsLinkLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },

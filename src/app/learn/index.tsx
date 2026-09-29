@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
@@ -14,6 +15,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningHomePayload, LearningItemLibraryPayload } from '@/types/learningPlatform';
 
+import { tr } from '../../utils/appText';
 export default function LearningHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -44,10 +46,10 @@ export default function LearningHomeScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
-        <title>{isArabic ? 'تعلّم وادرس — كوبتك هيمنز سنتر' : 'Learn & Study — Coptic Hymns Centre'}</title>
+        <title>{tr('Learn & Study — Coptic Hymns Centre', 'Apprendre — Coptic Hymns Centre', 'تعلّم وادرس — كوبتك هيمنز سنتر')}</title>
       </Head>
       <AppHeader
-        title={{ english: 'Learn & Study', arabic: 'تعلّم وادرس' }}
+        title={{ english: 'Learn & Study', arabic: 'تعلّم وادرس', french: 'Apprendre' }}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
       />
       <LearningSectionNav active="home" />
@@ -58,10 +60,10 @@ export default function LearningHomeScreen() {
             <View style={styles.discoveryIcon}><Text style={styles.discoveryGlyph}>♬</Text></View>
             <View style={styles.discoveryText}>
               <Text style={[styles.discoveryTitle, isArabic && styles.arabic]}>
-                {isArabic ? 'المعلّمون' : 'Cantors'}
+                {tr('Cantors', 'Chantres', 'المعلّمون')}
               </Text>
               <Text style={[styles.discoveryBody, isArabic && styles.arabic]}>
-                {isArabic ? 'تعلّم مع معلّمك المفضّل' : 'Learn with a familiar voice'}
+                {tr('Learn with a familiar voice', 'Apprenez avec une voix familière', 'تعلّم مع معلّمك المفضّل')}
               </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
@@ -70,10 +72,10 @@ export default function LearningHomeScreen() {
             <View style={styles.discoveryIcon}><Text style={styles.discoveryGlyph}>✦</Text></View>
             <View style={styles.discoveryText}>
               <Text style={[styles.discoveryTitle, isArabic && styles.arabic]}>
-                {isArabic ? 'المواسم' : 'Seasons'}
+                {tr('Seasons', 'Temps liturgiques', 'المواسم')}
               </Text>
               <Text style={[styles.discoveryBody, isArabic && styles.arabic]}>
-                {isArabic ? 'ادرس ألحان الموسم' : 'Study the hymns for the season'}
+                {tr('Study the hymns for the season', 'Étudiez les hymnes du temps', 'ادرس ألحان الموسم')}
               </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
@@ -86,8 +88,8 @@ export default function LearningHomeScreen() {
         {continueLearning.length ? (
           <>
             <SectionHeading
-              title={isArabic ? 'أكمل التعلّم' : 'Continue Learning'}
-              action={isArabic ? 'عرض الكل' : 'View all'}
+              title={tr('Continue Learning', 'Continuer l’apprentissage', 'أكمل التعلّم')}
+              action={tr('View all', 'Tout voir', 'عرض الكل')}
               onAction={() => router.push('/learn/library')}
               isArabic={isArabic}
             />
@@ -104,7 +106,7 @@ export default function LearningHomeScreen() {
                   <View style={styles.continueInfo}>
                     <Text numberOfLines={1} style={[styles.continueTitle, isArabic && styles.arabic]}>{item.title}</Text>
                     <Text numberOfLines={1} style={[styles.continueMeta, isArabic && styles.arabic]}>
-                      {item.subtitle || (isArabic ? 'قيد التعلّم' : 'Currently learning')}
+                      {item.subtitle || (tr('Currently learning', 'En cours d’apprentissage', 'قيد التعلّم'))}
                     </Text>
                   </View>
                   <View style={styles.resume}><Text style={styles.resumeText}>▶</Text></View>

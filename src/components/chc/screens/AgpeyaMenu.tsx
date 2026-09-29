@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -11,6 +12,7 @@ import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { toEasternArabicDigits } from '../../../utils/localeFormat';
 
+import { appText, entryLabel, tr } from '../../../utils/appText';
 const MAX_FONT_SCALE = 1.25;
 const THEME = getBookTheme('agpeya');
 const HOUR_TILE_GRADIENT = ['#4B2463', '#331744', '#24112F'] as const;
@@ -18,13 +20,13 @@ const MIDNIGHT_GRADIENT = ['#16244D', '#0A1128', '#03050D'] as const;
 const OTHER_PRAYERS_GRADIENT = ['#3A1B4D', '#24112F', '#140A1B'] as const;
 
 /** The canonical hours, in the order they are prayed through the day, with the traditional name each goes by. */
-const HOURS: { id: string; number: number; english: string; arabic: string }[] = [
-  { id: 'first_hour', number: 1, english: 'Prime', arabic: 'باكر' },
-  { id: 'third_hour', number: 3, english: 'Terce', arabic: '' },
-  { id: 'sixth_hour', number: 6, english: 'Sext', arabic: '' },
-  { id: 'ninth_hour', number: 9, english: 'None', arabic: '' },
-  { id: 'eleventh_hour', number: 11, english: 'Vespers', arabic: 'الغروب' },
-  { id: 'twelfth_hour', number: 12, english: 'Compline', arabic: 'النوم' },
+const HOURS: { id: string; number: number; english: string; arabic: string; french?: string }[] = [
+  { id: 'first_hour', number: 1, english: 'Prime', arabic: 'باكر', french: 'Prime' },
+  { id: 'third_hour', number: 3, english: 'Terce', arabic: '', french: 'Tierce' },
+  { id: 'sixth_hour', number: 6, english: 'Sext', arabic: '', french: 'Sexte' },
+  { id: 'ninth_hour', number: 9, english: 'None', arabic: '', french: 'None' },
+  { id: 'eleventh_hour', number: 11, english: 'Vespers', arabic: 'الغروب', french: 'Vêpres' },
+  { id: 'twelfth_hour', number: 12, english: 'Compline', arabic: 'النوم', french: 'Complies' },
 ];
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -54,8 +56,8 @@ export default function AgpeyaMenu() {
   return (
     <BookMenuScaffold
       theme={THEME}
-      title={{ english: 'Agpeya', arabic: 'الأجبية' }}
-      overline={arabic ? 'كتاب السواعي' : 'THE BOOK OF HOURS'}
+      title={{ english: 'Agpeya', arabic: 'الأجبية', french: 'Agpia' }}
+      overline={tr('THE BOOK OF HOURS', 'LE LIVRE DES HEURES', 'كتاب السواعي')}
       arabic={arabic}
       backHref="/books"
     >
@@ -67,10 +69,10 @@ export default function AgpeyaMenu() {
         >
           <View style={styles.flex}>
             <Text style={[styles.introOverline, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-              {arabic ? 'قبل كل ساعة' : 'BEFORE EVERY HOUR'}
+              {tr('BEFORE EVERY HOUR', 'AVANT CHAQUE HEURE', 'قبل كل ساعة')}
             </Text>
             <Text style={[styles.introTitle, arabic && styles.arabicTitle]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-              {arabic ? introduction.arabic : introduction.title}
+              {entryLabel(introduction)}
             </Text>
           </View>
           {bookmarked(introduction) ? <View><Icon name="bookmark" size={16} color={COLORS.gold} /></View> : null}
@@ -84,12 +86,12 @@ export default function AgpeyaMenu() {
             {row.map((hour) => {
               const service = byId(hour.id);
               if (!service) return <View key={hour.id} style={styles.flex} />;
-              const traditional = arabic ? hour.arabic : hour.english;
+              const traditional = appText(hour);
               return (
                 <Pressable
                   key={hour.id}
                   accessibilityRole="button"
-                  accessibilityLabel={arabic ? service.arabic : service.title}
+                  accessibilityLabel={entryLabel(service)}
                   onPress={() => open(service)}
                   style={({ pressed }) => [styles.hourTile, pressed && styles.pressed]}
                 >
@@ -100,7 +102,7 @@ export default function AgpeyaMenu() {
                   </View>
                   <View>
                     <Text style={[styles.hourTitle, arabic && styles.arabicTitle]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                      {arabic ? service.arabic : service.title}
+                      {entryLabel(service)}
                     </Text>
                     {traditional ? (
                       <Text style={[styles.hourSubtitle, arabic && styles.arabicText]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{traditional}</Text>
@@ -123,7 +125,7 @@ export default function AgpeyaMenu() {
           {/* Wrapped so the icon stacks above the gradient on web, where a bare SVG paints beneath positioned siblings. */}
           <View><Icon name="moon" size={28} color={COLORS.night} /></View>
           <View style={styles.flex}>
-            <Text style={[styles.midnightTitle, arabic && styles.arabicTitle]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{arabic ? midnight.arabic : midnight.title}</Text>
+            <Text style={[styles.midnightTitle, arabic && styles.arabicTitle]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{entryLabel(midnight)}</Text>
           </View>
           {bookmarked(midnight) ? <View><Icon name="bookmark" size={16} color={COLORS.gold} /></View> : null}
           <View><Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.night} /></View>
@@ -136,7 +138,7 @@ export default function AgpeyaMenu() {
           layout="row"
           gradient={OTHER_PRAYERS_GRADIENT}
           accent={THEME.accent}
-          title={arabic ? service.arabic : service.title}
+          title={entryLabel(service)}
           minHeight={64}
           arabic={arabic}
           bookmarked={bookmarked(service)}

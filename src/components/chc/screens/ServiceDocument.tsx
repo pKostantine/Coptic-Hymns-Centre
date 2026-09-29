@@ -44,6 +44,8 @@ interface ServiceDocumentProps {
   table: string;
   title: string;
   arabic: string;
+  /** The menu entry's French name, where it has one. */
+  french?: string;
   /** Extra condition flags forced true for this entry point (e.g. Vespers/Matins on the shared raising_of_incense document). */
   extraContext?: Record<string, boolean>;
   /** Manifest id of the menu entry this document was opened from. Only needed where several entries open the SAME schema/table (Vespers vs Matins), so a bookmark can record which one it was made in — see bookmarkKeyFor. */
@@ -62,7 +64,7 @@ function withAppendedHyperlink(sections: DocumentSection[], hyperlinkKey?: strin
     ...sections,
     {
       id: `next-${hyperlinkKey}`,
-      title: { english: destination.title, arabic: destination.arabic },
+      title: { english: destination.title, arabic: destination.arabic, french: destination.french },
       verses: [],
       isHyperlinkButton: true,
       hyperlinkKey,
@@ -73,7 +75,7 @@ function withAppendedHyperlink(sections: DocumentSection[], hyperlinkKey?: strin
 }
 
 interface SubdocumentModalTarget {
-  title: { english: string; arabic: string };
+  title: { english: string; arabic: string; french?: string };
   sections: DocumentSection[];
   subdocumentKey?: string;
   collapseMemoryScope: string;
@@ -97,7 +99,7 @@ interface AntiphonaryModalTarget {
  * native swipe-back gesture of its own to conflict with. The swipe gestures
  * are native-only: web always uses the visible header and never swipe-exits.
  */
-export default function ServiceDocument({ schema, table, title, arabic, extraContext, entryId, backHref, appendHyperlinkKey }: ServiceDocumentProps) {
+export default function ServiceDocument({ schema, table, title, arabic, french, extraContext, entryId, backHref, appendHyperlinkKey }: ServiceDocumentProps) {
   const router = useRouter();
   const { user } = useAuth();
   const {
@@ -794,7 +796,7 @@ export default function ServiceDocument({ schema, table, title, arabic, extraCon
       </Head>
       {!isMobileDocument ? (
         <DocumentTopBar
-          title={{ english: title, arabic }}
+          title={{ english: title, arabic, french }}
           onBack={() => leaveDocument()}
           backAccessibilityLabel="Leave document"
           leadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}

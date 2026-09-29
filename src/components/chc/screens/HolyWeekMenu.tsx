@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
@@ -11,6 +12,7 @@ import { useReadingPreferences } from '../../../context/ReadingPreferencesContex
 import { formatRowDate, holyWeekRowDate, weekdayName } from '../../../utils/holyWeek';
 import { useHolyWeekSchedule } from '../../../utils/useHolyWeekSchedule';
 
+import { entryLabel, tr } from '../../../utils/appText';
 /** Menu text never grows past this multiple of its design size, so large accessibility text keeps the two-column rows intact. */
 const MAX_FONT_SCALE = 1.25;
 
@@ -36,14 +38,14 @@ interface DayTileProps {
 function DayTile({ day, isCurrent, isArabic, onPress }: DayTileProps) {
   const eve = isEve(day);
   const theme = tileTheme(day, isCurrent);
-  const kind = eve ? (isArabic ? 'ليلة' : 'EVE') : (isArabic ? 'نهار' : 'DAY');
-  const now = eve ? (isArabic ? 'الليلة' : 'TONIGHT') : (isArabic ? 'الآن' : 'NOW');
+  const kind = eve ? (tr('EVE', 'VEILLE', 'ليلة')) : (tr('DAY', 'JOUR', 'نهار'));
+  const now = eve ? (tr('TONIGHT', 'CE SOIR', 'الليلة')) : (tr('NOW', 'MAINTENANT', 'الآن'));
   const standsApart = day.id === 'good-friday' || day.id === 'bright-saturday';
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${isArabic ? day.arabic : day.title}${isCurrent ? `, ${now}` : ''}`}
+      accessibilityLabel={`${entryLabel(day)}${isCurrent ? `, ${now}` : ''}`}
       onPress={onPress}
       style={({ pressed }) => [
         styles.tile,
@@ -63,7 +65,7 @@ function DayTile({ day, isCurrent, isArabic, onPress }: DayTileProps) {
         minimumFontScale={0.78}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
       >
-        {isArabic ? day.arabic : day.title}
+        {entryLabel(day)}
       </Text>
     </Pressable>
   );
@@ -104,8 +106,8 @@ export default function HolyWeekMenu() {
     <BookMenuScaffold
       ref={scrollRef}
       theme={getBookTheme('holy-week')}
-      title={{ english: 'Holy Week', arabic: 'أسبوع الآلام' }}
-      overline={isArabic ? 'البصخة المقدسة' : 'PASCHA'}
+      title={{ english: 'Holy Week', arabic: 'أسبوع الآلام', french: 'Semaine sainte' }}
+      overline={tr('PASCHA', 'PÂQUE', 'البصخة المقدسة')}
       arabic={isArabic}
       backHref="/books"
     >
@@ -130,7 +132,7 @@ export default function HolyWeekMenu() {
               {isCurrentRow ? (
                 <View style={styles.todayChip}>
                   <Text style={styles.todayChipText} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                    {currentIsEve ? (isArabic ? 'الليلة' : 'TONIGHT') : (isArabic ? 'اليوم' : 'TODAY')}
+                    {currentIsEve ? (tr('TONIGHT', 'CE SOIR', 'الليلة')) : (tr('TODAY', 'AUJOURD’HUI', 'اليوم'))}
                   </Text>
                 </View>
               ) : null}

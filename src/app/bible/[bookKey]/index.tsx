@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -8,6 +9,7 @@ import BibleTestamentMenu from '@/components/chc/screens/BibleTestamentMenu';
 import BookMenuScaffold from '@/components/chc/screens/BookMenuScaffold';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
 import { TESTAMENTS } from '@/constants/bibleTestaments';
+import { appText } from '@/utils/appText';
 import { getBookTheme } from '@/constants/bookTheme';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -19,9 +21,9 @@ const CHIP_SIZE = 58;
 type LoadedBibleChapters = { requestKey: string; chapters: number[] };
 type BibleLoadError = { requestKey: string; message: string };
 
-const PSALM_NUMBERING_OPTIONS: { key: PsalmNumbering; label: string; arabic: string }[] = [
-  { key: 'septuagint', label: 'Septuagint', arabic: 'السبعيني' },
-  { key: 'masoretic', label: 'Masoretic', arabic: 'العبري' },
+const PSALM_NUMBERING_OPTIONS: { key: PsalmNumbering; label: string; arabic: string; french?: string }[] = [
+  { key: 'septuagint', label: 'Septuagint', arabic: 'السبعيني', french: 'Septante' },
+  { key: 'masoretic', label: 'Masoretic', arabic: 'العبري', french: 'Massorétique' },
 ];
 
 /** `/bible/OT` and `/bible/NT` list a testament's books; any other key is a book, and lists its chapters. */
@@ -82,7 +84,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
     });
   }, [bookKey, chapters, isPsalms, psalmNumbering, router]);
 
-  const title = { english: loadedBook?.titleEnglish || bookKey, arabic: loadedBook?.titleArabic || '' };
+  const title = { english: loadedBook?.titleEnglish || bookKey, arabic: loadedBook?.titleArabic || '', french: loadedBook?.titleFrench || '' };
   const testament = loadedBook ? TESTAMENTS[loadedBook.testament] : null;
   const theme = testament?.theme ?? getBookTheme('bible');
   const accent = theme.accent;
@@ -104,7 +106,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
     <BookMenuScaffold
       theme={theme}
       title={title}
-      overline={testament ? (showArabic ? testament.arabic : testament.english.toUpperCase()) : undefined}
+      overline={testament ? (showArabic ? testament.arabic : appText(testament).toUpperCase()) : undefined}
       arabic={showArabic}
       backHref={loadedBook ? `/bible/${loadedBook.testament}` : '/bible'}
     >

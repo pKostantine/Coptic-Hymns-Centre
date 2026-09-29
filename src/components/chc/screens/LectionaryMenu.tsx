@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -14,18 +15,19 @@ import { useReadingPreferences } from '../../../context/ReadingPreferencesContex
 import { formatWeekdayDate, toEasternArabicDigits } from '../../../utils/localeFormat';
 import { getServiceReadingCitations, type LectionaryReadingKind, type LectionaryService, type ReadingCitation } from '../../../utils/readingsService';
 
+import { appText, entryLabel, tr } from '../../../utils/appText';
 const MAX_FONT_SCALE = 1.25;
 
 type Gradient = readonly [string, string, string];
-type ReadingLine = { key: string; label: { english: string; arabic: string }; value: string | null; fullRow?: boolean };
+type ReadingLine = { key: string; label: { english: string; arabic: string; french?: string }; value: string | null; fullRow?: boolean };
 
-const READING_LABELS: Record<LectionaryReadingKind, { english: string; arabic: string }> = {
-  Psalm: { english: 'Psalm', arabic: 'المزمور' },
-  Gospel: { english: 'Gospel', arabic: 'الإنجيل' },
-  Prophecy: { english: 'Prophecy', arabic: 'النبوة' },
-  Pauline: { english: 'Pauline', arabic: 'البولس' },
-  Catholic: { english: 'Catholic', arabic: 'الكاثوليكون' },
-  Praxis: { english: 'Acts', arabic: 'الإبركسيس' },
+const READING_LABELS: Record<LectionaryReadingKind, { english: string; arabic: string; french?: string }> = {
+  Psalm: { english: 'Psalm', arabic: 'المزمور', french: 'Psaume' },
+  Gospel: { english: 'Gospel', arabic: 'الإنجيل', french: 'Évangile' },
+  Prophecy: { english: 'Prophecy', arabic: 'النبوة', french: 'Prophétie' },
+  Pauline: { english: 'Pauline', arabic: 'البولس', french: 'Paul' },
+  Catholic: { english: 'Catholic', arabic: 'الكاثوليكون', french: 'Catholique' },
+  Praxis: { english: 'Acts', arabic: 'الإبركسيس', french: 'Actes' },
 };
 
 /** What each service always reads — its outline until the day's citations arrive, and wherever one can't be found. */
@@ -39,7 +41,7 @@ const EXPECTED: Record<LectionaryService, LectionaryReadingKind[]> = {
 const FULL_ROW: LectionaryReadingKind[] = ['Praxis'];
 
 /** "Prophecy 2" / "النبوة ٢" when several are read. */
-function numberedLabel(label: { english: string; arabic: string }, number: number | null) {
+function numberedLabel(label: { english: string; arabic: string; french?: string }, number: number | null) {
   if (number === null) return label;
   return { english: `${label.english} ${number}`, arabic: toEasternArabicDigits(`${label.arabic} ${number}`) };
 }
@@ -84,7 +86,7 @@ export default function LectionaryMenu() {
 
   const today = day?.key === dateKey ? day : null;
 
-  const cite = (citation: ReadingCitation) => (arabic ? toEasternArabicDigits(citation.arabic) : citation.english);
+  const cite = (citation: ReadingCitation) => (arabic ? toEasternArabicDigits(citation.arabic) : tr(citation.english, citation.french || citation.english, citation.arabic));
   const prophecies = (today?.citations.Matins ?? []).filter((citation) => citation.kind === 'Prophecy');
 
   /** The service's readings in reading order, falling back to its outline for any not (yet) known. */
@@ -116,7 +118,7 @@ export default function LectionaryMenu() {
       <ServiceReadingsCard
         key={service}
         // The manifest's short "Liturgy" is, in full, the Liturgy of the Word — as its Arabic, قداس الكلمة, already says.
-        title={arabic ? def.arabic : service === 'Liturgy' ? 'Liturgy of the Word' : def.title}
+        title={service === 'Liturgy' ? tr('Liturgy of the Word', 'Liturgie de la Parole', def.arabic) : entryLabel(def)}
         gradient={look.gradient}
         accent={look.accent}
         icon={look.icon}
@@ -135,8 +137,8 @@ export default function LectionaryMenu() {
   return (
     <BookMenuScaffold
       theme={theme}
-      title={{ english: 'Lectionary', arabic: 'القطمارس' }}
-      overline={arabic ? 'قراءات اليوم' : "TODAY'S READINGS"}
+      title={{ english: 'Lectionary', arabic: 'القطمارس', french: 'Lectionnaire' }}
+      overline={tr("TODAY'S READINGS", 'LECTURES DU JOUR', 'قراءات اليوم')}
       description={formatWeekdayDate(effectiveDate, arabic)}
       arabic={arabic}
       backHref="/books"
@@ -155,13 +157,13 @@ export default function LectionaryMenu() {
       )}
       {card('Liturgy', 2)}
 
-      <MenuSectionLabel text={arabic ? 'مع القراءات' : 'With the readings'} arabic={arabic} accent={theme.accent} />
+      <MenuSectionLabel text={tr('With the readings', 'Avec les lectures', 'مع القراءات')} arabic={arabic} accent={theme.accent} />
       {antiphonary ? (
         <JewelTile
           layout="row"
           gradient={['#0B4F5F', '#062A33', '#03161B']}
           accent={theme.accent}
-          title={arabic ? antiphonary.arabic : antiphonary.title}
+          title={entryLabel(antiphonary)}
           arabic={arabic}
           bookmarked={bookmarked(antiphonary)}
           onPress={() => open(antiphonary)}
@@ -172,7 +174,7 @@ export default function LectionaryMenu() {
           layout="row"
           gradient={['#123C4A', '#08212A', '#030F13']}
           accent={theme.accent}
-          title={arabic ? sermonPlanner.arabic : sermonPlanner.title}
+          title={entryLabel(sermonPlanner)}
           arabic={arabic}
           bookmarked={bookmarked(sermonPlanner)}
           onPress={() => open(sermonPlanner)}
@@ -216,7 +218,7 @@ function ServiceReadingsCard({ title, gradient, accent, icon, lines, columns, ar
         {lines.map((line) => (
           <View key={line.key} style={[styles.line, columns === 2 && !line.fullRow ? styles.halfLine : styles.fullLine]}>
             <Text style={[styles.label, { color: accent }, arabic && styles.arabicLabel]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-              {arabic ? line.label.arabic : line.label.english.toUpperCase()}
+              {(arabic ? line.label.arabic : appText(line.label).toUpperCase())}
             </Text>
             <Text style={[styles.value, !line.value && styles.valueMissing, arabic && styles.arabicText]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>
               {line.value ?? '—'}

@@ -1,5 +1,6 @@
 import { getSeasonRanges } from './calendarService';
 import { addUtcDays, toIsoDate } from './dateUtils';
+import { getCurrentAppLanguage } from './preferencesStorage';
 
 /**
  * Holy Week dates and per-hour reading summaries for the Holy Week menus.
@@ -61,12 +62,21 @@ export async function loadHolyWeekSchedule(effectiveDate: Date, isEvening: boole
 const WEEKDAYS = {
   english: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   arabic: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
+  french: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
+  frenchShort: ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'],
 };
 const MONTHS = {
   english: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   englishLong: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
   arabic: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
+  french: ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'],
+  frenchLong: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
 };
+
+/** Not Arabic: French when that is the App Language. */
+function isFrench(arabic: boolean): boolean {
+  return !arabic && getCurrentAppLanguage() === 'fr';
+}
 const EASTERN_ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
 
 export function toArabicDigits(value: string | number): string {
@@ -82,6 +92,7 @@ export function holyWeekRowDate(palmSunday: Date, index: number): Date {
 export function formatRowDate(date: Date, arabic: boolean): string {
   const weekday = date.getUTCDay();
   if (arabic) return `${WEEKDAYS.arabic[weekday]} ${toArabicDigits(date.getUTCDate())} ${MONTHS.arabic[date.getUTCMonth()]}`;
+  if (isFrench(arabic)) return `${WEEKDAYS.frenchShort[weekday]} · ${date.getUTCDate()} ${MONTHS.french[date.getUTCMonth()]}`.toUpperCase();
   return `${WEEKDAYS.english[weekday].slice(0, 3)} · ${MONTHS.english[date.getUTCMonth()]} ${date.getUTCDate()}`.toUpperCase();
 }
 
@@ -89,14 +100,17 @@ export function formatRowDate(date: Date, arabic: boolean): string {
 export function formatLongDate(date: Date, arabic: boolean): string {
   const weekday = date.getUTCDay();
   if (arabic) return `${WEEKDAYS.arabic[weekday]} ${toArabicDigits(date.getUTCDate())} ${MONTHS.arabic[date.getUTCMonth()]}`;
+  if (isFrench(arabic)) return `${WEEKDAYS.french[weekday]} ${date.getUTCDate()} ${MONTHS.frenchLong[date.getUTCMonth()]}`;
   return `${WEEKDAYS.english[weekday]}, ${MONTHS.englishLong[date.getUTCMonth()]} ${date.getUTCDate()}`;
 }
 
-/** "April 25". */
+/** "April 25" / "25 avril". */
 export function formatMonthDay(date: Date): string {
+  if (isFrench(false)) return `${date.getUTCDate()} ${MONTHS.frenchLong[date.getUTCMonth()]}`;
   return `${MONTHS.englishLong[date.getUTCMonth()]} ${date.getUTCDate()}`;
 }
 
 export function weekdayName(index: number, arabic: boolean): string {
-  return (arabic ? WEEKDAYS.arabic : WEEKDAYS.english)[index % 7];
+  const names = arabic ? WEEKDAYS.arabic : isFrench(arabic) ? WEEKDAYS.french : WEEKDAYS.english;
+  return names[index % 7];
 }

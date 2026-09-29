@@ -93,6 +93,24 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     const preservedEdgeRef = useRef<'start' | 'end'>('start');
     const pendingRestoreSectionIdRef = useRef<string | null>(null);
     const lastRestoreTokenRef = useRef<string | null>(null);
+    // A freshly (re)loaded page reports where it is the moment it first
+    // paints -- the top -- and that report can arrive before onLoadEnd. It
+    // would replace the section the reader was on, so the restore on load
+    // took them to the top instead: in a subdocument, a jump that "went there
+    // and then shot back up". Nothing the page reports counts until its
+    // restore has been sent.
+    const loadingRef = useRef(true);
+    // The last report made while loading, kept rather than dropped: the page
+    // reports once and then only on scroll, so a document that loads where
+    // it should never says where it is again.
+    const reportDuringLoadRef = useRef<DocumentAction | null>(null);
+    // A jump's own target, recorded the moment it's asked for, and the brief
+    // window in which reports of anywhere else are only the scroll catching
+    // up (or a reload's first paint) rather than where the reader is.
+    const jumpGuardRef = useRef<{ sectionId: string; until: number } | null>(null);
+    const guardJump = (sectionId: string) => {
+      jumpGuardRef.current = { sectionId, until: Date.now() + 1500 };
+    };
     // Assign before the rebuilt HTML/iframe is committed, never after a
     // transient "at the top" position report can overwrite the target.
     if (restoreRequest && lastRestoreTokenRef.current !== restoreRequest.token) {
@@ -104,6 +122,9 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     useImperativeHandle(ref, () => ({
       scrollToSection: (id: string, edge: 'start' | 'end' = 'start') => {
+        preservedSectionIdRef.current = id;
+        preservedEdgeRef.current = edge;
+        guardJump(id);
         webviewRef.current?.injectJavaScript(`window.scrollToSection(${JSON.stringify(id)}, ${JSON.stringify(edge)}); true;`);
       },
       scrollToVerse: (id: string) => {
@@ -135,24 +156,39 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sermonPlannerMode, JSON.stringify(sermonHighlights)]);
 
+    const handleAction = (action: DocumentAction) => {
+      if (action?.type === 'currentSection' && action.sectionId) {
+        if (loadingRef.current) {
+          reportDuringLoadRef.current = action;
+          return;
+        }
+        const guard = jumpGuardRef.current;
+          if (guard) {
+          if (guard.sectionId !== action.sectionId && Date.now() < guard.until) return;
+          jumpGuardRef.current = null;
+        }
+        if (pendingRestoreSectionIdRef.current && pendingRestoreSectionIdRef.current !== action.sectionId) return;
+        pendingRestoreSectionIdRef.current = null;
+        preservedSectionIdRef.current = action.sectionId;
+        preservedEdgeRef.current = 'start';
+      }
+      // Remember the title that was actually tapped before the collapse
+      // state rebuilds this HTML, so the reload stays anchored there.
+      if (action?.type === 'toggleCollapse' && action.sectionId) {
+        preservedSectionIdRef.current = action.sectionId;
+      }
+      onAction?.(action);
+    };
+
     const handleMessage = (event: WebViewMessageEvent) => {
+      let action: DocumentAction;
       try {
-        const action = JSON.parse(event.nativeEvent.data);
-        if (action?.type === 'currentSection' && action.sectionId) {
-          if (pendingRestoreSectionIdRef.current && pendingRestoreSectionIdRef.current !== action.sectionId) return;
-          pendingRestoreSectionIdRef.current = null;
-          preservedSectionIdRef.current = action.sectionId;
-          preservedEdgeRef.current = 'start';
-        }
-        // Remember the title that was actually tapped before the collapse
-        // state rebuilds this HTML, so the reload stays anchored there.
-        if (action?.type === 'toggleCollapse' && action.sectionId) {
-          preservedSectionIdRef.current = action.sectionId;
-        }
-        onAction?.(action);
+        action = JSON.parse(event.nativeEvent.data);
       } catch {
         // Malformed message from the HTML content — ignore.
+        return;
       }
+      handleAction(action);
     };
 
     // The Now Playing bar's clearance is applied to the loaded page, never
@@ -183,7 +219,14 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         webviewRef.current?.injectJavaScript(
           `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(candidates)}); } true;`,
         );
+        guardJump(candidates[0].sectionId);
       }
+      loadingRef.current = false;
+      // Let the kept report through now -- the jump guard above still turns
+      // it away unless it is where the restore is headed.
+      const keptReport = reportDuringLoadRef.current;
+      reportDuringLoadRef.current = null;
+      if (keptReport) handleAction(keptReport);
       syncSermonHighlights();
     };
 
@@ -272,6 +315,10 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         javaScriptEnabled
         textInteractionEnabled={selectText || sermonPlannerMode}
         onMessage={handleMessage}
+        onLoadStart={() => {
+          loadingRef.current = true;
+          reportDuringLoadRef.current = null;
+        }}
         onLoadEnd={handleLoadEnd}
       />
     );

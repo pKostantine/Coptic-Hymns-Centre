@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 
 import BookMenuScaffold, { MenuSectionLabel, TileRow } from './BookMenuScaffold';
@@ -7,11 +8,12 @@ import type { IconName } from '../ui/Icon';
 import { bookmarkKeyFor, DIVINE_LITURGY_SERVICES, RAISING_OF_INCENSE_OPTIONS, type ServiceDef } from '../../../constants/manifest';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 
+import { appText, entryLabel, tr } from '../../../utils/appText';
 type Gradient = readonly [string, string, string];
 
-const INCENSE: Record<string, { gradient: Gradient; accent: string; icon: IconName; hour: { english: string; arabic: string } }> = {
-  vespers: { gradient: ['#6B1A3A', '#3A0C22', '#1A0510'], accent: '#F5C6D6', icon: 'sunset', hour: { english: 'Evening', arabic: 'المساء' } },
-  matins: { gradient: ['#94303A', '#52141C', '#22070B'], accent: '#FFD8B0', icon: 'sunrise', hour: { english: 'Morning', arabic: 'الصباح' } },
+const INCENSE: Record<string, { gradient: Gradient; accent: string; icon: IconName; hour: { english: string; arabic: string; french?: string } }> = {
+  vespers: { gradient: ['#6B1A3A', '#3A0C22', '#1A0510'], accent: '#F5C6D6', icon: 'sunset', hour: { english: 'Evening', arabic: 'المساء', french: 'Soir' } },
+  matins: { gradient: ['#94303A', '#52141C', '#22070B'], accent: '#FFD8B0', icon: 'sunrise', hour: { english: 'Morning', arabic: 'الصباح', french: 'Matin' } },
 };
 const STEP_GRADIENT: Gradient = ['#7A1B30', '#3E0B18', '#1E050B'];
 const STEP_ACCENT = '#F2C2CC';
@@ -41,10 +43,10 @@ export default function LiturgyMenu({ section }: { section?: 'raising-of-incense
   const showIncense = section !== 'divine-liturgy';
   const showDivine = section !== 'raising-of-incense';
   const title = section === 'raising-of-incense'
-    ? { english: 'Raising of Incense', arabic: 'رفع بخور' }
+    ? { english: 'Raising of Incense', arabic: 'رفع بخور', french: 'Offrande de l’encens' }
     : section === 'divine-liturgy'
-      ? { english: 'The Divine Liturgy', arabic: 'القداس الإلهي' }
-      : { english: 'Liturgy', arabic: 'القداس' };
+      ? { english: 'The Divine Liturgy', arabic: 'القداس الإلهي', french: 'La divine liturgie' }
+      : { english: 'Liturgy', arabic: 'القداس', french: 'Liturgie' };
 
   const step = (id: string) => {
     const service = divine(id);
@@ -55,7 +57,7 @@ export default function LiturgyMenu({ section }: { section?: 'raising-of-incense
         layout="row"
         gradient={id === 'distribution' ? ['#5A1426', '#2E0913', '#140407'] : STEP_GRADIENT}
         accent={STEP_ACCENT}
-        title={arabic ? service.arabic : service.title}
+        title={entryLabel(service)}
         arabic={arabic}
         bookmarked={bookmarked(service)}
         onPress={() => openDivine(service)}
@@ -67,13 +69,13 @@ export default function LiturgyMenu({ section }: { section?: 'raising-of-incense
     <BookMenuScaffold
       theme={getBookTheme('liturgy')}
       title={title}
-      overline={section ? (arabic ? 'القداس' : 'LITURGY') : undefined}
+      overline={section ? (tr('LITURGY', 'LITURGIE', 'القداس')) : undefined}
       arabic={arabic}
       backHref={section ? '/liturgy' : '/books'}
     >
       {showIncense ? (
         <>
-          {!section ? <MenuSectionLabel text={arabic ? 'رفع البخور' : 'Raising of Incense'} arabic={arabic} /> : null}
+          {!section ? <MenuSectionLabel text={tr('Raising of Incense', 'Offrande de l’encens', 'رفع البخور')} arabic={arabic} /> : null}
           <TileRow arabic={arabic}>
             {RAISING_OF_INCENSE_OPTIONS.map((option) => {
               const look = INCENSE[option.id];
@@ -83,8 +85,8 @@ export default function LiturgyMenu({ section }: { section?: 'raising-of-incense
                   gradient={look.gradient}
                   accent={look.accent}
                   icon={look.icon}
-                  overline={arabic ? look.hour.arabic : look.hour.english.toUpperCase()}
-                  title={arabic ? option.arabic : option.title}
+                  overline={(arabic ? look.hour.arabic : appText(look.hour).toUpperCase())}
+                  title={entryLabel(option)}
                   titleSize={22}
                   minHeight={118}
                   arabic={arabic}
@@ -99,10 +101,10 @@ export default function LiturgyMenu({ section }: { section?: 'raising-of-incense
 
       {showDivine ? (
         <>
-          {!section ? <MenuSectionLabel text={arabic ? 'القداس الإلهي' : 'The Divine Liturgy'} arabic={arabic} /> : null}
+          {!section ? <MenuSectionLabel text={tr('The Divine Liturgy', 'La divine liturgie', 'القداس الإلهي')} arabic={arabic} /> : null}
           {step('offering_of_the_lamb')}
           {step('liturgy_of_the_word')}
-          <MenuSectionLabel text={arabic ? 'الأنافورا' : 'The Anaphora'} arabic={arabic} accent={ANAPHORA_ACCENT} />
+          <MenuSectionLabel text={tr('The Anaphora', 'L’anaphore', 'الأنافورا')} arabic={arabic} accent={ANAPHORA_ACCENT} />
           {ANAPHORAS.map((id) => {
             const service = divine(id);
             if (!service) return null;
@@ -112,7 +114,7 @@ export default function LiturgyMenu({ section }: { section?: 'raising-of-incense
                 layout="row"
                 gradient={ANAPHORA_GRADIENT}
                 accent={ANAPHORA_ACCENT}
-                title={arabic ? service.arabic : service.title}
+                title={entryLabel(service)}
                 arabic={arabic}
                 outlined
                 bookmarked={bookmarked(service)}

@@ -255,6 +255,7 @@ function buildReadingVerses(readingRow, withCoptic, isPsalm) {
         english: flatVerses.map((v) => v.english || "").filter(Boolean).join(" "),
         coptic: withCoptic ? flatVerses.map((v) => v.coptic || "").filter(Boolean).join(" ") : "",
         arabic: flatVerses.map((v) => v.arabic || "").filter(Boolean).join(" "),
+        french: flatVerses.map((v) => v.french || "").filter(Boolean).join(" "),
         type: "text",
       }),
     ]);
@@ -265,6 +266,7 @@ function buildReadingVerses(readingRow, withCoptic, isPsalm) {
       english: v.english || "",
       coptic: withCoptic ? v.coptic || "" : "",
       arabic: v.arabic || "",
+      french: v.french || "",
       type: "text",
       bibleChapterNumber: String(v.chapter_number),
       bibleVerseNumber: String(v.verse_number),
@@ -283,11 +285,11 @@ function getBibleBookTitleByKey(bookKey) {
       const { data, error } = await supabase
         .schema("bible")
         .from("books")
-        .select("title_english, title_arabic")
+        .select("title_english, title_arabic, title_french")
         .eq("book_key", bookKey)
         .maybeSingle();
       if (error) throw createReadableSupabaseError(error, "bible.books");
-      return data ? { english: data.title_english || "", arabic: data.title_arabic || "" } : null;
+      return data ? { english: data.title_english || "", arabic: data.title_arabic || "", french: data.title_french || "" } : null;
     })();
     bibleBookTitleCache.set(bookKey, cached);
   }
@@ -327,7 +329,7 @@ async function buildReadingCitation(readingRow) {
   // A citation cites ONE psalm chapter, so it reads "Psalm 67:11" — the book
   // title itself ("Psalms"/"المزامير") is the whole-book plural, wrong here.
   const bookTitle =
-    firstSegment.book_key === "psalms" ? { english: "Psalm", arabic: "مزمور" } : await getBibleBookTitleByKey(firstSegment.book_key);
+    firstSegment.book_key === "psalms" ? { english: "Psalm", arabic: "مزمور", french: "Psaume" } : await getBibleBookTitleByKey(firstSegment.book_key);
   if (!bookTitle || (!bookTitle.english && !bookTitle.arabic)) return null;
 
   const allVerses = segments.flatMap((s) => s.verses || []);
@@ -338,6 +340,7 @@ async function buildReadingCitation(readingRow) {
     return {
       english: `${bookTitle.english} ${chapters[0]}:${verseList}`.trim(),
       arabic: `${bookTitle.arabic} ${chapters[0]}:${verseList}`.trim(),
+      french: `${bookTitle.french || bookTitle.english} ${chapters[0]}:${verseList}`.trim(),
     };
   }
 
@@ -351,6 +354,7 @@ async function buildReadingCitation(readingRow) {
     return {
       english: `${bookTitle.english} ${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`.trim(),
       arabic: `${bookTitle.arabic} ${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`.trim(),
+      french: `${bookTitle.french || bookTitle.english} ${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`.trim(),
     };
   }
 
@@ -369,6 +373,7 @@ async function buildReadingCitation(readingRow) {
   return {
     english: `${bookTitle.english} ${citation}`.trim(),
     arabic: `${bookTitle.arabic} ${citation}`.trim(),
+    french: `${bookTitle.french || bookTitle.english} ${citation}`.trim(),
   };
 }
 
@@ -400,8 +405,8 @@ async function resolveReadingSentinelVerses(sentinel, isoDate, flags) {
 // exact "Coptic X" phrasing already used by gospel_rite.hymn_titles' own
 // "copticPsalm" entry ("Coptic Psalm" / "المزمور القبطي").
 const COPTIC_READING_TYPE_TITLES = {
-  Gospel: { english: "Coptic Gospel", arabic: "الإنجيل القبطي" },
-  Psalm: { english: "Coptic Psalm", arabic: "المزمور القبطي" },
+  Gospel: { english: "Coptic Gospel", arabic: "الإنجيل القبطي", french: "Évangile copte" },
+  Psalm: { english: "Coptic Psalm", arabic: "المزمور القبطي", french: "Psaume copte" },
 };
 
 /**
@@ -422,7 +427,7 @@ async function resolveReadingSentinelSplice(sentinel, isoDate, titleShown, minim
   const { verses, citation } = await resolveReadingSentinelVerses(sentinel, isoDate, flags);
   if (!verses.length) return null;
 
-  const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, coptic: "" }] : [];
+  const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, french: citation.french || citation.english, coptic: "" }] : [];
 
   if (titleShown) {
     const readingType = READING_SENTINEL_MAP[sentinel]?.readingType;
@@ -463,6 +468,7 @@ function getSynaxariumForDate(isoDate) {
 const SIGN_OF_THE_CROSS = {
   english: "In the name of the Father and the Son and the Holy Spirit, one God. Amen.",
   arabic: "باسمِ الآبِ والابنِ والرّوحِ القُدُسِ الإلهِ الواحدِ. آمين.",
+  french: "Au nom du Père et du Fils et du Saint-Esprit, un seul Dieu. Amen.",
 };
 
 const SYNAXARIUM_INTRO_PERSON_TYPE = "Bishop/Priest";
@@ -475,10 +481,11 @@ const SYNAXARIUM_ENTRY_PERSON_TYPE = "Reader";
  * `type` for the rubric, `personRole` so the label survives whatever `type`
  * later collapses to.
  */
-function synaxariumVerse({ english, arabic }, personType) {
+function synaxariumVerse({ english, arabic, french }, personType) {
   return {
     english: english || "",
     arabic: arabic ?? null,
+    french: french || "",
     coptic: null,
     type: getServiceVerseType(personType, null),
     personRole: resolvePersonRole(personType),
@@ -611,8 +618,8 @@ const PASCHA_READING_SENTINELS = new Set([
 const PASCHA_DAY_FLAGS = ["PalmSunday", "HolyMonday", "HolyTuesday", "HolyWednesday", "HolyThursday", "GoodFriday"];
 const PASCHA_HOUR_FLAGS = { FirstHour: 1, ThirdHour: 3, SixthHour: 6, NinthHour: 9, EleventhHour: 11, TwelfthHour: 12 };
 const PASCHA_READING_TITLES = {
-  "Pauline Epistle": { english: "Pauline Epistle", arabic: "البولس" },
-  Gospel: { english: "Gospel", arabic: "الإنجيل" },
+  "Pauline Epistle": { english: "Pauline Epistle", arabic: "البولس", french: "Épître de saint Paul" },
+  Gospel: { english: "Gospel", arabic: "الإنجيل", french: "Évangile" },
 };
 
 /** The (day_key, part, hour) of the Holy Week hour a document's flags describe, or null outside one. */
@@ -702,7 +709,7 @@ async function buildPaschaHymnSection(hymnKey, flags, id) {
     id,
     hymn_key: hymnKey,
     hymnKey,
-    title: { english: title?.title_english || "", arabic: title?.title_arabic || "" },
+    title: { english: title?.title_english || "", arabic: title?.title_arabic || "", french: title?.title_french || "" },
     titlePrayerType,
     collapsible: false,
     defaultCollapsed: false,
@@ -746,7 +753,7 @@ async function resolvePaschaReadingSections(section, flags, depth, isoDate) {
     const verses = buildReadingVerses(reading, row.reading_type === "Gospel", false);
     if (!verses.length) continue;
     const citation = await buildReadingCitation(reading);
-    const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, coptic: "" }] : [];
+    const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, french: citation.french || citation.english, coptic: "" }] : [];
     sections.push(applyCopticCaseToSection({
       id,
       hymn_key: section.hymn_key,
@@ -781,7 +788,7 @@ async function resolvePaschaReadingSections(section, flags, depth, isoDate) {
 const CURRENT_PROPHECY = Symbol("currentProphecy");
 /** The frames' reading rows, and whether each keeps the Coptic text. */
 const PROPHECY_READING_SENTINELS = { PROPHECY_WITH_COPTIC: true, PROPHECY_WITHOUT_COPTIC: false };
-const PROPHECY_TITLE = { english: "Prophecy", arabic: "النبوة" };
+const PROPHECY_TITLE = { english: "Prophecy", arabic: "النبوة", french: "Prophétie" };
 const BOOK_KEY_NUMERAL_WORDS = { first: "1", second: "2", third: "3" };
 
 /** isaiah -> ProphecyIsaiah, first_kings -> Prophecy1Kings: the flag readings.hymn_texts's introductions are conditioned on, spelled like the epistles' PaulineEpistle1Corinthians. */
@@ -805,6 +812,7 @@ function prophecyTitle(index, total) {
   return {
     english: `${PROPHECY_TITLE.english} ${index + 1}`,
     arabic: formatArabicDigits(`${PROPHECY_TITLE.arabic} ${index + 1}`),
+    french: `${PROPHECY_TITLE.french} ${index + 1}`,
   };
 }
 
@@ -931,7 +939,7 @@ function mergeNestedSectionsAsOneHymn(callingSection, nestedSections) {
 // ─── Raw row fetch (ported from stuff for claude/slideshowData.js) ──────────
 
 const ORDER_FIELDS = "item_order, hymn_key, condition, minimization, item_type";
-const SERVICE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, category, toggled, prayer_type";
+const SERVICE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, title_french, category, toggled, prayer_type";
 // Note: line_id is deliberately NOT selected here — doxologies.hymn_texts is
 // missing that column (every other schema's hymn_texts has it), and line_id
 // isn't actually needed: line_order is sufficient for sorting.
@@ -940,7 +948,7 @@ const SERVICE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, category, t
 // its own title, and (when shown) whether that title gets a minimize
 // button, the same way the order table's own `minimization` column works.
 const SERVICE_TEXT_FIELDS =
-  "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
+  "hymn_key, line_order, english, coptic, arabic, french, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
 // These schemas only have their own order table + hymn_texts — no native
 // hymn_titles table at all (confirmed against the live schema). Skip just
 // their native title fetch; later schemas in the shared lookup order can
@@ -1106,11 +1114,13 @@ function createFlatServiceRow(orderRow, title, line) {
     minimization: normalizeText(orderRow.minimization),
     title_english: normalizeText(title.title_english),
     title_arabic: normalizeText(title.title_arabic),
+    title_french: normalizeText(title.title_french),
     title_prayer_type: normalizeText(title.prayer_type),
     line_order: line ? normalizeNumeric(line.line_order) : null,
     english: normalizeText(line?.english),
     coptic: normalizeText(line?.coptic),
     arabic: normalizeText(line?.arabic),
+    french: normalizeText(line?.french),
     person_type: normalizeText(line?.person_type),
     prayer_type: normalizeText(line?.prayer_type),
     line_condition: normalizeText(line?.condition),
@@ -1152,7 +1162,7 @@ export function assembleServiceSections(rawRows) {
         isSubdocumentPlaceholder: isSubdoc,
         isInlinePlacement,
         isHyperlink,
-        title: { english: row.title_english || "", arabic: row.title_arabic || "" },
+        title: { english: row.title_english || "", arabic: row.title_arabic || "", french: row.title_french || "" },
         titlePrayerType: row.title_prayer_type || null,
         verses: [],
       });
@@ -1300,7 +1310,7 @@ function resolveEffectiveVerseType(personType, prayerType, sectionTitlePrayerTyp
  * `sectionTitlePrayerType` is the hymn's own overall prayer_type, which a
  * verse without one of its own inherits.
  *
- * @param {{ english?: string | null, coptic?: string | null, arabic?: string | null, condition?: string | null, person_type?: string | null, prayer_type?: string | null }} row
+ * @param {{ english?: string | null, coptic?: string | null, arabic?: string | null, french?: string | null, condition?: string | null, person_type?: string | null, prayer_type?: string | null }} row
  * @param {string | null} [sectionTitlePrayerType]
  */
 export function buildVerseFromTextRow(row, sectionTitlePrayerType = null) {
@@ -1308,6 +1318,7 @@ export function buildVerseFromTextRow(row, sectionTitlePrayerType = null) {
     english: row.english || "",
     coptic: row.coptic || "",
     arabic: row.arabic || "",
+    french: row.french || "",
     condition: normalizeText(row.condition),
     type: resolveEffectiveVerseType(row.person_type, row.prayer_type, sectionTitlePrayerType),
     prayerType: row.prayer_type || null,
@@ -1723,6 +1734,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         title: {
           english: section.title.english || humanizeSentinelKey(section.hymn_key),
           arabic: section.title.arabic,
+          french: section.title.french,
         },
         verses: [],
         isHyperlinkButton: true,
@@ -1746,7 +1758,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
           if (subdocumentSections.length) {
             hydrated.push({
               id: section.id,
-              title: { english: section.title.english || humanizeSentinelKey(section.hymn_key), arabic: section.title.arabic },
+              title: { english: section.title.english || humanizeSentinelKey(section.hymn_key), arabic: section.title.arabic, french: section.title.french },
               verses: [],
               isSubdocumentButton: true,
               subdocumentKey: section.hymn_key,
@@ -1765,7 +1777,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
           const label = section.title?.english || "Synaxarium";
           hydrated.push({
             id: section.id,
-            title: { english: label, arabic: section.title?.arabic || "السنكسار" },
+            title: { english: label, arabic: section.title?.arabic || "السنكسار", french: section.title?.french || (section.title?.english ? "" : "Synaxaire") },
             verses: [],
             isSubdocumentButton: true,
             subdocumentKey: "SYNAXARIUM",
@@ -1807,7 +1819,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       if (section.hymn_key === "ANTIPHONARY") {
         hydrated.push({
           id: section.id,
-          title: { english: label, arabic: section.title.arabic },
+          title: { english: label, arabic: section.title.arabic, french: section.title.french },
           verses: [],
           isAntiphonaryButton: true,
           subdocumentSections: addTuneMarkersToAntiphonarySections(subdocumentSections),
@@ -1820,7 +1832,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       }
       hydrated.push({
         id: section.id,
-        title: { english: label, arabic: section.title.arabic },
+        title: { english: label, arabic: section.title.arabic, french: section.title.french },
         verses: [],
         isSubdocumentButton: true,
         subdocumentKey: section.hymn_key,
@@ -1958,7 +1970,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
           const callingRow = {
             id: `${section.id}-inline-${verse.inlineHymnKey}`,
             title: hasOwnSentinelTitle
-              ? { english: inlineSentinelTitle.title_english || "", arabic: inlineSentinelTitle.title_arabic || "" }
+              ? { english: inlineSentinelTitle.title_english || "", arabic: inlineSentinelTitle.title_arabic || "", french: inlineSentinelTitle.title_french || "" }
               : { english: "", arabic: "" },
             titlePrayerType: hasOwnSentinelTitle ? inlineSentinelTitle.prayer_type || null : section.titlePrayerType,
             collapsible:
@@ -2030,7 +2042,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
             applyCopticCaseToSection({
               id: `${section.id}-inline-${verse.inlineHymnKey}`,
               hymn_key: verse.inlineHymnKey,
-              title: { english: inlineTitle.title_english || "", arabic: inlineTitle.title_arabic || "" },
+              title: { english: inlineTitle.title_english || "", arabic: inlineTitle.title_arabic || "", french: inlineTitle.title_french || "" },
               titlePrayerType: inlineTitlePrayerType,
               // inline_hymn_minimization works exactly like a type-3 order
               // table's own minimization column on this shown title — and
@@ -2241,7 +2253,7 @@ function applyCopticCaseToReadingVerses(verses) {
 }
 
 const INLINE_TEXT_FIELDS =
-  "hymn_key, line_order, english, coptic, arabic, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
+  "hymn_key, line_order, english, coptic, arabic, french, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
 
 async function fetchInlineHymnVerses(schema, hymnKey) {
   for (const lookupSchema of await getHymnKeyLookupSchemas(schema)) {
@@ -2373,6 +2385,7 @@ async function resolveInlineHymnVerses(
       english: row.english || "",
       coptic: row.coptic || "",
       arabic: row.arabic || "",
+      french: row.french || "",
       type: resolveEffectiveVerseType(effectivePersonType, effectivePrayerType, inlineTitlePrayerType),
       prayerType: effectivePrayerType || null,
       personRole: resolvePersonRole(effectivePersonType),
@@ -2387,7 +2400,7 @@ async function resolveInlineHymnVerses(
   return { segments };
 }
 
-const INLINE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, prayer_type";
+const INLINE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, title_french, prayer_type";
 
 /** Whether an inline-spliced hymn should be treated as its own hymn (own title, own alternation, restarted person-type indicators) hinges entirely on whether it has a row in hymn_titles — same schema search order as fetchInlineHymnVerses. Returns null if no title row exists anywhere. */
 async function fetchInlineHymnTitle(schema, hymnKey) {

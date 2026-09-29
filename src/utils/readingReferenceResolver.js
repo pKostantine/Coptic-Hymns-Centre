@@ -1,8 +1,9 @@
 import { contentDataClient as supabase } from "../services/contentDataClient";
 
 const PSALMS_CALENDAR_NUMBER = 19;
-const BIBLE_VERSE_FIELDS = "chapter_number, verse_number, english, coptic, arabic";
-const PSALM_VERSE_FIELDS = "chapter_number, verse_number, english:english_from_coptic, coptic, arabic:arabic_from_coptic";
+// bible.verse_parts has no French, so the part fields carry none.
+const BIBLE_VERSE_FIELDS = "chapter_number, verse_number, english, coptic, arabic, french";
+const PSALM_VERSE_FIELDS = "chapter_number, verse_number, english:english_from_coptic, coptic, arabic:arabic_from_coptic, french";
 const BIBLE_VERSE_PART_FIELDS = "english, coptic, arabic";
 const PSALM_VERSE_PART_FIELDS = "english:english_from_coptic, coptic, arabic:arabic_from_coptic";
 
@@ -102,6 +103,7 @@ function normalizeVerseRow(row, partLabel = null, chapterNumber = null, verseNum
     english: row.english || "",
     coptic: row.coptic || "",
     arabic: row.arabic || "",
+    french: row.french || "",
   };
 }
 

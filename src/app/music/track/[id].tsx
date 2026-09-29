@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -29,6 +30,7 @@ import { goBack } from '@/utils/navigation';
 import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
+import { tr } from '../../../utils/appText';
 function formatDuration(durationMs: number | null): string | null {
   if (!durationMs || durationMs <= 0) return null;
   const totalSeconds = Math.round(durationMs / 1000);
@@ -179,8 +181,8 @@ export default function MusicTrackDetailScreen() {
     if (!track || likeBusy) return;
     if (!libraryAuthenticated) {
       Alert.alert(
-        isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
-        isArabic ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.' : 'Sign in to your CHC account to save Liked Songs.',
+        tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
+        tr('Sign in to your CHC account to save Liked Songs.', 'Connectez-vous à votre compte CHC pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'),
       );
       return;
     }
@@ -191,7 +193,7 @@ export default function MusicTrackDetailScreen() {
       setLiked(next);
     } catch (cause) {
       Alert.alert(
-        isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
+        tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
         cause instanceof Error ? cause.message : 'Unable to update Liked Songs.',
       );
     } finally {
@@ -277,7 +279,7 @@ export default function MusicTrackDetailScreen() {
 
           <View style={[styles.details, desktop && styles.detailsDesktop]}>
             <Text style={[styles.eyebrow, isArabic && styles.arabic]}>
-              {isArabic ? 'ترنيمة' : 'TRACK'}
+              {tr('TRACK', 'TITRE', 'ترنيمة')}
             </Text>
             <Text style={[styles.title, isArabic && styles.arabic]}>{track.title}</Text>
 
@@ -302,7 +304,7 @@ export default function MusicTrackDetailScreen() {
                 style={({ pressed }) => [styles.playButton, pressed && styles.pressed]}
               >
                 <Icon name={isPlaying ? 'pause' : 'play'} size={23} color={COLORS.black} />
-                <Text style={styles.playLabel}>{isPlaying ? (isArabic ? 'إيقاف' : 'Pause') : (isArabic ? 'تشغيل' : 'Play')}</Text>
+                <Text style={styles.playLabel}>{isPlaying ? (tr('Pause', 'Pause', 'إيقاف')) : (tr('Play', 'Lire', 'تشغيل'))}</Text>
               </Pressable>
 
               <RoundIconButton
@@ -332,7 +334,7 @@ export default function MusicTrackDetailScreen() {
           >
             <MusicArtwork asset={release.coverAsset} size={72} radius={10} label={release.title} />
             <View style={styles.albumCardText}>
-              <Text style={[styles.albumCardLabel, isArabic && styles.arabic]}>{isArabic ? 'من الإصدار' : 'From the release'}</Text>
+              <Text style={[styles.albumCardLabel, isArabic && styles.arabic]}>{tr('From the release', 'De la parution', 'من الإصدار')}</Text>
               <Text numberOfLines={1} style={[styles.albumCardTitle, isArabic && styles.arabic]}>{release.title}</Text>
               <Text numberOfLines={1} style={[styles.albumCardMeta, isArabic && styles.arabic]}>
                 {[
@@ -346,7 +348,7 @@ export default function MusicTrackDetailScreen() {
         ) : null}
 
         <View style={styles.creditsCard}>
-          <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الفنانون' : 'Artists'}</Text>
+          <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Artists', 'Artistes', 'الفنانون')}</Text>
           {track.artists.map((artist, index) => (
             <Pressable
               key={artist.id + ':' + artist.role + ':' + index}
@@ -357,7 +359,7 @@ export default function MusicTrackDetailScreen() {
               <View style={styles.artistText}>
                 <Text numberOfLines={1} style={[styles.artistName, isArabic && styles.arabic]}>{artist.displayName}</Text>
                 <Text style={[styles.artistRole, isArabic && styles.arabic]}>
-                  {artist.role === 'primary' ? (isArabic ? 'فنان رئيسي' : 'Primary artist') : (isArabic ? 'فنان مشارك' : 'Featured artist')}
+                  {artist.role === 'primary' ? (tr('Primary artist', 'Artiste principal', 'فنان رئيسي')) : (tr('Featured artist', 'Artiste invité', 'فنان مشارك'))}
                 </Text>
               </View>
               <Icon name="chevron-forward" size={17} color={COLORS.muted} />
@@ -366,7 +368,7 @@ export default function MusicTrackDetailScreen() {
         </View>
 
         <View style={styles.lyricsCard}>
-          <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الكلمات' : 'Lyrics'}</Text>
+          <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Lyrics', 'Paroles', 'الكلمات')}</Text>
           <View style={[styles.lyricsViewport, desktop && styles.lyricsViewportDesktop]}>
             <MusicLyricsView
               lyricSets={lyricSets}

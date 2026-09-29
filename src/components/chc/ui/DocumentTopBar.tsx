@@ -1,13 +1,15 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
+import { appText, appTextIsArabic, type AppText } from '../../../utils/appText';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import Icon, { IconName } from './Icon';
 
 interface DocumentTopBarProps {
-  title: string | { english: string; arabic: string };
+  title: string | AppText;
   onBack: () => void;
   backAccessibilityLabel?: string;
   leadingIcon?: IconName;
@@ -51,10 +53,10 @@ export default function DocumentTopBar({
 
   // One language at a time, matching AppHeader: the app-wide choice, falling
   // back to whichever one this particular title actually has.
-  const showArabic = preferences.appLanguage === 'ar' && Boolean(titleParts.arabic);
+  const showArabic = appTextIsArabic(titleParts, preferences.appLanguage);
   const label = showArabic
     ? titleParts.arabic
-    : formatEnglishDisplayText(titleParts.english || titleParts.arabic);
+    : formatEnglishDisplayText(appText(titleParts, preferences.appLanguage));
 
   const hasLeading = Boolean(leadingIcon && onLeadingPress);
   const hasTrailing = Boolean(trailingIcon && onTrailingPress);

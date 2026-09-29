@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { learningService } from '@/services/learningService';
 import type { LearningProgressState } from '@/types/learningPlatform';
 
+import { tr } from '../../utils/appText';
 export default function LearningProgressControl({
   hymnId,
   locale,
@@ -65,31 +67,29 @@ export default function LearningProgressControl({
     return (
       <View style={styles.authCard}>
         <Text style={[styles.authTitle, isArabic && styles.arabic]}>
-          {isArabic ? 'سجّل الدخول لحفظ تقدّمك' : 'Sign in to save your progress'}
+          {tr('Sign in to save your progress', 'Connectez-vous pour enregistrer votre progression', 'سجّل الدخول لحفظ تقدّمك')}
         </Text>
         <Text style={[styles.authBody, isArabic && styles.arabic]}>
-          {isArabic
-            ? 'يمكنك الاستماع والمشاهدة بدون حساب، لكن حالات التعلّم مرتبطة بحساب CHC.'
-            : 'You can listen and watch without an account, but learning states are tied to your CHC account.'}
+          {tr('You can listen and watch without an account, but learning states are tied to your CHC account.', 'Vous pouvez écouter et regarder sans compte, mais votre progression est liée à votre compte CHC.', 'يمكنك الاستماع والمشاهدة بدون حساب، لكن حالات التعلّم مرتبطة بحساب CHC.')}
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Pressable style={styles.accountButton} onPress={() => router.push('/account')}>
-          <Text style={styles.accountButtonText}>{isArabic ? 'فتح الحساب' : 'Open Account'}</Text>
+          <Text style={styles.accountButtonText}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text>
         </Pressable>
       </View>
     );
   }
 
   const options: { id: LearningProgressState; label: string }[] = [
-    { id: 'will_learn', label: isArabic ? 'سأتعلّم' : 'Will Learn' },
-    { id: 'learning', label: isArabic ? 'أتعلّم الآن' : 'Currently Learning' },
-    { id: 'finished', label: isArabic ? 'أكملت التعلّم' : 'Finished Learning' },
+    { id: 'will_learn', label: tr('Will Learn', 'À apprendre', 'سأتعلّم') },
+    { id: 'learning', label: tr('Currently Learning', 'En cours d’apprentissage', 'أتعلّم الآن') },
+    { id: 'finished', label: tr('Finished Learning', 'Apprentissage terminé', 'أكملت التعلّم') },
   ];
 
   return (
     <View>
       <Text style={[styles.heading, isArabic && styles.arabic]}>
-        {isArabic ? 'تقدّم التعلّم' : 'Learning progress'}
+        {tr('Learning progress', 'Progression', 'تقدّم التعلّم')}
       </Text>
       <View style={styles.options}>
         {options.map((option) => {

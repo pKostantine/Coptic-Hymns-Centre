@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import Icon from '@/components/chc/ui/Icon';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
@@ -20,9 +21,10 @@ import { formatCopticYear, formatGregorianDate, formatGregorianDateRange } from 
 import { goBack } from '@/utils/navigation';
 import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
+import { appText, tr } from '../../../utils/appText';
 const SEASON_SELECTOR_LABELS = {
-  title: { english: 'Season Selector', arabic: 'اختيار الفترة' },
-  live: { english: 'Live', arabic: 'حاليًا' },
+  title: { english: 'Season Selector', arabic: 'اختيار الفترة', french: 'Choix du temps liturgique' },
+  live: { english: 'Live', arabic: 'حاليًا', french: 'En direct' },
 };
 
 interface ChildRow {
@@ -73,7 +75,8 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
   const { selectDate } = useCalendar();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
-  const labelText = (label: { english: string; arabic: string }) => (isArabic ? label.arabic : label.english);
+  const appLanguage = preferences.appLanguage;
+  const labelText = (label: { english: string; arabic: string; french?: string }) => (appText(label));
   const [year, setYear] = useState<number | null>(null);
   const [currentCopticYear, setCurrentCopticYear] = useState<number | null>(null);
   const [rows, setRows] = useState<TopRow[] | null>(null);
@@ -110,7 +113,8 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
           return {
             type: 'season',
             key: row.rangeKey,
-            title: formal.english,
+            // Shown whenever the Arabic isn't: French in French.
+            title: tr(formal.english, formal.french || formal.english, formal.english),
             arabic: formal.arabic,
             subtitle: formatGregorianDateRange(row.startDate, row.endDate, isArabic),
             startDate: row.startDate,
@@ -130,12 +134,12 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
           seasonRows.find((s) => event.date === s.startDate);
 
         const formal = getEventFormalName(event.key, event.title);
-        const child: ChildRow = { key: event.key, title: formal.english, arabic: formal.arabic, date: event.date };
+        const child: ChildRow = { key: event.key, title: tr(formal.english, formal.french || formal.english, formal.english), arabic: formal.arabic, date: event.date };
 
         if (assigned) {
           assigned.children.push(child);
         } else {
-          looseDays.push({ type: 'day', key: event.key, title: formal.english, arabic: formal.arabic, date: event.date });
+          looseDays.push({ type: 'day', key: event.key, title: tr(formal.english, formal.french || formal.english, formal.english), arabic: formal.arabic, date: event.date });
         }
       }
       seasonRows.forEach((s) => s.children.sort((a, b) => a.date.localeCompare(b.date)));
@@ -151,7 +155,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
     return () => {
       cancelled = true;
     };
-  }, [year, isArabic]);
+  }, [year, isArabic, appLanguage]);
 
   const todayIso = todayIsoDate();
   const todayInViewedYear = Boolean(yearRange && todayIso >= yearRange.startDate && todayIso < yearRange.endDate);
@@ -203,14 +207,14 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
       ) : (
         <>
           <View style={styles.yearRow}>
-            <Pressable accessibilityLabel={isArabic ? 'Next year' : 'Previous year'} style={styles.yearButton} onPress={() => setYear((y) => (y ?? 0) + (isArabic ? 1 : -1))}>
+            <Pressable accessibilityLabel={tr('Previous year', 'Année précédente', 'Next year')} style={styles.yearButton} onPress={() => setYear((y) => (y ?? 0) + (isArabic ? 1 : -1))}>
               <Icon name="chevron-back" size={26} color={COLORS.rowBlue} />
             </Pressable>
             <View style={[styles.yearLabel, isArabic && styles.rowReverse]}>
               {year === currentCopticYear ? <View style={styles.currentYearDot} /> : null}
               <Text style={[styles.yearText, isArabic && styles.arabicText]}>{formatCopticYear(year, isArabic)}</Text>
             </View>
-            <Pressable accessibilityLabel={isArabic ? 'Previous year' : 'Next year'} style={styles.yearButton} onPress={() => setYear((y) => (y ?? 0) + (isArabic ? -1 : 1))}>
+            <Pressable accessibilityLabel={tr('Next year', 'Année suivante', 'Previous year')} style={styles.yearButton} onPress={() => setYear((y) => (y ?? 0) + (isArabic ? -1 : 1))}>
               <Icon name="chevron-forward" size={26} color={COLORS.rowBlue} />
             </Pressable>
           </View>

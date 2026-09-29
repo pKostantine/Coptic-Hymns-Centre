@@ -1,3 +1,5 @@
+import { getCurrentAppLanguage } from './preferencesStorage';
+
 export const EASTERN_ARABIC_DIGITS: Record<string, string> = {
   '0': '٠',
   '1': '١',
@@ -41,6 +43,31 @@ export const GREGORIAN_MONTHS_AR = [
   'ديسمبر',
 ];
 
+export const GREGORIAN_MONTHS_FR = [
+  'janvier',
+  'février',
+  'mars',
+  'avril',
+  'mai',
+  'juin',
+  'juillet',
+  'août',
+  'septembre',
+  'octobre',
+  'novembre',
+  'décembre',
+];
+const GREGORIAN_MONTHS_FR_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+/** Not Arabic: French when that is the App Language. The helpers below take only an Arabic flag. */
+function isFrench(isArabic: boolean): boolean {
+  return !isArabic && getCurrentAppLanguage() === 'fr';
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 // One canonical spelling per Coptic month, matching what every month-name
 // column in the database now stores (calendar.coptic_date_conversions,
 // calendar.fixed_coptic_day_flags, calendar.calendar_event_instances,
@@ -66,17 +93,20 @@ const COPTIC_MONTHS_AR: Record<string, string> = {
 
 export const WEEKDAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const WEEKDAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+export const WEEKDAYS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 
-/** A date-only value (UTC midnight) as "Saturday, September 26" / "السبت ٢٦ سبتمبر". */
+/** A date-only value (UTC midnight) as "Saturday, September 26" / "Samedi 26 septembre" / "السبت ٢٦ سبتمبر". */
 export function formatWeekdayDate(date: Date, isArabic: boolean) {
   const weekday = date.getUTCDay();
   if (isArabic) return `${WEEKDAYS_AR[weekday]} ${toEasternArabicDigits(date.getUTCDate())} ${GREGORIAN_MONTHS_AR[date.getUTCMonth()]}`;
+  if (isFrench(isArabic)) return `${capitalize(WEEKDAYS_FR[weekday])} ${date.getUTCDate()} ${GREGORIAN_MONTHS_FR[date.getUTCMonth()]}`;
   return `${WEEKDAYS_EN[weekday]}, ${GREGORIAN_MONTHS_EN[date.getUTCMonth()]} ${date.getUTCDate()}`;
 }
 
-/** A Coptic date as "Thoout 16, 1743" / "١٦ توت ١٧٤٣". */
+/** A Coptic date as "Thoout 16, 1743" / "16 Thoout 1743" / "١٦ توت ١٧٤٣". */
 export function formatCopticDate(monthName: string, day: number, year: number, isArabic: boolean) {
   if (isArabic) return `${toEasternArabicDigits(day)} ${formatCopticMonthName(monthName, true)} ${toEasternArabicDigits(year)}`;
+  if (isFrench(isArabic)) return `${day} ${monthName} ${year}`;
   return `${monthName} ${day}, ${year}`;
 }
 
@@ -85,7 +115,9 @@ export function toEasternArabicDigits(value: number | string) {
 }
 
 export function formatGregorianMonthTitle(month: number, year: number, isArabic: boolean) {
-  const monthName = isArabic ? GREGORIAN_MONTHS_AR[month - 1] : GREGORIAN_MONTHS_EN[month - 1];
+  const monthName = isArabic
+    ? GREGORIAN_MONTHS_AR[month - 1]
+    : isFrench(isArabic) ? capitalize(GREGORIAN_MONTHS_FR[month - 1]) : GREGORIAN_MONTHS_EN[month - 1];
   const yearText = isArabic ? toEasternArabicDigits(year) : String(year);
   return `${monthName} ${yearText}`;
 }
@@ -95,7 +127,7 @@ export function formatCopticMonthName(monthName: string, isArabic: boolean) {
 }
 
 export function formatCopticYear(year: number, isArabic: boolean) {
-  return isArabic ? `${toEasternArabicDigits(year)} ش` : `${year} AM`;
+  return isArabic ? `${toEasternArabicDigits(year)} ش` : isFrench(isArabic) ? `${year} A.M.` : `${year} AM`;
 }
 
 export function formatCalendarDay(value: number | string, isArabic: boolean) {
@@ -104,6 +136,9 @@ export function formatCalendarDay(value: number | string, isArabic: boolean) {
 
 export function formatGregorianDate(isoDate: string, isArabic: boolean) {
   const date = new Date(`${isoDate}T00:00:00Z`);
+  if (isFrench(isArabic)) {
+    return `${date.getUTCDate()} ${GREGORIAN_MONTHS_FR_SHORT[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  }
   if (!isArabic) {
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -133,6 +168,12 @@ export function formatGregorianDateRange(startDate: string, endDate: string, isA
   const start = new Date(`${startDate}T00:00:00Z`);
   const end = new Date(`${endDate}T00:00:00Z`);
   const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+
+  if (isFrench(isArabic)) {
+    const startLabel = `${start.getUTCDate()} ${GREGORIAN_MONTHS_FR_SHORT[start.getUTCMonth()]}`;
+    const endLabel = formatGregorianDate(endDate, false);
+    return sameYear ? `${startLabel} – ${endLabel}` : `${formatGregorianDate(startDate, false)} – ${endLabel}`;
+  }
 
   if (!isArabic) {
     const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });

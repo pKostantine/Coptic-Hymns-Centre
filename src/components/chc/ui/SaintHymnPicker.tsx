@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -27,6 +28,7 @@ import {
 } from '@/utils/saintHymns';
 import { DISABLED_TEXT_SELECTION_STYLE, EDITABLE_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
+import { appText } from '../../../utils/appText';
 interface SaintHymnPickerProps {
   visible: boolean;
   onClose: () => void;
@@ -37,13 +39,13 @@ interface SaintHymnPickerProps {
 }
 
 const LABELS = {
-  title: { english: 'Saint Hymns', arabic: 'ألحان القديسين' },
-  search: { english: 'Search saints', arabic: 'ابحث عن قديس' },
-  empty: { english: 'No saints match that search.', arabic: 'لا يوجد قديس مطابق.' },
-  clear: { english: 'Clear', arabic: 'مسح' },
-  done: { english: 'Done', arabic: 'تم' },
-  close: { english: 'Close', arabic: 'إغلاق' },
-  noPreview: { english: 'This hymn has no text yet.', arabic: 'لا يوجد نص لهذا اللحن بعد.' },
+  title: { english: 'Saint Hymns', arabic: 'ألحان القديسين', french: 'Hymnes des saints' },
+  search: { english: 'Search saints', arabic: 'ابحث عن قديس', french: 'Rechercher des saints' },
+  empty: { english: 'No saints match that search.', arabic: 'لا يوجد قديس مطابق.', french: 'Aucun saint ne correspond à cette recherche.' },
+  clear: { english: 'Clear', arabic: 'مسح', french: 'Effacer' },
+  done: { english: 'Done', arabic: 'تم', french: 'Terminé' },
+  close: { english: 'Close', arabic: 'إغلاق', french: 'Fermer' },
+  noPreview: { english: 'This hymn has no text yet.', arabic: 'لا يوجد نص لهذا اللحن بعد.', french: 'Cette hymne n’a pas encore de texte.' },
 };
 
 interface PreviewTarget {
@@ -82,7 +84,7 @@ export default function SaintHymnPicker({
   const { height: windowHeight } = useWindowDimensions();
   const { preferences } = useReadingPreferences();
 
-  const label = (entry: { english: string; arabic: string }) => (isArabic ? entry.arabic : entry.english);
+  const label = (entry: { english: string; arabic: string; french?: string }) => (appText(entry));
   const localized = isArabic && styles.arabicText;
 
   useEffect(() => {

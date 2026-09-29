@@ -90,7 +90,11 @@ export default function VerseBlock({
   // per-language spot like any other verse. Only when the Coptic really is
   // the whole line does it stop being a column and span the row (see
   // spanningLanguage).
-  const hasTranslationText = Boolean((verse.english && verse.english.trim()) || (verse.arabic && verse.arabic.trim()));
+  const hasTranslationText = Boolean(
+    (verse.english && verse.english.trim()) ||
+      (verse.french && verse.french.trim()) ||
+      (verse.arabic && verse.arabic.trim()),
+  );
   const copticStandsAlone = verse.invincibleCoptic && !hasTranslationText;
   const bibleNumberFor = (language) =>
     !Array.isArray(verse.slideshowBibleNumberLanguages) ||
@@ -111,6 +115,22 @@ export default function VerseBlock({
       textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
       minWordsToJustify: 1,
       forceLines: verse.slideshowForcedLines?.english,
+    },
+    {
+      key: "french",
+      speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "french", bishopPresent),
+      text: String(verse.french || ""),
+      bibleVerseNumber: bibleNumberFor("french"),
+      // The seasonal prefix is English/Arabic text; French keeps its line
+      // blank so its verse starts level with theirs.
+      seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine ? verse.seasonalHoosVersePrefix : "",
+      fontSize: getSlideshowLanguageFontSize("french", { verse }, fontSize),
+      fontFamily: "Georgia",
+      lineHeight: getSlideshowLanguageLineHeight("french", { verse }, fontSize),
+      styles: [styles.english],
+      textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
+      minWordsToJustify: 1,
+      forceLines: verse.slideshowForcedLines?.french,
     },
     {
       key: "coptic",
@@ -679,6 +699,16 @@ function getSpeakerLabel(type, language, bishopPresent) {
       people: "People:",
       priest: "Priest:",
       reader: "Reader:",
+    }[role] || "";
+  }
+
+  if (language === "french") {
+    return {
+      bishop: "L’évêque :",
+      deacon: "Le diacre :",
+      people: "L’assemblée :",
+      priest: "Le prêtre :",
+      reader: "Le lecteur :",
     }[role] || "";
   }
 

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
@@ -13,6 +14,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningCantorSummary } from '@/types/learningPlatform';
 
+import { tr } from '../../utils/appText';
 export default function LearningCantorsScreen() {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
@@ -35,13 +37,11 @@ export default function LearningCantorsScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>{isArabic ? 'المعلّمون — تعلّم وادرس' : 'Cantors — Learn & Study'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'المعلّمون' : 'Cantors'} isArabic={isArabic} />
+      <Head><title>{tr('Cantors — Learn & Study', 'Chantres — Apprendre', 'المعلّمون — تعلّم وادرس')}</title></Head>
+      <LearningBackHeader title={tr('Cantors', 'Chantres', 'المعلّمون')} isArabic={isArabic} />
       <NowPlayingAwareScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.intro, isArabic && styles.arabic]}>
-          {isArabic
-            ? 'اختر معلّمًا لتصفح ألبوماته ودروسه المرتبة.'
-            : 'Choose a cantor to explore their learning albums and structured lesson sets.'}
+          {tr('Choose a cantor to explore their learning albums and structured lesson sets.', 'Choisissez un chantre pour découvrir ses albums d’apprentissage et ses séries de leçons.', 'اختر معلّمًا لتصفح ألبوماته ودروسه المرتبة.')}
         </Text>
         {!cantors && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}

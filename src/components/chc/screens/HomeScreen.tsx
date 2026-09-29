@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
@@ -17,6 +18,7 @@ import { musicService } from '@/services/musicService';
 import type { MusicConsumerReleaseSummary } from '@/types/musicConsumer';
 import { localDateAtUtcMidnight } from '@/utils/dateUtils';
 
+import { appLocale, tr } from '../../../utils/appText';
 function addUtcDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
@@ -48,7 +50,7 @@ function sundayForHome(rawDate: Date, period: 'morning' | 'evening') {
 }
 
 function formatDate(date: Date, locale: string) {
-  return date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-CA', {
+  return date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : appLocale() === 'fr' ? 'fr-FR' : 'en-CA', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -137,17 +139,17 @@ export default function HomeScreen() {
   }, [locale]);
 
   const sundayTitle = sunday.relation === 'this'
-    ? (isArabic ? 'رسالة هذا الأحد' : "This Sunday's Message")
-    : (isArabic ? 'رسالة الأحد الماضي' : "Last Sunday's Message");
+    ? (tr("This Sunday's Message", 'Message de ce dimanche', 'رسالة هذا الأحد'))
+    : (tr("Last Sunday's Message", 'Message de dimanche dernier', 'رسالة الأحد الماضي'));
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
-        <title>{isArabic ? 'كوبتك هيمنز سنتر' : 'Coptic Hymns Centre'}</title>
+        <title>{tr('Coptic Hymns Centre', 'Coptic Hymns Centre', 'كوبتك هيمنز سنتر')}</title>
       </Head>
 
       <AppHeader
-        title={{ english: 'Coptic Hymns Centre', arabic: 'كوبتك هيمنز سنتر' }}
+        title={{ english: 'Coptic Hymns Centre', arabic: 'كوبتك هيمنز سنتر', french: 'Coptic Hymns Centre' }}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
       />
 
@@ -164,10 +166,10 @@ export default function HomeScreen() {
           />
           <View style={styles.introCopy}>
             <Text style={[styles.introEyebrow, isArabic && styles.arabic]}>
-              {isArabic ? 'اليوم في الكنيسة' : 'TODAY IN THE CHURCH'}
+              {tr('TODAY IN THE CHURCH', 'AUJOURD’HUI DANS L’ÉGLISE', 'اليوم في الكنيسة')}
             </Text>
             <Text style={[styles.introTitle, !wide && styles.introTitleMobile, isArabic && styles.arabic]}>
-              {isArabic ? 'صلِّ. اقرأ. استمع. تعلّم.' : 'Pray. Read. Listen. Learn.'}
+              {tr('Pray. Read. Listen. Learn.', 'Prier. Lire. Écouter. Apprendre.', 'صلِّ. اقرأ. استمع. تعلّم.')}
             </Text>
           </View>
         </View>
@@ -187,10 +189,10 @@ export default function HomeScreen() {
 
           <Text style={[styles.messageText, isArabic && styles.arabic]}>
             {sundayLoading
-              ? (isArabic ? 'جارٍ تحميل الرسالة…' : 'Loading message…')
+              ? (tr('Loading message…', 'Chargement du message…', 'جارٍ تحميل الرسالة…'))
               : sundayMessage
                 ? sundayMessage
-                : (isArabic ? 'لم تتم إضافة رسالة لهذا الأحد بعد.' : 'A message has not been added for this Sunday yet.')}
+                : (tr('A message has not been added for this Sunday yet.', 'Aucun message n’a encore été ajouté pour ce dimanche.', 'لم تتم إضافة رسالة لهذا الأحد بعد.'))}
           </Text>
         </View>
 
@@ -201,28 +203,28 @@ export default function HomeScreen() {
             </View>
             <View style={styles.headingText}>
               <Text style={[styles.cardTitle, isArabic && styles.arabic]}>
-                {isArabic ? 'السنكسار' : 'Synaxarium'}
+                {tr('Synaxarium', 'Synaxaire', 'السنكسار')}
               </Text>
               <Text style={[styles.cardSubtitle, isArabic && styles.arabic]}>
-                {isArabic ? 'اليوم وغداً' : 'Today and tomorrow'}
+                {tr('Today and tomorrow', 'Aujourd’hui et demain', 'اليوم وغداً')}
               </Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isArabic ? 'بحث في السنكسار' : 'Search Synaxarium'}
+              accessibilityLabel={tr('Search Synaxarium', 'Rechercher dans le Synaxaire', 'بحث في السنكسار')}
               onPress={() => router.push('/synaxarium')}
               style={({ pressed }) => [styles.synaxSearchButton, pressed && styles.pressed]}
             >
               <Icon name="search-outline" size={17} color={COLORS.goldBright} />
               <Text style={[styles.synaxSearchText, isArabic && styles.arabic]}>
-                {isArabic ? 'بحث' : 'Search'}
+                {tr('Search', 'Rechercher', 'بحث')}
               </Text>
             </Pressable>
           </View>
 
           <View style={[styles.synaxColumns, wide && styles.synaxColumnsWide]}>
             <SynaxDay
-              title={isArabic ? 'اليوم' : 'Today'}
+              title={tr('Today', 'Aujourd’hui', 'اليوم')}
               date={synaxToday}
               events={todayEvents}
               loading={synaxLoading}
@@ -230,7 +232,7 @@ export default function HomeScreen() {
             />
             <View style={wide ? styles.synaxDividerVertical : styles.synaxDividerHorizontal} />
             <SynaxDay
-              title={isArabic ? 'غداً' : 'Tomorrow'}
+              title={tr('Tomorrow', 'Demain', 'غداً')}
               date={synaxTomorrow}
               events={tomorrowEvents}
               loading={synaxLoading}
@@ -246,21 +248,21 @@ export default function HomeScreen() {
             </View>
             <View style={styles.headingText}>
               <Text style={[styles.cardTitle, isArabic && styles.arabic]}>
-                {isArabic ? 'أحدث الإصدارات' : 'Latest Music Releases'}
+                {tr('Latest Music Releases', 'Dernières parutions musicales', 'أحدث الإصدارات')}
               </Text>
               <Text style={[styles.cardSubtitle, isArabic && styles.arabic]}>
-                {isArabic ? 'الجديد في CHC Music' : 'New on CHC Music'}
+                {tr('New on CHC Music', 'Nouveau sur CHC Music', 'الجديد في CHC Music')}
               </Text>
             </View>
             <Pressable onPress={() => router.push('/music')} style={styles.seeAllButton}>
-              <Text style={[styles.seeAllText, isArabic && styles.arabic]}>{isArabic ? 'الكل' : 'See all'}</Text>
+              <Text style={[styles.seeAllText, isArabic && styles.arabic]}>{tr('See all', 'Tout voir', 'الكل')}</Text>
               <Icon name="chevron-forward" size={15} color={COLORS.goldBright} />
             </Pressable>
           </View>
 
           {musicLoading ? (
             <Text style={[styles.emptyText, isArabic && styles.arabic]}>
-              {isArabic ? 'جارٍ تحميل الإصدارات…' : 'Loading releases…'}
+              {tr('Loading releases…', 'Chargement des parutions…', 'جارٍ تحميل الإصدارات…')}
             </Text>
           ) : releases.length ? (
             <ScrollView
@@ -286,7 +288,7 @@ export default function HomeScreen() {
             </ScrollView>
           ) : (
             <Text style={[styles.emptyText, isArabic && styles.arabic]}>
-              {isArabic ? 'لا توجد إصدارات منشورة بعد.' : 'No published releases yet.'}
+              {tr('No published releases yet.', 'Aucune parution publiée pour l’instant.', 'لا توجد إصدارات منشورة بعد.')}
             </Text>
           )}
         </View>
@@ -318,7 +320,7 @@ function SynaxDay({
       <Text style={[styles.synaxDate, isArabic && styles.arabic]}>{formatDate(date, locale)}</Text>
       {loading ? (
         <Text style={[styles.emptyText, isArabic && styles.arabic]}>
-          {isArabic ? 'جارٍ التحميل…' : 'Loading…'}
+          {tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}
         </Text>
       ) : events.length ? (
         <View style={styles.eventList}>
@@ -333,7 +335,7 @@ function SynaxDay({
         </View>
       ) : (
         <Text style={[styles.emptyText, isArabic && styles.arabic]}>
-          {isArabic ? 'لا توجد أحداث مدرجة.' : 'No events listed.'}
+          {tr('No events listed.', 'Aucun événement.', 'لا توجد أحداث مدرجة.')}
         </Text>
       )}
     </View>

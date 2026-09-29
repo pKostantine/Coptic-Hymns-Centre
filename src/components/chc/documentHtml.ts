@@ -11,6 +11,8 @@ import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
 export interface DocumentVerse {
   english: string;
+  /** hymn_texts.french — absent or empty wherever the French books had no counterpart. */
+  french?: string;
   coptic: string;
   arabic: string;
   type: string;
@@ -41,7 +43,7 @@ export interface DocumentVerse {
 
 export interface DocumentSection {
   id: string;
-  title: { english: string; arabic: string };
+  title: DocumentTitle;
   verses: DocumentVerse[];
   alternateEvery?: number | null;
   forceWhiteVerses?: boolean;
@@ -77,10 +79,38 @@ export interface DocumentSection {
   nonCopticGospelRiteOnly?: boolean;
 }
 
+export interface DocumentTitle {
+  english: string;
+  arabic: string;
+  /** hymn_titles.title_french — only some hymns have one. */
+  french?: string;
+}
+
 export interface VisibleColumns {
   english: boolean;
+  /** Off unless the reader turns French on. */
+  french?: boolean;
   coptic: boolean;
   arabic: boolean;
+}
+
+/**
+ * The one language a title shows in, picked by the App Language setting and
+ * falling back to whichever language this title does have (few hymns have a
+ * French title yet; some have no Arabic one).
+ */
+export function pickDocumentTitle(
+  title: Partial<DocumentTitle> | null | undefined,
+  appLanguage: AppTitleLanguage,
+): { text: string; language: 'english' | 'french' | 'arabic' } {
+  const texts = { english: title?.english || '', french: title?.french || '', arabic: title?.arabic || '' };
+  const order: ('english' | 'french' | 'arabic')[] = appLanguage === 'ar'
+    ? ['arabic', 'english', 'french']
+    : appLanguage === 'fr'
+      ? ['french', 'english', 'arabic']
+      : ['english', 'arabic', 'french'];
+  const language = order.find((candidate) => texts[candidate]) || 'english';
+  return { text: texts[language], language };
 }
 
 /** A message posted from inside the generated HTML (via `postAction`) up to the host app. */
@@ -98,7 +128,7 @@ export interface DocumentAction {
   height?: number;
 }
 
-const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, coptic: true, arabic: true };
+const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, french: false, coptic: true, arabic: true };
 
 // A non-breaking space, not an empty string: the Coptic column gets a blank
 // placeholder label so its text still starts on the same line as the
@@ -106,13 +136,13 @@ const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, coptic: true, a
 // vertically aligned.
 const BLANK_COPTIC_LABEL = ' ';
 
-const RUBRIC: Record<string, { color: string; english: string; arabic: string; coptic: string; class: string }> = {
-  priest: { color: COLORS.priest, english: 'Priest:', arabic: 'الكاهن:', coptic: BLANK_COPTIC_LABEL, class: 'priest' },
-  bishop: { color: COLORS.bishop, english: 'Bishop:', arabic: 'الأسقف:', coptic: BLANK_COPTIC_LABEL, class: 'bishop' },
-  deacon: { color: COLORS.deacon, english: 'Deacon:', arabic: 'الشماس:', coptic: BLANK_COPTIC_LABEL, class: 'deacon' },
-  reader: { color: COLORS.reader, english: 'Reader:', arabic: 'القارئ:', coptic: BLANK_COPTIC_LABEL, class: 'reader' },
-  people: { color: COLORS.people, english: 'People:', arabic: 'الشعب:', coptic: BLANK_COPTIC_LABEL, class: 'people' },
-  refrain: { color: COLORS.refrain, english: 'Refrain:', arabic: 'قرار:', coptic: BLANK_COPTIC_LABEL, class: 'refrain' },
+const RUBRIC: Record<string, { color: string; english: string; french: string; arabic: string; coptic: string; class: string }> = {
+  priest: { color: COLORS.priest, english: 'Priest:', french: 'Le prêtre :', arabic: 'الكاهن:', coptic: BLANK_COPTIC_LABEL, class: 'priest' },
+  bishop: { color: COLORS.bishop, english: 'Bishop:', french: 'L’évêque :', arabic: 'الأسقف:', coptic: BLANK_COPTIC_LABEL, class: 'bishop' },
+  deacon: { color: COLORS.deacon, english: 'Deacon:', french: 'Le diacre :', arabic: 'الشماس:', coptic: BLANK_COPTIC_LABEL, class: 'deacon' },
+  reader: { color: COLORS.reader, english: 'Reader:', french: 'Le lecteur :', arabic: 'القارئ:', coptic: BLANK_COPTIC_LABEL, class: 'reader' },
+  people: { color: COLORS.people, english: 'People:', french: 'L’assemblée :', arabic: 'الشعب:', coptic: BLANK_COPTIC_LABEL, class: 'people' },
+  refrain: { color: COLORS.refrain, english: 'Refrain:', french: 'Refrain :', arabic: 'قرار:', coptic: BLANK_COPTIC_LABEL, class: 'refrain' },
 };
 
 /**
@@ -348,7 +378,7 @@ export function buildDocumentHtml(
         text-align: justify;
         text-justify: inter-word;
       }
-      .english { font-family: Georgia, serif !important; }
+      .english, .french { font-family: Georgia, serif !important; }
       .coptic {
         font-family: CopticCHC, Georgia, serif !important;
         font-size: ${copticFontSize}px;
@@ -581,7 +611,7 @@ export function buildDocumentHtml(
         postAction('toggleCollapse', { sectionId: section.getAttribute('data-section-id'), collapsed: collapsed });
       });
       (function () {
-        var languages = ['english', 'coptic', 'arabic'];
+        var languages = ['english', 'french', 'coptic', 'arabic'];
         var selectTextEnabled = ${JSON.stringify(effectiveSelectText)};
         if (!selectTextEnabled) {
           var clearDisabledSelection = function () {
@@ -995,16 +1025,14 @@ function isWithinSilentPrayer(section: DocumentSection, index: number): boolean 
  */
 function renderDocumentButtonSection(section: DocumentSection, appLanguage: AppTitleLanguage) {
   const action = section.isAntiphonaryButton ? 'openAntiphonary' : 'openSubdocument';
-  const titleEn = section.title?.english || section.subdocumentKey || 'Open';
-  const titleAr = section.title?.arabic || '';
-  const showArabic = appLanguage === 'ar' ? Boolean(titleAr) : !titleEn && Boolean(titleAr);
+  const title = pickDocumentTitle(section.title, appLanguage);
+  const label = title.text || section.subdocumentKey || 'Open';
   const onclick = `postAction(${JSON.stringify(action)}, { sectionId: ${JSON.stringify(section.id)} })`;
 
   return `
     <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
       <button class="open-button" onclick="${escapeAttribute(onclick)}">
-        ${!showArabic ? `<span>${escapeHtml(titleEn || titleAr)}</span>` : ''}
-        ${showArabic ? `<span class="arabic">${escapeHtml(titleAr)}</span>` : ''}
+        <span${title.language === 'arabic' && title.text ? ' class="arabic"' : ''}>${escapeHtml(label)}</span>
       </button>
     </section>
   `;
@@ -1019,10 +1047,9 @@ function renderDocumentButtonSection(section: DocumentSection, appLanguage: AppT
  * a transition at the end of a service rather than as content of its own.
  */
 function renderHyperlinkButtonSection(section: DocumentSection, appLanguage: AppTitleLanguage) {
-  const titleEn = section.title?.english || section.hyperlinkKey || 'Continue';
-  const titleAr = section.title?.arabic || '';
-  const showArabic = appLanguage === 'ar' ? Boolean(titleAr) : !titleEn && Boolean(titleAr);
-  const label = showArabic ? titleAr : titleEn || titleAr;
+  const title = pickDocumentTitle(section.title, appLanguage);
+  const showArabic = title.language === 'arabic' && Boolean(title.text);
+  const label = title.text || section.hyperlinkKey || 'Continue';
   const onclick = `postAction('openHyperlink', { sectionId: ${JSON.stringify(section.id)} })`;
 
   return `
@@ -1036,18 +1063,17 @@ function renderHyperlinkButtonSection(section: DocumentSection, appLanguage: App
 }
 
 function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLanguage, isCollapsed: boolean) {
-  const titleEn = section.title?.english || '';
-  const titleAr = section.title?.arabic || '';
-  if (!titleEn && !titleAr) return '';
-
   // A title always shows exactly one language, driven by the App Language
   // setting — falling back to whichever language actually has text for this
   // specific section if the selected one doesn't (e.g. Arabic selected but
   // this hymn has no Arabic title).
-  const showArabic = appLanguage === 'ar' ? Boolean(titleAr) : !titleEn && Boolean(titleAr);
-  const languages: { align: string; className: string; text: string }[] = showArabic
-    ? [{ align: 'center', className: 'arabic', text: formatArabicDigits(titleAr) }]
-    : [{ align: 'center', className: 'english', text: titleEn || titleAr }];
+  const title = pickDocumentTitle(section.title, appLanguage);
+  if (!title.text) return '';
+  const languages: { align: string; className: string; text: string }[] = [{
+    align: 'center',
+    className: title.language,
+    text: title.language === 'arabic' ? formatArabicDigits(title.text) : title.text,
+  }];
 
   // A hymn whose own title row declares "Silent Prayer" reads visually
   // distinct from a normal title — dimmer/italic — since none of its
@@ -1116,7 +1142,9 @@ function renderVerse(
   // centered just because the row happens to be Invincible Coptic. Only when
   // there is no translation to justify against does the Coptic center, and
   // then it takes the whole row rather than a column (copticStandsAlone).
-  const hasTranslationText = Boolean((verse.english || '').trim()) || Boolean((verse.arabic || '').trim());
+  const hasTranslationText = Boolean((verse.english || '').trim())
+    || Boolean((verse.french || '').trim())
+    || Boolean((verse.arabic || '').trim());
   const isInvincibleCoptic = verse.prayerType === 'Invincible Coptic' || Boolean(verse.invincibleCoptic);
   const isCopticCentered = isCentered || (isInvincibleCoptic && !hasTranslationText);
   // "Coptic Recited Prayers" hides just this verse's Coptic text when the
@@ -1140,6 +1168,7 @@ function renderVerse(
 
   const languages: { className: string; key: keyof VisibleColumns; text: string; speakerLabel?: string; speakerClass?: string }[] = [
     { className: 'english', key: 'english' as const, text: verse.english || '', speakerLabel: rubric?.english, speakerClass: rubric?.class },
+    { className: 'french', key: 'french' as const, text: verse.french || '', speakerLabel: rubric?.french, speakerClass: rubric?.class },
     {
       className: 'coptic',
       key: 'coptic' as const,
@@ -1173,7 +1202,7 @@ function renderVerse(
       if (copticHiddenByToggle) return false;
       return (visibleColumns.coptic || isInvincibleCoptic) && Boolean(language.text.trim());
     }
-    return visibleColumns[language.key] && (Boolean(language.text.trim()) || Boolean(language.speakerLabel));
+    return Boolean(visibleColumns[language.key]) && (Boolean(language.text.trim()) || Boolean(language.speakerLabel));
   });
 
   // An Invincible Coptic line carrying no translation of its own isn't a

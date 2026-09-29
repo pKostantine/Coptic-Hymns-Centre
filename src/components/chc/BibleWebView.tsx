@@ -26,6 +26,7 @@ export interface BibleWebViewAction {
   highlightId?: string;
   active?: boolean;
   text?: string;
+  html?: string;
 }
 
 interface BibleWebViewProps {

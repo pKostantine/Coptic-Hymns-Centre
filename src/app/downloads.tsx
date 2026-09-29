@@ -108,7 +108,7 @@ function NativeDownloadsScreen() {
   );
 
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
-    <AppHeader title={{ english: 'Downloads & Storage', arabic: 'التنزيلات والتخزين' }} canGoBack onBack={() => goBack(router, '/account' as any)} visibleLanguages={{ english: !isArabic, arabic: isArabic }} />
+    <AppHeader title={{ english: 'Downloads & Storage', arabic: 'التنزيلات والتخزين', french: 'Téléchargements et stockage' }} canGoBack onBack={() => goBack(router, '/account' as any)} visibleLanguages={{ english: !isArabic, arabic: isArabic }} />
     <NowPlayingAwareScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}><Text style={styles.heading}>Storage</Text><Text style={styles.total}>{bytes(summary.musicBytes + summary.learningBytes + contentBytes)}</Text><Text style={styles.muted}>Books {bytes(contentBytes)} • Music {bytes(summary.musicBytes)} • Learn & Study {bytes(summary.learningBytes)}</Text></View>
       <View style={styles.card}>

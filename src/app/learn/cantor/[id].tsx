@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
@@ -14,6 +15,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningCantorDetail } from '@/types/learningPlatform';
 
+import { tr } from '../../../utils/appText';
 export default function LearningCantorScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
@@ -40,7 +42,7 @@ export default function LearningCantorScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{cantor ? cantor.displayName + ' — Learn & Study' : 'Cantor — Learn & Study'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'المعلّم' : 'Cantor'} isArabic={isArabic} />
+      <LearningBackHeader title={tr('Cantor', 'Chantre', 'المعلّم')} isArabic={isArabic} />
       {!cantor && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {cantor ? (
@@ -52,8 +54,8 @@ export default function LearningCantorScreen() {
           </View>
 
           <SectionTitle
-            title={isArabic ? 'ألبومات التعلّم' : 'Learning Albums'}
-            subtitle={isArabic ? 'تسجيلات مرتبة للاستماع والمراجعة' : 'Ordered recordings for listening and review'}
+            title={tr('Learning Albums', 'Albums d’apprentissage', 'ألبومات التعلّم')}
+            subtitle={tr('Ordered recordings for listening and review', 'Enregistrements ordonnés pour l’écoute et la révision', 'تسجيلات مرتبة للاستماع والمراجعة')}
             isArabic={isArabic}
           />
           <View style={styles.list}>
@@ -63,17 +65,17 @@ export default function LearningCantorScreen() {
                 kind="album"
                 title={album.title}
                 description={album.description}
-                meta={isArabic ? 'ألبوم تعلّم' : 'Learning album'}
+                meta={tr('Learning album', 'Album d’apprentissage', 'ألبوم تعلّم')}
                 isArabic={isArabic}
                 onPress={() => router.push({ pathname: '/learn/album/[id]', params: { id: album.id } })}
               />
             ))}
-            {!cantor.albums.length ? <Empty text={isArabic ? 'لا توجد ألبومات منشورة بعد.' : 'No published learning albums yet.'} /> : null}
+            {!cantor.albums.length ? <Empty text={tr('No published learning albums yet.', 'Aucun album d’apprentissage publié pour l’instant.', 'لا توجد ألبومات منشورة بعد.')} /> : null}
           </View>
 
           <SectionTitle
-            title={isArabic ? 'مجموعات الدروس' : 'Lesson Sets'}
-            subtitle={isArabic ? 'دروس خطوة بخطوة لكل لحن' : 'Step-by-step study for individual hymns'}
+            title={tr('Lesson Sets', 'Séries de leçons', 'مجموعات الدروس')}
+            subtitle={tr('Step-by-step study for individual hymns', 'Étude pas à pas de chaque hymne', 'دروس خطوة بخطوة لكل لحن')}
             isArabic={isArabic}
           />
           <View style={styles.list}>
@@ -83,12 +85,12 @@ export default function LearningCantorScreen() {
                 kind="lesson_set"
                 title={lessonSet.title}
                 description={lessonSet.description}
-                meta={isArabic ? 'منهج لحن' : 'Hymn course'}
+                meta={tr('Hymn course', 'Cours d’hymne', 'منهج لحن')}
                 isArabic={isArabic}
                 onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: lessonSet.id } })}
               />
             ))}
-            {!cantor.lessonSets.length ? <Empty text={isArabic ? 'لا توجد مجموعات دروس منشورة بعد.' : 'No published lesson sets yet.'} /> : null}
+            {!cantor.lessonSets.length ? <Empty text={tr('No published lesson sets yet.', 'Aucune série de leçons publiée pour l’instant.', 'لا توجد مجموعات دروس منشورة بعد.')} /> : null}
           </View>
         </NowPlayingAwareScrollView>
       ) : null}

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { musicTrackDownloadRequest } from '@/services/offlineDownloadRequests';
 import { publicShareUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
+import { tr } from '../../utils/appText';
 interface MusicTrackActionsMenuProps {
   item: MusicQueueItem;
   isArabic?: boolean;
@@ -82,7 +84,7 @@ export default function MusicTrackActionsMenu({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={isArabic ? 'خيارات المقطع' : 'Track options'}
+        accessibilityLabel={tr('Track options', 'Options du titre', 'خيارات المقطع')}
         hitSlop={4}
         onPress={(event) => {
           event.stopPropagation();
@@ -117,7 +119,7 @@ export default function MusicTrackActionsMenu({
                   <Text numberOfLines={1} style={[styles.subtitle, isArabic && styles.arabic]}>{item.releaseTitle}</Text>
                 ) : null}
               </View>
-              <Pressable accessibilityLabel={isArabic ? 'إغلاق' : 'Close'} onPress={close} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
+              <Pressable accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} onPress={close} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
                 <Icon name="close" size={20} color={COLORS.muted} />
               </Pressable>
             </View>
@@ -134,23 +136,23 @@ export default function MusicTrackActionsMenu({
               ) : null}
               <MusicPlaylistPicker
                 trackId={item.track.id}
-                label={isArabic ? 'إضافة إلى قائمة تشغيل' : 'Add to playlist'}
+                label={tr('Add to playlist', 'Ajouter à une playlist', 'إضافة إلى قائمة تشغيل')}
                 menuRow
                 onDismiss={close}
               />
               <ActionRow
                 icon="play-skip-forward"
-                label={isArabic ? 'تشغيل تالياً' : 'Add next'}
+                label={tr('Add next', 'Lire ensuite', 'تشغيل تالياً')}
                 onPress={addTrackNext}
               />
               <ActionRow
                 icon="list-outline"
-                label={isArabic ? 'إضافة إلى نهاية قائمة الانتظار' : 'Add to end of queue'}
+                label={tr('Add to end of queue', 'Ajouter à la fin de la file', 'إضافة إلى نهاية قائمة الانتظار')}
                 onPress={addTrackToEnd}
               />
               <ActionRow
                 icon="share-outline"
-                label={isArabic ? 'مشاركة' : 'Share'}
+                label={tr('Share', 'Partager', 'مشاركة')}
                 onPress={() => void shareTrack()}
               />
             </View>

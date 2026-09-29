@@ -1,14 +1,16 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
+import { appText, type AppText } from '../../../utils/appText';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import Icon, { IconName } from './Icon';
 
 interface AppHeaderProps {
-  title: string | { english: string; arabic: string };
+  title: string | AppText;
   canGoBack?: boolean;
   onBack?: () => void;
   rightLeadingIcon?: IconName;
@@ -56,6 +58,8 @@ export default function AppHeader({
   const wantsArabic = visibleLanguages ? visibleLanguages.arabic && !visibleLanguages.english : preferences.appLanguage === 'ar';
   const showArabic = wantsArabic && Boolean(titleParts.arabic);
   const showEnglish = !showArabic;
+  // Not Arabic: the French title in French, else the English.
+  const latinTitle = appText({ ...titleParts, arabic: '' }, preferences.appLanguage === 'fr' ? 'fr' : 'en') || titleParts.arabic;
   const defaultRightLeadingIcon = showBrowserFullscreen && shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined;
   const defaultRightLeadingPress = showBrowserFullscreen && shouldShowFullscreen ? toggleFullscreen : undefined;
   const effectiveRightLeadingIcon = rightLeadingIcon ?? defaultRightLeadingIcon;
@@ -81,7 +85,7 @@ export default function AppHeader({
         <View style={[styles.titleGroup, !titleVisible && styles.titleHidden]} aria-hidden={!titleVisible}>
           {showEnglish ? (
             <Text style={[styles.title, styles.centeredTitle]} numberOfLines={1}>
-              {formatEnglishDisplayText(titleParts.english || titleParts.arabic)}
+              {formatEnglishDisplayText(latinTitle)}
             </Text>
           ) : null}
           {showArabic ? (

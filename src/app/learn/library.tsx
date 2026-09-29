@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useFocusEffect, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useMemo, useState } from 'react';
@@ -31,6 +32,7 @@ import type {
   LearningProgressState,
 } from '@/types/learningPlatform';
 
+import { tr } from '../../utils/appText';
 const EMPTY_LIBRARY: LearningItemLibraryPayload = { authenticated: false, likedItemIds: [], items: [] };
 const EMPTY_PLAYLISTS: LearningPlaylistLibraryPayload = { authenticated: false, playlists: [] };
 
@@ -145,7 +147,7 @@ export default function LearningLibraryScreen() {
       setLibrary((current) => ({ ...current, items: previousItems }));
       const message = cause instanceof Error ? cause.message : 'Unable to update this learning item.';
       setError(message);
-      Alert.alert(isArabic ? 'تعذّر تحديث القائمة' : 'Could not update list', message);
+      Alert.alert(tr('Could not update list', 'Impossible de mettre à jour la liste', 'تعذّر تحديث القائمة'), message);
     } finally {
       setMovingId(null);
     }
@@ -156,8 +158,8 @@ export default function LearningLibraryScreen() {
     if (!name || creating) return;
     if (!playlistLibrary.authenticated) {
       Alert.alert(
-        isArabic ? 'تسجيل الدخول مطلوب' : 'Sign in required',
-        isArabic ? 'سجّل الدخول لإنشاء قوائم تعلّم مخصّصة.' : 'Sign in to create custom learning playlists.',
+        tr('Sign in required', 'Connexion requise', 'تسجيل الدخول مطلوب'),
+        tr('Sign in to create custom learning playlists.', 'Connectez-vous pour créer des playlists d’apprentissage.', 'سجّل الدخول لإنشاء قوائم تعلّم مخصّصة.'),
       );
       return;
     }
@@ -180,8 +182,8 @@ export default function LearningLibraryScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>{isArabic ? 'تعلّمي - مركز الألحان القبطية' : 'My Learning - Coptic Hymns Centre'}</title></Head>
-      <AppHeader title={{ english: 'Learn & Study', arabic: 'التعلّم والدراسة' }} />
+      <Head><title>{tr('My Learning - Coptic Hymns Centre', 'Mon apprentissage - Coptic Hymns Centre', 'تعلّمي - مركز الألحان القبطية')}</title></Head>
+      <AppHeader title={{ english: 'Learn & Study', arabic: 'التعلّم والدراسة', french: 'Apprendre' }} />
       <LearningSectionNav active="library" />
       <NowPlayingAwareScrollView
         contentContainerStyle={styles.content}
@@ -190,9 +192,9 @@ export default function LearningLibraryScreen() {
       >
         <View style={styles.titleRow}>
           <View style={styles.titleCopy}>
-            <Text style={[styles.pageTitle, isArabic && styles.arabic]}>{isArabic ? 'تعلّمي' : 'My Learning'}</Text>
+            <Text style={[styles.pageTitle, isArabic && styles.arabic]}>{tr('My Learning', 'Mon apprentissage', 'تعلّمي')}</Text>
             <Text style={[styles.pageBody, isArabic && styles.arabic]}>
-              {isArabic ? 'نظّم ما ستتعلّمه، وما تدرسه الآن، وما أكملته.' : 'Move each recording or lesson forward as you learn it.'}
+              {tr('Move each recording or lesson forward as you learn it.', 'Faites avancer chaque enregistrement ou leçon à mesure que vous l’apprenez.', 'نظّم ما ستتعلّمه، وما تدرسه الآن، وما أكملته.')}
             </Text>
           </View>
           {audioQueue.length ? (
@@ -209,9 +211,9 @@ export default function LearningLibraryScreen() {
           <View style={styles.authCard}>
             <Icon name="person-circle-outline" size={32} color={COLORS.learningBright} />
             <View style={styles.authCopy}>
-              <Text style={[styles.authTitle, isArabic && styles.arabic]}>{isArabic ? 'احفظ تعلّمك على كل أجهزتك' : 'Keep your learning across devices'}</Text>
+              <Text style={[styles.authTitle, isArabic && styles.arabic]}>{tr('Keep your learning across devices', 'Gardez votre apprentissage sur tous vos appareils', 'احفظ تعلّمك على كل أجهزتك')}</Text>
               <Text style={[styles.authBody, isArabic && styles.arabic]}>
-                {isArabic ? 'المحتوى متاح للجميع. سجّل الدخول لحفظ القوائم والتقدّم.' : 'All lessons remain available. Sign in to save progress and playlists.'}
+                {tr('All lessons remain available. Sign in to save progress and playlists.', 'Toutes les leçons restent accessibles. Connectez-vous pour enregistrer votre progression et vos playlists.', 'المحتوى متاح للجميع. سجّل الدخول لحفظ القوائم والتقدّم.')}
               </Text>
             </View>
             <Pressable accessibilityLabel="Open account" style={styles.authButton} onPress={() => router.push('/account')}>
@@ -278,7 +280,7 @@ export default function LearningLibraryScreen() {
                       style={styles.moveButton}
                     >
                       <Icon name="chevron-back" size={16} color={COLORS.muted} />
-                      <Text style={styles.moveText}>{stateIndex === 2 ? (isArabic ? 'أعد التعلّم' : 'Revisit') : (isArabic ? 'لاحقاً' : 'Later')}</Text>
+                      <Text style={styles.moveText}>{stateIndex === 2 ? (tr('Revisit', 'Revoir', 'أعد التعلّم')) : (tr('Later', 'Plus tard', 'لاحقاً'))}</Text>
                     </Pressable>
                   ) : null}
                   {stateIndex < STATE_ORDER.length - 1 ? (
@@ -288,7 +290,7 @@ export default function LearningLibraryScreen() {
                       onPress={() => void moveItem(item, STATE_ORDER[stateIndex + 1])}
                       style={[styles.moveButton, styles.moveButtonPrimary]}
                     >
-                      <Text style={[styles.moveText, styles.moveTextPrimary]}>{stateIndex === 0 ? (isArabic ? 'ابدأ' : 'Start') : (isArabic ? 'أكملت' : 'Finish')}</Text>
+                      <Text style={[styles.moveText, styles.moveTextPrimary]}>{stateIndex === 0 ? (tr('Start', 'Commencer', 'ابدأ')) : (tr('Finish', 'Terminer', 'أكملت'))}</Text>
                       <Icon name={stateIndex === 1 ? 'checkmark' : 'chevron-forward'} size={16} color={COLORS.learningDeep} />
                     </Pressable>
                   ) : null}
@@ -302,7 +304,7 @@ export default function LearningLibraryScreen() {
               <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>{labels[activeState].empty}</Text>
               {!authenticated ? (
                 <Pressable onPress={() => router.push('/account')}>
-                  <Text style={styles.emptyAction}>{isArabic ? 'تسجيل الدخول' : 'Sign in'}</Text>
+                  <Text style={styles.emptyAction}>{tr('Sign in', 'Se connecter', 'تسجيل الدخول')}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -311,11 +313,11 @@ export default function LearningLibraryScreen() {
 
         <View style={styles.customHeader}>
           <View style={styles.customTitleRow}>
-            <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'قوائم مخصّصة' : 'Custom Playlists'}</Text>
+            <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Custom Playlists', 'Playlists personnelles', 'قوائم مخصّصة')}</Text>
             <Text style={styles.itemCount}>{playlistLibrary.playlists.length}</Text>
           </View>
           <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
-            {isArabic ? 'اجمع الدروس والتسجيلات في قوائمك الخاصة.' : 'Group any lessons and recordings your way.'}
+            {tr('Group any lessons and recordings your way.', 'Regroupez leçons et enregistrements à votre façon.', 'اجمع الدروس والتسجيلات في قوائمك الخاصة.')}
           </Text>
         </View>
         <View style={styles.createRow}>
@@ -323,7 +325,7 @@ export default function LearningLibraryScreen() {
             editable={!creating}
             onChangeText={setPlaylistName}
             onSubmitEditing={() => void createPlaylist()}
-            placeholder={isArabic ? 'اسم قائمة جديدة' : 'New playlist name'}
+            placeholder={tr('New playlist name', 'Nom de la nouvelle playlist', 'اسم قائمة جديدة')}
             placeholderTextColor={COLORS.muted}
             returnKeyType="done"
             style={[styles.createInput, isArabic && styles.arabic]}

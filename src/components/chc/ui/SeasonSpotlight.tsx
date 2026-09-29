@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -8,10 +9,12 @@ import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { useCalendar } from '../../../context/CalendarContext';
 import { getCopticDate, getSeasonIndicatorLabel, type CopticDate } from '../../../utils/calendarService';
 import { holyWeekRowDate, type HolyWeekSchedule } from '../../../utils/holyWeek';
-import { formatCopticMonthName, formatWeekdayDate, toEasternArabicDigits } from '../../../utils/localeFormat';
+import { formatCopticDate, formatCopticMonthName, formatWeekdayDate, toEasternArabicDigits } from '../../../utils/localeFormat';
 import CopticCross from './CopticCross';
 import Icon from './Icon';
 
+import { entryLabel, tr } from '../../../utils/appText';
+import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 const MAX_FONT_SCALE = 1.25;
 
 interface SeasonSpotlightProps {
@@ -38,16 +41,19 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
   // Both are kept with the day they belong to, so a stale value drops out by key.
   const [coptic, setCoptic] = useState<{ key: string; date: CopticDate | null } | null>(null);
   const [season, setSeason] = useState<{ key: string; label: string | null } | null>(null);
+  // The season's name is read in the App Language, so it belongs to that too.
+  const { preferences } = useReadingPreferences();
+  const seasonKey = `${dateKey}:${preferences.appLanguage}`;
 
   useEffect(() => {
     let active = true;
     void getCopticDate(new Date(`${dateKey}T00:00:00Z`)).then((date) => { if (active) setCoptic({ key: dateKey, date }); });
-    void getSeasonIndicatorLabel(dateKey).then((label) => { if (active) setSeason({ key: dateKey, label }); });
+    void getSeasonIndicatorLabel(dateKey).then((label) => { if (active) setSeason({ key: seasonKey, label }); });
     return () => { active = false; };
-  }, [dateKey]);
+  }, [dateKey, seasonKey]);
 
   const copticDate = coptic?.key === dateKey ? coptic.date : null;
-  const seasonLabel = season?.key === dateKey ? season.label : null;
+  const seasonLabel = season?.key === seasonKey ? season.label : null;
   const current = holyWeek ? HOLY_WEEK_DAYS.find((day) => day.id === holyWeek.currentDayId) ?? null : null;
   const pascha = Boolean(holyWeek && current);
   const theme = pascha ? SPOTLIGHT_THEMES.pascha : SPOTLIGHT_THEMES.day;
@@ -60,23 +66,25 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
   if (pascha && holyWeek && current) {
     const rowIndex = HOLY_WEEK_ROWS.findIndex((row) => row.days.some((day) => day.id === current.id));
     const eve = current.id.endsWith('-eve');
-    chip = arabic ? 'البصخة المقدسة' : 'PASCHA';
+    chip = tr('PASCHA', 'PÂQUE', 'البصخة المقدسة');
     overline = eve
-      ? (arabic ? `الليلة · ${formatWeekdayDate(holyWeekRowDate(holyWeek.palmSunday, rowIndex), true)}` : `Tonight · ${formatWeekdayDate(holyWeekRowDate(holyWeek.palmSunday, rowIndex), false)}`)
-      : (arabic ? `اليوم · ${formatWeekdayDate(effectiveDate, true)}` : `Today · ${formatWeekdayDate(effectiveDate, false)}`);
-    heading = arabic ? current.arabic : current.title;
+      ? `${tr('Tonight', 'Ce soir', 'الليلة')} · ${formatWeekdayDate(holyWeekRowDate(holyWeek.palmSunday, rowIndex), arabic)}`
+      : `${tr('Today', 'Aujourd’hui', 'اليوم')} · ${formatWeekdayDate(effectiveDate, arabic)}`;
+    heading = entryLabel(current);
     footnote = copticDate
       ? (arabic
         ? `${toEasternArabicDigits(copticDate.day)} ${formatCopticMonthName(copticDate.monthName, true)} ${toEasternArabicDigits(copticDate.year)}`
-        : `${copticDate.monthName} ${copticDate.day}, ${copticDate.year}`)
+        : formatCopticDate(copticDate.monthName, copticDate.day, copticDate.year, false))
       : '';
   } else if (copticDate) {
     heading = arabic
       ? `${toEasternArabicDigits(copticDate.day)} ${formatCopticMonthName(copticDate.monthName, true)}`
-      : `${copticDate.monthName} ${copticDate.day}`;
-    footnote = arabic ? `سنة ${toEasternArabicDigits(copticDate.year)} للشهداء` : `Year of the Martyrs ${copticDate.year}`;
+      : tr(`${copticDate.monthName} ${copticDate.day}`, `${copticDate.day} ${copticDate.monthName}`, '');
+    footnote = arabic
+      ? `سنة ${toEasternArabicDigits(copticDate.year)} للشهداء`
+      : tr(`Year of the Martyrs ${copticDate.year}`, `An ${copticDate.year} des Martyrs`, '');
   }
-  if (!isLive && !pascha) overline = arabic ? `تاريخ مختار · ${overline}` : `Viewing · ${overline}`;
+  if (!isLive && !pascha) overline = arabic ? `تاريخ مختار · ${overline}` : `${tr('Viewing', 'Date choisie', '')} · ${overline}`;
 
   return (
     // A plain card: one full-size tap target lies behind the text, and the
@@ -89,7 +97,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={pascha ? `${heading}. ${overline}` : `${heading}. ${arabic ? 'افتح التقويم' : 'Open the calendar'}`}
+        accessibilityLabel={pascha ? `${heading}. ${overline}` : `${heading}. ${tr('Open the calendar', 'Ouvrir le calendrier', 'افتح التقويم')}`}
         onPress={pascha && current ? () => onOpenHolyWeekDay(current) : onOpenCalendar}
         style={({ pressed }) => [StyleSheet.absoluteFill, pressed && styles.pressed]}
       />
@@ -104,7 +112,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
         ) : <View pointerEvents="none" />}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={arabic ? 'افتح التقويم' : 'Open the calendar'}
+          accessibilityLabel={tr('Open the calendar', 'Ouvrir le calendrier', 'افتح التقويم')}
           hitSlop={8}
           onPress={onOpenCalendar}
           style={[styles.roundButton, { borderColor: `${theme.accent}59` }]}
@@ -141,7 +149,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
                 onPress={onOpenHolyWeek}
                 style={[styles.pill, { borderColor: `${theme.accent}66` }, arabic && styles.rowReverse]}
               >
-                <Text style={[styles.pillText, { color: theme.accent }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{arabic ? 'أسبوع الآلام' : 'All of Holy Week'}</Text>
+                <Text style={[styles.pillText, { color: theme.accent }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('All of Holy Week', 'Toute la Semaine sainte', 'أسبوع الآلام')}</Text>
                 <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={14} color={theme.accent} />
               </Pressable>
             ) : null}
@@ -153,7 +161,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
                 style={[styles.pill, { borderColor: `${theme.accent}66` }, arabic && styles.rowReverse]}
               >
                 <Icon name="time-outline" size={14} color={theme.accent} />
-                <Text style={[styles.pillText, { color: theme.accent }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{arabic ? 'العودة إلى اليوم' : 'Back to today'}</Text>
+                <Text style={[styles.pillText, { color: theme.accent }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Back to today', 'Revenir à aujourd’hui', 'العودة إلى اليوم')}</Text>
               </Pressable>
             ) : null}
           </View>

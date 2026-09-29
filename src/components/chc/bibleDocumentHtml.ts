@@ -1,4 +1,5 @@
 import { COLORS } from '../../constants/theme';
+import { formatCopticNumber, formatGreekNumber } from '../../utils/bibleNumerals';
 import { formatEnglishDisplayText } from '../../utils/displayText';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
@@ -56,6 +57,7 @@ export function buildBibleChapterHtml({
   bottomContentInset = 0,
   highlighting = false,
   highlightLabels = { copy: 'Copy', remove: 'Remove' },
+  copyReference = null,
 }: {
   verses: BibleDisplayVerse[];
   languageKeys: BibleLanguageKey[];
@@ -78,6 +80,8 @@ export function buildBibleChapterHtml({
   highlighting?: boolean;
   /** The toolbar's words, in the app's language. */
   highlightLabels?: { copy: string; remove: string };
+  /** The chapter a copy is signed with ("Leviticus 2"), in each language a column can be. */
+  copyReference?: Partial<Record<'english' | 'arabic' | 'coptic' | 'greek' | 'french', string>> | null;
 }) {
   const safeFontSize = Math.max(12, Number(fontSize) || 18);
   const effectiveSelectText = Boolean(selectText) && !isSlideshow;
@@ -381,6 +385,7 @@ export function buildBibleChapterHtml({
         }
         var selectableLanguages = ${JSON.stringify(effectiveLanguages)};
         var selectingLanguage = null;
+        var copyReference = ${JSON.stringify(copyReference || null)};
         var richCopyColors = {
           background: ${JSON.stringify(COLORS.black)},
           text: ${JSON.stringify(COLORS.white)},
@@ -424,6 +429,8 @@ export function buildBibleChapterHtml({
         }
 
         function onSelectionStart(event) {
+          // A tap on the selection's toolbar keeps the column it's in.
+          if (event.target && event.target.closest && event.target.closest('#sermon-highlight-tools')) return;
           setSelectingLanguage(inferLanguage(event.target));
         }
 
@@ -452,19 +459,6 @@ export function buildBibleChapterHtml({
             .trim();
         }
 
-        function fragmentText(fragment) {
-          var container = document.createElement('div');
-          container.appendChild(fragment);
-          Array.prototype.slice.call(container.querySelectorAll('.verse-number')).forEach(function (numberNode) {
-            var numberText = normalizeSelectionText(numberNode.textContent || '');
-            numberNode.textContent = numberText ? numberText + ' ' : '';
-          });
-          Array.prototype.slice.call(container.querySelectorAll('br')).forEach(function (br) {
-            br.parentNode.replaceChild(document.createTextNode('\\n'), br);
-          });
-          return normalizeSelectionText(container.textContent || '');
-        }
-
         function rangeIntersectsNode(range, node) {
           try {
             return range.intersectsNode(node);
@@ -474,7 +468,7 @@ export function buildBibleChapterHtml({
         }
 
         function clippedRangeForNode(range, node) {
-          if (!rangeIntersectsNode(range, node)) return '';
+          if (!rangeIntersectsNode(range, node)) return null;
           var nodeRange = document.createRange();
           nodeRange.selectNodeContents(node);
           var clipped = range.cloneRange();
@@ -487,11 +481,6 @@ export function buildBibleChapterHtml({
           return clipped;
         }
 
-        function clippedTextForNode(range, node) {
-          var clipped = clippedRangeForNode(range, node);
-          return clipped ? fragmentText(clipped.cloneContents()) : '';
-        }
-
         function styleString(styles) {
           return Object.keys(styles)
             .filter(function (key) { return styles[key] !== null && styles[key] !== undefined && styles[key] !== ''; })
@@ -499,95 +488,118 @@ export function buildBibleChapterHtml({
             .join(';');
         }
 
-        function inlineRichCopyStyles(container) {
-          Array.prototype.slice.call(container.querySelectorAll('.verse-number')).forEach(function (numberNode) {
-            var numberText = normalizeSelectionText(numberNode.textContent || '');
-            numberNode.textContent = numberText ? numberText + ' ' : '';
-            numberNode.setAttribute('style', styleString({
-              'background': richCopyColors.background,
-              'background-color': richCopyColors.background,
-              'color': numberNode.classList.contains('lxx-addition') ? richCopyColors.lxxAddition : richCopyColors.gold,
-              'font-weight': '700',
-              'white-space': 'nowrap'
-            }));
-          });
-          Array.prototype.slice.call(container.querySelectorAll('.verse-text')).forEach(function (textNode) {
-            textNode.setAttribute('style', styleString({
-              'background': richCopyColors.background,
-              'background-color': richCopyColors.background,
-              'color': 'inherit',
-              'font-style': 'inherit',
-              'white-space': 'pre-wrap'
-            }));
-          });
-          Array.prototype.slice.call(container.querySelectorAll('*')).forEach(function (element) {
-            element.removeAttribute('class');
-            element.removeAttribute('data-language');
-            element.removeAttribute('data-copy-text');
-          });
+        function escapeCopyHtml(text) {
+          return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
         }
 
-        function fragmentHtml(fragment, sourceNode) {
-          var block = document.createElement('div');
-          var computed = window.getComputedStyle ? window.getComputedStyle(sourceNode) : null;
-          var isIntroduction = sourceNode.classList && sourceNode.classList.contains('psalm-introduction');
-          var direction = sourceNode.getAttribute('dir') || (computed ? computed.direction : 'ltr') || 'ltr';
-          block.setAttribute('style', styleString({
+        // The selected verses of the one column the selection is in: each
+        // one's number as shown and the words selected from it.
+        function selectedVerses(selection, language) {
+          if (!selection || !selection.rangeCount || !language) return [];
+          var range = selection.getRangeAt(0);
+          if (range.collapsed) return [];
+          var cells = document.querySelectorAll('.verse-row:not(.preface-row) .cell[data-language="' + language + '"]');
+          return Array.prototype.slice.call(cells).map(function (cell) {
+            var textNode = cell.querySelector('.verse-text');
+            var clipped = textNode && clippedRangeForNode(range, textNode);
+            var text = clipped ? normalizeSelectionText(clipped.toString()) : '';
+            if (!text) return null;
+            var numberNode = cell.querySelector('.verse-number');
+            return {
+              cell: cell,
+              number: numberNode ? normalizeSelectionText(numberNode.textContent) : '',
+              text: text,
+              lxxAddition: Boolean(numberNode && numberNode.classList.contains('lxx-addition')),
+              introduction: cell.classList.contains('psalm-introduction')
+            };
+          }).filter(Boolean);
+        }
+
+        // "- Leviticus 2", or "- Leviticus 2:1" for one verse — in the
+        // column's own language and numerals (English for its three English
+        // columns, Arabic for both Arabic ones).
+        var COPY_REFERENCE_LANGUAGE = {
+          english: 'english', englishNkjv: 'english', englishFromCoptic: 'english',
+          arabic: 'arabic', arabicFromCoptic: 'arabic',
+          coptic: 'coptic', greek: 'greek', french: 'french'
+        };
+        function copyReferenceText(language, verses) {
+          if (!copyReference) return '';
+          var chapter = copyReference[COPY_REFERENCE_LANGUAGE[language] || 'english'] || copyReference.english;
+          if (!chapter) return '';
+          return '- ' + chapter + (verses.length === 1 && verses[0].number ? ':' + verses[0].number : '');
+        }
+
+        // The rich copy looks like the reader: white words on black in the
+        // column's own font, gold bold verse numbers — or, for one verse, a
+        // gold bold reference instead. It is always the reader's base size,
+        // though the reader enlarges Coptic and Arabic. Every run carries its
+        // own background and font, since editors keep a run's styles but
+        // drop a block's.
+        // Lines are <br>s inside one block, which iOS and Android both turn
+        // into single newlines for the plain text they derive from it.
+        function copyHtml(verses, single, reference) {
+          var cell = verses[0].cell;
+          var computed = window.getComputedStyle ? window.getComputedStyle(cell) : null;
+          var direction = cell.getAttribute('dir') || 'ltr';
+          var font = {
+            'font-family': computed ? computed.fontFamily : "Georgia, 'Times New Roman', serif",
+            'font-size': '${safeFontSize}px'
+          };
+          function run(tag, text, styles) {
+            var style = styleString(Object.assign({ 'background-color': richCopyColors.background }, font, styles));
+            return '<' + tag + ' style="' + escapeCopyHtml(style) + '">' + escapeCopyHtml(text).replace(/\\n/g, '<br>') + '</' + tag + '>';
+          }
+          var lines = verses.map(function (verse) {
+            var textStyles = verse.introduction
+              ? { 'color': richCopyColors.psalmIntroduction, 'font-style': 'italic' }
+              : { 'color': richCopyColors.text };
+            if (single || !verse.number) return run('span', verse.text, textStyles);
+            return run('b', verse.number, {
+              'color': verse.lxxAddition ? richCopyColors.lxxAddition : richCopyColors.gold,
+              'font-weight': '700'
+            }) + run('span', ' ' + verse.text, textStyles);
+          });
+          if (reference) {
+            lines.push(single
+              ? run('b', reference, { 'color': richCopyColors.gold, 'font-weight': '700' })
+              : run('span', reference, { 'color': richCopyColors.text }));
+          }
+          var block = styleString(Object.assign({
             'background': richCopyColors.background,
             'background-color': richCopyColors.background,
-            'color': isIntroduction ? richCopyColors.psalmIntroduction : richCopyColors.text,
-            'font-family': computed ? computed.fontFamily : "Georgia, 'Times New Roman', serif",
-            'font-size': computed ? computed.fontSize : '${safeFontSize}px',
-            'font-style': isIntroduction ? 'italic' : (computed ? computed.fontStyle : 'normal'),
-            'font-weight': computed ? computed.fontWeight : '400',
-            'line-height': computed ? computed.lineHeight : '1.25',
+            'color': richCopyColors.text,
+            'line-height': '${Math.round(safeFontSize * 1.3)}px',
             'direction': direction,
             'text-align': direction === 'rtl' ? 'right' : 'left',
-            'margin': '0 0 8px 0',
-            'padding': '0'
-          }));
-          block.appendChild(fragment);
-          inlineRichCopyStyles(block);
-          return block.innerHTML.trim() ? block.outerHTML : '';
+            'padding': '8px',
+            'margin': '0'
+          }, font));
+          return '<meta charset="utf-8"><div dir="' + direction + '" style="' + escapeCopyHtml(block) + '">' + lines.join('<br>') + '</div>';
         }
 
-        function clippedHtmlForNode(range, node) {
-          var clipped = clippedRangeForNode(range, node);
-          return clipped ? fragmentHtml(clipped.cloneContents(), node) : '';
+        // What Copy puts on the clipboard, as plain text and as rich text:
+        // one verse is its words then "- Leviticus 2:1"; several are
+        // "1 words" per line then "- Leviticus 2".
+        function bibleCopyPayload(selection) {
+          selection = selection || (window.getSelection && window.getSelection());
+          var language = selectingLanguage || (selection && (inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode)));
+          var verses = selectedVerses(selection, language);
+          if (!verses.length) return null;
+          var single = verses.length === 1;
+          var reference = copyReferenceText(language, verses);
+          var lines = verses.map(function (verse) {
+            return single || !verse.number ? verse.text : verse.number + ' ' + verse.text;
+          });
+          if (reference) lines.push(reference);
+          return { text: lines.join('\\n'), html: copyHtml(verses, single, reference) };
         }
-
-        function selectedTextForLanguage(selection, language) {
-          if (!selection || !selection.rangeCount || !language) return '';
-          var range = selection.getRangeAt(0);
-          var nodes = Array.prototype.slice.call(document.querySelectorAll('.cell[data-language="' + language + '"]'));
-          return nodes
-            .map(function (node) { return clippedTextForNode(range, node); })
-            .filter(Boolean)
-            .join('\\n');
-        }
-
-        function selectedHtmlForLanguage(selection, language) {
-          if (!selection || !selection.rangeCount || !language) return '';
-          var range = selection.getRangeAt(0);
-          var nodes = Array.prototype.slice.call(document.querySelectorAll('.cell[data-language="' + language + '"]'));
-          var body = nodes
-            .map(function (node) { return clippedHtmlForNode(range, node); })
-            .filter(Boolean)
-            .join('');
-          if (!body) return '';
-          return [
-            '<meta charset="utf-8">',
-            '<div style="' + styleString({
-              'background': richCopyColors.background,
-              'background-color': richCopyColors.background,
-              'color': richCopyColors.text,
-              'padding': '8px',
-              'margin': '0'
-            }) + '">',
-            body,
-            '</div>'
-          ].join('');
-        }
+        // The toolbar's Copy asks for the same payload.
+        window.__chcBibleCopyPayload = bibleCopyPayload;
 
         document.addEventListener('pointerdown', onSelectionStart, true);
         document.addEventListener('mousedown', onSelectionStart, true);
@@ -603,13 +615,10 @@ export function buildBibleChapterHtml({
           }
         });
         document.addEventListener('copy', function (event) {
-          var selection = window.getSelection && window.getSelection();
-          var language = selectingLanguage || (selection && (inferLanguage(selection.anchorNode) || inferLanguage(selection.focusNode)));
-          var text = selectedTextForLanguage(selection, language);
-          if (!text || !event.clipboardData) return;
-          event.clipboardData.setData('text/plain', text);
-          var html = selectedHtmlForLanguage(selection, language);
-          if (html) event.clipboardData.setData('text/html', html);
+          var payload = bibleCopyPayload(window.getSelection && window.getSelection());
+          if (!payload || !event.clipboardData) return;
+          event.clipboardData.setData('text/plain', payload.text);
+          event.clipboardData.setData('text/html', payload.html);
           event.preventDefault();
         });
         }
@@ -1053,6 +1062,7 @@ export function buildBibleChapterHtml({
       },
       tapToEdit: true,
       copy: true,
+      copyPayload: 'window.__chcBibleCopyPayload',
       singleLanguage: true,
       labels: highlightLabels,
     })}</script>` : ''}
@@ -1124,41 +1134,8 @@ function formatArabicLetterSuffixes(text: string) {
   });
 }
 
-const COPTIC_DIGITS: Record<number, string> = { 1: 'ⲁ̅', 2: 'ⲃ̅', 3: 'ⲅ̅', 4: 'ⲇ̅', 5: 'ⲉ̅', 6: 'ⲋ', 7: 'ⲍ̅', 8: 'ⲏ̅', 9: 'ⲑ̅' };
-const COPTIC_TENS: Record<number, string> = { 1: 'ⲓ̅', 2: 'ⲕ̅', 3: 'ⲗ̅', 4: 'ⲙ̅', 5: 'ⲛ̅', 6: 'ⲝ̅', 7: 'ⲟ̅', 8: 'ⲡ̅', 9: 'ϥ̅' };
-const COPTIC_HUNDREDS: Record<number, string> = { 1: 'ⲣ̅', 2: 'ⲥ̅', 3: 'ⲧ̅', 4: 'ⲩ̅', 5: 'ⲫ̅', 6: 'ⲭ̅', 7: 'ⲯ̅', 8: 'ⲱ̅', 9: 'ϣ̅' };
-
-function formatCopticNumber(value: number): string {
-  if (!Number.isInteger(value) || value <= 0 || value > 999) return String(value);
-  const hundreds = Math.floor(value / 100);
-  const tens = Math.floor((value % 100) / 10);
-  const ones = value % 10;
-  return `${COPTIC_HUNDREDS[hundreds] || ''}${COPTIC_TENS[tens] || ''}${COPTIC_DIGITS[ones] || ''}`;
-}
-
 function formatCopticNumbers(text: string): string {
   return String(text || '').replace(/\d+/g, (value) => formatCopticNumber(Number(value)));
-}
-
-const GREEK_NUMERAL_SIGN = 'ʹ';
-const GREEK_THOUSANDS_SIGN = '͵';
-const GREEK_DIGITS: Record<number, string> = { 1: 'Α', 2: 'Β', 3: 'Γ', 4: 'Δ', 5: 'Ε', 6: 'Ϛ', 7: 'Ζ', 8: 'Η', 9: 'Θ' };
-const GREEK_TENS: Record<number, string> = { 1: 'Ι', 2: 'Κ', 3: 'Λ', 4: 'Μ', 5: 'Ν', 6: 'Ξ', 7: 'Ο', 8: 'Π', 9: 'Ϟ' };
-const GREEK_HUNDREDS: Record<number, string> = { 1: 'Ρ', 2: 'Σ', 3: 'Τ', 4: 'Υ', 5: 'Φ', 6: 'Χ', 7: 'Ψ', 8: 'Ω', 9: 'Ϡ' };
-
-function formatGreekNumber(value: number): string {
-  if (!Number.isInteger(value) || value <= 0 || value > 9999) return String(value);
-  const thousands = Math.floor(value / 1000);
-  const remainder = value % 1000;
-  const numeral = `${thousands ? `${GREEK_THOUSANDS_SIGN}${formatGreekNumberUnderThousand(thousands)}` : ''}${formatGreekNumberUnderThousand(remainder)}`;
-  return numeral ? `${numeral}${GREEK_NUMERAL_SIGN}` : String(value);
-}
-
-function formatGreekNumberUnderThousand(value: number): string {
-  const hundreds = Math.floor(value / 100);
-  const tens = Math.floor((value % 100) / 10);
-  const ones = value % 10;
-  return `${GREEK_HUNDREDS[hundreds] || ''}${GREEK_TENS[tens] || ''}${GREEK_DIGITS[ones] || ''}`;
 }
 
 function getLanguageFontSize(fontSize: number, language: BibleLanguageKey) {

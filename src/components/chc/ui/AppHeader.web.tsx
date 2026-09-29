@@ -1,15 +1,17 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
+import { appText, type AppText } from '../../../utils/appText';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { useIsMobileWeb } from '../../../utils/useIsMobileWeb';
 import Icon, { IconName } from './Icon';
 
 interface AppHeaderProps {
-  title: string | { english: string; arabic: string };
+  title: string | AppText;
   canGoBack?: boolean;
   onBack?: () => void;
   rightLeadingIcon?: IconName;
@@ -52,6 +54,8 @@ export default function AppHeader({
   // shows something rather than going blank.
   const wantsArabic = visibleLanguages ? visibleLanguages.arabic && !visibleLanguages.english : preferences.appLanguage === 'ar';
   const showArabic = wantsArabic && Boolean(titleParts.arabic);
+  // Not Arabic: the French title in French, else the English.
+  const latinTitle = appText({ ...titleParts, arabic: '' }, preferences.appLanguage === 'fr' ? 'fr' : 'en') || titleParts.arabic;
   const showEnglish = !showArabic;
   const defaultRightLeadingIcon = showBrowserFullscreen && shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined;
   const defaultRightLeadingPress = showBrowserFullscreen && shouldShowFullscreen ? toggleFullscreen : undefined;
@@ -93,7 +97,7 @@ export default function AppHeader({
               style={[styles.title, isMobileWeb && styles.titleMobile, styles.centeredTitle]}
               numberOfLines={1}
             >
-              {formatEnglishDisplayText(titleParts.english || titleParts.arabic)}
+              {formatEnglishDisplayText(latinTitle)}
             </Text>
           ) : null}
           {showArabic ? (

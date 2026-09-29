@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -29,43 +30,44 @@ import { goBack } from '@/utils/navigation';
 import type { BibleVisibleLanguages } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 
+import { appText } from '../../utils/appText';
 const PAGE_SIZE = 25;
 /** Long enough that typing a word does not fire a search per letter, short enough not to feel held up. */
 const TYPING_PAUSE_MS = 300;
 
 const LABELS = {
-  title: { english: 'Search the Bible', arabic: 'ابحث في الكتاب المقدس' },
-  placeholder: { english: 'Words, a phrase, or a reference', arabic: 'كلمات أو عبارة أو شاهد' },
-  filters: { english: 'Filters', arabic: 'عوامل التصفية' },
-  modeAll: { english: 'All words', arabic: 'كل الكلمات' },
-  modeAny: { english: 'Any word', arabic: 'أي كلمة' },
-  modePhrase: { english: 'Exact phrase', arabic: 'عبارة حرفية' },
-  modeWeb: { english: 'Advanced', arabic: 'متقدم' },
-  scopeAll: { english: 'Whole Bible', arabic: 'الكتاب كله' },
-  scopeOt: { english: 'Old Testament', arabic: 'العهد القديم' },
-  scopeNt: { english: 'New Testament', arabic: 'العهد الجديد' },
-  prefix: { english: 'Match word beginnings', arabic: 'مطابقة بدايات الكلمات' },
-  sortRelevance: { english: 'Best match', arabic: 'الأنسب' },
-  sortCanonical: { english: 'Bible order', arabic: 'ترتيب الكتاب' },
-  languages: { english: 'Search in', arabic: 'ابحث في' },
-  noResults: { english: 'Nothing found.', arabic: 'لا توجد نتائج.' },
+  title: { english: 'Search the Bible', arabic: 'ابحث في الكتاب المقدس', french: 'Rechercher dans la Bible' },
+  placeholder: { english: 'Words, a phrase, or a reference', arabic: 'كلمات أو عبارة أو شاهد', french: 'Des mots, une expression ou une référence' },
+  filters: { english: 'Filters', arabic: 'عوامل التصفية', french: 'Filtres' },
+  modeAll: { english: 'All words', arabic: 'كل الكلمات', french: 'Tous les mots' },
+  modeAny: { english: 'Any word', arabic: 'أي كلمة', french: 'N’importe quel mot' },
+  modePhrase: { english: 'Exact phrase', arabic: 'عبارة حرفية', french: 'Expression exacte' },
+  modeWeb: { english: 'Advanced', arabic: 'متقدم', french: 'Avancé' },
+  scopeAll: { english: 'Whole Bible', arabic: 'الكتاب كله', french: 'Toute la Bible' },
+  scopeOt: { english: 'Old Testament', arabic: 'العهد القديم', french: 'Ancien Testament' },
+  scopeNt: { english: 'New Testament', arabic: 'العهد الجديد', french: 'Nouveau Testament' },
+  prefix: { english: 'Match word beginnings', arabic: 'مطابقة بدايات الكلمات', french: 'Début des mots' },
+  sortRelevance: { english: 'Best match', arabic: 'الأنسب', french: 'Pertinence' },
+  sortCanonical: { english: 'Bible order', arabic: 'ترتيب الكتاب', french: 'Ordre biblique' },
+  languages: { english: 'Search in', arabic: 'ابحث في', french: 'Rechercher dans' },
+  noResults: { english: 'Nothing found.', arabic: 'لا توجد نتائج.', french: 'Aucun résultat.' },
   // Exact phrase is served by the full text index, which does not record the
   // most ordinary words, so a phrase made only of those cannot be looked up.
   noResultsPhrase: {
     english: 'Nothing found. A phrase of only common words (like "I am") cannot be searched exactly — try All words.',
-    arabic: 'لا توجد نتائج. العبارة المكونة من كلمات شائعة فقط لا يمكن البحث عنها حرفيًا — جرّب "كل الكلمات".',
+    arabic: 'لا توجد نتائج. العبارة المكونة من كلمات شائعة فقط لا يمكن البحث عنها حرفيًا — جرّب "كل الكلمات".', french: 'Aucun résultat. Une expression faite uniquement de mots courants (comme « je suis ») ne peut pas être recherchée exactement — essayez Tous les mots.',
   },
-  noLanguages: { english: 'Choose at least one language to search in.', arabic: 'اختر لغة واحدة على الأقل.' },
+  noLanguages: { english: 'Choose at least one language to search in.', arabic: 'اختر لغة واحدة على الأقل.', french: 'Choisissez au moins une langue de recherche.' },
   hint: {
     english: 'Type words to search, or a reference like John 3:16 to go straight there.',
-    arabic: 'اكتب كلمات للبحث، أو شاهدًا مثل يوحنا ٣:١٦ للانتقال إليه.',
+    arabic: 'اكتب كلمات للبحث، أو شاهدًا مثل يوحنا ٣:١٦ للانتقال إليه.', french: 'Tapez des mots à rechercher, ou une référence comme Jean 3:16 pour y aller directement.',
   },
   advancedHint: {
     english: 'Advanced: "quoted words" for a phrase, -word to exclude, or between alternatives.',
-    arabic: 'متقدم: "كلمات بين علامتي اقتباس" لعبارة، و-كلمة للاستبعاد، وor للبدائل.',
+    arabic: 'متقدم: "كلمات بين علامتي اقتباس" لعبارة، و-كلمة للاستبعاد، وor للبدائل.', french: 'Avancé : "mots entre guillemets" pour une expression, -mot pour exclure, or entre deux possibilités.',
   },
-  goTo: { english: 'Go to', arabic: 'اذهب إلى' },
-  loadMore: { english: 'Show more', arabic: 'عرض المزيد' },
+  goTo: { english: 'Go to', arabic: 'اذهب إلى', french: 'Aller à' },
+  loadMore: { english: 'Show more', arabic: 'عرض المزيد', french: 'Afficher plus' },
 };
 
 const MODES: { key: BibleSearchMode; label: keyof typeof LABELS }[] = [
@@ -98,7 +100,7 @@ export default function BibleSearchScreen() {
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
-  const label = (entry: { english: string; arabic: string }) => (isArabic ? entry.arabic : entry.english);
+  const label = (entry: { english: string; arabic: string; french?: string }) => (appText(entry));
   const localized = isArabic && styles.arabicText;
 
   const [query, setQuery] = useState('');
@@ -281,7 +283,7 @@ export default function BibleSearchScreen() {
         >
           <Icon name="book" size={18} color={COLORS.gold} />
           <Text style={[styles.referenceText, localized]} numberOfLines={1}>
-            {label(LABELS.goTo)} {formatBibleReference(reference, isArabic ? 'ar' : 'en')}
+            {label(LABELS.goTo)} {formatBibleReference(reference, preferences.appLanguage)}
           </Text>
           <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} />
         </Pressable>
@@ -387,6 +389,7 @@ export default function BibleSearchScreen() {
           renderItem={({ item }) => (
             <ResultRow
               result={item}
+              titleFrench={books.find((book) => book.bookKey === item.bookKey)?.titleFrench}
               isArabic={isArabic}
               onPress={() => openVerse(item.bookKey, item.chapterNumber, item.verseNumber)}
             />
@@ -427,14 +430,17 @@ function Chip({
  */
 function ResultRow({
   result,
+  titleFrench,
   isArabic,
   onPress,
 }: {
   result: BibleSearchResult;
+  /** The search itself returns English and Arabic book names only. */
+  titleFrench?: string;
   isArabic: boolean;
   onPress: () => void;
 }) {
-  const title = isArabic ? result.titleArabic || result.titleEnglish : result.titleEnglish;
+  const title = appText({ english: result.titleEnglish, arabic: result.titleArabic, french: titleFrench });
 
   return (
     <Pressable style={styles.resultRow} onPress={onPress}>

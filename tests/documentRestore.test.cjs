@@ -162,3 +162,25 @@ test('Calendar and Settings opened from a subdocument close with the edge swipe'
   assert.match(modal, /isMobileDocument \? overlaySwipePanResponder\.panHandlers/);
   assert.match(modal, /screen === 'seasons' \? 'calendar' : null/);
 });
+
+test('a reload or a jump never lets the page\'s first "at the top" report replace where the reader is', () => {
+  // A (re)loaded page reports its top before its restore arrives, and a jump
+  // reports sections it passes; in a subdocument that sent a jump straight
+  // back to the top.
+  for (const file of ['src/components/chc/DocumentWebView.tsx', 'src/components/chc/DocumentWebView.web.tsx']) {
+    const view = fs.readFileSync(file, 'utf8');
+    assert.match(view, /if \(loadingRef\.current\) \{\s*reportDuringLoadRef\.current = action;\s*return;/, file);
+    assert.match(view, /guard\.sectionId !== action\.sectionId && Date\.now\(\) < guard\.until\) return;/, file);
+    // A jump records its target before the page has scrolled anywhere.
+    assert.match(view, /scrollToSection: \(id: string, edge: 'start' \| 'end' = 'start'\) => \{\s*preservedSectionIdRef\.current = id;\s*preservedEdgeRef\.current = edge;\s*guardJump\(id\);/, file);
+    // Reports count again only once the restore has been sent.
+    assert.match(view, /guardJump\(candidates\[0\]\.sectionId\);\s*\}\s*loadingRef\.current = false;/, file);
+  }
+  const native = fs.readFileSync('src/components/chc/DocumentWebView.tsx', 'utf8');
+  assert.match(native, /onLoadStart=\{\(\) => \{\s*loadingRef\.current = true;/);
+  const web = fs.readFileSync('src/components/chc/DocumentWebView.web.tsx', 'utf8');
+  assert.match(web, /useLayoutEffect\(\(\) => \{\s*loadingRef\.current = true;[\s\S]*?\}, \[html\]\);/);
+  // The subdocument remembers a jump itself, so a remounted reader lands there.
+  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  assert.match(modal, /function jumpToSection\(id: string\) \{[\s\S]*?setCurrentSectionId\(id\);/);
+});

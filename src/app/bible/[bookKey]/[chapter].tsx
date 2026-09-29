@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Head from 'expo-router/head';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -18,6 +19,7 @@ import {
     BibleBook,
     getBibleBook,
     getBibleChapterHeaderTitle,
+    getBibleChapterReferences,
     getBibleChapterKeys,
     getBibleVerseDisplayLabel,
     getDisplayedChapterVerses,
@@ -26,6 +28,8 @@ import {
 } from '@/utils/bibleService';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { goBack } from '@/utils/navigation';
+import { writeRichClipboard } from '@/utils/richClipboard';
+import { appText, type AppText } from '@/utils/appText';
 import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
@@ -36,15 +40,15 @@ import { createBibleHighlight, isBibleHighlightAnchor, isBibleHighlightColor } f
 type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
 type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
 
-const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: { english: string; arabic: string } }[] = [
-  { key: 'english', label: { english: 'English', arabic: 'الإنجليزية' } },
-  { key: 'englishNkjv', label: { english: 'English (NKJV)', arabic: 'الإنجليزية (NKJV)' } },
-  { key: 'englishFromCoptic', label: { english: 'English (from Coptic)', arabic: 'الإنجليزية (من القبطية)' } },
-  { key: 'coptic', label: { english: 'Coptic', arabic: 'القبطية' } },
-  { key: 'greek', label: { english: 'Greek', arabic: 'اليونانية' } },
-  { key: 'arabic', label: { english: 'Arabic', arabic: 'العربية' } },
-  { key: 'arabicFromCoptic', label: { english: 'Arabic (from Coptic)', arabic: 'العربية (من القبطية)' } },
-  { key: 'french', label: { english: 'French', arabic: 'الفرنسية' } },
+const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: AppText }[] = [
+  { key: 'english', label: { english: 'English', arabic: 'الإنجليزية', french: 'Anglais' } },
+  { key: 'englishNkjv', label: { english: 'English (NKJV)', arabic: 'الإنجليزية (NKJV)', french: 'Anglais (NKJV)' } },
+  { key: 'englishFromCoptic', label: { english: 'English (from Coptic)', arabic: 'الإنجليزية (من القبطية)', french: 'Anglais (du copte)' } },
+  { key: 'coptic', label: { english: 'Coptic', arabic: 'القبطية', french: 'Copte' } },
+  { key: 'greek', label: { english: 'Greek', arabic: 'اليونانية', french: 'Grec' } },
+  { key: 'arabic', label: { english: 'Arabic', arabic: 'العربية', french: 'Arabe' } },
+  { key: 'arabicFromCoptic', label: { english: 'Arabic (from Coptic)', arabic: 'العربية (من القبطية)', french: 'Arabe (du copte)' } },
+  { key: 'french', label: { english: 'French', arabic: 'الفرنسية', french: 'Français' } },
 ];
 
 const PSALMS_BOOK_KEY = 'psalms';
@@ -92,6 +96,19 @@ const SELECTOR_TEXT: Record<AppLanguage, {
     copy: 'نسخ',
     removeHighlight: 'إزالة',
   },
+  fr: {
+    verses: 'Versets',
+    previous: 'Précédent',
+    previousChapter: 'Chapitre précédent',
+    next: 'Suivant',
+    nextChapter: 'Chapitre suivant',
+    openSelector: 'Ouvrir la liste des versets',
+    closeSelector: 'Fermer la liste des versets',
+    bookmarkChapter: 'Ajouter le chapitre aux favoris',
+    openBibleSettings: 'Ouvrir les réglages de la Bible',
+    copy: 'Copier',
+    removeHighlight: 'Retirer',
+  },
 };
 
 function getAvailableLanguages(verses: BibleDisplayVerse[], bookKey: string | null | undefined): BibleLanguageKey[] {
@@ -102,11 +119,13 @@ function getAvailableLanguages(verses: BibleDisplayVerse[], bookKey: string | nu
   // rows decide whether to offer it rather than gating on testament/book.
   if (verses.some((verse) => String(verse.englishNkjv || '').trim())) languages.push('englishNkjv');
   if (isPsalms && verses.some((verse) => String(verse.englishFromCoptic || '').trim())) languages.push('englishFromCoptic');
+  // French beside the English, before the Coptic and Arabic — the same order
+  // as the documents.
+  if (verses.some((verse) => String(verse.french || '').trim())) languages.push('french');
   if (verses.some((verse) => String(verse.coptic || '').trim())) languages.push('coptic');
   if (verses.some((verse) => String(verse.greek || '').trim())) languages.push('greek');
   languages.push('arabic');
   if (isPsalms && verses.some((verse) => String(verse.arabicFromCoptic || '').trim())) languages.push('arabicFromCoptic');
-  if (verses.some((verse) => String(verse.french || '').trim())) languages.push('french');
   return languages;
 }
 
@@ -134,7 +153,7 @@ function getPsalmStanza(
 
 function getBibleLanguageLabel(language: BibleLanguageKey, appLanguage: AppLanguage): string {
   const option = LANGUAGE_OPTIONS.find((item) => item.key === language);
-  return appLanguage === 'ar' ? option?.label.arabic || language : option?.label.english || language;
+  return appText(option?.label, appLanguage) || language;
 }
 
 function getVersePreviewLanguage(
@@ -145,7 +164,9 @@ function getVersePreviewLanguage(
 ): BibleLanguageKey {
   const primaryLanguages: BibleLanguageKey[] = appLanguage === 'ar'
     ? ['arabic', 'arabicFromCoptic', 'english', 'englishNkjv', 'englishFromCoptic', 'coptic', 'greek']
-    : ['english', 'englishNkjv', 'englishFromCoptic', 'arabic', 'arabicFromCoptic', 'coptic', 'greek'];
+    : appLanguage === 'fr'
+      ? ['french', 'english', 'englishNkjv', 'englishFromCoptic', 'arabic', 'arabicFromCoptic', 'coptic', 'greek']
+      : ['english', 'englishNkjv', 'englishFromCoptic', 'arabic', 'arabicFromCoptic', 'coptic', 'greek'];
   const orderedLanguages = [
     ...primaryLanguages,
     ...availableLanguages.filter((language) => !primaryLanguages.includes(language)),
@@ -310,6 +331,8 @@ export default function BibleChapterDocument() {
   const currentChapterNumber = Number(chapter);
   const headerTitleEnglish = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'en');
   const headerTitleArabic = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'ar');
+  const headerTitleFrench = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'fr');
+  const copyReference = useMemo(() => getBibleChapterReferences(book, bookKey, currentChapterNumber), [book, bookKey, currentChapterNumber]);
   const preface = book?.bookKey === 'psalms' ? getDisplayedPsalmPreface() : null;
   const selectorText = SELECTOR_TEXT[preferences.appLanguage];
   // Reading the chapter, text can always be selected — to highlight or copy
@@ -342,8 +365,9 @@ export default function BibleChapterDocument() {
       bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
       highlighting: effectiveSelectText,
       highlightLabels: { copy: selectorText.copy, remove: selectorText.removeHighlight },
+      copyReference,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText, copyReference]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -436,7 +460,7 @@ export default function BibleChapterDocument() {
           app too, not only on the web: it is the only place that says which
           book and chapter is open. */}
       <DocumentTopBar
-        title={{ english: headerTitleEnglish, arabic: headerTitleArabic }}
+        title={{ english: headerTitleEnglish, arabic: headerTitleArabic, french: headerTitleFrench }}
         onBack={goBackALevel}
         leadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
         onLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
@@ -479,9 +503,9 @@ export default function BibleChapterDocument() {
                 return;
               }
               if (action.type === 'copyBibleText') {
-                // The page's own copy command didn't take (a browser that
-                // blocks it in a frame); the app's clipboard does it instead.
-                if (action.text) void globalThis.navigator?.clipboard?.writeText?.(action.text).catch(() => undefined);
+                // The page's own copy command was refused; the app's
+                // clipboard does it instead.
+                if (action.text) void writeRichClipboard(action.text, action.html);
                 return;
               }
               if (action.type === 'currentVerse' && action.verse) {

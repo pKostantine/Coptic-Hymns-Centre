@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -9,6 +10,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { getBibleBooks, getBibleChapterKeys, getCachedBibleChapterKeys, type BibleBook } from '../../../utils/bibleService';
 
+import { appText, tr } from '../../../utils/appText';
 const MAX_FONT_SCALE = 1.25;
 
 type LoadedBooks = { testament: Testament; books: BibleBook[] };
@@ -84,9 +86,9 @@ export default function BibleTestamentMenu({ testament }: { testament: Testament
   return (
     <BookMenuScaffold
       theme={look.theme}
-      title={{ english: look.english, arabic: look.arabic }}
-      overline={arabic ? 'الكتاب المقدس' : 'BIBLE'}
-      description={arabic ? look.range.arabic : look.range.english}
+      title={{ english: look.english, arabic: look.arabic, french: look.french }}
+      overline={tr('BIBLE', 'BIBLE', 'الكتاب المقدس')}
+      description={appText(look.range)}
       arabic={arabic}
       backHref="/bible"
     >
@@ -97,13 +99,13 @@ export default function BibleTestamentMenu({ testament }: { testament: Testament
       ) : (
         groups.map(({ section, books: sectionBooks }) => (
           <View key={section.from} style={styles.group}>
-            <MenuSectionLabel text={arabic ? section.arabic : section.english} arabic={arabic} accent={look.theme.accent} />
+            <MenuSectionLabel text={appText(section)} arabic={arabic} accent={look.theme.accent} />
             {pairs(sectionBooks).map((row) => (
               <TileRow key={row[0].bookKey} arabic={arabic}>
                 {row.map((book) => (
                   <BookTile
                     key={book.bookKey}
-                    title={arabic ? book.titleArabic || book.titleEnglish : book.titleEnglish}
+                    title={appText({ english: book.titleEnglish, arabic: book.titleArabic, french: book.titleFrench })}
                     gradient={section.gradient}
                     accent={look.theme.accent}
                     arabic={arabic}

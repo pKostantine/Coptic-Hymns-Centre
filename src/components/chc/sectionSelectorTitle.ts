@@ -12,10 +12,10 @@ const READING_REFERENCE_SELECTOR_TITLES = new Set(['pauline epistle', 'catholic 
 // A prophecy is "Prophecy", or "Prophecy 2" when several are read (see prophecyTitle in hymnLibrary.js).
 const PROPHECY_SELECTOR_TITLE_PATTERN = /^prophecy( \d+)?$/;
 const READING_REFERENCE_SELECTOR_KEY_PATTERN = /^(PAULINE_EPISTLE|CATHOLIC_EPISTLE|PRAXIS)(_|$)/;
-const READING_REFERENCE_SELECTOR_KEY_TITLES: Record<string, { english: string; arabic: string }> = {
-  PAULINE_EPISTLE: { english: 'Pauline Epistle', arabic: 'البولس' },
-  CATHOLIC_EPISTLE: { english: 'Catholic Epistle', arabic: 'الكاثوليكون' },
-  PRAXIS: { english: 'Praxis', arabic: 'الإبركسيس' },
+const READING_REFERENCE_SELECTOR_KEY_TITLES: Record<string, { english: string; arabic: string; french?: string }> = {
+  PAULINE_EPISTLE: { english: 'Pauline Epistle', arabic: 'البولس', french: 'Épître de saint Paul' },
+  CATHOLIC_EPISTLE: { english: 'Catholic Epistle', arabic: 'الكاثوليكون', french: 'Épître catholique' },
+  PRAXIS: { english: 'Praxis', arabic: 'الإبركسيس', french: 'Praxis' },
 };
 
 function normalizeSelectorTitle(value?: string) {
@@ -50,16 +50,16 @@ function appendReadingReference(title: string, reference?: string) {
   return `${cleanTitle} (${cleanReference})`;
 }
 
-export function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
+export function getSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string; french?: string } {
   const title = resolveSectionSelectorTitle(section);
   // Arabic carries its own numerals wherever the app writes Arabic, so a
   // reading listed as متى 11:11-19 belongs here as متى ١١:١١-١٩. Applied to the
   // title once, rather than at each place one is drawn, because every one of
   // those falls back to the Arabic when a section has no English title.
-  return { english: title?.english || '', arabic: formatArabicDigits(title?.arabic || '') };
+  return { english: title?.english || '', arabic: formatArabicDigits(title?.arabic || ''), french: title?.french || '' };
 }
 
-function resolveSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string } {
+function resolveSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string; french?: string } {
   const readingReference = section.verses.find((verse) => verse.type === 'readingReference');
   const baseTitle = getReadingReferenceSelectorBaseTitle(section);
   if (baseTitle) {
@@ -67,10 +67,14 @@ function resolveSectionSelectorTitle(section: DocumentSection): { english: strin
     return {
       english: appendReadingReference(baseTitle.english || '', readingReference?.english),
       arabic: appendReadingReference(baseTitle.arabic || '', readingReference?.arabic),
+      french: baseTitle.french
+        ? appendReadingReference(baseTitle.french, readingReference?.french || readingReference?.english)
+        : '',
     };
   }
   return {
     english: readingReference?.english || '',
     arabic: readingReference?.arabic || '',
+    french: readingReference?.french || '',
   };
 }

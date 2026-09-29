@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { COLORS } from '../../constants/theme';
@@ -94,6 +94,17 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     const preservedEdgeRef = useRef<'start' | 'end'>('start');
     const pendingRestoreSectionIdRef = useRef<string | null>(null);
     const lastRestoreTokenRef = useRef<string | null>(null);
+    // As in DocumentWebView.tsx: a (re)loaded page's first report is its
+    // pre-restore top, and a jump's target is recorded before the scroll
+    // reports catch up to it -- neither may replace where the reader is.
+    const loadingRef = useRef(true);
+    // See DocumentWebView.tsx: the loading page's last report, replayed once
+    // the restore has been sent.
+    const reportDuringLoadRef = useRef<DocumentAction | null>(null);
+    const jumpGuardRef = useRef<{ sectionId: string; until: number } | null>(null);
+    const guardJump = (sectionId: string) => {
+      jumpGuardRef.current = { sectionId, until: Date.now() + 1500 };
+    };
     // Assign before the rebuilt HTML/iframe is committed, never after a
     // transient "at the top" position report can overwrite the target.
     if (restoreRequest && lastRestoreTokenRef.current !== restoreRequest.token) {
@@ -105,6 +116,9 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     useImperativeHandle(ref, () => ({
       scrollToSection: (id: string, edge: 'start' | 'end' = 'start') => {
+        preservedSectionIdRef.current = id;
+        preservedEdgeRef.current = edge;
+        guardJump(id);
         const win = iframeRef.current?.contentWindow as (Window & { scrollToSection?: (id: string, edge?: 'start' | 'end') => void }) | null | undefined;
         win?.scrollToSection?.(id, edge);
       },
@@ -133,31 +147,51 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       win?.setSermonHighlights?.(sermonHighlights);
     }, [sermonHighlights, sermonPlannerMode]);
 
+    const handleAction = (action: DocumentAction) => {
+      if (action?.type === 'currentSection' && action.sectionId) {
+        if (loadingRef.current) {
+          reportDuringLoadRef.current = action;
+          return;
+        }
+        const guard = jumpGuardRef.current;
+        if (guard) {
+          if (guard.sectionId !== action.sectionId && Date.now() < guard.until) return;
+          jumpGuardRef.current = null;
+        }
+        if (pendingRestoreSectionIdRef.current && pendingRestoreSectionIdRef.current !== action.sectionId) return;
+        pendingRestoreSectionIdRef.current = null;
+        preservedSectionIdRef.current = action.sectionId;
+        preservedEdgeRef.current = 'start';
+      }
+      // Remember the title that was actually tapped before the collapse
+      // state rebuilds this HTML, so the reload stays anchored there.
+      if (action?.type === 'toggleCollapse' && action.sectionId) {
+        preservedSectionIdRef.current = action.sectionId;
+      }
+      onAction?.(action);
+    };
+    // The listener is added once; it always runs this render's handler.
+    const handleActionRef = useRef(handleAction);
+    useEffect(() => {
+      handleActionRef.current = handleAction;
+    });
+
     useEffect(() => {
       const handleMessage = (event: MessageEvent) => {
         if (event.source !== iframeRef.current?.contentWindow) return;
+        let action: DocumentAction;
         try {
-          const action = JSON.parse(event.data);
-          if (action?.type === 'currentSection' && action.sectionId) {
-            if (pendingRestoreSectionIdRef.current && pendingRestoreSectionIdRef.current !== action.sectionId) return;
-            pendingRestoreSectionIdRef.current = null;
-            preservedSectionIdRef.current = action.sectionId;
-            preservedEdgeRef.current = 'start';
-          }
-          // Remember the title that was actually tapped before the collapse
-          // state rebuilds this HTML, so the reload stays anchored there.
-          if (action?.type === 'toggleCollapse' && action.sectionId) {
-            preservedSectionIdRef.current = action.sectionId;
-          }
-          onAction?.(action);
+          action = JSON.parse(event.data);
         } catch {
           // Malformed message from the HTML content — ignore.
+          return;
         }
+        handleActionRef.current(action);
       };
 
       window.addEventListener('message', handleMessage);
       return () => window.removeEventListener('message', handleMessage);
-    }, [onAction]);
+    }, []);
 
     // The Now Playing bar's clearance is applied to the loaded page, never
     // built into it: the bar appears, collapses and re-measures while a
@@ -186,7 +220,16 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       // sectionRestoreCandidates.
       const candidates = sectionRestoreCandidates(sections.map((section) => section.id), preservedSectionIdRef.current)
         .map((sectionId, index) => ({ sectionId, edge: index ? 'end' : preservedEdgeRef.current }));
-      if (candidates.length) win?.scrollToSection?.(candidates);
+      if (candidates.length) {
+        win?.scrollToSection?.(candidates);
+        guardJump(candidates[0].sectionId);
+      }
+      loadingRef.current = false;
+      const keptReport = reportDuringLoadRef.current;
+      reportDuringLoadRef.current = null;
+      // Let the kept report through now -- the jump guard above still turns
+      // it away unless it is where the restore is headed.
+      if (keptReport) handleAction(keptReport);
       if (sermonPlannerMode) {
         const annotationWindow = win as typeof win & { setSermonHighlights?: (value: SermonHighlight[]) => void };
         annotationWindow?.setSermonHighlights?.(sermonHighlights);
@@ -251,6 +294,13 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         sermonPlannerMode,
       ],
     );
+
+    // A new srcDoc is a new load: its reports don't count until handleLoad
+    // has sent the restore.
+    useLayoutEffect(() => {
+      loadingRef.current = true;
+      reportDuringLoadRef.current = null;
+    }, [html]);
 
     if (!html) {
       return (

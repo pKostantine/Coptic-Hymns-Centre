@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -5,16 +6,19 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import BookMenuScaffold, { TileRow } from './BookMenuScaffold';
 import CopticCross from '../ui/CopticCross';
 import Icon from '../ui/Icon';
+import JewelTile from '../ui/JewelTile';
 import { getBookTheme } from '../../../constants/bookTheme';
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { TESTAMENTS, type Testament } from '../../../constants/bibleTestaments';
 
+import { appText, tr } from '../../../utils/appText';
 const MAX_FONT_SCALE = 1.25;
 
 /**
- * The Bible: a search field to find any passage, then the two testaments as
- * a pair of covers — each opening on its first words, "In the beginning".
+ * The Bible: a search field to find any passage, the reader's bookmarked
+ * chapters, then the two testaments as a pair of covers — each opening on
+ * its first words, "In the beginning".
  */
 export default function BibleMenu() {
   const router = useRouter();
@@ -25,27 +29,34 @@ export default function BibleMenu() {
   return (
     <BookMenuScaffold
       theme={theme}
-      title={{ english: 'Bible', arabic: 'الكتاب المقدس' }}
-      overline={arabic ? 'الأسفار المقدسة' : 'HOLY SCRIPTURE'}
+      title={{ english: 'Bible', arabic: 'الكتاب المقدس', french: 'Bible' }}
+      overline={tr('HOLY SCRIPTURE', 'SAINTES ÉCRITURES', 'الأسفار المقدسة')}
       arabic={arabic}
       backHref="/books"
-      headerAction={{
-        icon: 'bookmark-outline',
-        label: arabic ? 'محفوظات الكتاب المقدس' : 'Bible bookmarks',
-        onPress: () => router.push('/bible/bookmarks'),
-      }}
     >
       <Pressable
         accessibilityRole="search"
-        accessibilityLabel={arabic ? 'ابحث في الكتاب المقدس' : 'Search the Bible'}
+        accessibilityLabel={tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس')}
         onPress={() => router.push('/bible/search')}
         style={({ pressed }) => [styles.search, { borderColor: `${theme.accent}40` }, arabic && styles.rowReverse, pressed && styles.searchPressed]}
       >
         <View><Icon name="search-outline" size={19} color={theme.accent} /></View>
         <Text style={[styles.searchText, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-          {arabic ? 'ابحث عن آية أو كلمة أو شاهد' : 'Search a verse, word or reference'}
+          {tr('Search a verse, word or reference', 'Rechercher un verset, un mot ou une référence', 'ابحث عن آية أو كلمة أو شاهد')}
         </Text>
       </Pressable>
+
+      {/* The chapters saved from their verse lists — a place of its own in the Bible, first thing under the search. */}
+      <JewelTile
+        layout="row"
+        gradient={theme.gradient}
+        accent={theme.accent}
+        icon="bookmark"
+        title={tr('Bookmarks', 'Favoris', 'المحفوظات')}
+        minHeight={68}
+        arabic={arabic}
+        onPress={() => router.push('/bible/bookmarks')}
+      />
 
       <TileRow arabic={arabic}>
         {(Object.keys(TESTAMENTS) as Testament[]).map((key) => (
@@ -63,7 +74,7 @@ export default function BibleMenu() {
 
 function TestamentCover({ testament, arabic, onPress }: { testament: Testament; arabic: boolean; onPress: () => void }) {
   const look = TESTAMENTS[testament];
-  const title = arabic ? look.arabic : look.english;
+  const title = appText(look);
   return (
     <Pressable
       accessibilityRole="button"
@@ -80,11 +91,11 @@ function TestamentCover({ testament, arabic, onPress }: { testament: Testament; 
       <View>
         <Text style={[styles.coverTitle, arabic && styles.coverTitleArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
         <Text style={[styles.verse, { color: `${look.theme.accent}CC` }, arabic && styles.verseArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-          {arabic ? look.verse.arabic : look.verse.english}
+          {appText(look.verse)}
         </Text>
       </View>
       <Text style={[styles.range, { color: look.theme.accent }, arabic && styles.rangeArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-        {arabic ? look.range.arabic : look.range.english}
+        {appText(look.range)}
       </Text>
     </Pressable>
   );

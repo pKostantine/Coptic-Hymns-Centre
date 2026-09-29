@@ -17,6 +17,7 @@ interface BookmarkEntry {
   id: string;
   title: string;
   arabic: string;
+  french?: string;
   href: string;
 }
 
@@ -35,39 +36,40 @@ function buildBookmarkIndex(): Record<string, BookmarkEntry> {
     title: string,
     arabic: string,
     href: string,
+    french?: string,
   ) => {
     const key = bookmarkKeyFor(schema, table, entryId);
-    index[key] = { id: key, title, arabic, href };
+    index[key] = { id: key, title, arabic, french, href };
     // Bookmarks saved before the key gained its entry-id suffix are genuinely
     // ambiguous — nothing recorded which entry they were made from. Rather
     // than drop them from the list, the bare key stays resolvable, pointing at
     // the first entry that claims it.
     const bare = `${schema}:${table}`;
-    if (key !== bare && !index[bare]) index[bare] = { id: bare, title, arabic, href };
+    if (key !== bare && !index[bare]) index[bare] = { id: bare, title, arabic, french, href };
   };
 
   for (const category of CATEGORIES) {
     if (category.kind === 'direct' && category.schema && category.table) {
-      register(category.schema, category.table, category.id, category.title, category.arabic, `/${category.id}`);
+      register(category.schema, category.table, category.id, category.title, category.arabic, `/${category.id}`, category.french);
     }
   }
 
   for (const [categoryId, services] of Object.entries(SERVICES_BY_CATEGORY)) {
     for (const service of services) {
-      register(service.schema, service.table, service.id, service.title, service.arabic, `/${categoryId}/${service.id}`);
+      register(service.schema, service.table, service.id, service.title, service.arabic, `/${categoryId}/${service.id}`, service.french);
     }
   }
 
   for (const option of RAISING_OF_INCENSE_OPTIONS) {
-    register(option.schema, option.table, option.id, option.title, option.arabic, `/liturgy/raising-of-incense/${option.id}`);
+    register(option.schema, option.table, option.id, option.title, option.arabic, `/liturgy/raising-of-incense/${option.id}`, option.french);
   }
 
   for (const service of DIVINE_LITURGY_SERVICES) {
-    register(service.schema, service.table, service.id, service.title, service.arabic, `/liturgy/divine-liturgy/${service.id}`);
+    register(service.schema, service.table, service.id, service.title, service.arabic, `/liturgy/divine-liturgy/${service.id}`, service.french);
   }
 
   for (const hour of HOLY_WEEK_HOURS) {
-    register(hour.schema, hour.table, hour.id, hour.title, hour.arabic, holyWeekHourHref(hour));
+    register(hour.schema, hour.table, hour.id, hour.title, hour.arabic, holyWeekHourHref(hour), hour.french);
   }
 
   return index;
@@ -79,7 +81,8 @@ const BOOKMARK_INDEX = buildBookmarkIndex();
 export default function BookmarksScreen() {
   const router = useRouter();
   const { bookmarks, preferences } = useReadingPreferences();
-  const showEnglish = preferences.appLanguage === 'en';
+  // French shows in the English (left-to-right) slot.
+  const showEnglish = preferences.appLanguage !== 'ar';
   const showArabic = preferences.appLanguage === 'ar';
 
   // Bible chapters have their own bookmarks, in the Bible (BibleBookmarks).
@@ -101,6 +104,7 @@ export default function BookmarksScreen() {
             id,
             title: `${parent.title} – ${subdocumentLabel}`,
             arabic: parent.arabic ? `${parent.arabic} – ${subdocumentLabel}` : '',
+            french: parent.french ? `${parent.french} – ${subdocumentLabel}` : undefined,
             href: `${parent.href}?sub=${subdocumentKey}`,
           };
         }
@@ -126,7 +130,7 @@ export default function BookmarksScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item, index }) => (
             <MenuRow
-              title={item.title}
+              title={preferences.appLanguage === 'fr' ? item.french || item.title : item.title}
               arabic={item.arabic}
               showEnglish={showEnglish}
               showArabic={showArabic}

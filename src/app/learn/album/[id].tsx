@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
@@ -21,6 +22,7 @@ import {
 } from '@/services/offlineDownloadRequests';
 import type { LearningAlbumDetail } from '@/types/learningPlatform';
 
+import { tr } from '../../../utils/appText';
 export default function LearningAlbumScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
@@ -50,7 +52,7 @@ export default function LearningAlbumScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{album ? album.title + ' — Learn & Study' : 'Learning Album'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'ألبوم تعلّم' : 'Learning Album'} isArabic={isArabic} />
+      <LearningBackHeader title={tr('Learning Album', 'Album d’apprentissage', 'ألبوم تعلّم')} isArabic={isArabic} />
       {!album && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {album ? (
@@ -58,7 +60,7 @@ export default function LearningAlbumScreen() {
           <View style={styles.hero}>
             <LearningArtwork asset={album.coverAsset} size={210} label={album.title} />
             <View style={styles.heroInfo}>
-              <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{isArabic ? 'ألبوم تعلّم' : 'LEARNING ALBUM'}</Text>
+              <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{tr('LEARNING ALBUM', 'ALBUM D’APPRENTISSAGE', 'ألبوم تعلّم')}</Text>
               <Text style={[styles.title, isArabic && styles.arabic]}>{album.title}</Text>
               <Pressable onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: album.cantor.id } })}>
                 <Text style={[styles.cantor, isArabic && styles.arabic]}>{album.cantor.displayName}</Text>
@@ -71,7 +73,7 @@ export default function LearningAlbumScreen() {
               {album.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{album.description}</Text> : null}
               <View style={styles.actions}>
                 <Pressable disabled={!queue.length} style={[styles.playAll, !queue.length && styles.disabled]} onPress={() => queue.length && playQueue(queue, 0)}>
-                  <Text style={styles.playAllText}>▶  {isArabic ? 'تشغيل الكل' : 'Play All'}</Text>
+                  <Text style={styles.playAllText}>▶  {tr('Play All', 'Tout lire', 'تشغيل الكل')}</Text>
                 </Pressable>
                 {downloadRequest ? (
                   <LearningDownloadButton
@@ -86,9 +88,9 @@ export default function LearningAlbumScreen() {
 
           <View style={styles.headingRow}>
             <View>
-              <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'التسجيلات' : 'Recordings'}</Text>
+              <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Recordings', 'Enregistrements', 'التسجيلات')}</Text>
               <Text style={[styles.sectionMeta, isArabic && styles.arabic]}>
-                {album.recordings.length + (isArabic ? ' تسجيل' : album.recordings.length === 1 ? ' recording' : ' recordings')}
+                {album.recordings.length + tr(album.recordings.length === 1 ? ' recording' : ' recordings', album.recordings.length === 1 ? ' enregistrement' : ' enregistrements', ' تسجيل')}
               </Text>
             </View>
           </View>
@@ -125,7 +127,7 @@ export default function LearningAlbumScreen() {
                 />
               );
             })}
-            {!album.recordings.length ? <Text style={styles.empty}>{isArabic ? 'لا توجد تسجيلات منشورة.' : 'No published recordings.'}</Text> : null}
+            {!album.recordings.length ? <Text style={styles.empty}>{tr('No published recordings.', 'Aucun enregistrement publié.', 'لا توجد تسجيلات منشورة.')}</Text> : null}
           </View>
         </NowPlayingAwareScrollView>
       ) : null}

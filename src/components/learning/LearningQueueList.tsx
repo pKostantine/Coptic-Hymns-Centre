@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { MutableRefObject, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -19,6 +20,7 @@ import type { LearningQueueItem } from '@/context/LearningPlayerContext';
 import type { PlaybackRepeatMode } from '@/types/playback';
 import LearningArtwork from './LearningArtwork';
 
+import { tr } from '../../utils/appText';
 const ROW_HEIGHT = 64;
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -98,9 +100,9 @@ export default function LearningQueueList({
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={[styles.headerTitle, isArabic && styles.arabic]}>{isArabic ? 'قائمة الانتظار' : 'Queue'}</Text>
+            <Text style={[styles.headerTitle, isArabic && styles.arabic]}>{tr('Queue', 'File d’attente', 'قائمة الانتظار')}</Text>
             <Text style={[styles.headerMeta, isArabic && styles.arabic]}>
-              {isArabic ? `${upNext} تالياً` : `${upNext} up next · ${queue.length} items`}
+              {tr(`${upNext} up next · ${queue.length} items`, `${upNext} à suivre · ${queue.length} éléments`, `${upNext} تالياً`)}
             </Text>
           </View>
           <View style={styles.modeButtons}>
@@ -125,7 +127,7 @@ export default function LearningQueueList({
         </View>
         <Pressable disabled={queue.length <= 1} onPress={onClear} style={styles.clearButton}>
           <Icon name="close" size={12} color={queue.length <= 1 ? COLORS.muted : COLORS.learningBright} />
-          <Text style={[styles.clearText, queue.length <= 1 && styles.disabledText]}>{isArabic ? 'مسح التالي' : 'Clear upcoming'}</Text>
+          <Text style={[styles.clearText, queue.length <= 1 && styles.disabledText]}>{tr('Clear upcoming', 'Vider la suite', 'مسح التالي')}</Text>
         </Pressable>
       </View>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} scrollEnabled={!drag} nestedScrollEnabled>

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
@@ -13,6 +14,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningSeasonDetail } from '@/types/learningPlatform';
 
+import { tr } from '../../../utils/appText';
 export default function LearningSeasonScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
@@ -39,18 +41,18 @@ export default function LearningSeasonScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{season ? season.title + ' — Learn & Study' : 'Season — Learn & Study'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'الموسم' : 'Season'} isArabic={isArabic} />
+      <LearningBackHeader title={tr('Season', 'Temps liturgique', 'الموسم')} isArabic={isArabic} />
       {!season && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {season ? (
         <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
-            <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{isArabic ? 'موسم كنسي' : 'CHURCH SEASON'}</Text>
+            <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{tr('CHURCH SEASON', 'TEMPS LITURGIQUE', 'موسم كنسي')}</Text>
             <Text style={[styles.title, isArabic && styles.arabic]}>{season.title}</Text>
             {season.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{season.description}</Text> : null}
           </View>
 
-          <SectionTitle title={isArabic ? 'منهج الألحان' : 'Hymn Curriculum'} isArabic={isArabic} />
+          <SectionTitle title={tr('Hymn Curriculum', 'Programme d’hymnes', 'منهج الألحان')} isArabic={isArabic} />
           <View style={styles.hymnList}>
             {season.hymns.map((hymn, index) => (
               <Pressable key={hymn.id} style={styles.hymn} onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: hymn.id } })}>
@@ -62,10 +64,10 @@ export default function LearningSeasonScreen() {
                 <Text style={styles.chevron}>›</Text>
               </Pressable>
             ))}
-            {!season.hymns.length ? <Empty text={isArabic ? 'لم تُضف ألحان لهذا الموسم بعد.' : 'No hymns have been added to this season yet.'} /> : null}
+            {!season.hymns.length ? <Empty text={tr('No hymns have been added to this season yet.', 'Aucune hymne n’a encore été ajoutée à ce temps.', 'لم تُضف ألحان لهذا الموسم بعد.')} /> : null}
           </View>
 
-          <SectionTitle title={isArabic ? 'ألبومات الموسم' : 'Season Albums'} isArabic={isArabic} />
+          <SectionTitle title={tr('Season Albums', 'Albums du temps', 'ألبومات الموسم')} isArabic={isArabic} />
           <View style={styles.collections}>
             {season.albums.map((album) => (
               <LearningCollectionCard
@@ -78,10 +80,10 @@ export default function LearningSeasonScreen() {
                 onPress={() => router.push({ pathname: '/learn/album/[id]', params: { id: album.id } })}
               />
             ))}
-            {!season.albums.length ? <Empty text={isArabic ? 'لا توجد ألبومات منشورة.' : 'No published albums for this season.'} /> : null}
+            {!season.albums.length ? <Empty text={tr('No published albums for this season.', 'Aucun album publié pour ce temps.', 'لا توجد ألبومات منشورة.')} /> : null}
           </View>
 
-          <SectionTitle title={isArabic ? 'مجموعات الدروس' : 'Lesson Sets'} isArabic={isArabic} />
+          <SectionTitle title={tr('Lesson Sets', 'Séries de leçons', 'مجموعات الدروس')} isArabic={isArabic} />
           <View style={styles.collections}>
             {season.lessonSets.map((lessonSet) => (
               <LearningCollectionCard
@@ -94,7 +96,7 @@ export default function LearningSeasonScreen() {
                 onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: lessonSet.id } })}
               />
             ))}
-            {!season.lessonSets.length ? <Empty text={isArabic ? 'لا توجد مجموعات دروس منشورة.' : 'No published lesson sets for this season.'} /> : null}
+            {!season.lessonSets.length ? <Empty text={tr('No published lesson sets for this season.', 'Aucune série de leçons publiée pour ce temps.', 'لا توجد مجموعات دروس منشورة.')} /> : null}
           </View>
         </NowPlayingAwareScrollView>
       ) : null}

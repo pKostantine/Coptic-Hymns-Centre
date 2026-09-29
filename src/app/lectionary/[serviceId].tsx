@@ -15,6 +15,7 @@ export default function LectionaryDocument() {
       table={service.table}
       title={service.title}
       arabic={service.arabic}
+      french={service.french}
       extraContext={service.extraContext}
       entryId={service.id}
       backHref="/lectionary"

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
@@ -19,6 +20,7 @@ import { learningService, type LearningLessonDetailPayload } from '@/services/le
 import { learningLessonDownloadRequest } from '@/services/offlineDownloadRequests';
 import { goBack } from '@/utils/navigation';
 
+import { tr } from '../../../utils/appText';
 export default function LearningLessonScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string; setId: string }>();
@@ -92,7 +94,7 @@ export default function LearningLessonScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{data ? data.lesson.title + ' — Learn & Study' : 'Lesson — Learn & Study'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'الدرس' : 'Lesson'} isArabic={isArabic} onBack={() => void leaveLesson()} />
+      <LearningBackHeader title={tr('Lesson', 'Leçon', 'الدرس')} isArabic={isArabic} onBack={() => void leaveLesson()} />
       {!data && !error && !linkIncomplete ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {linkIncomplete || error ? <Text style={styles.error}>{linkIncomplete ? 'This lesson link is incomplete.' : error}</Text> : null}
       {data ? (
@@ -101,7 +103,7 @@ export default function LearningLessonScreen() {
             <View style={styles.videoSection}>
               <View style={styles.modeSwitch}>
                 <Pressable onPress={() => setVideoMode('video')} style={[styles.modeButton, videoMode === 'video' && styles.modeButtonActive]}>
-                  <Text style={[styles.modeText, videoMode === 'video' && styles.modeTextActive]}>{isArabic ? 'فيديو' : 'Video'}</Text>
+                  <Text style={[styles.modeText, videoMode === 'video' && styles.modeTextActive]}>{tr('Video', 'Vidéo', 'فيديو')}</Text>
                 </Pressable>
                 <Pressable
                   disabled={!data.lesson.audioAsset}
@@ -111,7 +113,7 @@ export default function LearningLessonScreen() {
                   }}
                   style={[styles.modeButton, videoMode === 'audio' && styles.modeButtonActive, !data.lesson.audioAsset && styles.disabled]}
                 >
-                  <Text style={[styles.modeText, videoMode === 'audio' && styles.modeTextActive]}>{isArabic ? 'صوت فقط' : 'Audio only'}</Text>
+                  <Text style={[styles.modeText, videoMode === 'audio' && styles.modeTextActive]}>{tr('Audio only', 'Audio seulement', 'صوت فقط')}</Text>
                 </Pressable>
               </View>
               {videoMode === 'video' ? (
@@ -132,8 +134,8 @@ export default function LearningLessonScreen() {
               <Pressable style={styles.audioButton} onPress={playAudio}>
                 <Text style={styles.audioButtonText}>
                   {currentItem?.id === data.lesson.id && playing
-                    ? (isArabic ? 'قيد التشغيل' : 'Now Playing')
-                    : (isArabic ? 'تشغيل الدرس' : 'Play Lesson')}
+                    ? (tr('Now Playing', 'En cours de lecture', 'قيد التشغيل'))
+                    : (tr('Play Lesson', 'Lire la leçon', 'تشغيل الدرس'))}
                 </Text>
               </Pressable>
             </View>
@@ -142,8 +144,8 @@ export default function LearningLessonScreen() {
           <View style={styles.meta}>
             <Text style={[styles.type, isArabic && styles.arabic]}>
               {data.lesson.mediaType === 'video'
-                ? (isArabic ? 'درس فيديو' : 'VIDEO LESSON')
-                : (isArabic ? 'درس صوتي' : 'AUDIO LESSON')}
+                ? (tr('VIDEO LESSON', 'LEÇON VIDÉO', 'درس فيديو'))
+                : (tr('AUDIO LESSON', 'LEÇON AUDIO', 'درس صوتي'))}
             </Text>
             <Text style={[styles.title, isArabic && styles.arabic]}>{data.lesson.title}</Text>
             <Pressable onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: data.lessonSet.id } })}>

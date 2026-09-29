@@ -104,6 +104,22 @@ test('Holy Week does not inherit annual or normal fasting conditions', async () 
   assert.equal(Boolean(flags.NormalFastingDays), false);
 });
 
+test('HolyWeek starts with Monday Eve, not with the season on Lazarus Saturday', async () => {
+  const { getContextFlags } = loadEngine();
+  // 2026-04-04 is Lazarus Saturday, 04-05 Palm Sunday; Palm Sunday evening is
+  // already dated Holy Monday (04-06) by the evening rollover.
+  const lazarusSaturday = await getContextFlags('2026-04-04');
+  const palmSunday = await getContextFlags('2026-04-05');
+  const palmSundayEvening = await getContextFlags('2026-04-06');
+  const brightSaturday = await getContextFlags('2026-04-11');
+  assert.equal(Boolean(lazarusSaturday.HolyWeek), false);
+  assert.equal(Boolean(palmSunday.HolyWeek), false);
+  assert.equal(lazarusSaturday.Pascha, true);
+  assert.equal(palmSunday.Pascha, true);
+  assert.equal(palmSundayEvening.HolyWeek, true);
+  assert.equal(brightSaturday.HolyWeek, true);
+});
+
 test('normal days outside Lent retain the conditions returned by the RPC', async () => {
   const { getContextFlags } = loadEngine({
     '2026-10-07': { Annual: true, NormalFastingDays: true, Wednesday: true },

@@ -167,3 +167,10 @@ test('pascha_hour bookmarks keep the hour they were made in', () => {
   assert.equal(bookmarkKeyFor('holy_week', 'pascha_hour', 'monday_1st'), 'holy_week:pascha_hour@monday_1st');
   assert.equal(bookmarkKeyFor('holy_week', 'good_friday_twelfth_hour', 'friday_12th'), 'holy_week:good_friday_twelfth_hour');
 });
+
+test('HolyThursdayMatins is raised by the Holy Thursday 1st hour alone', () => {
+  const raising = manifest.HOLY_WEEK_HOURS.filter((hour) => hour.extraContext?.HolyThursdayMatins === true);
+  assert.deepEqual(raising.map((hour) => hour.id), ['thursday_1st']);
+  assert.equal(raising[0].table, 'thursday_first_hour');
+  assert.equal(raising[0].extraContext.Matins, true);
+});

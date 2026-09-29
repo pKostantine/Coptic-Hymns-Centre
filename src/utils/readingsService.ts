@@ -11,8 +11,9 @@ import { formatVerses } from './verseFormatting';
 // in Septuagint (LXX) chapter/verse numbering, matching bible.verses directly.
 // No conversion is needed at query time.
 const PSALMS_CALENDAR_NUMBER = 19;
-const BIBLE_VERSE_FIELDS = 'chapter_number, verse_number, english, coptic, arabic';
-const PSALM_VERSE_FIELDS = 'chapter_number, verse_number, english:english_from_coptic, coptic, arabic:arabic_from_coptic';
+// bible.verse_parts has no French, so the part fields carry none.
+const BIBLE_VERSE_FIELDS = 'chapter_number, verse_number, english, coptic, arabic, french';
+const PSALM_VERSE_FIELDS = 'chapter_number, verse_number, english:english_from_coptic, coptic, arabic:arabic_from_coptic, french';
 const BIBLE_VERSE_PART_FIELDS = 'english, coptic, arabic';
 const PSALM_VERSE_PART_FIELDS = 'english:english_from_coptic, coptic, arabic:arabic_from_coptic';
 
@@ -26,14 +27,14 @@ function getBibleVersePartSelectFields(bookNum: number): string {
 
 // ─── Gospel author substitution (Coptic Gospel Rite's "[AUTHOR]" placeholder) ─
 
-const GOSPEL_AUTHORS: Record<string, { english: string; coptic: string; arabic: string }> = {
-  matthew: { english: 'Matthew', coptic: 'ⲙⲁⲧⲑⲉⲟⲛ', arabic: 'متى' },
-  mark: { english: 'Mark', coptic: 'ⲙⲁⲣⲕⲟⲛ', arabic: 'مرقس' },
-  luke: { english: 'Luke', coptic: 'ⲗⲟⲩⲕⲁⲛ', arabic: 'لوقا' },
-  john: { english: 'John', coptic: 'ⲓⲱⲁⲛⲛⲏⲛ', arabic: 'يوحنا' },
+const GOSPEL_AUTHORS: Record<string, { english: string; coptic: string; arabic: string; french: string }> = {
+  matthew: { english: 'Matthew', coptic: 'ⲙⲁⲧⲑⲉⲟⲛ', arabic: 'متى', french: 'Matthieu' },
+  mark: { english: 'Mark', coptic: 'ⲙⲁⲣⲕⲟⲛ', arabic: 'مرقس', french: 'Marc' },
+  luke: { english: 'Luke', coptic: 'ⲗⲟⲩⲕⲁⲛ', arabic: 'لوقا', french: 'Luc' },
+  john: { english: 'John', coptic: 'ⲓⲱⲁⲛⲛⲏⲛ', arabic: 'يوحنا', french: 'Jean' },
 };
 
-function substituteAuthor(text: string, language: 'english' | 'coptic' | 'arabic', bookKey: string | null): string {
+function substituteAuthor(text: string, language: 'english' | 'coptic' | 'arabic' | 'french', bookKey: string | null): string {
   if (!text || !text.includes('[AUTHOR]')) return text;
   const author = bookKey ? GOSPEL_AUTHORS[bookKey] : null;
   return text.split('[AUTHOR]').join(author ? author[language] : '');
@@ -47,6 +48,7 @@ function substituteAuthorInSections(sections: DocumentSection[], bookKey: string
       english: substituteAuthor(verse.english, 'english', bookKey),
       coptic: substituteAuthor(verse.coptic, 'coptic', bookKey),
       arabic: substituteAuthor(verse.arabic, 'arabic', bookKey),
+      ...(verse.french ? { french: substituteAuthor(verse.french, 'french', bookKey) } : {}),
     })),
   }));
 }
@@ -409,9 +411,10 @@ export interface ReadingVerse {
   english: string;
   coptic: string | null;
   arabic: string;
+  french?: string;
 }
 
-type ReadingVerseRow = { chapter_number: number; verse_number: number | string; english: string; coptic: string | null; arabic: string };
+type ReadingVerseRow = { chapter_number: number; verse_number: number | string; english: string; coptic: string | null; arabic: string; french?: string | null };
 type ReadingVersePartRow = { english: string; coptic: string | null; arabic: string };
 
 async function loadBookKeyByCalendarNumber(bookNum: number): Promise<string | null> {
@@ -480,6 +483,7 @@ async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse
           english: row.english || '',
           coptic: row.coptic,
           arabic: row.arabic || '',
+          french: row.french || '',
         };
       })
       .filter((verse): verse is ReadingVerse => {
@@ -532,6 +536,7 @@ async function fetchSegmentVerses(segment: ReadingSegment): Promise<ReadingVerse
               english: row.english || '',
               coptic: row.coptic,
               arabic: row.arabic || '',
+              french: row.french || '',
             };
           })
           .filter((verse): verse is ReadingVerse => Boolean(verse));
@@ -586,11 +591,11 @@ async function fetchReadingReferenceVerses(reference: string): Promise<{ verses:
  * single continuous passage in this data model, never a discrete list —
  * detected below and kept as its own start-end dash citation.
  */
-function buildReadingCitation(reference: string, bookTitle: { english: string; arabic: string }, isPsalm: boolean): { english: string; arabic: string } | null {
+function buildReadingCitation(reference: string, bookTitle: { english: string; arabic: string; french?: string }, isPsalm: boolean): { english: string; arabic: string; french?: string } | null {
   if (!bookTitle.english && !bookTitle.arabic) return null;
   // A citation cites ONE psalm chapter, so it reads "Psalm 67:11" — the book
   // title itself ("Psalms"/"المزامير") is the whole-book plural, wrong here.
-  const citationBookTitle = isPsalm ? { english: 'Psalm', arabic: 'مزمور' } : bookTitle;
+  const citationBookTitle = isPsalm ? { english: 'Psalm', arabic: 'مزمور', french: 'Psaume' } : bookTitle;
   const segments = splitReadingReference(reference).map(parseSegment);
   if (!segments.length) return null;
   const first = segments[0];
@@ -608,6 +613,7 @@ function buildReadingCitation(reference: string, bookTitle: { english: string; a
       return {
         english: `${citationBookTitle.english} ${citation}`.trim(),
         arabic: `${citationBookTitle.arabic} ${citation}`.trim(),
+        french: `${citationBookTitle.french || citationBookTitle.english} ${citation}`.trim(),
       };
     }
 
@@ -635,6 +641,7 @@ function buildReadingCitation(reference: string, bookTitle: { english: string; a
     return {
       english: `${citationBookTitle.english} ${citation}`.trim(),
       arabic: `${citationBookTitle.arabic} ${citation}`.trim(),
+      french: `${citationBookTitle.french || citationBookTitle.english} ${citation}`.trim(),
     };
   }
 
@@ -653,20 +660,23 @@ function buildReadingCitation(reference: string, bookTitle: { english: string; a
   return {
     english: `${citationBookTitle.english} ${firstStart.chapter}:${verseList}`.trim(),
     arabic: `${citationBookTitle.arabic} ${firstStart.chapter}:${verseList}`.trim(),
+    french: `${citationBookTitle.french || citationBookTitle.english} ${firstStart.chapter}:${verseList}`.trim(),
   };
 }
 
-const bookTitleCache = new Map<number, Promise<{ english: string; arabic: string; bookKey: string | null } | null>>();
+const bookTitleCache = new Map<number, Promise<{ english: string; arabic: string; french: string; bookKey: string | null } | null>>();
 
-function getReadingBookTitle(bookNum: number): Promise<{ english: string; arabic: string; bookKey: string | null } | null> {
+function getReadingBookTitle(bookNum: number): Promise<{ english: string; arabic: string; french: string; bookKey: string | null } | null> {
   let cached = bookTitleCache.get(bookNum);
   if (!cached) {
     cached = (async () => {
       const bookKey = await getBookKeyByCalendarNumber(bookNum);
       if (!bookKey) return null;
-      const { data, error } = await supabase.schema('bible').from('books').select('title_english, title_arabic').eq('book_key', bookKey).maybeSingle();
+      const { data, error } = await supabase.schema('bible').from('books').select('title_english, title_arabic, title_french').eq('book_key', bookKey).maybeSingle();
       if (error) throw new Error(`Unable to load book title: ${error.message}`);
-      return data ? { english: data.title_english || '', arabic: data.title_arabic || '', bookKey } : { english: '', arabic: '', bookKey };
+      return data
+        ? { english: data.title_english || '', arabic: data.title_arabic || '', french: data.title_french || '', bookKey }
+        : { english: '', arabic: '', french: '', bookKey };
     })();
     bookTitleCache.set(bookNum, cached);
   }
@@ -678,10 +688,10 @@ function getReadingBookTitle(bookNum: number): Promise<{ english: string; arabic
 // Pauline/Catholic Epistle and Praxis are no longer built here — see
 // pushReadingsTable in getReadingsForDate — so only the reading types still
 // resolved through buildReadingSection need a label.
-const READING_TYPE_LABELS: Record<string, { english: string; arabic: string }> = {
-  Psalm: { english: 'Psalm', arabic: 'مزمور' },
-  Gospel: { english: 'Gospel', arabic: 'إنجيل' },
-  Prophecy: { english: 'Prophecy', arabic: 'النبوخة' },
+const READING_TYPE_LABELS: Record<string, { english: string; arabic: string; french?: string }> = {
+  Psalm: { english: 'Psalm', arabic: 'مزمور', french: 'Psaume' },
+  Gospel: { english: 'Gospel', arabic: 'إنجيل', french: 'Évangile' },
+  Prophecy: { english: 'Prophecy', arabic: 'النبوخة', french: 'Prophétie' },
 };
 
 // A reading is treated like its own hymn for Coptic casing purposes: one
@@ -745,7 +755,7 @@ async function buildReadingSection(rule: ReadingRule): Promise<{ section: Docume
   // content, inside `verses` — never merged into `section.title` ("Gospel
   // according to Mark"), which is a separate header rendered in its own slot.
   const citation = bookTitle && verses.length ? buildReadingCitation(rule.reading_reference, bookTitle, isPsalm) : null;
-  const citationVerse = citation ? [{ type: 'readingReference', english: citation.english, coptic: '', arabic: citation.arabic }] : [];
+  const citationVerse = citation ? [{ type: 'readingReference', english: citation.english, coptic: '', arabic: citation.arabic, french: citation.french || citation.english }] : [];
 
   // "X according to Y" only makes sense when the book varies by day (Gospel/
   // Prophecy) — a Psalm reading is always from the Psalms, so naming the
@@ -821,6 +831,7 @@ export interface ReadingCitation {
   kind: LectionaryReadingKind;
   english: string;
   arabic: string;
+  french?: string;
 }
 
 /** Each service's readings in the order they are read, as `calendar.reading_rules` files them (the Liturgy's epistles and Acts under services of their own). */

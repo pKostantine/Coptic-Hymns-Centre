@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -37,6 +38,7 @@ import { goBack } from '@/utils/navigation';
 import { publicShareUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
+import { tr } from '../../utils/appText';
 // Lyrics | player | queue side by side once there is room for all three.
 const WIDE_MIN_WIDTH = 1024;
 const WIDE_MIN_HEIGHT = 560;
@@ -257,8 +259,8 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     if (likeBusy) return;
     if (!libraryAuthenticated) {
       Alert.alert(
-        isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
-        isArabic ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.' : 'Sign in to your CHC account to save Liked Songs.',
+        tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
+        tr('Sign in to your CHC account to save Liked Songs.', 'Connectez-vous à votre compte CHC pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'),
       );
       return;
     }
@@ -273,7 +275,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         return nextSet;
       });
     } catch (cause) {
-      Alert.alert(isArabic ? 'الأغاني المعجبة' : 'Liked Songs', cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
+      Alert.alert(tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'), cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
     } finally {
       setLikeBusy(false);
     }
@@ -294,7 +296,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         size={isLandscapePhone ? 38 : 44}
       />
       <View style={styles.headerCenter}>
-        {!isLandscapePhone ? <Text style={styles.headerEyebrow}>{isArabic ? 'قيد التشغيل' : 'NOW PLAYING'}</Text> : null}
+        {!isLandscapePhone ? <Text style={styles.headerEyebrow}>{tr('NOW PLAYING', 'EN COURS DE LECTURE', 'قيد التشغيل')}</Text> : null}
         {currentItem?.releaseTitle ? (
           <Text numberOfLines={1} style={[styles.headerTitle, isLandscapePhone && styles.headerTitleLandscape]}>
             {currentItem.releaseTitle}
@@ -372,7 +374,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
 
   const lyricsPanelHeader = (
     <View style={[styles.panelHeader, isLandscapePhone && styles.panelHeaderLandscape]}>
-      <Text style={[styles.panelTitle, isLandscapePhone && styles.panelTitleLandscape, isArabic && styles.arabic]}>{isArabic ? 'الكلمات' : 'Lyrics'}</Text>
+      <Text style={[styles.panelTitle, isLandscapePhone && styles.panelTitleLandscape, isArabic && styles.arabic]}>{tr('Lyrics', 'Paroles', 'الكلمات')}</Text>
       <RoundIconButton
         icon="open-in-full"
         accessibilityLabel="Full screen lyrics"
@@ -495,13 +497,13 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         <View style={[styles.pullUpRow, styles.pullUpRowLandscape]}>
           <PullUpButton
             icon="book"
-            label={isArabic ? 'الكلمات' : 'Lyrics'}
+            label={tr('Lyrics', 'Paroles', 'الكلمات')}
             onPress={() => setOpenSheet('lyrics')}
             compact
           />
           <PullUpButton
             icon="list-outline"
-            label={isArabic ? 'قائمة الانتظار' : 'Queue'}
+            label={tr('Queue', 'File d’attente', 'قائمة الانتظار')}
             count={queue.length}
             onPress={() => setOpenSheet('queue')}
             compact
@@ -541,12 +543,12 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
             <View style={styles.pullUpRow}>
               <PullUpButton
                 icon="book"
-                label={isArabic ? 'الكلمات' : 'Lyrics'}
+                label={tr('Lyrics', 'Paroles', 'الكلمات')}
                 onPress={() => setOpenSheet('lyrics')}
               />
               <PullUpButton
                 icon="list-outline"
-                label={isArabic ? 'قائمة الانتظار' : 'Queue'}
+                label={tr('Queue', 'File d’attente', 'قائمة الانتظار')}
                 count={queue.length}
                 onPress={() => setOpenSheet('queue')}
               />
@@ -560,7 +562,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
           <PlayerSheet
             visible={openSheet === 'lyrics'}
             onClose={() => setOpenSheet(null)}
-            accessibilityLabel={isArabic ? 'الكلمات' : 'Lyrics'}
+            accessibilityLabel={tr('Lyrics', 'Paroles', 'الكلمات')}
           >
             <View style={styles.sheetContent}>
               {lyricsPanelHeader}
@@ -571,7 +573,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
           <PlayerSheet
             visible={openSheet === 'queue'}
             onClose={() => setOpenSheet(null)}
-            accessibilityLabel={isArabic ? 'قائمة الانتظار' : 'Queue'}
+            accessibilityLabel={tr('Queue', 'File d’attente', 'قائمة الانتظار')}
           >
             <MusicQueueList {...queueProps} scrollable style={styles.sheetQueue} />
           </PlayerSheet>
@@ -869,7 +871,7 @@ function PlayerCard({
           <View style={[styles.playerActions, styles.playerActionsHorizontal]}>
             <RoundIconButton
               icon={liked ? 'heart' : 'heart-outline'}
-              accessibilityLabel={liked ? (isArabic ? 'إزالة الإعجاب' : 'Unlike') : (isArabic ? 'إعجاب' : 'Like')}
+              accessibilityLabel={liked ? (tr('Unlike', 'Je n’aime plus', 'إزالة الإعجاب')) : (tr('Like', 'J’aime', 'إعجاب'))}
               active={liked}
               disabled={likeBusy}
               onPress={onToggleLike}
@@ -877,7 +879,7 @@ function PlayerCard({
             />
             <RoundIconButton
               icon="share-outline"
-              accessibilityLabel={isArabic ? 'مشاركة' : 'Share'}
+              accessibilityLabel={tr('Share', 'Partager', 'مشاركة')}
               onPress={onShare}
               size={44}
             />
@@ -890,7 +892,7 @@ function PlayerCard({
           <View style={[styles.playerActions, compact && styles.playerActionsCompact]}>
             <RoundIconButton
               icon={liked ? 'heart' : 'heart-outline'}
-              accessibilityLabel={liked ? (isArabic ? 'إزالة الإعجاب' : 'Unlike') : (isArabic ? 'إعجاب' : 'Like')}
+              accessibilityLabel={liked ? (tr('Unlike', 'Je n’aime plus', 'إزالة الإعجاب')) : (tr('Like', 'J’aime', 'إعجاب'))}
               active={liked}
               disabled={likeBusy}
               onPress={onToggleLike}
@@ -898,7 +900,7 @@ function PlayerCard({
             />
             <RoundIconButton
               icon="share-outline"
-              accessibilityLabel={isArabic ? 'مشاركة' : 'Share'}
+              accessibilityLabel={tr('Share', 'Partager', 'مشاركة')}
               onPress={onShare}
               size={compact ? 48 : 42}
             />

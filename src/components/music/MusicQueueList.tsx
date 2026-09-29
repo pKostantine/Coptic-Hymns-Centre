@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { MutableRefObject, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -23,6 +24,7 @@ import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import MusicArtwork from './MusicArtwork';
 import MusicTrackActionsMenu from './MusicTrackActionsMenu';
 
+import { tr } from '../../utils/appText';
 // Rows are a fixed height so a drag distance maps directly onto a slot index.
 const ROW_HEIGHT = 64;
 const COMPACT_ROW_HEIGHT = 52;
@@ -154,7 +156,7 @@ export default function MusicQueueList({
     <View style={[styles.card, scrollable && styles.cardScrollable, style]}>
       <View style={[styles.header, compact && styles.headerCompact]}>
         <View style={styles.headerTop}>
-          <Text style={[styles.headerTitle, compact && styles.headerTitleCompact, isArabic && styles.arabic]}>{isArabic ? 'قائمة الانتظار' : 'Queue'}</Text>
+          <Text style={[styles.headerTitle, compact && styles.headerTitleCompact, isArabic && styles.arabic]}>{tr('Queue', 'File d’attente', 'قائمة الانتظار')}</Text>
           <View style={styles.modeButtons}>
             <RoundIconButton
               icon="shuffle"
@@ -175,17 +177,17 @@ export default function MusicQueueList({
         </View>
         <View style={[styles.headerBottom, compact && styles.headerBottomCompact]}>
           <Text style={[styles.headerMeta, compact && styles.headerMetaCompact, isArabic && styles.arabic]}>
-            {isArabic ? `${upNext} التالي` : `${upNext} up next · ${count} ${count === 1 ? 'track' : 'tracks'}`}
+            {tr(`${upNext} up next · ${count} ${count === 1 ? 'track' : 'tracks'}`, `${upNext} à suivre · ${count} ${count === 1 ? 'titre' : 'titres'}`, `${upNext} التالي`)}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={isArabic ? 'مسح قائمة الانتظار' : 'Clear queue'}
+            accessibilityLabel={tr('Clear queue', 'Vider la file', 'مسح قائمة الانتظار')}
             disabled={count <= 1}
             onPress={onClear}
             style={({ pressed }) => [styles.clearButton, count <= 1 && styles.clearButtonDisabled, pressed && styles.pressed]}
           >
             <Icon name="close" size={12} color={count <= 1 ? COLORS.muted : COLORS.goldBright} />
-            <Text style={[styles.clearText, count <= 1 && styles.clearTextDisabled]}>{isArabic ? 'مسح' : 'Clear queue'}</Text>
+            <Text style={[styles.clearText, count <= 1 && styles.clearTextDisabled]}>{tr('Clear queue', 'Vider la file', 'مسح')}</Text>
           </Pressable>
         </View>
       </View>

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
@@ -14,6 +15,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicHomePayload } from '@/types/musicConsumer';
 
+import { tr } from '../../utils/appText';
 export default function MusicHomeScreen() {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
@@ -33,9 +35,9 @@ export default function MusicHomeScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>{isArabic ? 'الترانيم — كوبتك هيمنز سنتر' : 'Music — Coptic Hymns Centre'}</title></Head>
+      <Head><title>{tr('Music — Coptic Hymns Centre', 'Musique — Coptic Hymns Centre', 'الترانيم — كوبتك هيمنز سنتر')}</title></Head>
       <AppHeader
-        title={{ english: 'Hymns & Songs', arabic: 'الألحان والترانيم' }}
+        title={{ english: 'Hymns & Songs', arabic: 'الألحان والترانيم', french: 'Hymnes et chants' }}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
       />
       <MusicSectionNav active="home" />
@@ -43,9 +45,9 @@ export default function MusicHomeScreen() {
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <Text style={[styles.heroEyebrow, isArabic && styles.arabic]}>COPTIC HYMNS CENTRE</Text>
-          <Text style={[styles.heroTitle, isArabic && styles.arabic]}>{isArabic ? 'استمع. صلِّ. احفظ.' : 'Listen. Pray. Remember.'}</Text>
+          <Text style={[styles.heroTitle, isArabic && styles.arabic]}>{tr('Listen. Pray. Remember.', 'Écouter. Prier. Se souvenir.', 'استمع. صلِّ. احفظ.')}</Text>
           <Text style={[styles.heroBody, isArabic && styles.arabic]}>
-            {isArabic ? 'موسيقى وترانيم قبطية أرثوذكسية في مكان واحد.' : 'Coptic Orthodox hymns and spiritual music, gathered into one listening experience.'}
+            {tr('Coptic Orthodox hymns and spiritual music, gathered into one listening experience.', 'Hymnes coptes orthodoxes et musique spirituelle, réunis en un seul lieu d’écoute.', 'موسيقى وترانيم قبطية أرثوذكسية في مكان واحد.')}
           </Text>
         </View>
 
@@ -54,7 +56,7 @@ export default function MusicHomeScreen() {
 
         {data ? (
           <>
-            <SectionHeading title={isArabic ? 'أحدث الإصدارات' : 'Latest Releases'} />
+            <SectionHeading title={tr('Latest Releases', 'Dernières parutions', 'أحدث الإصدارات')} />
             {data.latestReleases.length ? (
               <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                 {data.latestReleases.map((release) => (
@@ -68,9 +70,9 @@ export default function MusicHomeScreen() {
                   </Pressable>
                 ))}
               </NowPlayingAwareScrollView>
-            ) : <EmptyState text={isArabic ? 'لا توجد إصدارات منشورة بعد.' : 'No published releases yet.'} />}
+            ) : <EmptyState text={tr('No published releases yet.', 'Aucune parution publiée pour l’instant.', 'لا توجد إصدارات منشورة بعد.')} />}
 
-            <SectionHeading title={isArabic ? 'الفنانون' : 'Artists'} />
+            <SectionHeading title={tr('Artists', 'Artistes', 'الفنانون')} />
             {data.artists.length ? (
               <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                 {data.artists.map((artist) => (
@@ -80,7 +82,7 @@ export default function MusicHomeScreen() {
                   </Pressable>
                 ))}
               </NowPlayingAwareScrollView>
-            ) : <EmptyState text={isArabic ? 'لا يوجد فنانون منشورون بعد.' : 'No published artists yet.'} />}
+            ) : <EmptyState text={tr('No published artists yet.', 'Aucun artiste publié pour l’instant.', 'لا يوجد فنانون منشورون بعد.')} />}
           </>
         ) : null}
       </NowPlayingAwareScrollView>

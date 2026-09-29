@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,6 +12,8 @@ import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { getBibleBooks, getBibleChapterDisplayLabel, type BibleBook } from '../../../utils/bibleService';
 
+import { appText, tr } from '../../../utils/appText';
+import { getCurrentAppLanguage } from '../../../utils/preferencesStorage';
 const MAX_FONT_SCALE = 1.25;
 
 /** A bookmarked chapter: "bible:<testament>:<bookKey>:<chapter>", as the chapter reader saves it. */
@@ -62,32 +65,32 @@ export default function BibleBookmarks() {
     .filter((group) => group.chapters.length > 0);
 
   const title = (entry: BookmarkedChapter) => {
-    const bookTitle = arabic ? entry.book.titleArabic || entry.book.titleEnglish : entry.book.titleEnglish;
-    return `${bookTitle} ${getBibleChapterDisplayLabel(entry.book.bookKey, entry.chapter, arabic ? 'ar' : 'en')}`;
+    const bookTitle = appText({ english: entry.book.titleEnglish, arabic: entry.book.titleArabic, french: entry.book.titleFrench });
+    return `${bookTitle} ${getBibleChapterDisplayLabel(entry.book.bookKey, entry.chapter, getCurrentAppLanguage())}`;
   };
 
   return (
     <BookMenuScaffold
       theme={getBookTheme('bible')}
-      title={{ english: 'Bookmarks', arabic: 'المحفوظات' }}
-      overline={arabic ? 'الكتاب المقدس' : 'BIBLE'}
+      title={{ english: 'Bookmarks', arabic: 'المحفوظات', french: 'Favoris' }}
+      overline={tr('BIBLE', 'BIBLE', 'الكتاب المقدس')}
       arabic={arabic}
       backHref="/bible"
     >
       {books && !chapters.length ? (
         <View style={styles.empty}>
           <Text style={[styles.emptyTitle, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-            {arabic ? 'لا توجد إصحاحات محفوظة بعد' : 'No bookmarked chapters yet'}
+            {tr('No bookmarked chapters yet', 'Aucun chapitre en favori pour l’instant', 'لا توجد إصحاحات محفوظة بعد')}
           </Text>
           <Text style={[styles.emptyHint, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-            {arabic ? 'احفظ إصحاحاً من قائمة آياته.' : 'Bookmark a chapter from its list of verses.'}
+            {tr('Bookmark a chapter from its list of verses.', 'Ajoutez un chapitre aux favoris depuis sa liste de versets.', 'احفظ إصحاحاً من قائمة آياته.')}
           </Text>
         </View>
       ) : null}
       {groups.map((group) => (
         <View key={group.testament} style={styles.group}>
           <MenuSectionLabel
-            text={arabic ? TESTAMENTS[group.testament].arabic : TESTAMENTS[group.testament].english}
+            text={appText(TESTAMENTS[group.testament])}
             arabic={arabic}
             accent={TESTAMENTS[group.testament].theme.accent}
           />
@@ -142,7 +145,7 @@ function BookmarkRow({ title, testament, arabic, onPress, onRemove }: BookmarkRo
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={arabic ? `إزالة ${title} من المحفوظات` : `Remove ${title} from bookmarks`}
+        accessibilityLabel={tr(`Remove ${title} from bookmarks`, `Retirer ${title} des favoris`, `إزالة ${title} من المحفوظات`)}
         hitSlop={8}
         onPress={onRemove}
         style={({ pressed }) => [styles.remove, pressed && styles.pressed]}

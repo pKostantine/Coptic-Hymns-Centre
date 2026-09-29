@@ -3,7 +3,7 @@ import { ActivityIndicator, Platform, useWindowDimensions, View } from 'react-na
 
 import SlideshowContainer from './SlideshowContainer';
 import DocumentWebView, { DocumentAction, DocumentSection, DocumentWebViewHandle } from './DocumentWebView';
-import { withRememberedCollapse } from './documentHtml';
+import { pickDocumentTitle, withRememberedCollapse, type DocumentTitle } from './documentHtml';
 import { CHC_SLIDESHOW_THEME, COLORS } from '../../constants/theme';
 import { useBottomChrome } from '../../context/BottomChromeContext';
 import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
@@ -171,15 +171,15 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     // If the selected language has no title text for a given section (e.g.
     // Arabic selected but this hymn has no Arabic title), fall back to
     // whichever language does have one instead of showing nothing.
+    // The slideshow's left-to-right title slot is called "English"; a French
+    // title shows in it too.
     const titleHelpers = useMemo(() => {
       const appLanguage = preferences.appLanguage;
       return {
-        getTitleParts: (title: { english: string; arabic: string }) => title || { english: '', arabic: '' },
-        getTitleText: (title: { english: string; arabic: string }) => title?.english || title?.arabic || '',
-        shouldShowEnglishTitle: (title: { english: string; arabic: string }) =>
-          appLanguage === 'en' || !title?.arabic,
-        shouldShowArabicTitle: (title: { english: string; arabic: string }) =>
-          appLanguage === 'ar' && Boolean(title?.arabic),
+        getTitleParts: (title: DocumentTitle) => title || { english: '', arabic: '' },
+        getTitleText: (title: DocumentTitle) => pickDocumentTitle(title, appLanguage).text,
+        shouldShowEnglishTitle: (title: DocumentTitle) => pickDocumentTitle(title, appLanguage).language !== 'arabic',
+        shouldShowArabicTitle: (title: DocumentTitle) => pickDocumentTitle(title, appLanguage).language === 'arabic',
       };
     }, [preferences.appLanguage]);
 
@@ -206,14 +206,14 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       [onAction, rememberCollapseState],
     );
 
-    // One object for as long as the three toggles are unchanged. The reader
+    // One object for as long as the language toggles are unchanged. The reader
     // rebuilds its whole document -- and reloads, losing the reader's place --
     // whenever this changes identity, so a fresh literal on every render made
     // any re-render (a scroll report, a collapse toggle) a reload.
-    const { english: showEnglish, coptic: showCoptic, arabic: showArabic } = preferences.visibleLanguages;
+    const { english: showEnglish, french: showFrench, coptic: showCoptic, arabic: showArabic } = preferences.visibleLanguages;
     const visibleColumns = useMemo(
-      () => ({ english: showEnglish, coptic: showCoptic, arabic: showArabic }),
-      [showEnglish, showCoptic, showArabic],
+      () => ({ english: showEnglish, french: showFrench, coptic: showCoptic, arabic: showArabic }),
+      [showEnglish, showFrench, showCoptic, showArabic],
     );
 
     // Slideshow mode only. The scrolling reader gets the raw sections plus the

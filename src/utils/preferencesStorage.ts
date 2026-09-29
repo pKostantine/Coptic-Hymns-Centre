@@ -12,6 +12,7 @@ import {
 
 export interface VisibleLanguages {
   english: boolean;
+  french: boolean;
   coptic: boolean;
   copticRecitedPrayers: boolean;
   arabic: boolean;
@@ -35,7 +36,13 @@ export interface SermonPlannerVisibleLanguages {
 
 export type OrientationMode = 'auto' | 'landscape' | 'reverseLandscape' | 'portrait';
 
-export type AppLanguage = 'en' | 'ar';
+export type AppLanguage = 'en' | 'ar' | 'fr';
+
+export const APP_LANGUAGES: AppLanguage[] = ['en', 'fr', 'ar'];
+
+function isAppLanguage(value: unknown): value is AppLanguage {
+  return APP_LANGUAGES.includes(value as AppLanguage);
+}
 
 export interface ReadingPreferences {
   visibleLanguages: VisibleLanguages;
@@ -87,6 +94,7 @@ export type SyncedReadingPreferences = Pick<ReadingPreferences,
 export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   visibleLanguages: {
     english: true,
+    french: false,
     coptic: true,
     copticRecitedPrayers: true,
     arabic: true,
@@ -125,6 +133,11 @@ let currentAppLanguage: AppLanguage = DEFAULT_READING_PREFERENCES.appLanguage;
 /** Current menu/chrome language for synchronous label helpers outside React components. */
 export function getCurrentAppLanguage(): AppLanguage {
   return currentAppLanguage;
+}
+
+/** Set by ReadingPreferencesProvider while it renders, so everything below it reads the new language in the same render. */
+export function setCurrentAppLanguage(language: AppLanguage): void {
+  currentAppLanguage = language;
 }
 
 /** Lowest selectable font scale. */
@@ -192,7 +205,7 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
     ? migrateReadingFontLevel(storedFontScale, stored.fontScaleRangeMax, READING_DEVICE_CLASS)
     : DEFAULT_READING_PREFERENCES.fontScale;
   merged.fontScaleRangeMax = MAX_FONT_SCALE;
-  if (merged.appLanguage !== 'en' && merged.appLanguage !== 'ar') {
+  if (!isAppLanguage(merged.appLanguage)) {
     merged.appLanguage = 'en';
   }
   merged.selectedSaintHymns = Array.isArray(merged.selectedSaintHymns)
@@ -249,6 +262,7 @@ export function applySyncedReadingPreferences(
     ...local,
     visibleLanguages: {
       english: booleanValue(visible.english, local.visibleLanguages.english),
+      french: booleanValue(visible.french, local.visibleLanguages.french),
       coptic: booleanValue(visible.coptic, local.visibleLanguages.coptic),
       copticRecitedPrayers: booleanValue(visible.copticRecitedPrayers, local.visibleLanguages.copticRecitedPrayers),
       arabic: booleanValue(visible.arabic, local.visibleLanguages.arabic),
@@ -270,9 +284,7 @@ export function applySyncedReadingPreferences(
     copticGospelRite: booleanValue(cloud.copticGospelRite, local.copticGospelRite),
     selectedSaintHymns: saintTokens,
     inMonastery: booleanValue(cloud.inMonastery, local.inMonastery),
-    appLanguage: cloud.appLanguage === 'en' || cloud.appLanguage === 'ar'
-      ? cloud.appLanguage
-      : local.appLanguage,
+    appLanguage: isAppLanguage(cloud.appLanguage) ? cloud.appLanguage : local.appLanguage,
   };
 }
 

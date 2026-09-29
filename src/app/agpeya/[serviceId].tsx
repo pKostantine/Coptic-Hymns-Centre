@@ -9,5 +9,5 @@ export default function AgpeyaDocument() {
 
   if (!service) return null;
 
-  return <ServiceDocument schema={service.schema} table={service.table} title={service.title} arabic={service.arabic} entryId={service.id} backHref="/agpeya" />;
+  return <ServiceDocument schema={service.schema} table={service.table} title={service.title} arabic={service.arabic} french={service.french} entryId={service.id} backHref="/agpeya" />;
 }

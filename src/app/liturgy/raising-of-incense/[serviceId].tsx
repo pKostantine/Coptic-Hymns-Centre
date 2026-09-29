@@ -15,6 +15,7 @@ export default function RaisingOfIncenseDocument() {
       table={option.table}
       title={option.title}
       arabic={option.arabic}
+      french={option.french}
       extraContext={option.extraContext}
       entryId={option.id}
       backHref="/liturgy"

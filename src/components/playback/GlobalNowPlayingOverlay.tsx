@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { usePathname } from 'expo-router';
 import { type ReactNode, useEffect, useId, useState } from 'react';
 import { Alert, Animated, Easing, Pressable, StyleSheet } from 'react-native';
@@ -19,6 +20,7 @@ import { musicService } from '@/services/musicService';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import MiniPlayerCard from './MiniPlayerCard';
 
+import { tr } from '../../utils/appText';
 // Same small gap whether the bar floats over a tab bar or the page edge.
 const FLOATING_GAP = 10;
 
@@ -294,7 +296,7 @@ export default function GlobalNowPlayingOverlay() {
           if (miniLikeBusy) return;
           if (!libraryAuthenticated) {
             Alert.alert(
-              preferences.appLanguage === 'ar' ? 'الأغاني المعجبة' : 'Liked Songs',
+              tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
               preferences.appLanguage === 'ar'
                 ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'
                 : `Sign in to your CHC account to save ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
@@ -312,7 +314,7 @@ export default function GlobalNowPlayingOverlay() {
             setMiniLiked(nextLiked);
           } catch (cause) {
             Alert.alert(
-              preferences.appLanguage === 'ar' ? 'الأغاني المعجبة' : 'Liked Songs',
+              tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
               cause instanceof Error ? cause.message : `Unable to update ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
             );
           } finally {

@@ -26,13 +26,15 @@ export interface TextHighlightScriptOptions {
     recolor?: string;
     /** Payload `{ highlightId }`. */
     remove?: string;
-    /** Payload `{ text }` — only when the page's own copy command is unavailable. */
+    /** Payload `{ text, html? }` — only when the page's own copy command is refused. */
     copy?: string;
   };
   /** Tapping a highlight selects it and offers recolour/copy/remove in the toolbar. */
   tapToEdit?: boolean;
   /** Adds Copy to the toolbar. */
   copy?: boolean;
+  /** A JavaScript expression for the page's `function (selection) { return { text, html } | null; }` that formats what Copy puts on the clipboard; read when Copy is tapped. */
+  copyPayload?: string;
   /** A selection only highlights within the language column it started in. */
   singleLanguage?: boolean;
   labels?: { copy?: string; remove?: string };
@@ -75,6 +77,9 @@ export function textHighlightStyles() {
         z-index: 2147483647;
       }
       #sermon-highlight-tools.is-visible { display: flex; }
+      #sermon-highlight-tools.is-below { transform: translate(-50%, 0); }
+      #sermon-highlight-tools.is-copy-only .sermon-color-button,
+      #sermon-highlight-tools.is-copy-only .text-highlight-divider { display: none; }
       .sermon-color-button {
         border: 2px solid rgba(255, 255, 255, 0.72);
         border-radius: 999px;
@@ -118,6 +123,17 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
         var SINGLE_LANGUAGE = ${JSON.stringify(Boolean(options.singleLanguage))};
         var currentHighlights = [];
         var editingHighlightId = null;
+        // The selection the toolbar acts on, kept apart from the live one: on
+        // a phone a tap can clear the live selection before a button hears it.
+        var savedRange = null;
+        var paletteTouch = null;
+        var lastTouchActivation = 0;
+        var showTimer = 0;
+        var mouseDown = false;
+        var pendingCopy = null;
+        var copyWritten = false;
+        // Phones put their own menu (Copy, Look Up…) above a selection.
+        var coarsePointer = Boolean(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
         var annotationSelector = '.sermon-annotatable-text[data-sermon-verse-id][data-sermon-language]';
         var palette = document.createElement('div');
         palette.id = 'sermon-highlight-tools';
@@ -369,8 +385,54 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
         }
 
         function hidePalette() {
-          palette.classList.remove('is-visible');
+          clearTimeout(showTimer);
+          palette.classList.remove('is-visible', 'is-copy-only');
           setEditing(null);
+        }
+
+        function rememberSelection() {
+          var selection = window.getSelection && window.getSelection();
+          if (selection && selection.rangeCount && !selection.isCollapsed) savedRange = selection.getRangeAt(0).cloneRange();
+        }
+
+        // The live selection, or — when a tap has already cleared it — the one
+        // the toolbar kept, shaped like a Selection for the code that reads it.
+        function selectionForToolbar() {
+          var selection = window.getSelection && window.getSelection();
+          if (selection && selection.rangeCount && !selection.isCollapsed) return selection;
+          if (!savedRange || savedRange.collapsed) return selection;
+          var range = savedRange;
+          return {
+            rangeCount: 1,
+            isCollapsed: false,
+            anchorNode: range.startContainer,
+            focusNode: range.endContainer,
+            getRangeAt: function () { return range; },
+            toString: function () { return range.toString(); }
+          };
+        }
+
+        function restoreLiveSelection() {
+          var selection = window.getSelection && window.getSelection();
+          if (!selection || !savedRange || (selection.rangeCount && !selection.isCollapsed)) return;
+          try {
+            selection.removeAllRanges();
+            selection.addRange(savedRange);
+          } catch (error) {
+            // The kept range no longer fits the page; Copy falls back to the host.
+          }
+        }
+
+        function clearSelection() {
+          savedRange = null;
+          var selection = window.getSelection && window.getSelection();
+          if (selection) selection.removeAllRanges();
+        }
+
+        function selectionTouchesText(selection) {
+          if (!selection || !selection.rangeCount || selection.isCollapsed) return false;
+          var range = selection.getRangeAt(0);
+          return Boolean(closestRoot(range.startContainer) || closestRoot(range.endContainer));
         }
 
         function placePalette(rect) {
@@ -379,71 +441,143 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
           // the toolbar is wider with Copy and Remove than colours alone.
           var half = Math.max(78, Math.ceil(palette.offsetWidth / 2) + 8);
           var x = Math.max(half, Math.min(window.innerWidth - half, rect.left + rect.width / 2));
-          var y = Math.max(60, rect.top - 8);
+          // On a phone it goes under the selection, clear of the system's own
+          // menu above it — unless there's no room there.
+          var height = palette.offsetHeight || 46;
+          var below = coarsePointer && rect.bottom + 18 + height < window.innerHeight - 8;
+          palette.classList.toggle('is-below', below);
+          var y = below ? rect.bottom + 18 : Math.max(60, rect.top - 8);
           palette.style.left = x + 'px';
           palette.style.top = y + 'px';
         }
 
-        function showPaletteForSelection() {
+        function showPaletteForSelection(expand) {
           // A tapped highlight's own toolbar stays up until the reader moves on.
           if (editingHighlightId) return;
           var selection = window.getSelection && window.getSelection();
           var anchors = anchorsFromSelection(selection);
-          if (!anchors.length) {
-            hidePalette();
+          // Text that's already highlighted can't be highlighted again, but
+          // can still be copied.
+          var copyOnly = !anchors.length && COPY && selectionTouchesText(selection);
+          if (!anchors.length && !copyOnly) {
+            // Leave the toolbar up while a press on it is in progress.
+            if (!paletteTouch) hidePalette();
             return;
           }
-          showExpandedSelection(selection, anchors);
+          if (anchors.length && expand !== false) showExpandedSelection(selection, anchors);
+          rememberSelection();
+          palette.classList.toggle('is-copy-only', copyOnly);
           placePalette(selection.getRangeAt(0).getBoundingClientRect());
         }
 
         function commitSelection(color) {
-          var selection = window.getSelection && window.getSelection();
+          var selection = selectionForToolbar();
           if (editingHighlightId) {
             if (ACTIONS.recolor) emit(ACTIONS.recolor, { highlightId: editingHighlightId, color: color || 'gold' });
           } else {
             var anchors = anchorsFromSelection(selection);
             if (anchors.length) emit(ACTIONS.create, { anchors: anchors, color: color || 'gold' });
           }
-          if (selection) selection.removeAllRanges();
+          clearSelection();
           hidePalette();
         }
 
-        // The page's own copy command runs its copy handler (the Bible's
-        // formats verse numbers and keeps to one column); the host only steps
-        // in where that command isn't available.
-        function copySelection() {
-          var selection = window.getSelection && window.getSelection();
-          var text = selection ? selection.toString() : '';
-          var copied = false;
-          try {
-            copied = document.execCommand('copy');
-          } catch (error) {
-            copied = false;
+        function copyPayloadFor(selection) {
+          var build = ${options.copyPayload || 'null'};
+          if (typeof build === 'function') {
+            try {
+              var payload = build(selection);
+              if (payload && payload.text) return payload;
+            } catch (error) {}
           }
-          if (!copied && text && ACTIONS.copy) emit(ACTIONS.copy, { text: text });
-          if (selection) selection.removeAllRanges();
+          var text = selection ? selection.toString() : '';
+          return text ? { text: text } : null;
+        }
+
+        // Copy writes its payload (plain and rich) through the page's own copy
+        // command, which the tap allows in a browser and in the app's WebView
+        // alike, and which lets the system turn the rich copy into what other
+        // apps read. The host writes it only if that command is refused.
+        document.addEventListener('copy', function (event) {
+          if (!pendingCopy || !event.clipboardData) return;
+          event.clipboardData.setData('text/plain', pendingCopy.text);
+          if (pendingCopy.html) event.clipboardData.setData('text/html', pendingCopy.html);
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          copyWritten = true;
+        }, true);
+
+        function copySelection() {
+          var payload = copyPayloadFor(selectionForToolbar());
+          if (payload) {
+            // The copy command needs a live selection; a tap may have cleared it.
+            restoreLiveSelection();
+            pendingCopy = payload;
+            copyWritten = false;
+            try {
+              document.execCommand('copy');
+            } catch (error) {
+              copyWritten = false;
+            }
+            pendingCopy = null;
+            if (!copyWritten && ACTIONS.copy) emit(ACTIONS.copy, payload);
+          }
+          clearSelection();
           hidePalette();
         }
 
         function removeEditingHighlight() {
           if (editingHighlightId && ACTIONS.remove) emit(ACTIONS.remove, { highlightId: editingHighlightId });
-          var selection = window.getSelection && window.getSelection();
-          if (selection) selection.removeAllRanges();
+          clearSelection();
           hidePalette();
         }
 
-        palette.addEventListener('pointerdown', function (event) { event.preventDefault(); });
+        function paletteButton(target) {
+          var element = target && target.nodeType === 1 ? target : target && target.parentElement;
+          var button = element && element.closest ? element.closest('[data-color], [data-action]') : null;
+          return button && palette.contains(button) && !button.hidden ? button : null;
+        }
+
+        function pressPaletteButton(button) {
+          if (!button) return;
+          if (button.hasAttribute('data-color')) commitSelection(button.getAttribute('data-color'));
+          else if (button.getAttribute('data-action') === 'copy') copySelection();
+          else if (button.getAttribute('data-action') === 'remove') removeEditingHighlight();
+        }
+
+        // On a phone a tap clears the selection and hides the toolbar before
+        // its click arrives. So the toolbar takes the touch itself: holding it
+        // keeps the selection (and stops the tap turning into a click), and
+        // lifting over the same button presses it.
+        palette.addEventListener('touchstart', function (event) {
+          paletteTouch = paletteButton(event.target) || palette;
+          if (event.cancelable) event.preventDefault();
+          event.stopPropagation();
+        }, { passive: false });
+        palette.addEventListener('touchmove', function (event) {
+          if (event.cancelable) event.preventDefault();
+          event.stopPropagation();
+        }, { passive: false });
+        palette.addEventListener('touchend', function (event) {
+          var pressed = paletteTouch;
+          paletteTouch = null;
+          if (event.cancelable) event.preventDefault();
+          event.stopPropagation();
+          var touch = event.changedTouches && event.changedTouches[0];
+          var released = touch ? paletteButton(document.elementFromPoint(touch.clientX, touch.clientY)) : null;
+          if (!released || released !== pressed) return;
+          lastTouchActivation = Date.now();
+          pressPaletteButton(released);
+        }, { passive: false });
+        palette.addEventListener('touchcancel', function () { paletteTouch = null; });
+        palette.addEventListener('pointerdown', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        });
         palette.addEventListener('click', function (event) {
-          var button = event.target.closest('[data-color]');
-          if (button) {
-            commitSelection(button.getAttribute('data-color'));
-            return;
-          }
-          var action = event.target.closest('[data-action]');
-          if (!action) return;
-          if (action.getAttribute('data-action') === 'copy') copySelection();
-          else if (action.getAttribute('data-action') === 'remove') removeEditingHighlight();
+          // A touch already pressed it.
+          if (Date.now() - lastTouchActivation < 800) return;
+          pressPaletteButton(paletteButton(event.target));
         });
 
         function editHighlight(mark) {
@@ -474,19 +608,33 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
         });
         document.addEventListener('selectionchange', function () {
           var selection = window.getSelection && window.getSelection();
+          clearTimeout(showTimer);
           if (!selection || selection.isCollapsed) {
-            hidePalette();
+            // A press on the toolbar itself keeps it up.
+            if (!paletteTouch) hidePalette();
             return;
           }
+          rememberSelection();
           // Adjusting the selection away from a tapped highlight leaves editing it.
           if (editingHighlightId) {
             var mark = document.querySelector('mark[data-sermon-highlight-id="' + CSS.escape(editingHighlightId) + '"]');
             if (!mark || selection.toString() !== mark.textContent) setEditing(null);
           }
+          // A phone selects with a long press and drag handles, which the page
+          // never sees as a finger lifting — so the toolbar also follows the
+          // selection itself once it settles (not mid-drag with a mouse, nor
+          // mid-stroke with a Pencil).
+          if (mouseDown || pencilStart || window.__sermonPencilActive) return;
+          showTimer = setTimeout(function () { showPaletteForSelection(false); }, 300);
         });
+        document.addEventListener('pointerdown', function (event) {
+          if (event.pointerType === 'mouse') mouseDown = true;
+        }, true);
         document.addEventListener('pointerup', function (event) {
+          if (event.pointerType === 'mouse') mouseDown = false;
           if (event.pointerType !== 'pen') setTimeout(showPaletteForSelection, 0);
         });
+        document.addEventListener('pointercancel', function () { mouseDown = false; });
         document.addEventListener('touchend', function () { setTimeout(showPaletteForSelection, 80); }, { passive: true });
         document.addEventListener('keyup', function () { setTimeout(showPaletteForSelection, 0); });
 

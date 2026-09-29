@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useState } from 'react';
@@ -15,27 +16,29 @@ import { goBack } from '@/utils/navigation';
 import { OrientationMode, VisibleLanguages } from '@/utils/preferencesStorage';
 import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
-const LANGUAGE_OPTIONS: { key: keyof VisibleLanguages; label: string; arabic: string }[] = [
-  { key: 'english', label: 'English', arabic: 'الإنجليزية' }, { key: 'coptic', label: 'Coptic', arabic: 'القبطية' },
-  { key: 'copticRecitedPrayers', label: 'Coptic Recited Prayers', arabic: 'الصلوات القبطية المرتلة قراءة' }, { key: 'arabic', label: 'Arabic', arabic: 'العربية' },
+import { appText } from '../../../utils/appText';
+const LANGUAGE_OPTIONS: { key: keyof VisibleLanguages; label: string; arabic: string; french: string }[] = [
+  { key: 'english', label: 'English', arabic: 'الإنجليزية', french: 'Anglais' }, { key: 'french', label: 'French', arabic: 'الفرنسية', french: 'Français' },
+  { key: 'coptic', label: 'Coptic', arabic: 'القبطية', french: 'Copte' },
+  { key: 'copticRecitedPrayers', label: 'Coptic Recited Prayers', arabic: 'الصلوات القبطية المرتلة قراءة', french: 'Prières récitées en copte' }, { key: 'arabic', label: 'Arabic', arabic: 'العربية', french: 'Arabe' },
 ];
-const ORIENTATION_OPTIONS: { key: OrientationMode; label: string; arabic: string }[] = [
-  { key: 'landscape', label: 'Landscape', arabic: 'أفقي' }, { key: 'reverseLandscape', label: 'Reverse Landscape', arabic: 'أفقي معكوس' },
-  { key: 'portrait', label: 'Portrait', arabic: 'عمودي' }, { key: 'auto', label: 'Auto Rotate', arabic: 'تدوير تلقائي' },
+const ORIENTATION_OPTIONS: { key: OrientationMode; label: string; arabic: string; french: string }[] = [
+  { key: 'landscape', label: 'Landscape', arabic: 'أفقي', french: 'Paysage' }, { key: 'reverseLandscape', label: 'Reverse Landscape', arabic: 'أفقي معكوس', french: 'Paysage inversé' },
+  { key: 'portrait', label: 'Portrait', arabic: 'عمودي', french: 'Portrait' }, { key: 'auto', label: 'Auto Rotate', arabic: 'تدوير تلقائي', french: 'Rotation automatique' },
 ];
 const SETTINGS_LABELS = {
-  settings: { english: 'Book Settings', arabic: 'إعدادات الكتب' }, languages: { english: 'Languages', arabic: 'اللغات' }, orientation: { english: 'Orientation', arabic: 'الاتجاه' },
-  display: { english: 'Display', arabic: 'العرض' }, slideshowMode: { english: 'Slideshow Mode', arabic: 'وضع العرض التقديمي' }, selectText: { english: 'Select Text', arabic: 'تحديد النص' },
-  displayComments: { english: 'Display Comments', arabic: 'عرض التعليقات' }, displaySilentPrayers: { english: 'Display Silent Prayers', arabic: 'عرض الصلوات السرية' }, displayNowPlayingBar: { english: 'Display Now Playing Bar', arabic: 'عرض شريط التشغيل الحالي' },
-  content: { english: 'Content', arabic: 'المحتوى' }, saintHymns: { english: 'Saint Hymns', arabic: 'ألحان القديسين' }, inMonastery: { english: 'In Monastery', arabic: 'في الدير' },
-  textSize: { english: 'Text Size', arabic: 'حجم النص' }, downloads: { english: 'Downloads & Storage', arabic: 'التنزيلات والتخزين' },
+  settings: { english: 'Book Settings', arabic: 'إعدادات الكتب', french: 'Réglages des livres' }, languages: { english: 'Languages', arabic: 'اللغات', french: 'Langues' }, orientation: { english: 'Orientation', arabic: 'الاتجاه', french: 'Orientation' },
+  display: { english: 'Display', arabic: 'العرض', french: 'Affichage' }, slideshowMode: { english: 'Slideshow Mode', arabic: 'وضع العرض التقديمي', french: 'Mode diaporama' }, selectText: { english: 'Select Text', arabic: 'تحديد النص', french: 'Sélectionner le texte' },
+  displayComments: { english: 'Display Comments', arabic: 'عرض التعليقات', french: 'Afficher les commentaires' }, displaySilentPrayers: { english: 'Display Silent Prayers', arabic: 'عرض الصلوات السرية', french: 'Afficher les prières secrètes' }, displayNowPlayingBar: { english: 'Display Now Playing Bar', arabic: 'عرض شريط التشغيل الحالي', french: 'Afficher la barre de lecture' },
+  content: { english: 'Content', arabic: 'المحتوى', french: 'Contenu' }, saintHymns: { english: 'Saint Hymns', arabic: 'ألحان القديسين', french: 'Hymnes des saints' }, inMonastery: { english: 'In Monastery', arabic: 'في الدير', french: 'Au monastère' },
+  textSize: { english: 'Text Size', arabic: 'حجم النص', french: 'Taille du texte' }, downloads: { english: 'Downloads & Storage', arabic: 'التنزيلات والتخزين', french: 'Téléchargements et stockage' },
 };
 interface SettingsScreenProps { onClose?: () => void; }
 export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   const router = useRouter(); const isHosted = Boolean(onClose); const closeScreen = () => (onClose ? onClose() : goBack(router, '/books'));
   const { preferences, toggleLanguage, setFontScale, setFontScaleValue, setOrientationMode, toggleSelectText, toggleSlideshowMode, toggleDisplayComments, toggleDisplaySilentPrayers, toggleDisplayNowPlayingBar, toggleSaintHymn, clearSaintHymns, toggleInMonastery } = useReadingPreferences();
   const [saintPickerOpen, setSaintPickerOpen] = useState(false); const chosenSaintHymns = preferences.selectedSaintHymns || []; const isArabicChrome = preferences.appLanguage === 'ar';
-  const labelText = (label: { english?: string; label?: string; arabic: string }) => isArabicChrome ? label.arabic : label.english || label.label || ''; const localizedTextStyle = isArabicChrome && styles.arabicText;
+  const labelText = (label: { english?: string; label?: string; arabic: string; french?: string }) => appText({ english: label.english || label.label || '', arabic: label.arabic, french: label.french }); const localizedTextStyle = isArabicChrome && styles.arabicText;
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safeArea, DISABLED_TEXT_SELECTION_STYLE]}>
     {isHosted ? null : <Head><title>CHC Book Settings</title></Head>}
     <AppHeader title={SETTINGS_LABELS.settings} canGoBack onBack={closeScreen} visibleLanguages={{ english: !isArabicChrome, arabic: isArabicChrome }} />

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -22,6 +23,7 @@ import { homeService, type SynaxariumYearRow } from '@/services/homeService';
 import { localDateAtUtcMidnight } from '@/utils/dateUtils';
 import { goBack } from '@/utils/navigation';
 
+import { appLocale, tr } from '../../utils/appText';
 interface SynaxariumEntry {
   entryKey: string;
   entryOrder: number;
@@ -89,7 +91,7 @@ function normalizeSearch(value: string): string {
 function formatGregorianDate(iso: string, locale: 'en' | 'ar'): string {
   const [year, month, day] = iso.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(
-    locale === 'ar' ? 'ar-EG' : 'en-CA',
+    locale === 'ar' ? 'ar-EG' : appLocale() === 'fr' ? 'fr-FR' : 'en-CA',
     {
       weekday: 'long',
       month: 'long',
@@ -171,7 +173,7 @@ export default function SynaxariumBrowserScreen() {
       <Head><title>Synaxarium — Coptic Hymns Centre</title></Head>
 
       <AppHeader
-        title={{ english: 'Synaxarium', arabic: 'السنكسار' }}
+        title={{ english: 'Synaxarium', arabic: 'السنكسار', french: 'Synaxaire' }}
         canGoBack
         onBack={() => goBack(router, '/')}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
@@ -182,10 +184,10 @@ export default function SynaxariumBrowserScreen() {
           <Icon name="search-outline" size={19} color={COLORS.muted} />
           <TextInput
             ref={inputRef}
-            accessibilityLabel={isArabic ? 'بحث في السنكسار' : 'Search Synaxarium'}
+            accessibilityLabel={tr('Search Synaxarium', 'Rechercher dans le Synaxaire', 'بحث في السنكسار')}
             value={query}
             onChangeText={setQuery}
-            placeholder={isArabic ? 'ابحث عن قديس أو حدث' : 'Search saints and events'}
+            placeholder={tr('Search saints and events', 'Rechercher des saints et des événements', 'ابحث عن قديس أو حدث')}
             placeholderTextColor="rgba(201,211,220,0.55)"
             autoCapitalize="none"
             autoCorrect={false}
@@ -200,7 +202,7 @@ export default function SynaxariumBrowserScreen() {
           {query && Platform.OS !== 'ios' ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isArabic ? 'مسح البحث' : 'Clear search'}
+              accessibilityLabel={tr('Clear search', 'Effacer la recherche', 'مسح البحث')}
               onPress={() => {
                 setQuery('');
                 inputRef.current?.focus();
@@ -214,12 +216,12 @@ export default function SynaxariumBrowserScreen() {
 
         <Text style={[styles.searchHint, isArabic && styles.arabic]}>
           {normalizedQuery
-            ? (isArabic
-                ? `${visibleDays.length} يوم مطابق`
-                : `${visibleDays.length} matching day${visibleDays.length === 1 ? '' : 's'}`)
-            : (isArabic
-                ? `السنة القبطية ${yearNumber ?? ''}`
-                : `Coptic Year ${yearNumber ?? ''}`)}
+            ? tr(
+                `${visibleDays.length} matching day${visibleDays.length === 1 ? '' : 's'}`,
+                `${visibleDays.length} jour${visibleDays.length === 1 ? '' : 's'} correspondant${visibleDays.length === 1 ? '' : 's'}`,
+                `${visibleDays.length} يوم مطابق`,
+              )
+            : tr(`Coptic Year ${yearNumber ?? ''}`, `Année copte ${yearNumber ?? ''}`, `السنة القبطية ${yearNumber ?? ''}`)}
         </Text>
       </View>
 
@@ -227,13 +229,13 @@ export default function SynaxariumBrowserScreen() {
         <View style={styles.centerState}>
           <ActivityIndicator color={COLORS.gold} />
           <Text style={[styles.stateText, isArabic && styles.arabic]}>
-            {isArabic ? 'جارٍ تحميل السنكسار…' : 'Loading Synaxarium…'}
+            {tr('Loading Synaxarium…', 'Chargement du Synaxaire…', 'جارٍ تحميل السنكسار…')}
           </Text>
         </View>
       ) : error ? (
         <View style={styles.centerState}>
           <Text style={[styles.errorTitle, isArabic && styles.arabic]}>
-            {isArabic ? 'تعذر تحميل السنكسار' : 'Unable to load Synaxarium'}
+            {tr('Unable to load Synaxarium', 'Impossible de charger le Synaxaire', 'تعذر تحميل السنكسار')}
           </Text>
           <Text style={[styles.stateText, isArabic && styles.arabic]}>{error}</Text>
         </View>
@@ -241,12 +243,10 @@ export default function SynaxariumBrowserScreen() {
         <View style={styles.centerState}>
           <Icon name="search-outline" size={30} color={COLORS.goldBright} />
           <Text style={[styles.errorTitle, isArabic && styles.arabic]}>
-            {isArabic ? 'لا توجد نتائج' : 'No results'}
+            {tr('No results', 'Aucun résultat', 'لا توجد نتائج')}
           </Text>
           <Text style={[styles.stateText, isArabic && styles.arabic]}>
-            {isArabic
-              ? 'جرّب اسماً آخر أو صيغة مختلفة.'
-              : 'Try another name or spelling.'}
+            {tr('Try another name or spelling.', 'Essayez un autre nom ou une autre orthographe.', 'جرّب اسماً آخر أو صيغة مختلفة.')}
           </Text>
         </View>
       ) : (
@@ -280,7 +280,7 @@ export default function SynaxariumBrowserScreen() {
                       {isToday && !normalizedQuery ? (
                         <View style={styles.todayBadge}>
                           <Text style={[styles.todayBadgeText, isArabic && styles.arabic]}>
-                            {isArabic ? 'اليوم' : 'Today'}
+                            {tr('Today', 'Aujourd’hui', 'اليوم')}
                           </Text>
                         </View>
                       ) : null}
@@ -306,7 +306,7 @@ export default function SynaxariumBrowserScreen() {
                   </View>
                 ) : (
                   <Text style={[styles.noEntries, isArabic && styles.arabic]}>
-                    {isArabic ? 'لا توجد أحداث مدرجة.' : 'No events listed.'}
+                    {tr('No events listed.', 'Aucun événement.', 'لا توجد أحداث مدرجة.')}
                   </Text>
                 )}
               </View>

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import Icon from '@/components/chc/ui/Icon';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
@@ -24,21 +25,29 @@ import {
   SingleDayEvent,
 } from '@/utils/calendarService';
 import { todayIsoDate } from '@/utils/dateUtils';
-import { formatCalendarDay, formatCopticMonthName, GREGORIAN_MONTHS_AR, GREGORIAN_MONTHS_EN } from '@/utils/localeFormat';
+import { formatCalendarDay, formatCopticMonthName, GREGORIAN_MONTHS_AR, GREGORIAN_MONTHS_EN, GREGORIAN_MONTHS_FR } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
 import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
+import { appText, tr } from '../../../utils/appText';
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAYS_AR = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
+const WEEKDAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+/** A Gregorian month's name in the App Language. */
+function gregorianMonthName(month: number): string {
+  const french = GREGORIAN_MONTHS_FR[month - 1] || '';
+  return tr(GREGORIAN_MONTHS_EN[month - 1], french.charAt(0).toUpperCase() + french.slice(1), GREGORIAN_MONTHS_AR[month - 1]);
+}
 const WEEKDAY_INDEX: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
 const COPTIC_MONTHS = ['Thoout', 'Paope', 'Hathor', 'Kiahk', 'Tobe', 'Meshir', 'Paremhotep', 'Parmoute', 'Pashons', 'Paone', 'Epep', 'Mesore', 'Nesi'];
 const CALENDAR_LABELS = {
-  calendar: { english: 'Calendar', arabic: 'التقويم' },
-  live: { english: 'Live', arabic: 'حاليًا' },
-  setLive: { english: 'Set Live', arabic: 'العودة للحالي' },
-  season: { english: 'Season', arabic: 'فترة' },
-  gregorian: { english: 'Gregorian', arabic: 'ميلادي' },
-  coptic: { english: 'Coptic', arabic: 'قبطي' },
+  calendar: { english: 'Calendar', arabic: 'التقويم', french: 'Calendrier' },
+  live: { english: 'Live', arabic: 'حاليًا', french: 'En direct' },
+  setLive: { english: 'Set Live', arabic: 'العودة للحالي', french: 'Revenir au direct' },
+  season: { english: 'Season', arabic: 'فترة', french: 'Temps liturgique' },
+  gregorian: { english: 'Gregorian', arabic: 'ميلادي', french: 'Grégorien' },
+  coptic: { english: 'Coptic', arabic: 'قبطي', french: 'Copte' },
 };
 
 type Mode = 'gregorian' | 'coptic';
@@ -63,7 +72,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
   const { rawDate, effectiveDate, isLive, selectDate, goLive, liturgicalDayPeriod, setLiturgicalDayPeriod } = useCalendar();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
-  const labelText = (label: { english: string; arabic: string }) => (isArabic ? label.arabic : label.english);
+  const labelText = (label: { english: string; arabic: string; french?: string }) => (appText(label));
 
   const [mode, setMode] = useState<Mode>('gregorian');
   const [gregorianYear, setGregorianYear] = useState(rawDate.getUTCFullYear());
@@ -230,7 +239,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
   const displayedYear = mode === 'gregorian' ? gregorianYear : copticYear;
   const displayedMonth = mode === 'gregorian' ? gregorianMonth : copticMonth;
   const displayedMonthName = mode === 'gregorian'
-    ? (isArabic ? GREGORIAN_MONTHS_AR[gregorianMonth - 1] : GREGORIAN_MONTHS_EN[gregorianMonth - 1])
+    ? gregorianMonthName(gregorianMonth)
     : copticMonthName ? formatCopticMonthName(copticMonthName, isArabic) : '';
   const yearWindowAnchor = pickerYearAnchor ?? displayedYear ?? new Date().getUTCFullYear();
   const pickerYears = useMemo(
@@ -255,7 +264,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
     setPickerOpen(true);
   };
 
-  const weekdayLabels = isArabic ? WEEKDAYS_AR : WEEKDAYS;
+  const weekdayLabels = isArabic ? WEEKDAYS_AR : preferences.appLanguage === 'fr' ? WEEKDAYS_FR : WEEKDAYS;
   const goVisualLeftMonth = () => {
     if (isArabic) {
       mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1);
@@ -343,7 +352,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
 
         <View style={styles.monthHeader}>
           <Pressable
-            accessibilityLabel={isArabic ? 'Next month' : 'Previous month'}
+            accessibilityLabel={tr('Previous month', 'Mois précédent', 'Next month')}
             style={styles.monthButton}
             onPress={goVisualLeftMonth}
           >
@@ -382,7 +391,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
           </View>
 
           <Pressable
-            accessibilityLabel={isArabic ? 'Previous month' : 'Next month'}
+            accessibilityLabel={tr('Next month', 'Mois suivant', 'Previous month')}
             style={styles.monthButton}
             onPress={goVisualRightMonth}
           >
@@ -428,7 +437,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
             <View style={[styles.pickerColumns, isArabic && styles.rowReverse]}>
               <View style={styles.pickerColumn}>
                 <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>
-                  {isArabic ? 'الشهر' : 'Month'}
+                  {tr('Month', 'Mois', 'الشهر')}
                 </Text>
                 <ScrollView
                   ref={monthListRef}
@@ -440,7 +449,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
                   {pickerMonths.map((value) => {
                     const isSelected = value === displayedMonth;
                     const label = mode === 'gregorian'
-                      ? (isArabic ? GREGORIAN_MONTHS_AR[value - 1] : GREGORIAN_MONTHS_EN[value - 1])
+                      ? gregorianMonthName(value)
                       : formatCopticMonthName(COPTIC_MONTHS[value - 1], isArabic);
                     return (
                       <Pressable
@@ -471,7 +480,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
 
               <View style={styles.pickerColumn}>
                 <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>
-                  {isArabic ? 'السنة' : 'Year'}
+                  {tr('Year', 'Année', 'السنة')}
                 </Text>
                 <ScrollView
                   ref={yearListRef}
@@ -508,7 +517,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
                 usually want to set one then the other, so the panel stays put
                 and this closes it (as does tapping the scrim). */}
             <Pressable accessibilityLabel="Close date picker" style={styles.pickerDone} onPress={() => setPickerOpen(false)}>
-              <Text style={[styles.pickerDoneText, isArabic && styles.arabicText]}>{isArabic ? 'تم' : 'Done'}</Text>
+              <Text style={[styles.pickerDoneText, isArabic && styles.arabicText]}>{tr('Done', 'Terminé', 'تم')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>

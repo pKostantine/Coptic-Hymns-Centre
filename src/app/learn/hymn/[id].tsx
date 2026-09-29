@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
@@ -14,6 +15,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningHymnDetail } from '@/types/learningPlatform';
 
+import { tr } from '../../../utils/appText';
 export default function LearningHymnScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
@@ -40,13 +42,13 @@ export default function LearningHymnScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{hymn ? hymn.title + ' — Learn & Study' : 'Hymn — Learn & Study'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'تعلّم اللحن' : 'Learn a Hymn'} isArabic={isArabic} />
+      <LearningBackHeader title={tr('Learn a Hymn', 'Apprendre une hymne', 'تعلّم اللحن')} isArabic={isArabic} />
       {!hymn && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {hymn ? (
         <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
-            <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{isArabic ? 'لحن' : 'HYMN'}</Text>
+            <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{tr('HYMN', 'HYMNE', 'لحن')}</Text>
             <Text style={[styles.title, isArabic && styles.arabic]}>{hymn.title}</Text>
             {hymn.subtitle ? <Text style={[styles.subtitle, isArabic && styles.arabic]}>{hymn.subtitle}</Text> : null}
             {hymn.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{hymn.description}</Text> : null}
@@ -57,7 +59,7 @@ export default function LearningHymnScreen() {
           </View>
 
           <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>
-            {isArabic ? 'مجموعات الدروس' : 'Lesson Sets'}
+            {tr('Lesson Sets', 'Séries de leçons', 'مجموعات الدروس')}
           </Text>
           <View style={styles.list}>
             {hymn.lessonSets.map((lessonSet) => (
@@ -66,17 +68,17 @@ export default function LearningHymnScreen() {
                 kind="lesson_set"
                 title={lessonSet.title}
                 description={lessonSet.description}
-                meta={isArabic ? 'دروس مرتبة' : 'Structured lessons'}
+                meta={tr('Structured lessons', 'Leçons structurées', 'دروس مرتبة')}
                 isArabic={isArabic}
                 onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: lessonSet.id } })}
               />
             ))}
-            {!hymn.lessonSets.length ? <Empty text={isArabic ? 'لا توجد دروس منشورة لهذا اللحن بعد.' : 'No published lessons for this hymn yet.'} /> : null}
+            {!hymn.lessonSets.length ? <Empty text={tr('No published lessons for this hymn yet.', 'Aucune leçon publiée pour cette hymne pour l’instant.', 'لا توجد دروس منشورة لهذا اللحن بعد.')} /> : null}
           </View>
 
           {hymn.seasons.length ? (
             <>
-              <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'يُرتّل في' : 'Belongs to'}</Text>
+              <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Belongs to', 'Appartient à', 'يُرتّل في')}</Text>
               <View style={styles.chips}>
                 {hymn.seasons.map((season) => (
                   <Pressable key={season.id} style={styles.chip} onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: season.id } })}>
@@ -89,7 +91,7 @@ export default function LearningHymnScreen() {
 
           {hymn.relatedHymns.length ? (
             <>
-              <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'ألحان مرتبطة' : 'Related Hymns'}</Text>
+              <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Related Hymns', 'Hymnes associées', 'ألحان مرتبطة')}</Text>
               <View style={styles.relatedList}>
                 {hymn.relatedHymns.map((related) => (
                   <Pressable key={related.id} style={styles.related} onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: related.id } })}>

@@ -18,6 +18,7 @@ export default function HolyWeekHourDocument() {
       table={hour.table}
       title={hour.title}
       arabic={hour.arabic}
+      french={hour.french}
       extraContext={hour.extraContext}
       entryId={hour.id}
       appendHyperlinkKey={hour.nextHyperlinkKey}

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState, useSyncExternalStore } from 'react';
@@ -17,6 +18,7 @@ import { bookDownloadManager } from '@/services/bookDownloadManager';
 import type { BookDownloadProgress } from '@/types/bookDownloads';
 import { useHolyWeekSchedule } from '@/utils/useHolyWeekSchedule';
 
+import { appText, entryLabel, tr } from '../../utils/appText';
 /** How many covers sit side by side: two on a phone, more as the window widens. */
 function columnsFor(width: number): number {
   if (width >= 1000) return 4;
@@ -65,12 +67,12 @@ export default function BooksHome() {
     return (
       <BookCover
         key={item.id}
-        title={arabic ? item.arabic : item.title}
-        description={arabic ? item.metaArabic : item.meta}
+        title={entryLabel(item)}
+        description={appText({ english: item.meta, arabic: item.metaArabic, french: item.metaFrench })}
         theme={getBookTheme(item.id)}
         arabic={arabic}
         wide={wide}
-        overline={item.id === 'holy-week' ? (arabic ? 'البصخة المقدسة' : 'PASCHA') : undefined}
+        overline={item.id === 'holy-week' ? (tr('PASCHA', 'PÂQUE', 'البصخة المقدسة')) : undefined}
         onPress={() => router.push(`/${item.id}`)}
         {...(book ? { downloadStatus: book.status, downloadProgress: book.progress, onDownloadPress: () => downloadAction(book) } : {})}
       />
@@ -80,10 +82,10 @@ export default function BooksHome() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
-        <title>{arabic ? 'الكتب' : 'Books'}</title>
+        <title>{tr('Books', 'Livres', 'الكتب')}</title>
       </Head>
       <AppHeader
-        title={{ english: 'Books', arabic: 'الكتب' }}
+        title={{ english: 'Books', arabic: 'الكتب', french: 'Livres' }}
         visibleLanguages={{ english: !arabic, arabic }}
         rightLeadingIcon="bookmark-outline"
         onRightLeadingPress={() => router.push('/bookmarks')}

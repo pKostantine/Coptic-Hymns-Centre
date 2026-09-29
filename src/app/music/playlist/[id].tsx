@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -27,6 +28,7 @@ import { goBack } from '@/utils/navigation';
 import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
+import { tr } from '../../../utils/appText';
 export default function MusicPlaylistScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -102,7 +104,7 @@ export default function MusicPlaylistScreen() {
         return next;
       });
     } catch (cause) {
-      Alert.alert(isArabic ? 'الأغاني المعجبة' : 'Liked Songs', cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
+      Alert.alert(tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'), cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
     }
   };
 
@@ -246,7 +248,7 @@ export default function MusicPlaylistScreen() {
       ) : null}
       <View style={styles.header}>
         <Pressable accessibilityLabel="Back" onPress={() => goBack(router, '/music')} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
-        <Text numberOfLines={1} style={[styles.headerTitle, isArabic && styles.arabic]}>{isArabic ? 'قائمة التشغيل' : 'Playlist'}</Text>
+        <Text numberOfLines={1} style={[styles.headerTitle, isArabic && styles.arabic]}>{tr('Playlist', 'Playlist', 'قائمة التشغيل')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -262,12 +264,16 @@ export default function MusicPlaylistScreen() {
               <Text style={[styles.title, isArabic && styles.arabic]}>{playlist.name}</Text>
               {playlist.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{playlist.description}</Text> : null}
               <Text style={[styles.meta, isArabic && styles.arabic]}>
-                {isArabic ? `${playlist.tracks.length} ترنيمة` : `${playlist.tracks.length} ${playlist.tracks.length === 1 ? 'track' : 'tracks'}`}
+                {tr(
+                  `${playlist.tracks.length} ${playlist.tracks.length === 1 ? 'track' : 'tracks'}`,
+                  `${playlist.tracks.length} ${playlist.tracks.length === 1 ? 'titre' : 'titres'}`,
+                  `${playlist.tracks.length} ترنيمة`,
+                )}
               </Text>
               <View style={styles.actions}>
                 {playlist.tracks.length ? (
                   <>
-                  <Pressable style={styles.playButton} onPress={() => playQueue(queue, 0)}><Text style={styles.playButtonText}>▶ {isArabic ? 'تشغيل' : 'Play'}</Text></Pressable>
+                  <Pressable style={styles.playButton} onPress={() => playQueue(queue, 0)}><Text style={styles.playButtonText}>▶ {tr('Play', 'Lire', 'تشغيل')}</Text></Pressable>
                   {Platform.OS !== 'web' ? (
                     <MusicDownloadButton
                       packageKey={`music_playlist:${playlist.id}:${locale}`}
@@ -280,13 +286,13 @@ export default function MusicPlaylistScreen() {
                 {playlist.visibility === 'public' ? (
                   <Pressable style={styles.actionButton} onPress={() => void sharePlaylist()}>
                     <Icon name="share-outline" size={18} color={COLORS.goldBright} />
-                    <Text style={styles.actionButtonText}>{isArabic ? 'مشاركة' : 'Share'}</Text>
+                    <Text style={styles.actionButtonText}>{tr('Share', 'Partager', 'مشاركة')}</Text>
                   </Pressable>
                 ) : null}
                 {playlist.isOwner ? (
                   <Pressable style={styles.actionButton} onPress={() => setEditing((current) => !current)}>
                     <Icon name="settings-outline" size={18} color={COLORS.goldBright} />
-                    <Text style={styles.actionButtonText}>{editing ? (isArabic ? 'إغلاق' : 'Close') : (isArabic ? 'تعديل' : 'Edit')}</Text>
+                    <Text style={styles.actionButtonText}>{editing ? (tr('Close', 'Fermer', 'إغلاق')) : (tr('Edit', 'Modifier', 'تعديل'))}</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -295,23 +301,21 @@ export default function MusicPlaylistScreen() {
 
           {playlist.isOwner && editing ? (
             <View style={styles.editor}>
-              <Text style={styles.editorTitle}>{isArabic ? 'تعديل قائمة التشغيل' : 'Edit playlist'}</Text>
+              <Text style={styles.editorTitle}>{tr('Edit playlist', 'Modifier la playlist', 'تعديل قائمة التشغيل')}</Text>
               <View style={styles.coverEditor}>
                 <MusicArtwork asset={playlist.coverAsset} size={84} label={playlist.name} />
                 <View style={styles.coverEditorText}>
-                  <Text style={[styles.coverLabel, isArabic && styles.arabic]}>{isArabic ? 'غلاف قائمة التشغيل' : 'Playlist cover'}</Text>
+                  <Text style={[styles.coverLabel, isArabic && styles.arabic]}>{tr('Playlist cover', 'Couverture de la playlist', 'غلاف قائمة التشغيل')}</Text>
                   <Text style={[styles.coverHelp, isArabic && styles.arabic]}>
-                    {isArabic
-                      ? 'بدون صورة مخصصة، يتبع الغلاف تلقائياً صورة أول ترنيمة.'
-                      : 'Without a custom image, the cover automatically follows the first track.'}
+                    {tr('Without a custom image, the cover automatically follows the first track.', 'Sans image personnalisée, la couverture reprend celle du premier titre.', 'بدون صورة مخصصة، يتبع الغلاف تلقائياً صورة أول ترنيمة.')}
                   </Text>
                   <View style={styles.coverActions}>
                     <Pressable disabled={coverBusy} style={[styles.coverButton, coverBusy && styles.disabled]} onPress={() => void choosePlaylistCover()}>
-                      <Text style={styles.coverButtonText}>{playlist.hasCustomCover ? (isArabic ? 'استبدال' : 'Replace') : (isArabic ? 'اختيار صورة' : 'Choose image')}</Text>
+                      <Text style={styles.coverButtonText}>{playlist.hasCustomCover ? (tr('Replace', 'Remplacer', 'استبدال')) : (tr('Choose image', 'Choisir une image', 'اختيار صورة'))}</Text>
                     </Pressable>
                     {playlist.hasCustomCover ? (
                       <Pressable disabled={coverBusy} style={[styles.coverRemoveButton, coverBusy && styles.disabled]} onPress={() => void clearPlaylistCover()}>
-                        <Text style={styles.coverRemoveText}>{isArabic ? 'إزالة' : 'Remove'}</Text>
+                        <Text style={styles.coverRemoveText}>{tr('Remove', 'Retirer', 'إزالة')}</Text>
                       </Pressable>
                     ) : null}
                   </View>
@@ -322,16 +326,16 @@ export default function MusicPlaylistScreen() {
               <View style={styles.visibilityControl}>
                 {(['private', 'public'] as const).map((visibility) => (
                   <Pressable key={visibility} accessibilityRole="radio" accessibilityState={{ checked: editVisibility === visibility }} style={[styles.visibilityButton, editVisibility === visibility && styles.visibilityButtonActive]} onPress={() => setEditVisibility(visibility)}>
-                    <Text style={[styles.visibilityText, editVisibility === visibility && styles.visibilityTextActive]}>{visibility === 'private' ? (isArabic ? 'خاصة' : 'Private') : (isArabic ? 'عامة' : 'Public')}</Text>
+                    <Text style={[styles.visibilityText, editVisibility === visibility && styles.visibilityTextActive]}>{visibility === 'private' ? (tr('Private', 'Privée', 'خاصة')) : (tr('Public', 'Publique', 'عامة'))}</Text>
                   </Pressable>
                 ))}
               </View>
               <Text style={styles.visibilityHelp}>{editVisibility === 'public' ? 'Anyone with the link can open and play this playlist.' : 'Only you can open this playlist.'}</Text>
               <Pressable disabled={!editName.trim() || saving} style={[styles.saveButton, (!editName.trim() || saving) && styles.disabled]} onPress={() => void savePlaylist()}>
-                {saving ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.saveButtonText}>{isArabic ? 'حفظ التغييرات' : 'Save changes'}</Text>}
+                {saving ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.saveButtonText}>{tr('Save changes', 'Enregistrer', 'حفظ التغييرات')}</Text>}
               </Pressable>
               {!confirmDelete ? (
-                <Pressable style={styles.deleteButton} onPress={() => setConfirmDelete(true)}><Text style={styles.deleteButtonText}>{isArabic ? 'حذف قائمة التشغيل' : 'Delete playlist'}</Text></Pressable>
+                <Pressable style={styles.deleteButton} onPress={() => setConfirmDelete(true)}><Text style={styles.deleteButtonText}>{tr('Delete playlist', 'Supprimer la playlist', 'حذف قائمة التشغيل')}</Text></Pressable>
               ) : (
                 <View style={styles.deleteConfirm}>
                   <Text style={styles.deleteConfirmText}>Delete this playlist? This cannot be undone.</Text>
@@ -374,7 +378,7 @@ export default function MusicPlaylistScreen() {
                   </View>
                 )
               )) : (
-              <View style={styles.empty}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'هذه القائمة فارغة.' : 'This playlist is empty.'}</Text></View>
+              <View style={styles.empty}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('This playlist is empty.', 'Cette playlist est vide.', 'هذه القائمة فارغة.')}</Text></View>
             )}
           </View>
         </NowPlayingAwareScrollView>

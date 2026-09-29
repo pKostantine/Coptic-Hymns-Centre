@@ -1,4 +1,6 @@
 import { contentDataClient as supabase } from '../services/contentDataClient';
+import { formatCopticNumber, formatGreekNumber } from './bibleNumerals';
+import type { AppLanguage } from './preferencesStorage';
 
 export interface BibleBook {
   bookKey: string;
@@ -7,6 +9,8 @@ export interface BibleBook {
   titleEnglish: string;
   titleArabic: string;
   titleCoptic: string;
+  titleGreek: string;
+  titleFrench: string;
   aliases: string[];
 }
 
@@ -54,16 +58,20 @@ const EASTERN_ARABIC_DIGITS: Record<string, string> = {
 export interface BibleChapterTitle {
   english: string;
   arabic: string;
+  /** Where the chapter has text in that language; otherwise the English is used. */
+  coptic?: string;
+  greek?: string;
+  french?: string;
 }
 
 const SPECIAL_CHAPTER_TITLES: Record<string, Record<number, BibleChapterTitle>> = {
   daniel: {
-    0: { english: 'Susanna', arabic: 'سوسنة' },
-    13: { english: 'Bel and the Dragon', arabic: 'بيل والتنين' },
-    14: { english: '14th Vision of Daniel', arabic: 'رؤيا دانيال الرابعة عشرة' },
+    0: { english: 'Susanna', arabic: 'سوسنة', coptic: 'Ⲥⲟⲩⲥⲁⲛⲛⲁ', greek: 'Σουσάννα', french: 'Suzanne' },
+    13: { english: 'Bel and the Dragon', arabic: 'بيل والتنين', greek: 'Βὴλ καὶ Δράκων', french: 'Bel et le Dragon' },
+    14: { english: '14th Vision of Daniel', arabic: 'رؤيا دانيال الرابعة عشرة', french: 'Quatorzième vision de Daniel' },
   },
   second_chronicles: {
-    37: { english: 'Prayer of Manasseh', arabic: 'صلاة منسى' },
+    37: { english: 'Prayer of Manasseh', arabic: 'صلاة منسى', greek: 'Προσευχὴ Μανασσῆ', french: 'Prière de Manassé' },
   },
 };
 
@@ -90,7 +98,7 @@ function formatArabicLetterSuffixes(text: string): string {
   });
 }
 
-export function getBibleVerseDisplayLabel(verseNumber: BibleVerseNumber, appLanguage: 'en' | 'ar' = 'en'): string {
+export function getBibleVerseDisplayLabel(verseNumber: BibleVerseNumber, appLanguage: AppLanguage = 'en'): string {
   const text = String(verseNumber);
   if (appLanguage !== 'ar') return text;
   return formatArabicLetterSuffixes(formatArabicDigits(text));
@@ -155,7 +163,7 @@ export function getBibleSpecialChapterTitle(bookKey: string | null | undefined, 
   return SPECIAL_CHAPTER_TITLES[normalizeBookKey(bookKey)]?.[chapterNumber] || null;
 }
 
-export function getBibleChapterDisplayLabel(bookKey: string | null | undefined, chapterNumber: number, appLanguage: 'en' | 'ar' = 'en'): string {
+export function getBibleChapterDisplayLabel(bookKey: string | null | undefined, chapterNumber: number, appLanguage: AppLanguage = 'en'): string {
   if (normalizeBookKey(bookKey || '') === ESTHER_KEY && ESTHER_ADDITION_CHAPTER_LABELS[chapterNumber]) {
     return appLanguage === 'ar'
       ? ESTHER_ADDITION_CHAPTER_ARABIC_LABELS[chapterNumber]
@@ -164,20 +172,21 @@ export function getBibleChapterDisplayLabel(bookKey: string | null | undefined, 
   const specialTitle = getBibleSpecialChapterTitle(bookKey, chapterNumber);
   if (!specialTitle) return appLanguage === 'ar' ? formatArabicDigits(String(chapterNumber)) : String(chapterNumber);
   if (appLanguage === 'ar') return specialTitle.arabic;
+  if (appLanguage === 'fr') return specialTitle.french || specialTitle.english;
   return specialTitle.english;
 }
 
-export function getBibleChapterMenuLabel(bookKey: string | null | undefined, chapterNumber: number, appLanguage: 'en' | 'ar' = 'en'): string {
+export function getBibleChapterMenuLabel(bookKey: string | null | undefined, chapterNumber: number, appLanguage: AppLanguage = 'en'): string {
   return getBibleChapterDisplayLabel(bookKey, chapterNumber, appLanguage);
 }
 
 export function getBibleChapterHeaderTitle(
-  book: Pick<BibleBook, 'titleEnglish' | 'titleArabic'> | null | undefined,
+  book: (Pick<BibleBook, 'titleEnglish' | 'titleArabic'> & Partial<Pick<BibleBook, 'titleFrench'>>) | null | undefined,
   fallbackTitle: string | null | undefined,
   fallbackArabic: string | null | undefined,
   bookKey: string | null | undefined,
   chapterNumber: number,
-  appLanguage: 'en' | 'ar' = 'en',
+  appLanguage: AppLanguage = 'en',
 ): string {
   const chapterLabel = getBibleChapterMenuLabel(bookKey, chapterNumber, appLanguage);
   const normalizedBookKey = normalizeBookKey(bookKey || '');
@@ -191,7 +200,61 @@ export function getBibleChapterHeaderTitle(
   if (appLanguage === 'ar') {
     return `${arabicBookTitle} ${chapterLabel}`.trim();
   }
+  if (appLanguage === 'fr') {
+    const frenchBookTitle = normalizedBookKey === PSALMS_KEY ? 'Psaume' : book?.titleFrench || englishBookTitle;
+    return `${frenchBookTitle} ${chapterLabel}`.trim();
+  }
   return `${englishBookTitle} ${chapterLabel}`.trim();
+}
+
+export type BibleReferenceLanguage = 'english' | 'arabic' | 'coptic' | 'greek' | 'french';
+
+const PSALM_REFERENCE_TITLES: Record<BibleReferenceLanguage, string> = {
+  english: 'Psalm',
+  arabic: 'مزمور',
+  coptic: 'Ⲯⲁⲗⲙⲟⲥ',
+  greek: 'Ψαλμός',
+  french: 'Psaume',
+};
+const ESTHER_ADDITION_GREEK_LABELS: Record<number, string> = { 0: 'Α', 11: 'Β', 12: 'Γ' };
+
+function getBibleChapterReferenceLabel(bookKey: string | null | undefined, chapterNumber: number, language: BibleReferenceLanguage): string {
+  if (language === 'english' || language === 'arabic') return getBibleChapterDisplayLabel(bookKey, chapterNumber, language === 'arabic' ? 'ar' : 'en');
+  if (normalizeBookKey(bookKey || '') === ESTHER_KEY && ESTHER_ADDITION_CHAPTER_LABELS[chapterNumber]) {
+    return language === 'greek' ? ESTHER_ADDITION_GREEK_LABELS[chapterNumber] : ESTHER_ADDITION_CHAPTER_LABELS[chapterNumber];
+  }
+  const specialTitle = getBibleSpecialChapterTitle(bookKey, chapterNumber);
+  if (specialTitle) return specialTitle[language] || specialTitle.english;
+  if (language === 'coptic') return formatCopticNumber(chapterNumber);
+  if (language === 'greek') return formatGreekNumber(chapterNumber);
+  return String(chapterNumber);
+}
+
+/**
+ * "Leviticus 2" in each language a chapter can be read in — the book's name
+ * in that language and the chapter in that language's numerals (Coptic and
+ * Greek letters, Arabic-Indic digits). A copied verse is signed with the one
+ * for its column. A book with no name in a language falls back to English.
+ */
+export function getBibleChapterReferences(
+  book: Pick<BibleBook, 'titleEnglish' | 'titleArabic' | 'titleCoptic' | 'titleGreek' | 'titleFrench'> | null | undefined,
+  bookKey: string | null | undefined,
+  chapterNumber: number,
+): Record<BibleReferenceLanguage, string> {
+  const isPsalms = normalizeBookKey(bookKey || '') === PSALMS_KEY;
+  const englishTitle = isPsalms ? PSALM_REFERENCE_TITLES.english : book?.titleEnglish || bookKey || '';
+  const titles: Record<BibleReferenceLanguage, string> = {
+    english: englishTitle,
+    arabic: isPsalms ? PSALM_REFERENCE_TITLES.arabic : book?.titleArabic || englishTitle,
+    coptic: isPsalms ? PSALM_REFERENCE_TITLES.coptic : book?.titleCoptic || englishTitle,
+    greek: isPsalms ? PSALM_REFERENCE_TITLES.greek : book?.titleGreek || englishTitle,
+    french: isPsalms ? PSALM_REFERENCE_TITLES.french : book?.titleFrench || englishTitle,
+  };
+  const languages: BibleReferenceLanguage[] = ['english', 'arabic', 'coptic', 'greek', 'french'];
+  return Object.fromEntries(languages.map((language) => [
+    language,
+    `${titles[language]} ${getBibleChapterReferenceLabel(bookKey, chapterNumber, language)}`.trim(),
+  ])) as Record<BibleReferenceLanguage, string>;
 }
 
 // ─── Book metadata (small, cached for the whole session) ──────────────────
@@ -228,6 +291,8 @@ async function loadBibleBooks(): Promise<BibleBook[]> {
       titleEnglish: row.title_english || '',
       titleArabic: row.title_arabic || '',
       titleCoptic: row.title_coptic || '',
+      titleGreek: row.title_greek || '',
+      titleFrench: row.title_french || '',
       aliases: row.aliases_json || [],
     }));
 }

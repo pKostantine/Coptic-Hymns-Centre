@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -22,6 +23,7 @@ import { goBack } from '@/utils/navigation';
 import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
+import { tr } from '../../../utils/appText';
 export default function MusicReleaseScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -118,8 +120,8 @@ export default function MusicReleaseScreen() {
     if (!release || releaseLikeBusy) return;
     if (!libraryAuthenticated) {
       Alert.alert(
-        isArabic ? 'الإصدارات المعجبة' : 'Liked Releases',
-        isArabic ? 'سجّل الدخول إلى حساب CHC لحفظ الإصدارات.' : 'Sign in to your CHC account to save liked releases.',
+        tr('Liked Releases', 'Parutions aimées', 'الإصدارات المعجبة'),
+        tr('Sign in to your CHC account to save liked releases.', 'Connectez-vous à votre compte CHC pour enregistrer vos parutions aimées.', 'سجّل الدخول إلى حساب CHC لحفظ الإصدارات.'),
       );
       return;
     }
@@ -131,7 +133,7 @@ export default function MusicReleaseScreen() {
       setReleaseLiked(nextLiked);
     } catch (cause) {
       Alert.alert(
-        isArabic ? 'الإصدارات المعجبة' : 'Liked Releases',
+        tr('Liked Releases', 'Parutions aimées', 'الإصدارات المعجبة'),
         cause instanceof Error ? cause.message : 'Unable to update this release.',
       );
     } finally {
@@ -142,8 +144,8 @@ export default function MusicReleaseScreen() {
   const handleToggleTrackLike = async (trackId: string) => {
     if (!libraryAuthenticated) {
       Alert.alert(
-        isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
-        isArabic ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.' : 'Sign in to your CHC account to save Liked Songs.',
+        tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
+        tr('Sign in to your CHC account to save Liked Songs.', 'Connectez-vous à votre compte CHC pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'),
       );
       return;
     }
@@ -157,14 +159,14 @@ export default function MusicReleaseScreen() {
         return next;
       });
     } catch (cause) {
-      Alert.alert(isArabic ? 'الأغاني المعجبة' : 'Liked Songs', cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
+      Alert.alert(tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'), cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
     }
   };
 
   if (!release) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Header onBack={() => goBack(router, '/music')} title={isArabic ? 'الإصدار' : 'Release'} isArabic={isArabic} />
+        <Header onBack={() => goBack(router, '/music')} title={tr('Release', 'Parution', 'الإصدار')} isArabic={isArabic} />
         {error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={COLORS.gold} style={styles.loader} />}
       </SafeAreaView>
     );
@@ -179,7 +181,7 @@ export default function MusicReleaseScreen() {
     release.musicType,
     releaseType,
     release.releaseDate?.slice(0, 4),
-    isArabic ? `${tracks.length} ترنيمة` : `${tracks.length} track${tracks.length === 1 ? '' : 's'}`,
+    tr(`${tracks.length} track${tracks.length === 1 ? '' : 's'}`, `${tracks.length} titre${tracks.length === 1 ? '' : 's'}`, `${tracks.length} ترنيمة`),
   ].filter(Boolean).join(' • ');
 
   return (
@@ -212,7 +214,7 @@ export default function MusicReleaseScreen() {
             <View style={[styles.actions, desktop && styles.actionsDesktop]}>
               <Pressable style={styles.playAll} onPress={() => queue.length && playQueue(queue, 0)}>
                 <Icon name="play" size={16} color={COLORS.black} />
-                <Text style={styles.playAllText}>{isArabic ? 'تشغيل' : 'Play'}</Text>
+                <Text style={styles.playAllText}>{tr('Play', 'Lire', 'تشغيل')}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -222,11 +224,11 @@ export default function MusicReleaseScreen() {
                 onPress={() => void handleToggleReleaseLike()}
               >
                 <Icon name={releaseLiked ? 'heart' : 'heart-outline'} size={19} color={releaseLiked ? COLORS.goldBright : COLORS.white} />
-                <Text style={styles.actionButtonText}>{isArabic ? 'إعجاب' : 'Like'}</Text>
+                <Text style={styles.actionButtonText}>{tr('Like', 'J’aime', 'إعجاب')}</Text>
               </Pressable>
               <Pressable style={styles.actionButton} onPress={() => void handleShareRelease()}>
                 <Icon name="share-outline" size={19} color={COLORS.goldBright} />
-                <Text style={styles.actionButtonText}>{isArabic ? 'مشاركة' : 'Share'}</Text>
+                <Text style={styles.actionButtonText}>{tr('Share', 'Partager', 'مشاركة')}</Text>
               </Pressable>
               {downloadRequest ? (
                 <MusicDownloadButton

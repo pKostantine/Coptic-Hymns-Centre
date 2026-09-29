@@ -1,5 +1,6 @@
 import { BibleBook, getBibleBooks } from './bibleService';
 import { contentDataClient as supabase } from '../services/contentDataClient';
+import type { AppLanguage } from './preferencesStorage';
 
 /**
  * Search over the Bible.
@@ -32,15 +33,15 @@ export const BIBLE_SEARCH_LANGUAGES: BibleSearchLanguage[] = [
   'french',
 ];
 
-export const BIBLE_SEARCH_LANGUAGE_LABELS: Record<BibleSearchLanguage, { english: string; arabic: string }> = {
-  english: { english: 'English', arabic: 'الإنجليزية' },
-  english_nkjv: { english: 'English (NKJV)', arabic: 'الإنجليزية (NKJV)' },
-  english_from_coptic: { english: 'English from Coptic', arabic: 'الإنجليزية عن القبطية' },
-  coptic: { english: 'Coptic', arabic: 'القبطية' },
-  greek: { english: 'Greek', arabic: 'اليونانية' },
-  arabic: { english: 'Arabic', arabic: 'العربية' },
-  arabic_from_coptic: { english: 'Arabic from Coptic', arabic: 'العربية عن القبطية' },
-  french: { english: 'French', arabic: 'الفرنسية' },
+export const BIBLE_SEARCH_LANGUAGE_LABELS: Record<BibleSearchLanguage, { english: string; arabic: string; french?: string }> = {
+  english: { english: 'English', arabic: 'الإنجليزية', french: 'Anglais' },
+  english_nkjv: { english: 'English (NKJV)', arabic: 'الإنجليزية (NKJV)', french: 'Anglais (NKJV)' },
+  english_from_coptic: { english: 'English from Coptic', arabic: 'الإنجليزية عن القبطية', french: 'Anglais du copte' },
+  coptic: { english: 'Coptic', arabic: 'القبطية', french: 'Copte' },
+  greek: { english: 'Greek', arabic: 'اليونانية', french: 'Grec' },
+  arabic: { english: 'Arabic', arabic: 'العربية', french: 'Arabe' },
+  arabic_from_coptic: { english: 'Arabic from Coptic', arabic: 'العربية عن القبطية', french: 'Arabe du copte' },
+  french: { english: 'French', arabic: 'الفرنسية', french: 'Français' },
 };
 
 /**
@@ -199,6 +200,7 @@ export interface BibleReference {
   bookKey: string;
   titleEnglish: string;
   titleArabic: string;
+  titleFrench?: string;
   chapter: number;
   /** Absent when only a chapter was named. */
   verse?: number;
@@ -234,6 +236,11 @@ const ORDINAL_WORDS: Record<string, string> = {
  */
 function normalizeName(value: string): string {
   const folded = String(value || '')
+    // "levitique" finds "Lévitique": Latin accents fold away (Arabic marks
+    // are handled below).
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .normalize('NFC')
     .toLowerCase()
     .replace(/[٠-٩]/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit)
     .replace(/[ً-ٰٟـ]/g, '')
@@ -257,7 +264,8 @@ function normalizeName(value: string): string {
 }
 
 function referenceNamesFor(book: BibleBook): string[] {
-  return [book.titleEnglish, book.titleArabic, book.bookKey, ...(book.aliases || [])]
+  const frenchNames = book.bookKey === 'psalms' ? [book.titleFrench, 'Psaume'] : [book.titleFrench];
+  return [book.titleEnglish, book.titleArabic, ...frenchNames, book.bookKey, ...(book.aliases || [])]
     .map(normalizeName)
     .filter(Boolean);
 }
@@ -293,7 +301,7 @@ export function parseBibleReference(input: string, books: BibleBook[]): BibleRef
     const rest = words.slice(take).join(' ').trim();
     // A bare book name is a reference to its first chapter.
     if (!rest) {
-      return { bookKey: book.bookKey, titleEnglish: book.titleEnglish, titleArabic: book.titleArabic, chapter: 1 };
+      return { bookKey: book.bookKey, titleEnglish: book.titleEnglish, titleArabic: book.titleArabic, titleFrench: book.titleFrench, chapter: 1 };
     }
 
     // chapter, then an optional verse, then an optional end of a range. The
@@ -312,6 +320,7 @@ export function parseBibleReference(input: string, books: BibleBook[]): BibleRef
       bookKey: book.bookKey,
       titleEnglish: book.titleEnglish,
       titleArabic: book.titleArabic,
+      titleFrench: book.titleFrench,
       chapter,
       verse,
       endVerse,
@@ -328,8 +337,12 @@ export async function resolveBibleReference(input: string): Promise<BibleReferen
 }
 
 /** "John 3:16", "John 3:16-18", "John 3" — for showing what a reference was read as. */
-export function formatBibleReference(reference: BibleReference, appLanguage: 'en' | 'ar' = 'en'): string {
-  const title = appLanguage === 'ar' ? reference.titleArabic || reference.titleEnglish : reference.titleEnglish;
+export function formatBibleReference(reference: BibleReference, appLanguage: AppLanguage = 'en'): string {
+  const title = appLanguage === 'ar'
+    ? reference.titleArabic || reference.titleEnglish
+    : appLanguage === 'fr'
+      ? reference.titleFrench || reference.titleEnglish
+      : reference.titleEnglish;
   if (reference.verse === undefined) return `${title} ${reference.chapter}`;
   if (reference.endVerse === undefined) return `${title} ${reference.chapter}:${reference.verse}`;
   return `${title} ${reference.chapter}:${reference.verse}-${reference.endVerse}`;

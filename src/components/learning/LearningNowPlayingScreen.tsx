@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -29,6 +30,7 @@ import LearningArtwork from './LearningArtwork';
 import LearningPlaylistPicker from './LearningPlaylistPicker';
 import LearningQueueList from './LearningQueueList';
 
+import { tr } from '../../utils/appText';
 const WIDE_MIN_WIDTH = 1024;
 const WIDE_MIN_HEIGHT = 560;
 
@@ -147,8 +149,8 @@ export default function LearningNowPlayingScreen({
     if (likeBusy) return;
     if (!libraryAuthenticated) {
       Alert.alert(
-        isArabic ? 'المحتوى المفضّل' : 'Liked Learning',
-        isArabic ? 'سجّل الدخول لحفظ الدروس والتسجيلات المفضّلة.' : 'Sign in to save liked lessons and recordings.',
+        tr('Liked Learning', 'Apprentissages aimés', 'المحتوى المفضّل'),
+        tr('Sign in to save liked lessons and recordings.', 'Connectez-vous pour enregistrer les leçons et enregistrements aimés.', 'سجّل الدخول لحفظ الدروس والتسجيلات المفضّلة.'),
       );
       return;
     }
@@ -162,7 +164,7 @@ export default function LearningNowPlayingScreen({
         return next;
       });
     } catch (cause) {
-      Alert.alert(isArabic ? 'المحتوى المفضّل' : 'Liked Learning', cause instanceof Error ? cause.message : 'Unable to update this item.');
+      Alert.alert(tr('Liked Learning', 'Apprentissages aimés', 'المحتوى المفضّل'), cause instanceof Error ? cause.message : 'Unable to update this item.');
     } finally {
       setLikeBusy(false);
     }
@@ -173,8 +175,8 @@ export default function LearningNowPlayingScreen({
       <SafeAreaView edges={['left', 'right']} style={[styles.safeArea, embedded && styles.embedded]}>
         <PlayerHeader title="Learn & Study" onClose={closePlayer} />
         <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>{isArabic ? 'لا يوجد درس قيد التشغيل' : 'Nothing playing'}</Text>
-          <Text style={styles.emptyBody}>{isArabic ? 'اختر درساً أو تسجيلاً للبدء.' : 'Choose a lesson or recording to start learning.'}</Text>
+          <Text style={styles.emptyTitle}>{tr('Nothing playing', 'Aucune lecture en cours', 'لا يوجد درس قيد التشغيل')}</Text>
+          <Text style={styles.emptyBody}>{tr('Choose a lesson or recording to start learning.', 'Choisissez une leçon ou un enregistrement pour commencer.', 'اختر درساً أو تسجيلاً للبدء.')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -254,7 +256,7 @@ export default function LearningNowPlayingScreen({
       {wide ? (
         <View style={styles.wideBody}>
           <View style={styles.panel}>
-            <PanelHeader title={isArabic ? 'الكلمات' : 'Lyrics'} onFullscreen={() => setLyricsFullscreen(true)} />
+            <PanelHeader title={tr('Lyrics', 'Paroles', 'الكلمات')} onFullscreen={() => setLyricsFullscreen(true)} />
             <MusicLyricsView {...lyricsProps} />
           </View>
           <View style={styles.playerColumn}>{playerCard}</View>
@@ -300,7 +302,7 @@ export default function LearningNowPlayingScreen({
         <>
           <PlayerSheet visible={openSheet === 'lyrics'} onClose={() => setOpenSheet(null)} accessibilityLabel="Lyrics">
             <View style={styles.sheetContent}>
-              <PanelHeader title={isArabic ? 'الكلمات' : 'Lyrics'} onFullscreen={() => setLyricsFullscreen(true)} />
+              <PanelHeader title={tr('Lyrics', 'Paroles', 'الكلمات')} onFullscreen={() => setLyricsFullscreen(true)} />
               <MusicLyricsView {...lyricsProps} />
             </View>
           </PlayerSheet>
@@ -359,8 +361,8 @@ function PanelHeader({ title, onFullscreen }: { title: string; onFullscreen: () 
 function SheetButtons({ onLyrics, onQueue, count, isArabic }: { onLyrics: () => void; onQueue: () => void; count: number; isArabic: boolean }) {
   return (
     <View style={styles.sheetButtons}>
-      <SheetButton icon="book" label={isArabic ? 'الكلمات' : 'Lyrics'} onPress={onLyrics} />
-      <SheetButton icon="list-outline" label={isArabic ? 'قائمة الانتظار' : 'Queue'} count={count} onPress={onQueue} />
+      <SheetButton icon="book" label={tr('Lyrics', 'Paroles', 'الكلمات')} onPress={onLyrics} />
+      <SheetButton icon="list-outline" label={tr('Queue', 'File d’attente', 'قائمة الانتظار')} count={count} onPress={onQueue} />
     </View>
   );
 }

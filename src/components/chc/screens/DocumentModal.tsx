@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,9 +18,10 @@ import LoadingScreen from '../ui/LoadingScreen';
 import CalendarScreen from './CalendarScreen';
 import SeasonSelectorScreen from './SeasonSelectorScreen';
 import SettingsScreen from './SettingsScreen';
+import { getCurrentAppLanguage } from '../../../utils/preferencesStorage';
 
 interface DocumentModalTarget {
-  title: { english: string; arabic: string };
+  title: { english: string; arabic: string; french?: string };
   sections: DocumentSection[];
   isAntiphonary?: boolean;
   subdocumentKey?: string;
@@ -28,7 +30,7 @@ interface DocumentModalTarget {
 
 interface DocumentModalProps {
   visible: boolean;
-  title: { english: string; arabic: string } | null;
+  title: { english: string; arabic: string; french?: string } | null;
   sections: DocumentSection[] | null;
   isAntiphonary?: boolean;
   subdocumentKey?: string;
@@ -58,10 +60,12 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
     // Named as the content selector names it — a prophecy's pill reads
     // "Prophecy 2 (Isaiah 1:2-18)", as it does in the parent's list.
     const selectorTitle = getSectionSelectorTitle(section);
+    if (getCurrentAppLanguage() === 'fr' && selectorTitle.french) return formatEnglishDisplayText(selectorTitle.french);
     return selectorTitle.english ? formatEnglishDisplayText(selectorTitle.english) : selectorTitle.arabic || null;
   }
   if (!includeReadingReference) return null;
   const reference = section.verses.find((v) => v.type === 'readingReference');
+  if (reference && getCurrentAppLanguage() === 'fr' && reference.french) return reference.french;
   return reference ? reference.english || reference.arabic || null : null;
 }
 
@@ -128,7 +132,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       const triggerSection = sections.find((s) => s.id === action.sectionId);
       if (triggerSection?.subdocumentSections) {
         setNestedModal({
-          title: { english: 'Antiphonary', arabic: 'الدفنار' },
+          title: { english: 'Antiphonary', arabic: 'الدفنار', french: 'Antiphonaire' },
           sections: triggerSection.subdocumentSections,
           isAntiphonary: true,
           collapseMemoryScope: `${collapseMemoryScope}:sub:${triggerSection.id}`,
@@ -162,6 +166,11 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   };
 
   function jumpToSection(id: string) {
+    // Where the reader asked to be, straight away: a pick from the content
+    // list lands while the list still covers this document, and reports are
+    // ignored then, so this would otherwise still hold wherever they were
+    // before -- the top -- for anything that remounts the reader.
+    setCurrentSectionId(id);
     if (preferences.slideshowMode) setSelectedSlideSectionId(id);
     else documentRef.current?.scrollToSection(id);
   }
@@ -416,7 +425,7 @@ export function AntiphonaryModal({
   return (
     <DocumentModal
       visible={visible}
-      title={{ english: 'Antiphonary', arabic: 'الدفنار' }}
+      title={{ english: 'Antiphonary', arabic: 'الدفنار', french: 'Antiphonaire' }}
       sections={sections}
       isAntiphonary
       collapseMemoryScope={collapseMemoryScope}

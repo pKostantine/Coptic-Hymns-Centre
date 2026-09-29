@@ -14,9 +14,12 @@ function loadBuilder() {
       "import { formatEnglishDisplayText } from '../../utils/displayText';",
       "const formatEnglishDisplayText = (value) => String(value || '');",
     );
-  // The builder's one local import, the shared highlighting layer.
-  const textHighlights = evaluateModule(fs.readFileSync('src/components/chc/textHighlights.ts', 'utf8'), 'textHighlights.ts', require);
-  const localRequire = (name) => (name === './textHighlights' ? textHighlights : require(name));
+  // The builder's local imports: the shared highlighting layer and numerals.
+  const localModules = {
+    './textHighlights': evaluateModule(fs.readFileSync('src/components/chc/textHighlights.ts', 'utf8'), 'textHighlights.ts', require),
+    '../../utils/bibleNumerals': evaluateModule(fs.readFileSync('src/utils/bibleNumerals.ts', 'utf8'), 'bibleNumerals.ts', require),
+  };
+  const localRequire = (name) => localModules[name] || require(name);
   return evaluateModule(source, 'bibleDocumentHtml.ts', localRequire).buildBibleChapterHtml;
 }
 
@@ -102,6 +105,7 @@ test('Bible reading view highlights by stored chapter and verse, and offers Copy
     selectText: true,
     highlighting: true,
     highlightLabels: { copy: 'Copy', remove: 'Remove' },
+    copyReference: { english: 'Psalm 10', arabic: 'مزمور ١٠', coptic: 'Ⲯⲁⲗⲙⲟⲥ ⲓ̅' },
   });
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
   assert.equal(scripts.length, 2);
@@ -112,6 +116,25 @@ test('Bible reading view highlights by stored chapter and verse, and offers Copy
   assert.match(html, /"copy":"copyBibleText"/);
   assert.match(html, /addAction\('copy', "Copy"\)/);
   assert.match(html, /window\.__chcBiblePost = post/);
+  // Copy — the toolbar's and the system's — is signed with the chapter. The
+  // toolbar writes it through the page's copy command, and the host only when
+  // that is refused.
+  assert.match(html, /var copyReference = \{"english":"Psalm 10","arabic":"مزمور ١٠","coptic":"Ⲯⲁⲗⲙⲟⲥ ⲓ̅"\}/);
+  // A copy is the reader's base size whatever the column's own size.
+  assert.match(html, /'font-size': '18px'/);
+  assert.match(html, /window\.__chcBibleCopyPayload = bibleCopyPayload/);
+  assert.match(html, /var build = window\.__chcBibleCopyPayload;/);
+  assert.match(html, /pendingCopy = payload;[\s\S]*?document\.execCommand\('copy'\);[\s\S]*?if \(!copyWritten && ACTIONS\.copy\) emit\(ACTIONS\.copy, payload\)/);
+  // A phone's tap clears the live selection before a click: the toolbar takes
+  // the touch itself and acts on the selection it kept.
+  assert.match(html, /palette\.addEventListener\('touchstart', function \(event\) \{\s*paletteTouch = [^;]+;\s*if \(event\.cancelable\) event\.preventDefault\(\);/);
+  assert.match(html, /palette\.addEventListener\('touchend'[\s\S]*?pressPaletteButton\(released\)/);
+  assert.match(html, /function commitSelection\(color\) \{\s*var selection = selectionForToolbar\(\);/);
+  // …and appears for a selection made with a long press, which never lifts a finger on the page.
+  assert.match(html, /showTimer = setTimeout\(function \(\) \{ showPaletteForSelection\(false\); \}, 300\)/);
+  const route = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
+  assert.match(route, /getBibleChapterReferences\(book, bookKey, currentChapterNumber\)/);
+  assert.match(route, /writeRichClipboard\(action\.text, action\.html\)/);
 
   const slideshow = buildBibleChapterHtml({
     verses: [{ verseNumber: 1, english: 'In the beginning', englishNkjv: '', englishFromCoptic: '', coptic: '', greek: '', arabic: '', arabicFromCoptic: '', french: '' }],

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Href, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Children, forwardRef, useRef, useState, type ReactNode } from 'react';
@@ -12,9 +13,10 @@ import type { BookTheme } from '../../../constants/bookTheme';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { goBack } from '../../../utils/navigation';
 
+import { appText } from '../../../utils/appText';
 interface BookMenuScaffoldProps {
   theme: BookTheme;
-  title: { english: string; arabic: string };
+  title: { english: string; arabic: string; french?: string };
   overline?: string;
   description?: string;
   /** Set under the band's description (Holy Week's dates). */
@@ -67,7 +69,7 @@ const BookMenuScaffold = forwardRef<ScrollView, BookMenuScaffoldProps>(function 
         scrollEventThrottle={32}
       >
         <View onLayout={(event) => { bandHeight.current = event.nativeEvent.layout.height; }}>
-          <BookBand theme={theme} title={arabic ? title.arabic : title.english} overline={overline} description={description} arabic={arabic}>
+          <BookBand theme={theme} title={appText(title)} overline={overline} description={description} arabic={arabic}>
             {bandChildren}
           </BookBand>
         </View>

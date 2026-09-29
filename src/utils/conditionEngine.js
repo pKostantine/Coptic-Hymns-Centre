@@ -147,8 +147,13 @@ function fetchDerivedLentFlags(isoDate) {
         }
       }
       if (holyWeekRange) {
-        flags.HolyWeek = true;
         flags.Pascha = true;
+        // The holy-week season opens on Lazarus Saturday, but HolyWeek itself
+        // starts with Monday Eve, prayed on Palm Sunday evening — which the
+        // evening rollover (CalendarContext) already dates Holy Monday, two
+        // days into the season. Lazarus Saturday and Palm Sunday keep their
+        // own feast flags without Holy Week's.
+        if (daysBetweenIsoDates(holyWeekRange.start_date, isoDate) >= 2) flags.HolyWeek = true;
       }
       return flags;
     })();

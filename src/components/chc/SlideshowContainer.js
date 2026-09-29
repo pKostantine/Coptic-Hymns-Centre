@@ -147,6 +147,7 @@ export default function SlideshowContainer({
         fontSize,
         slideTableWidth,
         visibleLanguages.english,
+        visibleLanguages.french,
         visibleLanguages.coptic,
         visibleLanguages.copticRecitedPrayers,
         visibleLanguages.arabic,
@@ -1387,13 +1388,14 @@ function slideHasVisibleContent(slide = []) {
 
     if (item.type === "title") {
       const title = item.title || {};
-      return Boolean(String(title.english || "").trim() || String(title.arabic || "").trim());
+      return Boolean(String(title.english || "").trim() || String(title.french || "").trim() || String(title.arabic || "").trim());
     }
 
     if (item.type === "verse") {
       const verse = item.verse || {};
       return Boolean(
         String(verse.english || "").trim() ||
+          String(verse.french || "").trim() ||
           String(verse.coptic || "").trim() ||
           String(verse.arabic || "").trim() ||
           (item.hasSpeakerLabel && !item.suppressSpeakerLabel) ||
@@ -1413,7 +1415,7 @@ function dropEmptySlides(slides) {
 }
 
 function getVisibleLanguageCount(visibleLanguages = {}) {
-  return ["english", "coptic", "arabic"].filter((language) => visibleLanguages[language]).length || 1;
+  return ["english", "french", "coptic", "arabic"].filter((language) => visibleLanguages[language]).length || 1;
 }
 
 function isEditableKeyboardTarget(target) {

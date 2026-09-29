@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -21,6 +22,7 @@ import type { MusicPlaylistVisibility } from '@/types/mediaPlatform';
 import type { OfflineDownloadProgress } from '@/types/offlineDownloads';
 import { goBack } from '@/utils/navigation';
 
+import { tr } from '../../../utils/appText';
 type LibrarySection = 'likes' | 'playlists' | 'releases' | 'following' | 'downloads' | 'recent-tracks' | 'recent-releases';
 
 const VALID_SECTIONS = new Set<LibrarySection>([
@@ -120,14 +122,14 @@ export default function MusicLibraryFolderScreen() {
     coverAsset: track.releaseCoverAsset ?? null,
   }));
 
-  const titles: Record<LibrarySection, { en: string; ar: string; searchEn: string; searchAr: string }> = {
-    likes: { en: 'Liked tracks', ar: 'الترانيم المعجبة', searchEn: 'Search liked tracks', searchAr: 'ابحث في الترانيم المعجبة' },
-    playlists: { en: 'Playlists', ar: 'قوائم التشغيل', searchEn: 'Search playlists', searchAr: 'ابحث في قوائم التشغيل' },
-    releases: { en: 'Liked releases', ar: 'الإصدارات المعجبة', searchEn: 'Search liked releases', searchAr: 'ابحث في الإصدارات المعجبة' },
-    following: { en: 'Following', ar: 'الفنانون المتابَعون', searchEn: 'Search followed artists', searchAr: 'ابحث في الفنانين' },
-    downloads: { en: 'Downloads', ar: 'التنزيلات', searchEn: 'Search downloads', searchAr: 'ابحث في التنزيلات' },
-    'recent-tracks': { en: 'Recently played tracks', ar: 'الترانيم المشغّلة مؤخراً', searchEn: 'Search recent tracks', searchAr: 'ابحث في الترانيم الأخيرة' },
-    'recent-releases': { en: 'Recently played releases', ar: 'الإصدارات المشغّلة مؤخراً', searchEn: 'Search recent releases', searchAr: 'ابحث في الإصدارات الأخيرة' },
+  const titles: Record<LibrarySection, { en: string; ar: string; fr: string; searchEn: string; searchAr: string; searchFr: string }> = {
+    likes: { en: 'Liked tracks', ar: 'الترانيم المعجبة', fr: 'Titres aimés', searchEn: 'Search liked tracks', searchAr: 'ابحث في الترانيم المعجبة', searchFr: 'Rechercher dans les titres aimés' },
+    playlists: { en: 'Playlists', ar: 'قوائم التشغيل', fr: 'Playlists', searchEn: 'Search playlists', searchAr: 'ابحث في قوائم التشغيل', searchFr: 'Rechercher dans les playlists' },
+    releases: { en: 'Liked releases', ar: 'الإصدارات المعجبة', fr: 'Parutions aimées', searchEn: 'Search liked releases', searchAr: 'ابحث في الإصدارات المعجبة', searchFr: 'Rechercher dans les parutions aimées' },
+    following: { en: 'Following', ar: 'الفنانون المتابَعون', fr: 'Suivis', searchEn: 'Search followed artists', searchAr: 'ابحث في الفنانين', searchFr: 'Rechercher dans les artistes suivis' },
+    downloads: { en: 'Downloads', ar: 'التنزيلات', fr: 'Téléchargements', searchEn: 'Search downloads', searchAr: 'ابحث في التنزيلات', searchFr: 'Rechercher dans les téléchargements' },
+    'recent-tracks': { en: 'Recently played tracks', ar: 'الترانيم المشغّلة مؤخراً', fr: 'Titres écoutés récemment', searchEn: 'Search recent tracks', searchAr: 'ابحث في الترانيم الأخيرة', searchFr: 'Rechercher dans les titres récents' },
+    'recent-releases': { en: 'Recently played releases', ar: 'الإصدارات المشغّلة مؤخراً', fr: 'Parutions écoutées récemment', searchEn: 'Search recent releases', searchAr: 'ابحث في الإصدارات الأخيرة', searchFr: 'Rechercher dans les parutions récentes' },
   };
   const labels = titles[section];
 
@@ -186,9 +188,9 @@ export default function MusicLibraryFolderScreen() {
     if (!library.authenticated && section !== 'downloads') {
       return (
         <View style={styles.emptyCard}>
-          <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>{isArabic ? 'تسجيل الدخول مطلوب' : 'Sign in required'}</Text>
-          <Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'افتح حسابك للوصول إلى هذه القائمة.' : 'Open your account to access this list.'}</Text>
-          <Pressable style={styles.primaryButton} onPress={() => router.push('/account')}><Text style={styles.primaryButtonText}>{isArabic ? 'فتح الحساب' : 'Open Account'}</Text></Pressable>
+          <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>{tr('Sign in required', 'Connexion requise', 'تسجيل الدخول مطلوب')}</Text>
+          <Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('Open your account to access this list.', 'Ouvrez votre compte pour accéder à cette liste.', 'افتح حسابك للوصول إلى هذه القائمة.')}</Text>
+          <Pressable style={styles.primaryButton} onPress={() => router.push('/account')}><Text style={styles.primaryButtonText}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text></Pressable>
         </View>
       );
     }
@@ -237,21 +239,21 @@ export default function MusicLibraryFolderScreen() {
         <>
           <Pressable style={styles.newPlaylistButton} onPress={() => setShowCreator((current) => !current)}>
             <Icon name={showCreator ? 'close' : 'add'} size={18} color={COLORS.black} />
-            <Text style={styles.newPlaylistText}>{showCreator ? (isArabic ? 'إلغاء' : 'Cancel') : (isArabic ? 'قائمة جديدة' : 'New playlist')}</Text>
+            <Text style={styles.newPlaylistText}>{showCreator ? (tr('Cancel', 'Annuler', 'إلغاء')) : (tr('New playlist', 'Nouvelle playlist', 'قائمة جديدة'))}</Text>
           </Pressable>
           {showCreator ? (
             <View style={styles.creator}>
-              <TextInput value={newPlaylistName} onChangeText={setNewPlaylistName} placeholder={isArabic ? 'اسم قائمة التشغيل' : 'Playlist name'} placeholderTextColor={COLORS.muted} style={[styles.input, isArabic && styles.arabicInput]} />
-              <TextInput value={newPlaylistDescription} onChangeText={setNewPlaylistDescription} placeholder={isArabic ? 'الوصف (اختياري)' : 'Description (optional)'} placeholderTextColor={COLORS.muted} style={[styles.input, styles.descriptionInput, isArabic && styles.arabicInput]} multiline />
+              <TextInput value={newPlaylistName} onChangeText={setNewPlaylistName} placeholder={tr('Playlist name', 'Nom de la playlist', 'اسم قائمة التشغيل')} placeholderTextColor={COLORS.muted} style={[styles.input, isArabic && styles.arabicInput]} />
+              <TextInput value={newPlaylistDescription} onChangeText={setNewPlaylistDescription} placeholder={tr('Description (optional)', 'Description (facultatif)', 'الوصف (اختياري)')} placeholderTextColor={COLORS.muted} style={[styles.input, styles.descriptionInput, isArabic && styles.arabicInput]} multiline />
               <View style={styles.visibilityControl}>
                 {(['private', 'public'] as const).map((visibility) => (
                   <Pressable key={visibility} style={[styles.visibilityButton, newPlaylistVisibility === visibility && styles.visibilityActive]} onPress={() => setNewPlaylistVisibility(visibility)}>
-                    <Text style={[styles.visibilityText, newPlaylistVisibility === visibility && styles.visibilityTextActive]}>{visibility === 'private' ? (isArabic ? 'خاصة' : 'Private') : (isArabic ? 'عامة' : 'Public')}</Text>
+                    <Text style={[styles.visibilityText, newPlaylistVisibility === visibility && styles.visibilityTextActive]}>{visibility === 'private' ? (tr('Private', 'Privée', 'خاصة')) : (tr('Public', 'Publique', 'عامة'))}</Text>
                   </Pressable>
                 ))}
               </View>
               <Pressable disabled={!newPlaylistName.trim() || creating} style={[styles.createButton, (!newPlaylistName.trim() || creating) && styles.disabled]} onPress={() => void createPlaylist()}>
-                {creating ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.createButtonText}>{isArabic ? 'إنشاء' : 'Create playlist'}</Text>}
+                {creating ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.createButtonText}>{tr('Create playlist', 'Créer une playlist', 'إنشاء')}</Text>}
               </Pressable>
             </View>
           ) : null}
@@ -298,17 +300,17 @@ export default function MusicLibraryFolderScreen() {
             <MusicArtwork asset={artist.profileImageAsset} size={58} rounded label={artist.displayName} />
             <View style={styles.entityInfo}>
               <Text numberOfLines={1} style={[styles.entityTitle, isArabic && styles.arabic]}>{artist.displayName}</Text>
-              <Text style={[styles.entityMeta, isArabic && styles.arabic]}>{isArabic ? 'فنان متابَع' : 'Following'}</Text>
+              <Text style={[styles.entityMeta, isArabic && styles.arabic]}>{tr('Following', 'Suivi', 'فنان متابَع')}</Text>
             </View>
           </Pressable>
-          <Pressable style={styles.textAction} onPress={() => void unfollowArtist(artist.id)}><Text style={styles.textActionLabel}>{isArabic ? 'إلغاء' : 'Unfollow'}</Text></Pressable>
+          <Pressable style={styles.textAction} onPress={() => void unfollowArtist(artist.id)}><Text style={styles.textActionLabel}>{tr('Unfollow', 'Ne plus suivre', 'إلغاء')}</Text></Pressable>
         </View>
       ))}</View> : <Empty query={normalizedQuery} isArabic={isArabic} />;
     }
 
     const visibleDownloads = downloads.filter((item) => includesSearch([item.title, item.entityType, item.status], normalizedQuery));
     if (Platform.OS === 'web') {
-      return <View style={styles.emptyCard}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'تتوفر التنزيلات في تطبيق CHC للهاتف.' : 'Offline downloads are available in the CHC iOS and Android apps.'}</Text></View>;
+      return <View style={styles.emptyCard}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('Offline downloads are available in the CHC iOS and Android apps.', 'Les téléchargements hors ligne sont disponibles dans les applications CHC pour iOS et Android.', 'تتوفر التنزيلات في تطبيق CHC للهاتف.')}</Text></View>;
     }
     return visibleDownloads.length ? <View style={styles.list}>{visibleDownloads.map((item) => (
       <View key={item.packageKey} style={styles.entityRow}>
@@ -317,7 +319,7 @@ export default function MusicLibraryFolderScreen() {
           <Text numberOfLines={1} style={[styles.entityTitle, isArabic && styles.arabic]}>{item.title}</Text>
           <Text style={[styles.entityMeta, isArabic && styles.arabic]}>{item.status} · {bytes(item.bytesWritten)}</Text>
         </View>
-        <Pressable style={styles.textAction} onPress={() => void removeDownload(item.packageKey)}><Text style={styles.textActionLabel}>{isArabic ? 'إزالة' : 'Remove'}</Text></Pressable>
+        <Pressable style={styles.textAction} onPress={() => void removeDownload(item.packageKey)}><Text style={styles.textActionLabel}>{tr('Remove', 'Retirer', 'إزالة')}</Text></Pressable>
       </View>
     ))}</View> : <Empty query={normalizedQuery} isArabic={isArabic} />;
   })();
@@ -325,7 +327,7 @@ export default function MusicLibraryFolderScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <AppHeader
-        title={{ english: labels.en, arabic: labels.ar }}
+        title={{ english: labels.en, arabic: labels.ar, french: labels.fr }}
         canGoBack
         onBack={() => goBack(router, '/music/library')}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
@@ -334,11 +336,11 @@ export default function MusicLibraryFolderScreen() {
         <View style={styles.searchBox}>
           <Icon name="search-outline" size={18} color={COLORS.muted} />
           <TextInput
-            accessibilityLabel={isArabic ? labels.searchAr : labels.searchEn}
+            accessibilityLabel={tr(labels.searchEn, labels.searchFr, labels.searchAr)}
             autoCapitalize="none"
             autoCorrect={false}
             onChangeText={setQuery}
-            placeholder={isArabic ? labels.searchAr : labels.searchEn}
+            placeholder={tr(labels.searchEn, labels.searchFr, labels.searchAr)}
             placeholderTextColor={COLORS.muted}
             style={[styles.searchInput, isArabic && styles.arabicInput]}
             value={query}
@@ -359,8 +361,8 @@ function Empty({ query, isArabic }: { query: string; isArabic: boolean }) {
     <View style={styles.emptyCard}>
       <Text style={[styles.emptyText, isArabic && styles.arabic]}>
         {query
-          ? (isArabic ? 'لا توجد نتائج مطابقة.' : 'No matching results.')
-          : (isArabic ? 'لا توجد عناصر هنا بعد.' : 'Nothing here yet.')}
+          ? (tr('No matching results.', 'Aucun résultat correspondant.', 'لا توجد نتائج مطابقة.'))
+          : (tr('Nothing here yet.', 'Rien pour l’instant.', 'لا توجد عناصر هنا بعد.'))}
       </Text>
     </View>
   );

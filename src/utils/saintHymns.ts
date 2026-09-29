@@ -293,7 +293,7 @@ const VENERATION_HYMN_KEY = 'axios';
 
 export interface SaintHymnPreviewHymn {
   hymnKey: string;
-  title: { english: string; arabic: string };
+  title: { english: string; arabic: string; french?: string };
   /** The hymn's own prayer_type, which a verse without one of its own inherits — exactly as a section's does in a real document. */
   titlePrayerType: string | null;
   alternateEvery?: number | null;
@@ -405,7 +405,7 @@ function toPreviewHymn({
   rows,
 }: {
   hymnKey: string;
-  title: { english: string; arabic: string };
+  title: { english: string; arabic: string; french?: string };
   titlePrayerType: string | null;
   rows: TextRow[];
 }): SaintHymnPreviewHymn | null {

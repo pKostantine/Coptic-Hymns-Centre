@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
@@ -21,6 +22,7 @@ import {
 } from '@/services/offlineDownloadRequests';
 import type { LearningLessonSetDetail } from '@/types/learningPlatform';
 
+import { tr } from '../../../utils/appText';
 export default function LearningLessonSetScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
@@ -63,7 +65,7 @@ export default function LearningLessonSetScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{lessonSet ? lessonSet.title + ' — Learn & Study' : 'Lesson Set'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'مجموعة دروس' : 'Lesson Set'} isArabic={isArabic} />
+      <LearningBackHeader title={tr('Lesson Set', 'Série de leçons', 'مجموعة دروس')} isArabic={isArabic} />
       {!lessonSet && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {lessonSet ? (
@@ -71,7 +73,7 @@ export default function LearningLessonSetScreen() {
           <View style={styles.hero}>
             <LearningArtwork asset={lessonSet.coverAsset} size={190} label={lessonSet.title} />
             <View style={styles.heroInfo}>
-              <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{isArabic ? 'منهج لحن' : 'HYMN COURSE'}</Text>
+              <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{tr('HYMN COURSE', 'COURS D’HYMNE', 'منهج لحن')}</Text>
               <Text style={[styles.title, isArabic && styles.arabic]}>{lessonSet.title}</Text>
               <Pressable onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: lessonSet.hymn.id } })}>
                 <Text style={[styles.hymn, isArabic && styles.arabic]}>{lessonSet.hymn.title}</Text>
@@ -87,7 +89,7 @@ export default function LearningLessonSetScreen() {
               {lessonSet.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{lessonSet.description}</Text> : null}
               <View style={styles.actions}>
                 <Pressable disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playQueue(audioQueue, 0)}>
-                  <Text style={styles.playAllText}>▶  {isArabic ? 'تشغيل الدروس الصوتية' : 'Play Audio Lessons'}</Text>
+                  <Text style={styles.playAllText}>▶  {tr('Play Audio Lessons', 'Lire les leçons audio', 'تشغيل الدروس الصوتية')}</Text>
                 </Pressable>
                 {downloadRequest ? (
                   <LearningDownloadButton packageKey={downloadRequest.packageKey} request={downloadRequest} isArabic={isArabic} />
@@ -97,9 +99,9 @@ export default function LearningLessonSetScreen() {
           </View>
 
           <View style={styles.headingRow}>
-            <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'الدروس' : 'Lessons'}</Text>
+            <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Lessons', 'Leçons', 'الدروس')}</Text>
             <Text style={[styles.sectionMeta, isArabic && styles.arabic]}>
-              {lessonSet.lessons.length + (isArabic ? ' درس' : lessonSet.lessons.length === 1 ? ' lesson' : ' lessons')}
+              {lessonSet.lessons.length + tr(lessonSet.lessons.length === 1 ? ' lesson' : ' lessons', lessonSet.lessons.length === 1 ? ' leçon' : ' leçons', ' درس')}
             </Text>
           </View>
           <View style={styles.mediaList}>
@@ -136,7 +138,7 @@ export default function LearningLessonSetScreen() {
                 />
               );
             })}
-            {!lessonSet.lessons.length ? <Text style={styles.empty}>{isArabic ? 'لا توجد دروس منشورة.' : 'No published lessons.'}</Text> : null}
+            {!lessonSet.lessons.length ? <Text style={styles.empty}>{tr('No published lessons.', 'Aucune leçon publiée.', 'لا توجد دروس منشورة.')}</Text> : null}
           </View>
         </NowPlayingAwareScrollView>
       ) : null}

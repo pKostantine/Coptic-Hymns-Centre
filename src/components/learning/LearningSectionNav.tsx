@@ -1,9 +1,11 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 
+import { tr } from '../../utils/appText';
 export type LearningSection = 'home' | 'search' | 'library';
 
 export default function LearningSectionNav({ active }: { active: LearningSection }) {
@@ -15,9 +17,9 @@ export default function LearningSectionNav({ active }: { active: LearningSection
     label: string;
     route: '/learn' | '/learn/search' | '/learn/library';
   }[] = [
-    { id: 'home', label: isArabic ? 'الرئيسية' : 'Discover', route: '/learn' },
-    { id: 'search', label: isArabic ? 'بحث' : 'Search', route: '/learn/search' },
-    { id: 'library', label: isArabic ? 'تعلّمي' : 'My Learning', route: '/learn/library' },
+    { id: 'home', label: tr('Discover', 'Découvrir', 'الرئيسية'), route: '/learn' },
+    { id: 'search', label: tr('Search', 'Rechercher', 'بحث'), route: '/learn/search' },
+    { id: 'library', label: tr('My Learning', 'Mon apprentissage', 'تعلّمي'), route: '/learn/library' },
   ];
 
   return (

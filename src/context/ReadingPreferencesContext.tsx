@@ -13,6 +13,7 @@ import {
     OrientationMode,
     ReadingPreferences,
     saveReadingPreferences,
+    setCurrentAppLanguage,
     SermonPlannerVisibleLanguages,
     syncedReadingPreferences,
     VisibleLanguages,
@@ -384,6 +385,10 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     ],
   );
 
+  // Menu text helpers (src/utils/appText.ts) read this synchronously; setting
+  // it here, as the provider renders, means everything below renders in the
+  // new language on the same pass rather than after the save effect.
+  setCurrentAppLanguage(preferences.appLanguage);
   return <ReadingPreferencesContext.Provider value={value}>{children}</ReadingPreferencesContext.Provider>;
 }
 

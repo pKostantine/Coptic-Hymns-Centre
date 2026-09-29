@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
@@ -12,6 +13,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningSeasonSummary } from '@/types/learningPlatform';
 
+import { tr } from '../../utils/appText';
 export default function LearningSeasonsScreen() {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
@@ -34,13 +36,11 @@ export default function LearningSeasonsScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>{isArabic ? 'المواسم — تعلّم وادرس' : 'Seasons — Learn & Study'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'المواسم' : 'Seasons'} isArabic={isArabic} />
+      <Head><title>{tr('Seasons — Learn & Study', 'Temps liturgiques — Apprendre', 'المواسم — تعلّم وادرس')}</title></Head>
+      <LearningBackHeader title={tr('Seasons', 'Temps liturgiques', 'المواسم')} isArabic={isArabic} />
       <NowPlayingAwareScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.intro, isArabic && styles.arabic]}>
-          {isArabic
-            ? 'تصفّح الألحان والدروس بحسب الموسم الكنسي.'
-            : 'Follow the Church year and study the hymns that belong to each season.'}
+          {tr('Follow the Church year and study the hymns that belong to each season.', 'Suivez l’année liturgique et étudiez les hymnes propres à chaque temps.', 'تصفّح الألحان والدروس بحسب الموسم الكنسي.')}
         </Text>
         {!seasons && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}

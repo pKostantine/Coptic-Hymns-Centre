@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -17,6 +18,7 @@ import { goBack } from '@/utils/navigation';
 import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
+import { tr } from '../../../utils/appText';
 export default function MusicArtistScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -82,10 +84,8 @@ export default function MusicArtistScreen() {
     if (!artist || followBusy) return;
     if (!libraryAuthenticated) {
       Alert.alert(
-        locale === 'ar' ? 'متابعة الفنان' : 'Follow artist',
-        locale === 'ar'
-          ? 'سجّل الدخول إلى حساب CHC لمتابعة الفنانين.'
-          : 'Sign in to your CHC account to follow artists.',
+        tr('Follow artist', 'Suivre l’artiste', 'متابعة الفنان'),
+        tr('Sign in to your CHC account to follow artists.', 'Connectez-vous à votre compte CHC pour suivre des artistes.', 'سجّل الدخول إلى حساب CHC لمتابعة الفنانين.'),
       );
       return;
     }
@@ -97,7 +97,7 @@ export default function MusicArtistScreen() {
       setFollowed(next);
     } catch (cause) {
       Alert.alert(
-        locale === 'ar' ? 'متابعة الفنان' : 'Follow artist',
+        tr('Follow artist', 'Suivre l’artiste', 'متابعة الفنان'),
         cause instanceof Error ? cause.message : 'Unable to update this artist.',
       );
     } finally {
@@ -159,7 +159,7 @@ export default function MusicArtistScreen() {
               >
                 {followed ? <Icon name="checkmark" size={17} color={COLORS.black} /> : null}
                 <Text style={[styles.followButtonText, followed && styles.followButtonTextActive]}>
-                  {followed ? (locale === 'ar' ? 'متابَع' : 'Following') : (locale === 'ar' ? 'متابعة' : 'Follow')}
+                  {followed ? (tr('Following', 'Suivi', 'متابَع')) : (tr('Follow', 'Suivre', 'متابعة'))}
                 </Text>
               </Pressable>
 

@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import {
   ActivityIndicator,
@@ -15,6 +16,7 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { downloadManager } from '@/services/downloadManager';
 import type { OfflineDownloadProgress, OfflineDownloadRequest } from '@/types/offlineDownloads';
 
+import { tr } from '../../utils/appText';
 type DownloadTheme = 'music' | 'learning';
 
 export interface OfflineDownloadButtonProps {
@@ -116,14 +118,12 @@ function NativeOfflineDownloadButton({
 
       if (progress?.status === 'complete') {
         Alert.alert(
-          isArabic ? 'إزالة التنزيل؟' : 'Remove download?',
-          isArabic
-            ? 'سيتم حذف النسخة المحفوظة من هذا الجهاز.'
-            : 'The saved offline copy will be removed from this device.',
+          tr('Remove download?', 'Supprimer le téléchargement ?', 'إزالة التنزيل؟'),
+          tr('The saved offline copy will be removed from this device.', 'La copie hors ligne enregistrée sera supprimée de cet appareil.', 'سيتم حذف النسخة المحفوظة من هذا الجهاز.'),
           [
-            { text: isArabic ? 'إلغاء' : 'Cancel', style: 'cancel' },
+            { text: tr('Cancel', 'Annuler', 'إلغاء'), style: 'cancel' },
             {
-              text: isArabic ? 'إزالة' : 'Remove',
+              text: tr('Remove', 'Retirer', 'إزالة'),
               style: 'destructive',
               onPress: () => {
                 void downloadManager.remove(packageKey);
@@ -158,10 +158,10 @@ function NativeOfflineDownloadButton({
       onAction?.();
     } catch (cause) {
       Alert.alert(
-        isArabic ? 'تعذر التنزيل' : 'Download unavailable',
+        tr('Download unavailable', 'Téléchargement indisponible', 'تعذر التنزيل'),
         cause instanceof Error
           ? cause.message
-          : (isArabic ? 'تعذر بدء التنزيل.' : 'Unable to start this download.'),
+          : (tr('Unable to start this download.', 'Impossible de lancer ce téléchargement.', 'تعذر بدء التنزيل.')),
       );
     } finally {
       setBusy(false);
@@ -173,14 +173,14 @@ function NativeOfflineDownloadButton({
   const active = progress?.status === 'downloading' || progress?.status === 'queued';
   const failed = progress?.status === 'failed' || progress?.status === 'cancelled';
   const text = progress?.status === 'complete'
-    ? (updateAvailable ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'تم التنزيل' : 'Downloaded'))
+    ? (updateAvailable ? (tr('Update', 'Mettre à jour', 'تحديث')) : (tr('Downloaded', 'Téléchargé', 'تم التنزيل')))
     : active
-      ? `${isArabic ? 'تنزيل' : 'Downloading'} ${percentage(progress?.progress ?? 0)}`
+      ? `${tr('Downloading', 'Téléchargement', 'تنزيل')} ${percentage(progress?.progress ?? 0)}`
       : progress?.status === 'paused'
-        ? (isArabic ? 'متوقف مؤقتًا' : 'Resume')
+        ? (tr('Resume', 'Reprendre', 'متوقف مؤقتًا'))
         : failed
-          ? (isArabic ? 'إعادة المحاولة' : 'Retry')
-          : label ?? (isArabic ? 'تنزيل' : 'Download');
+          ? (tr('Retry', 'Réessayer', 'إعادة المحاولة'))
+          : label ?? (tr('Download', 'Télécharger', 'تنزيل'));
 
   const accent = theme === 'learning' ? COLORS.learningBright : COLORS.goldBright;
   const soft = theme === 'learning' ? COLORS.learningSoft : COLORS.goldSoft;
@@ -189,19 +189,19 @@ function NativeOfflineDownloadButton({
   if (menuRow) {
     const removing = progress?.status === 'complete' && !updateAvailable;
     const menuText = removing
-      ? (isArabic ? 'إزالة التنزيل' : 'Remove download')
+      ? (tr('Remove download', 'Supprimer le téléchargement', 'إزالة التنزيل'))
       : text;
     const menuDetail = updateAvailable
-      ? (isArabic ? 'يتوفر إصدار أحدث' : 'A newer version is available')
+      ? (tr('A newer version is available', 'Une version plus récente est disponible', 'يتوفر إصدار أحدث'))
       : removing
-        ? (isArabic ? 'حذف النسخة المحفوظة من هذا الجهاز' : 'Delete the offline copy from this device')
+        ? (tr('Delete the offline copy from this device', 'Supprimer la copie hors ligne de cet appareil', 'حذف النسخة المحفوظة من هذا الجهاز'))
         : active
-          ? (isArabic ? 'اضغط للإيقاف المؤقت' : 'Tap to pause')
+          ? (tr('Tap to pause', 'Touchez pour mettre en pause', 'اضغط للإيقاف المؤقت'))
           : progress?.status === 'paused'
-            ? (isArabic ? 'متابعة التنزيل' : 'Continue this download')
+            ? (tr('Continue this download', 'Poursuivre ce téléchargement', 'متابعة التنزيل'))
             : failed
-              ? (isArabic ? 'حاول التنزيل مرة أخرى' : 'Try downloading again')
-              : (isArabic ? 'الحفظ للاستماع بلا اتصال' : 'Save for offline listening');
+              ? (tr('Try downloading again', 'Réessayer le téléchargement', 'حاول التنزيل مرة أخرى'))
+              : (tr('Save for offline listening', 'Enregistrer pour l’écoute hors ligne', 'الحفظ للاستماع بلا اتصال'));
     const menuIcon: IconName = updateAvailable
       ? 'repeat'
       : removing
@@ -219,7 +219,7 @@ function NativeOfflineDownloadButton({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={menuText}
-        accessibilityHint={active ? (isArabic ? 'اضغط للإيقاف المؤقت' : 'Tap to pause') : undefined}
+        accessibilityHint={active ? (tr('Tap to pause', 'Touchez pour mettre en pause', 'اضغط للإيقاف المؤقت')) : undefined}
         disabled={busy}
         onPress={action}
         style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed, busy && styles.disabled]}
@@ -239,7 +239,7 @@ function NativeOfflineDownloadButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={text}
-      accessibilityHint={active ? (isArabic ? 'اضغط للإيقاف المؤقت' : 'Tap to pause') : undefined}
+      accessibilityHint={active ? (tr('Tap to pause', 'Touchez pour mettre en pause', 'اضغط للإيقاف المؤقت')) : undefined}
       disabled={busy}
       onPress={action}
       style={[

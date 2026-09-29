@@ -6,7 +6,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
-import { DocumentSection } from '../documentHtml';
+import { DocumentSection, pickDocumentTitle } from '../documentHtml';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import Icon from './Icon';
 
@@ -262,7 +262,8 @@ export default function ContentSelectorDrawer({
               // language actually has text for this specific section if the
               // selected one doesn't.
               const selectorTitle = getSectionSelectorTitle(section);
-              const showArabic = appLanguage === 'ar' ? Boolean(selectorTitle.arabic) : !selectorTitle.english && Boolean(selectorTitle.arabic);
+              const pickedTitle = pickDocumentTitle(selectorTitle, appLanguage);
+              const showArabic = pickedTitle.language === 'arabic' && Boolean(pickedTitle.text);
               // A hymn whose own title row declares "Silent Prayer" reads
               // visually distinct in the selector too — dimmer/italic, since
               // none of its content is spoken aloud.
@@ -349,7 +350,7 @@ export default function ContentSelectorDrawer({
                             showArabic && styles.dividerLabelArabic,
                           ]}
                         >
-                          {showArabic ? selectorTitle.arabic : selectorTitle.english || selectorTitle.arabic}
+                          {pickedTitle.text}
                         </Text>
                         {foldableDividerId ? (
                           <Icon name={isFolded ? 'chevron-forward' : 'chevron-down'} size={14} color={COLORS.gold} />
@@ -362,7 +363,7 @@ export default function ContentSelectorDrawer({
                       {showArabic ? (
                         <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
                       ) : (
-                        <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.english || selectorTitle.arabic}</Text>
+                        <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{pickedTitle.text}</Text>
                       )}
                     </View>
                   )}
@@ -396,7 +397,7 @@ export default function ContentSelectorDrawer({
                 {appLanguage === 'ar' ? (
                   <Text style={[styles.selectorToggleText, styles.selectorToggleArabicText]}>حضور أسقف</Text>
                 ) : (
-                  <Text style={styles.selectorToggleText}>Bishop Present</Text>
+                  <Text style={styles.selectorToggleText}>{appLanguage === 'fr' ? 'Évêque présent' : 'Bishop Present'}</Text>
                 )}
               </View>
               <View style={[styles.selectorSwitch, bishopPresent ? styles.selectorSwitchOn : styles.selectorSwitchOff]}>

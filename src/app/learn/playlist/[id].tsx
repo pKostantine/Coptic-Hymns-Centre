@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
@@ -16,6 +17,8 @@ import { learningService } from '@/services/learningService';
 import { learningPlaylistDownloadRequest } from '@/services/offlineDownloadRequests';
 import type { LearningPlaylistDetail, LearningPlaylistItem } from '@/types/learningPlatform';
 
+import { tr } from '../../../utils/appText';
+import { getCurrentAppLanguage } from '../../../utils/preferencesStorage';
 function toQueueItem(item: LearningPlaylistItem): LearningQueueItem | null {
   if (item.kind === 'album_recording') {
     return {
@@ -111,7 +114,7 @@ export default function LearningPlaylistScreen() {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Unable to remove this item.';
       setError(message);
-      Alert.alert(isArabic ? 'تعذّرت الإزالة' : 'Could not remove item', message);
+      Alert.alert(tr('Could not remove item', 'Impossible de retirer l’élément', 'تعذّرت الإزالة'), message);
     } finally {
       setRemovingId(null);
     }
@@ -120,7 +123,7 @@ export default function LearningPlaylistScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{playlist ? playlist.name + ' — Learn & Study' : 'Learning Playlist'}</title></Head>
-      <LearningBackHeader title={isArabic ? 'قائمة تعلّم' : 'Learning Playlist'} isArabic={isArabic} />
+      <LearningBackHeader title={tr('Learning Playlist', 'Playlist d’apprentissage', 'قائمة تعلّم')} isArabic={isArabic} />
       {!playlist && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {playlist ? (
@@ -128,16 +131,20 @@ export default function LearningPlaylistScreen() {
           <View style={styles.hero}>
             <View style={styles.heroIcon}><Text style={styles.heroGlyph}>≡</Text></View>
             <Text style={[styles.eyebrow, isArabic && styles.arabic]}>
-              {isArabic ? visibilityLabel(playlist.visibility, true) + ' · قائمة مخصّصة' : visibilityLabel(playlist.visibility, false).toUpperCase() + ' · CUSTOM PLAYLIST'}
+              {isArabic ? visibilityLabel(playlist.visibility, true) + ' · قائمة مخصّصة' : visibilityLabel(playlist.visibility, false).toUpperCase() + tr(' · CUSTOM PLAYLIST', ' · PLAYLIST PERSONNELLE', '')}
             </Text>
             <Text style={[styles.title, isArabic && styles.arabic]}>{playlist.name}</Text>
             {playlist.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{playlist.description}</Text> : null}
             <Text style={[styles.itemCount, isArabic && styles.arabic]}>
-              {isArabic ? `${playlist.items.length} عنصر` : `${playlist.items.length} ${playlist.items.length === 1 ? 'item' : 'items'}`}
+              {tr(
+                `${playlist.items.length} ${playlist.items.length === 1 ? 'item' : 'items'}`,
+                `${playlist.items.length} ${playlist.items.length === 1 ? 'élément' : 'éléments'}`,
+                `${playlist.items.length} عنصر`,
+              )}
             </Text>
             <View style={styles.actions}>
               <Pressable disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playQueue(audioQueue, 0)}>
-                <Text style={styles.playAllText}>▶  {isArabic ? 'تشغيل الصوت' : 'Play Audio'}</Text>
+                <Text style={styles.playAllText}>▶  {tr('Play Audio', 'Lire l’audio', 'تشغيل الصوت')}</Text>
               </Pressable>
               {downloadRequest ? (
                 <LearningDownloadButton packageKey={downloadRequest.packageKey} request={downloadRequest} isArabic={isArabic} />
@@ -146,8 +153,8 @@ export default function LearningPlaylistScreen() {
           </View>
 
           <View style={styles.headingRow}>
-            <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{isArabic ? 'محتوى القائمة' : 'Playlist Items'}</Text>
-            {owned ? <Text style={[styles.ownerBadge, isArabic && styles.arabic]}>{isArabic ? 'قائمتك' : 'YOURS'}</Text> : null}
+            <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Playlist Items', 'Éléments de la playlist', 'محتوى القائمة')}</Text>
+            {owned ? <Text style={[styles.ownerBadge, isArabic && styles.arabic]}>{tr('YOURS', 'À VOUS', 'قائمتك')}</Text> : null}
           </View>
           <View style={styles.mediaList}>
             {playlist.items.map((item, index) => {
@@ -182,11 +189,11 @@ export default function LearningPlaylistScreen() {
             })}
             {!playlist.items.length ? (
               <View style={styles.empty}>
-                <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>{isArabic ? 'القائمة فارغة' : 'This playlist is empty'}</Text>
+                <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>{tr('This playlist is empty', 'Cette playlist est vide', 'القائمة فارغة')}</Text>
                 <Text style={[styles.emptyBody, isArabic && styles.arabic]}>
                   {owned
-                    ? (isArabic ? 'أضف تسجيلات أو دروسًا من صفحات المحتوى.' : 'Add recordings or lessons from their content pages.')
-                    : (isArabic ? 'لم تُضف عناصر إلى هذه القائمة بعد.' : 'No items have been added yet.')}
+                    ? (tr('Add recordings or lessons from their content pages.', 'Ajoutez des enregistrements ou des leçons depuis leurs pages.', 'أضف تسجيلات أو دروسًا من صفحات المحتوى.'))
+                    : (tr('No items have been added yet.', 'Aucun élément n’a encore été ajouté.', 'لم تُضف عناصر إلى هذه القائمة بعد.'))}
                 </Text>
               </View>
             ) : null}
@@ -203,6 +210,11 @@ function visibilityLabel(value: 'private' | 'unlisted' | 'public', isArabic: boo
     if (value === 'public') return 'عامّة';
     if (value === 'unlisted') return 'غير مدرجة';
     return 'خاصّة';
+  }
+  if (getCurrentAppLanguage() === 'fr') {
+    if (value === 'public') return 'Publique';
+    if (value === 'unlisted') return 'Non répertoriée';
+    return 'Privée';
   }
   if (value === 'public') return 'Public';
   if (value === 'unlisted') return 'Unlisted';

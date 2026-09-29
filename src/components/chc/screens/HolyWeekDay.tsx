@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -13,6 +14,7 @@ import { useReadingPreferences } from '../../../context/ReadingPreferencesContex
 import { formatLongDate, formatMonthDay, holyWeekRowDate, toArabicDigits, weekdayName } from '../../../utils/holyWeek';
 import { useHolyWeekSchedule } from '../../../utils/useHolyWeekSchedule';
 
+import { tr } from '../../../utils/appText';
 const MAX_FONT_SCALE = 1.25;
 
 type Block = { kind: 'hours'; hours: HolyWeekHourDef[] } | { kind: 'service'; hour: HolyWeekHourDef };
@@ -23,7 +25,9 @@ function whenLine(day: HolyWeekDayDef, rowIndex: number, palmSunday: Date | null
   const date = holyWeekRowDate(palmSunday, rowIndex);
   if (!day.id.endsWith('-eve')) return formatLongDate(date, arabic);
   // An eve belongs to the evening before its day.
-  return arabic ? `مساء ${formatLongDate(date, true)}` : `${weekdayName(rowIndex, false)} evening · ${formatMonthDay(date)}`;
+  return arabic
+    ? `مساء ${formatLongDate(date, true)}`
+    : tr(`${weekdayName(rowIndex, false)} evening · ${formatMonthDay(date)}`, `${weekdayName(rowIndex, false)} soir · ${formatMonthDay(date)}`, '');
 }
 
 /** Runs of consecutive hours become grids; the services that aren't hours stand on their own, all in prayer order. */
@@ -68,8 +72,8 @@ export default function HolyWeekDay({ day }: { day: HolyWeekDayDef }) {
       ? PASCHA_TILE_THEMES.brightSaturday
       : eve ? PASCHA_TILE_THEMES.eveNow : PASCHA_TILE_THEMES.dayNow;
   const tileTheme = day.id === 'good-friday' ? PASCHA_TILE_THEMES.goodFriday : eve ? PASCHA_TILE_THEMES.eve : PASCHA_TILE_THEMES.day;
-  const kind = eve ? (isArabic ? 'ليلة' : 'EVE') : (isArabic ? 'نهار' : 'DAY');
-  const now = eve ? (isArabic ? 'الليلة' : 'TONIGHT') : (isArabic ? 'الآن' : 'NOW');
+  const kind = eve ? (tr('EVE', 'VEILLE', 'ليلة')) : (tr('DAY', 'JOUR', 'نهار'));
+  const now = eve ? (tr('TONIGHT', 'CE SOIR', 'الليلة')) : (tr('NOW', 'MAINTENANT', 'الآن'));
 
   const bookmarked = (hour: HolyWeekHourDef) => isBookmarked(bookmarkKeyFor(hour.schema, hour.table, hour.id));
   const open = (hour: HolyWeekHourDef) => router.push(holyWeekHourHref(hour) as never);
@@ -77,7 +81,7 @@ export default function HolyWeekDay({ day }: { day: HolyWeekDayDef }) {
   return (
     <BookMenuScaffold
       theme={bandTheme}
-      title={{ english: day.title, arabic: day.arabic }}
+      title={{ english: day.title, arabic: day.arabic, french: day.french }}
       overline={isCurrent ? `${kind} · ${now}` : kind}
       description={whenLine(day, rowIndex, schedule?.palmSunday ?? null, isArabic)}
       arabic={isArabic}
@@ -92,7 +96,7 @@ export default function HolyWeekDay({ day }: { day: HolyWeekDayDef }) {
             gradient={tileTheme.gradient}
             accent={tileTheme.accent}
             leading={<NumberBadge hour={block.hours[0]} accent={tileTheme.accent} arabic={isArabic} />}
-            title={isArabic ? block.hours[0].shortArabic : block.hours[0].shortTitle}
+            title={tr(block.hours[0].shortTitle, block.hours[0].shortFrench, block.hours[0].shortArabic)}
             minHeight={72}
             arabic={isArabic}
             bookmarked={bookmarked(block.hours[0])}
@@ -105,7 +109,7 @@ export default function HolyWeekDay({ day }: { day: HolyWeekDayDef }) {
             gradient={PASCHA_TILE_THEMES.dayNow.gradient}
             accent={PASCHA_TILE_THEMES.dayNow.accent}
             leading={<CrossBadge accent={PASCHA_TILE_THEMES.dayNow.accent} />}
-            title={isArabic ? block.hour.shortArabic : block.hour.shortTitle}
+            title={tr(block.hour.shortTitle, block.hour.shortFrench, block.hour.shortArabic)}
             minHeight={72}
             arabic={isArabic}
             outlined
@@ -167,7 +171,7 @@ interface HourTileProps {
 
 /** An hour of the day or eve: its number set large, its name beneath — as the Agpeya's hours are. */
 function HourTile({ hour, theme, eve, arabic, bookmarked, onPress }: HourTileProps) {
-  const title = arabic ? hour.shortArabic : hour.shortTitle;
+  const title = tr(hour.shortTitle, hour.shortFrench, hour.shortArabic);
   return (
     <Pressable
       accessibilityRole="button"

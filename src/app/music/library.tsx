@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { type ErrorBoundaryProps, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -19,6 +20,7 @@ import { musicService } from '@/services/musicService';
 import type { MusicLibraryPayload } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 
+import { tr } from '../../utils/appText';
 type LibraryFolder = 'likes' | 'playlists' | 'releases' | 'following' | 'downloads';
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
@@ -26,7 +28,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <AppHeader title={{ english: 'Your Library', arabic: 'مكتبتك' }} visibleLanguages={{ english: true, arabic: false }} />
+      <AppHeader title={{ english: 'Your Library', arabic: 'مكتبتك', french: 'Votre bibliothèque' }} visibleLanguages={{ english: true, arabic: false }} />
       <View style={styles.crashCard}>
         <Text style={styles.crashTitle}>Library could not be displayed</Text>
         <Text selectable style={styles.crashBody}>{error.message}</Text>
@@ -93,44 +95,44 @@ export default function MusicLibraryScreen() {
   const folders = ([
     {
       id: 'likes',
-      title: isArabic ? 'الترانيم المعجبة' : 'Liked tracks',
+      title: tr('Liked tracks', 'Titres aimés', 'الترانيم المعجبة'),
       count: library?.likedTracks.length ?? 0,
-      detail: isArabic ? 'الترانيم المحفوظة' : 'Saved tracks',
+      detail: tr('Saved tracks', 'Titres enregistrés', 'الترانيم المحفوظة'),
     },
     {
       id: 'playlists',
-      title: isArabic ? 'قوائم التشغيل' : 'Playlists',
+      title: tr('Playlists', 'Playlists', 'قوائم التشغيل'),
       count: library?.playlists.length ?? 0,
-      detail: isArabic ? 'مجموعاتك' : 'Your collections',
+      detail: tr('Your collections', 'Vos collections', 'مجموعاتك'),
     },
     {
       id: 'releases',
-      title: isArabic ? 'الإصدارات المعجبة' : 'Liked releases',
+      title: tr('Liked releases', 'Parutions aimées', 'الإصدارات المعجبة'),
       count: library?.likedReleases.length ?? 0,
-      detail: isArabic ? 'الألبومات والإصدارات المحفوظة' : 'Saved albums and releases',
+      detail: tr('Saved albums and releases', 'Albums et parutions enregistrés', 'الألبومات والإصدارات المحفوظة'),
     },
     {
       id: 'following',
-      title: isArabic ? 'الفنانون المتابَعون' : 'Following',
+      title: tr('Following', 'Suivi', 'الفنانون المتابَعون'),
       count: library?.followedArtists.length ?? 0,
-      detail: isArabic ? 'الفنانون الذين تتابعهم' : 'Artists you follow',
+      detail: tr('Artists you follow', 'Artistes suivis', 'الفنانون الذين تتابعهم'),
     },
     {
       id: 'downloads',
-      title: isArabic ? 'التنزيلات' : 'Downloads',
+      title: tr('Downloads', 'Téléchargements', 'التنزيلات'),
       count: downloadCount,
       detail: Platform.OS === 'web'
-        ? (isArabic ? 'متاحة في تطبيق الهاتف' : 'Available in the mobile app')
-        : (isArabic ? 'محفوظة على هذا الجهاز' : 'Saved on this device'),
+        ? (tr('Available in the mobile app', 'Disponible dans l’application mobile', 'متاحة في تطبيق الهاتف'))
+        : (tr('Saved on this device', 'Enregistré sur cet appareil', 'محفوظة على هذا الجهاز')),
     },
   ] satisfies { id: LibraryFolder; title: string; count: number; detail: string }[])
     .filter((folder) => Platform.OS !== 'web' || folder.id !== 'downloads');
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>{isArabic ? 'مكتبتي — كوبتك هيمنز سنتر' : 'Your Library — Coptic Hymns Centre'}</title></Head>
+      <Head><title>{tr('Your Library — Coptic Hymns Centre', 'Votre bibliothèque — Coptic Hymns Centre', 'مكتبتي — كوبتك هيمنز سنتر')}</title></Head>
       <AppHeader
-        title={{ english: 'Your Library', arabic: 'مكتبتك' }}
+        title={{ english: 'Your Library', arabic: 'مكتبتك', french: 'Votre bibliothèque' }}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
       />
       <MusicSectionNav active="library" />
@@ -141,14 +143,12 @@ export default function MusicLibraryScreen() {
 
         {!loading && library && !library.authenticated ? (
           <View style={styles.authCard}>
-            <Text style={[styles.authTitle, isArabic && styles.arabic]}>{isArabic ? 'سجّل الدخول إلى حساب CHC' : 'Sign in to your CHC account'}</Text>
+            <Text style={[styles.authTitle, isArabic && styles.arabic]}>{tr('Sign in to your CHC account', 'Connectez-vous à votre compte CHC', 'سجّل الدخول إلى حساب CHC')}</Text>
             <Text style={[styles.authBody, isArabic && styles.arabic]}>
-              {isArabic
-                ? 'الإعجابات وقوائم التشغيل وسجل الاستماع مرتبطة بحسابك.'
-                : 'Likes, playlists, follows, and listening history are tied to your account.'}
+              {tr('Likes, playlists, follows, and listening history are tied to your account.', 'Vos favoris, playlists, abonnements et historique d’écoute sont liés à votre compte.', 'الإعجابات وقوائم التشغيل وسجل الاستماع مرتبطة بحسابك.')}
             </Text>
             <Pressable style={styles.primaryButton} onPress={() => router.push('/account')}>
-              <Text style={styles.primaryButtonText}>{isArabic ? 'فتح الحساب' : 'Open Account'}</Text>
+              <Text style={styles.primaryButtonText}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -173,8 +173,8 @@ export default function MusicLibraryScreen() {
         {library?.authenticated ? (
           <>
             <RecentHeading
-              title={isArabic ? 'الترانيم المشغّلة مؤخراً' : 'Recently played tracks'}
-              action={isArabic ? 'الكل' : 'See all'}
+              title={tr('Recently played tracks', 'Titres écoutés récemment', 'الترانيم المشغّلة مؤخراً')}
+              action={tr('See all', 'Tout voir', 'الكل')}
               isArabic={isArabic}
               onPress={() => openFolder('recent-tracks')}
             />
@@ -190,11 +190,11 @@ export default function MusicLibraryScreen() {
                   </Pressable>
                 ))}
               </ScrollView>
-            ) : <Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'ستظهر الترانيم هنا بعد الاستماع.' : 'Tracks will appear here after you listen.'}</Text>}
+            ) : <Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('Tracks will appear here after you listen.', 'Les titres apparaîtront ici après votre écoute.', 'ستظهر الترانيم هنا بعد الاستماع.')}</Text>}
 
             <RecentHeading
-              title={isArabic ? 'الإصدارات المشغّلة مؤخراً' : 'Recently played releases'}
-              action={isArabic ? 'الكل' : 'See all'}
+              title={tr('Recently played releases', 'Parutions écoutées récemment', 'الإصدارات المشغّلة مؤخراً')}
+              action={tr('See all', 'Tout voir', 'الكل')}
               isArabic={isArabic}
               onPress={() => openFolder('recent-releases')}
             />
@@ -208,7 +208,7 @@ export default function MusicLibraryScreen() {
                   </Pressable>
                 ))}
               </ScrollView>
-            ) : <Text style={[styles.emptyText, isArabic && styles.arabic]}>{isArabic ? 'ستظهر الإصدارات هنا بعد الاستماع.' : 'Releases will appear here after you listen.'}</Text>}
+            ) : <Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('Releases will appear here after you listen.', 'Les parutions apparaîtront ici après votre écoute.', 'ستظهر الإصدارات هنا بعد الاستماع.')}</Text>}
           </>
         ) : null}
       </NowPlayingAwareScrollView>

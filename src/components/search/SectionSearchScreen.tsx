@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -31,24 +32,25 @@ import type { UnifiedSearchKind, UnifiedSearchResult } from '@/types/unifiedSear
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import { goBack } from '@/utils/navigation';
 
+import { tr } from '../../utils/appText';
 type SearchSection = 'music' | 'learning';
 
 interface SectionSearchScreenProps {
   section: SearchSection;
 }
 
-const MUSIC_GROUPS: { kind: UnifiedSearchKind; en: string; ar: string }[] = [
-  { kind: 'music_artist', en: 'Artists', ar: 'الفنانون' },
-  { kind: 'music_release', en: 'Albums & Releases', ar: 'الألبومات والإصدارات' },
-  { kind: 'music_track', en: 'Tracks', ar: 'الترانيم' },
+const MUSIC_GROUPS: { kind: UnifiedSearchKind; en: string; ar: string; fr: string }[] = [
+  { kind: 'music_artist', en: 'Artists', ar: 'الفنانون', fr: 'Artistes' },
+  { kind: 'music_release', en: 'Albums & Releases', ar: 'الألبومات والإصدارات', fr: 'Albums et parutions' },
+  { kind: 'music_track', en: 'Tracks', ar: 'الترانيم', fr: 'Titres' },
 ];
 
-const LEARNING_GROUPS: { kind: UnifiedSearchKind; en: string; ar: string }[] = [
-  { kind: 'learning_cantor', en: 'Cantors', ar: 'المعلمون' },
-  { kind: 'learning_hymn', en: 'Hymns', ar: 'الألحان' },
-  { kind: 'learning_season', en: 'Seasons', ar: 'المواسم' },
-  { kind: 'learning_album', en: 'Albums', ar: 'الألبومات' },
-  { kind: 'learning_lesson', en: 'Lessons', ar: 'الدروس' },
+const LEARNING_GROUPS: { kind: UnifiedSearchKind; en: string; ar: string; fr: string }[] = [
+  { kind: 'learning_cantor', en: 'Cantors', ar: 'المعلمون', fr: 'Chantres' },
+  { kind: 'learning_hymn', en: 'Hymns', ar: 'الألحان', fr: 'Hymnes' },
+  { kind: 'learning_season', en: 'Seasons', ar: 'المواسم', fr: 'Temps liturgiques' },
+  { kind: 'learning_album', en: 'Albums', ar: 'الألبومات', fr: 'Albums' },
+  { kind: 'learning_lesson', en: 'Lessons', ar: 'الدروس', fr: 'Leçons' },
 ];
 
 function resultSubtitle(result: UnifiedSearchResult): string | null {
@@ -203,8 +205,8 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   const toggleTrackLike = async (trackId: string) => {
     if (!libraryAuthenticated) {
       Alert.alert(
-        isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
-        isArabic ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.' : 'Sign in to your CHC account to save Liked Songs.',
+        tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
+        tr('Sign in to your CHC account to save Liked Songs.', 'Connectez-vous à votre compte CHC pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'),
       );
       return;
     }
@@ -219,7 +221,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
       });
     } catch (cause) {
       Alert.alert(
-        isArabic ? 'الأغاني المعجبة' : 'Liked Songs',
+        tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
         cause instanceof Error ? cause.message : 'Unable to update Liked Songs.',
       );
     }
@@ -298,7 +300,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
       <View style={styles.topBar}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={isArabic ? 'رجوع' : 'Back'}
+          accessibilityLabel={tr('Back', 'Retour', 'رجوع')}
           onPress={() => goBack(router, fallback)}
           style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
         >
@@ -313,16 +315,16 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
           <TextInput
             ref={inputRef}
             accessibilityLabel={music
-              ? (isArabic ? 'بحث في الترانيم' : 'Search Music')
-              : (isArabic ? 'بحث في التعلّم' : 'Search Learn & Study')}
+              ? (tr('Search Music', 'Rechercher de la musique', 'بحث في الترانيم'))
+              : (tr('Search Learn & Study', 'Rechercher dans Apprendre', 'بحث في التعلّم'))}
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus
             clearButtonMode={Platform.OS === 'ios' ? 'while-editing' : 'never'}
             onChangeText={changeQuery}
             placeholder={music
-              ? (isArabic ? 'فنان أو ألبوم أو ترنيمة' : 'Artists, albums, and tracks')
-              : (isArabic ? 'معلّم أو لحن أو درس' : 'Cantors, hymns, albums, and lessons')}
+              ? (tr('Artists, albums, and tracks', 'Artistes, albums et titres', 'فنان أو ألبوم أو ترنيمة'))
+              : (tr('Cantors, hymns, albums, and lessons', 'Chantres, hymnes, albums et leçons', 'معلّم أو لحن أو درس'))}
             placeholderTextColor="rgba(201,211,220,0.52)"
             returnKeyType="search"
             selectionColor={accent}
@@ -336,7 +338,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
           {query && Platform.OS !== 'ios' ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isArabic ? 'مسح البحث' : 'Clear search'}
+              accessibilityLabel={tr('Clear search', 'Effacer la recherche', 'مسح البحث')}
               onPress={() => {
                 changeQuery('');
                 inputRef.current?.focus();
@@ -361,13 +363,13 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
             </View>
             <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>
               {music
-                ? (isArabic ? 'ابحث في الترانيم' : 'Search Music')
-                : (isArabic ? 'ابحث في التعلّم' : 'Search Learn & Study')}
+                ? (tr('Search Music', 'Rechercher de la musique', 'ابحث في الترانيم'))
+                : (tr('Search Learn & Study', 'Rechercher dans Apprendre', 'ابحث في التعلّم'))}
             </Text>
             <Text style={[styles.emptyBody, isArabic && styles.arabic]}>
               {music
-                ? (isArabic ? 'ابحث عن فنان أو ألبوم أو ترنيمة.' : 'Find an artist, album, EP, single, or track.')
-                : (isArabic ? 'ابحث عن معلّم أو لحن أو ألبوم أو درس.' : 'Find a cantor, hymn, season, album, or lesson.')}
+                ? (tr('Find an artist, album, EP, single, or track.', 'Trouvez un artiste, un album, un EP, un single ou un titre.', 'ابحث عن فنان أو ألبوم أو ترنيمة.'))
+                : (tr('Find a cantor, hymn, season, album, or lesson.', 'Trouvez un chantre, une hymne, un temps liturgique, un album ou une leçon.', 'ابحث عن معلّم أو لحن أو ألبوم أو درس.'))}
             </Text>
           </View>
         ) : null}
@@ -378,10 +380,10 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
         {hasQuery && !loading && !error && results.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>
-              {isArabic ? 'لا توجد نتائج' : 'No results'}
+              {tr('No results', 'Aucun résultat', 'لا توجد نتائج')}
             </Text>
             <Text style={[styles.emptyBody, isArabic && styles.arabic]}>
-              {isArabic ? 'جرّب تهجئة مختلفة أو كلمة أقصر.' : 'Try another spelling or a shorter search.'}
+              {tr('Try another spelling or a shorter search.', 'Essayez une autre orthographe ou une recherche plus courte.', 'جرّب تهجئة مختلفة أو كلمة أقصر.')}
             </Text>
           </View>
         ) : null}
@@ -389,7 +391,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
         {!loading && grouped.map((group) => (
           <View key={group.kind} style={styles.group}>
             <Text style={[styles.groupTitle, { color: accentBright }, isArabic && styles.arabic]}>
-              {isArabic ? group.ar : group.en}
+              {tr(group.en, group.fr, group.ar)}
             </Text>
             <View style={styles.resultCard}>
               {group.results.map((result, index) => (

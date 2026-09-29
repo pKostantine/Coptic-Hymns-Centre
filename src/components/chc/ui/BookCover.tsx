@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -6,14 +7,15 @@ import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import CopticCross from './CopticCross';
 import Icon from './Icon';
 
+import { appText } from '../../../utils/appText';
 /** Book-menu text never grows past this multiple of its design size, so large accessibility text keeps the shelf intact. */
 const MAX_FONT_SCALE = 1.3;
 
 /** Download states worth words; the button's own icon already says "not downloaded", "installed" and "downloading". */
-const STATUS_TEXT: Record<string, { english: string; arabic: string }> = {
-  paused: { english: 'Download paused', arabic: 'التنزيل متوقف' },
-  update_available: { english: 'Update available', arabic: 'يوجد تحديث' },
-  failed: { english: "Couldn't download", arabic: 'تعذّر التنزيل' },
+const STATUS_TEXT: Record<string, { english: string; arabic: string; french?: string }> = {
+  paused: { english: 'Download paused', arabic: 'التنزيل متوقف', french: 'Téléchargement en pause' },
+  update_available: { english: 'Update available', arabic: 'يوجد تحديث', french: 'Mise à jour disponible' },
+  failed: { english: "Couldn't download", arabic: 'تعذّر التنزيل', french: 'Échec du téléchargement' },
 };
 
 interface BookCoverProps {
@@ -99,7 +101,7 @@ export default function BookCover({
           {status ? (
             <View style={styles.statusWrap} pointerEvents="none">
               <Text style={[styles.status, failed && styles.statusFailed, arabic && styles.arabicText]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                {arabic ? status.arabic : status.english}
+                {appText(status)}
               </Text>
             </View>
           ) : <View pointerEvents="none" />}
