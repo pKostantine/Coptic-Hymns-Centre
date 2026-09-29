@@ -6,12 +6,14 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import BibleWebView, { BibleWebViewHandle } from '@/components/chc/BibleWebView';
 import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/chc/bibleDocumentHtml';
-import AppHeader from '@/components/chc/ui/AppHeader';
+import DocumentTopBar from '@/components/chc/ui/DocumentTopBar';
 import Icon from '@/components/chc/ui/Icon';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useBottomChrome } from '@/context/BottomChromeContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { useBibleHighlights } from '@/hooks/useBibleHighlights';
 import {
     BibleBook,
     getBibleBook,
@@ -29,6 +31,7 @@ import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
 import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
+import { createBibleHighlight, isBibleHighlightAnchor, isBibleHighlightColor } from '@/utils/bibleHighlights';
 
 type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
 type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
@@ -60,6 +63,8 @@ const SELECTOR_TEXT: Record<AppLanguage, {
   closeSelector: string;
   bookmarkChapter: string;
   openBibleSettings: string;
+  copy: string;
+  removeHighlight: string;
 }> = {
   en: {
     verses: 'Verses',
@@ -71,6 +76,8 @@ const SELECTOR_TEXT: Record<AppLanguage, {
     closeSelector: 'Close verse selector',
     bookmarkChapter: 'Bookmark chapter',
     openBibleSettings: 'Open Bible settings',
+    copy: 'Copy',
+    removeHighlight: 'Remove',
   },
   ar: {
     verses: 'الآيات',
@@ -82,6 +89,8 @@ const SELECTOR_TEXT: Record<AppLanguage, {
     closeSelector: 'إغلاق محدد الآيات',
     bookmarkChapter: 'حفظ الإصحاح',
     openBibleSettings: 'فتح إعدادات الكتاب المقدس',
+    copy: 'نسخ',
+    removeHighlight: 'إزالة',
   },
 };
 
@@ -170,6 +179,10 @@ export default function BibleChapterDocument() {
   }>();
   const psalmNumbering: PsalmNumbering = numberingParam === 'masoretic' ? 'masoretic' : 'septuagint';
   const { preferences, isBookmarked, toggleBookmark, setBibleVisibleLanguages } = useReadingPreferences();
+  const { user } = useAuth();
+  const bibleHighlights = useBibleHighlights(bookKey, user?.id);
+  // True while an Apple Pencil stroke is highlighting, so it never turns into an edge swipe.
+  const [pencilGestureActive, setPencilGestureActive] = useState(false);
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const copticFontDataUri = useCopticFontDataUri();
   const bibleWebViewRef = useRef<BibleWebViewHandle>(null);
@@ -299,7 +312,9 @@ export default function BibleChapterDocument() {
   const headerTitleArabic = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'ar');
   const preface = book?.bookKey === 'psalms' ? getDisplayedPsalmPreface() : null;
   const selectorText = SELECTOR_TEXT[preferences.appLanguage];
-  const effectiveSelectText = preferences.selectText && !preferences.slideshowMode;
+  // Reading the chapter, text can always be selected — to highlight or copy
+  // it, as in the Sermon Planner; slideshow pages stay untouchable.
+  const effectiveSelectText = !preferences.slideshowMode;
 
   const chapterIndex = chapterKeys ? chapterKeys.indexOf(currentChapterNumber) : -1;
   const previousChapter = chapterIndex > 0 ? chapterKeys![chapterIndex - 1] : null;
@@ -325,8 +340,10 @@ export default function BibleChapterDocument() {
       // Now Playing is an overlay in slideshow mode. It must never shorten
       // the page or change where Bible verses split.
       bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
+      highlighting: effectiveSelectText,
+      highlightLabels: { copy: selectorText.copy, remove: selectorText.removeHighlight },
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -391,7 +408,7 @@ export default function BibleChapterDocument() {
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
     return PanResponder.create({
       onMoveShouldSetPanResponder: (event, gestureState) => {
-        if (isStylusGestureEvent(event)) return false;
+        if (isStylusGestureEvent(event) || pencilGestureActive) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
         if (!isHorizontal) return false;
         const isBackSwipe = gestureState.x0 < 56 && gestureState.dx > 24;
@@ -399,7 +416,7 @@ export default function BibleChapterDocument() {
         return isBackSwipe || isSelectorSwipe;
       },
       onPanResponderRelease: (event, gestureState) => {
-        if (isStylusGestureEvent(event)) return;
+        if (isStylusGestureEvent(event) || pencilGestureActive) return;
         const selectorEdge = Math.min(240, Math.max(128, screenWidth * 0.18));
         if (gestureState.x0 < 56 && gestureState.dx > 60) {
           goBackALevel();
@@ -408,25 +425,25 @@ export default function BibleChapterDocument() {
         }
       },
     });
-  }, [goBackALevel, screenWidth, isSelectorOpen]);
+  }, [goBackALevel, screenWidth, isSelectorOpen, pencilGestureActive]);
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}>
       <Head>
         <title>{`CHC ${headerTitleEnglish || 'Bible'}`}</title>
       </Head>
-      {/* Unlike every other document screen, the Bible reader's header is
-          NEVER hidden -- not even natively -- because it's the only place
-          showing the user which book/chapter they're actually reading. */}
-      <AppHeader
+      {/* The same bar as every other document. Unlike them it stays in the
+          app too, not only on the web: it is the only place that says which
+          book and chapter is open. */}
+      <DocumentTopBar
         title={{ english: headerTitleEnglish, arabic: headerTitleArabic }}
-        canGoBack
         onBack={goBackALevel}
-        rightIcon="list-outline"
-        rightAccessibilityLabel={selectorText.openSelector}
-        onRightPress={openVerseSelector}
-        rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
-        onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
+        leadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+        onLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
+        leadingAccessibilityLabel={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+        trailingIcon="list-outline"
+        trailingAccessibilityLabel={selectorText.openSelector}
+        onTrailingPress={openVerseSelector}
       />
       {error ? (
         <View style={styles.center}>
@@ -442,7 +459,31 @@ export default function BibleChapterDocument() {
             scrollEnabled={!preferences.slideshowMode}
             restoreVerse={restoreVerse}
             selectText={effectiveSelectText}
+            highlights={bibleHighlights.highlights}
             onAction={(action) => {
+              if (action.type === 'biblePencilGesture') {
+                setPencilGestureActive(Boolean(action.active));
+                return;
+              }
+              if (action.type === 'createBibleHighlights' || action.type === 'recolorBibleHighlight' || action.type === 'removeBibleHighlight') {
+                // Only from the chapter on screen now, never a page it replaced.
+                if (action.readerId !== readerId) return;
+                const color = isBibleHighlightColor(action.color) ? action.color : 'gold';
+                if (action.type === 'createBibleHighlights') {
+                  bibleHighlights.addHighlights((action.anchors || []).filter(isBibleHighlightAnchor).map((anchor) => createBibleHighlight(anchor, color)));
+                } else if (action.highlightId && action.type === 'recolorBibleHighlight') {
+                  bibleHighlights.setHighlightColor(action.highlightId, color);
+                } else if (action.highlightId) {
+                  bibleHighlights.deleteHighlight(action.highlightId);
+                }
+                return;
+              }
+              if (action.type === 'copyBibleText') {
+                // The page's own copy command didn't take (a browser that
+                // blocks it in a frame); the app's clipboard does it instead.
+                if (action.text) void globalThis.navigator?.clipboard?.writeText?.(action.text).catch(() => undefined);
+                return;
+              }
               if (action.type === 'currentVerse' && action.verse) {
                 if (action.readerId !== readerId || !focusedRef.current || selectorOpenRef.current) return;
                 if (restoreGuardRef.current && restoreGuardRef.current !== action.verse) return;

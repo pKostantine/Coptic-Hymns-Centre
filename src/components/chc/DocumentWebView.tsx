@@ -155,7 +155,24 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       }
     };
 
+    // The Now Playing bar's clearance is applied to the loaded page, never
+    // built into it: the bar appears, collapses and re-measures while a
+    // document is open (a subdocument even mounts its own copy), and
+    // rebuilding for that reloaded the document and dropped the reader's place.
+    const applyBottomInset = () => {
+      webviewRef.current?.injectJavaScript(
+        `(function () { var page = document.querySelector('.document'); if (page) page.style.paddingBottom = ${JSON.stringify(`${Math.max(0, Math.round(bottomContentInset))}px`)}; })(); true;`,
+      );
+    };
+
+    useEffect(() => {
+      applyBottomInset();
+      // Only the value matters; the injector itself is rebuilt every render.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [bottomContentInset]);
+
     const handleLoadEnd = () => {
+      applyBottomInset();
       // The whole chain, not just the remembered section: this load is
       // usually a settings change rebuilding the document, and that setting
       // may be what hid the section being restored to. See
@@ -206,7 +223,8 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               copticRecitedPrayers,
               copticGospelRite,
               suppressAllSpeakerLabels,
-              bottomContentInset,
+              // Applied after load instead — see applyBottomInset.
+              bottomContentInset: 0,
               sermonPlannerMode,
               nativeSwipeNavigation: true,
             })
@@ -224,7 +242,6 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         copticRecitedPrayers,
         copticGospelRite,
         suppressAllSpeakerLabels,
-        bottomContentInset,
         sermonPlannerMode,
       ],
     );

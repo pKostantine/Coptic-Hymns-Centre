@@ -29,6 +29,9 @@ export interface BibleVerse {
   french: string;
   isLxxAddition?: boolean;
   isPsalmIntroduction?: boolean;
+  /** Where the verse is stored (the Septuagint numbering) — what a highlight anchors to, so it holds in either Psalm numbering. */
+  sourceChapter?: number;
+  sourceVerse?: BibleVerseNumber;
 }
 
 export type PsalmNumbering = 'septuagint' | 'masoretic';
@@ -399,7 +402,8 @@ export async function getDisplayedChapterVerses(
   await assertBibleBookVisible(bookKey);
 
   if (bookKey !== PSALMS_KEY || psalmNumbering === 'septuagint') {
-    return fetchChapterVerses(bookKey, displayChapter);
+    const verses = await fetchChapterVerses(bookKey, displayChapter);
+    return verses.map((verse) => ({ ...verse, sourceChapter: displayChapter, sourceVerse: verse.verseNumber }));
   }
 
   // Masoretic display: pull the 1-2 Septuagint chapters this Masoretic
@@ -413,7 +417,7 @@ export async function getDisplayedChapterVerses(
       if (typeof verse.verseNumber !== 'number') return;
       const hebrew = mapSeptuagintPsalmReferenceToHebrew(sourceChapter, verse.verseNumber);
       if (hebrew && hebrew.chapter === displayChapter) {
-        mapped.push({ ...verse, verseNumber: hebrew.verse });
+        mapped.push({ ...verse, verseNumber: hebrew.verse, sourceChapter, sourceVerse: verse.verseNumber });
       }
     });
   });

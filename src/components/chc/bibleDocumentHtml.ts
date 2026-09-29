@@ -1,5 +1,6 @@
 import { COLORS } from '../../constants/theme';
 import { formatEnglishDisplayText } from '../../utils/displayText';
+import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
 export interface BibleDisplayVerse {
   verseNumber: number | string;
@@ -13,6 +14,9 @@ export interface BibleDisplayVerse {
   french: string;
   isLxxAddition?: boolean;
   isPsalmIntroduction?: boolean;
+  /** Where the verse is stored (Septuagint numbering) — the id a highlight anchors to. */
+  sourceChapter?: number;
+  sourceVerse?: number | string;
 }
 
 export interface BiblePreface {
@@ -50,6 +54,8 @@ export function buildBibleChapterHtml({
   restoreVerse = null,
   readerId = '',
   bottomContentInset = 0,
+  highlighting = false,
+  highlightLabels = { copy: 'Copy', remove: 'Remove' },
 }: {
   verses: BibleDisplayVerse[];
   languageKeys: BibleLanguageKey[];
@@ -68,6 +74,10 @@ export function buildBibleChapterHtml({
   restoreVerse?: string | number | null;
   /** Identifies this HTML generation so stale iframe/WebView messages are ignored. */
   readerId?: string;
+  /** Highlighting and its selection toolbar (colours, Copy) — the reading view only, not slideshow pages. */
+  highlighting?: boolean;
+  /** The toolbar's words, in the app's language. */
+  highlightLabels?: { copy: string; remove: string };
 }) {
   const safeFontSize = Math.max(12, Number(fontSize) || 18);
   const effectiveSelectText = Boolean(selectText) && !isSlideshow;
@@ -75,6 +85,7 @@ export function buildBibleChapterHtml({
   const columnTemplate = `repeat(${Math.max(effectiveLanguages.length, 1)}, minmax(0, 1fr))`;
   const firstCopticVerse = verses.find((verse) => !verse.isPsalmIntroduction && String(verse.coptic || '').trim());
   const arabicVerseLineHeight = Math.round(fontSize * 1.6);
+  const effectiveHighlighting = Boolean(highlighting) && !isSlideshow;
 
   const rowHtml = verses
     .map((verse) => {
@@ -89,10 +100,17 @@ export function buildBibleChapterHtml({
           if (!String(text || '').trim()) {
             return `<div class="cell placeholder ${language}" data-language="${language}"></div>`;
           }
+          // A highlight anchors to where the verse is stored, "chapter:verse",
+          // and to its column — so it lands on the same words in either Psalm
+          // numbering and whichever columns are showing.
+          const textClass = effectiveHighlighting ? 'verse-text sermon-annotatable-text' : 'verse-text';
+          const annotation = effectiveHighlighting
+            ? ` data-sermon-section-id="bible" data-sermon-verse-id="${escapeHtml(bibleHighlightVerseId(verse))}" data-sermon-language="${language}"`
+            : '';
           return [
             `<div class="cell ${language}${isPsalmIntroduction ? ' psalm-introduction' : ''}" data-language="${language}" dir="${isArabicLanguage(language) ? 'rtl' : 'ltr'}">`,
             verseNumberHtml,
-            `<span class="verse-text">${escapeHtml(formatVerseText(text, language, verse === firstCopticVerse))}</span>`,
+            `<span class="${textClass}"${annotation}>${escapeHtml(formatVerseText(text, language, verse === firstCopticVerse))}</span>`,
             '</div>',
           ].join('');
         })
@@ -335,6 +353,7 @@ export function buildBibleChapterHtml({
         top: 0;
         width: 1px;
       }
+      ${effectiveHighlighting ? textHighlightStyles() : ''}
     </style>
   </head>
   <body class="${isSlideshow ? 'slideshow' : 'scroll'}">
@@ -385,6 +404,8 @@ export function buildBibleChapterHtml({
             window.parent.postMessage(payload, '*');
           }
         }
+        // The highlighting layer is its own script; it posts through this.
+        window.__chcBiblePost = post;
 
         function closestLanguageCell(node) {
           var element = node && node.nodeType === 1 ? node : node && node.parentElement;
@@ -1021,8 +1042,28 @@ export function buildBibleChapterHtml({
         }
       })();
     </script>
+    ${effectiveHighlighting ? `<script>${textHighlightScript({
+      emit: 'function (type, payload) { if (window.__chcBiblePost) window.__chcBiblePost(Object.assign({ type: type }, payload || {})); }',
+      actions: {
+        create: 'createBibleHighlights',
+        pencil: 'biblePencilGesture',
+        recolor: 'recolorBibleHighlight',
+        remove: 'removeBibleHighlight',
+        copy: 'copyBibleText',
+      },
+      tapToEdit: true,
+      copy: true,
+      singleLanguage: true,
+      labels: highlightLabels,
+    })}</script>` : ''}
   </body>
 </html>`;
+}
+
+/** "chapter:verse" where the verse is stored — see BibleDisplayVerse.sourceChapter. */
+export function bibleHighlightVerseId(verse: Pick<BibleDisplayVerse, 'verseNumber' | 'sourceChapter' | 'sourceVerse'>): string {
+  const verseNumber = String(verse.sourceVerse ?? verse.verseNumber);
+  return verse.sourceChapter === undefined ? verseNumber : `${verse.sourceChapter}:${verseNumber}`;
 }
 
 const COPTIC_CHARACTER_PATTERN = /[Ϣ-ϯⲀ-⳿ⲭⲬϭϮ]/u;

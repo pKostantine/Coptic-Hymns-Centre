@@ -82,7 +82,7 @@ Local verification:
 - `npm run test:lyrics` - 5 passing tests
 - `npm run test:playback` - 5 passing tests
 
-The web export reaches Metro bundling but the repository does not contain the pre-existing `assets/fonts/CopticCHC-Regular-V3.ttf` required by the root layout. That packaging issue is unrelated to Phase 12; type checking and changed-file lint complete cleanly.
+The web export reaches Metro bundling but the repository does not contain the pre-existing `assets/fonts/CopticCHC-Regular-V3.1.ttf` required by the root layout. That packaging issue is unrelated to Phase 12; type checking and changed-file lint complete cleanly.
 
 ## Follow-up
 

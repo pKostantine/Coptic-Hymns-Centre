@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 
 import { COLORS } from '../../constants/theme';
+import type { BibleHighlight } from '../../types/bibleHighlights';
 import { BibleWebViewAction, BibleWebViewHandle } from './BibleWebView';
 
 interface BibleWebViewProps {
@@ -8,14 +9,30 @@ interface BibleWebViewProps {
   restoreVerse?: string | null;
   scrollEnabled?: boolean;
   selectText?: boolean;
+  highlights?: BibleHighlight[];
   onAction?: (action: BibleWebViewAction) => void;
 }
 
+type BibleFrameWindow = Window & {
+  selectBibleVerse?: (verse: string) => void;
+  setSermonHighlights?: (highlights: BibleHighlight[]) => void;
+};
+
 /** Web Bible chapter renderer — plain iframe, same HTML builder as the native renderer. */
-const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, onAction }, ref) => {
+const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, highlights, onAction }, ref) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const restoreVerseRef = useRef(restoreVerse);
   restoreVerseRef.current = restoreVerse;
+  const highlightsRef = useRef(highlights);
+  highlightsRef.current = highlights;
+  const drawHighlights = () => {
+    const win = iframeRef.current?.contentWindow as BibleFrameWindow | null | undefined;
+    win?.setSermonHighlights?.(highlightsRef.current || []);
+  };
+
+  useEffect(() => {
+    drawHighlights();
+  }, [highlights]);
 
   useImperativeHandle(ref, () => ({
     selectVerse: (verse: number | string) => {
@@ -46,6 +63,7 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
       sandbox="allow-same-origin allow-scripts"
       srcDoc={html}
       onLoad={() => {
+        drawHighlights();
         const verse = restoreVerseRef.current;
         if (verse) {
           const win = iframeRef.current?.contentWindow as (Window & { selectBibleVerse?: (verse: string) => void }) | null | undefined;

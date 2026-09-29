@@ -29,6 +29,11 @@ export default function BibleMenu() {
       overline={arabic ? 'الأسفار المقدسة' : 'HOLY SCRIPTURE'}
       arabic={arabic}
       backHref="/books"
+      headerAction={{
+        icon: 'bookmark-outline',
+        label: arabic ? 'محفوظات الكتاب المقدس' : 'Bible bookmarks',
+        onPress: () => router.push('/bible/bookmarks'),
+      }}
     >
       <Pressable
         accessibilityRole="search"

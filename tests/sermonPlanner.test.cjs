@@ -268,7 +268,7 @@ test('A synced highlight deletion wins over an older copy from another device', 
 });
 
 test('Sermon selection snaps across complete English, Arabic and Coptic words', () => {
-  const html = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
+  const html = fs.readFileSync('src/components/chc/textHighlights.ts', 'utf8');
   const start = html.indexOf('function expandToWholeWords(text, start, end)');
   const end = html.indexOf('function anchorsFromSelection(selection)', start);
   assert.ok(start >= 0 && end > start);

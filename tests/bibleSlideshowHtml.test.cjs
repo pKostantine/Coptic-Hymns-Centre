@@ -14,18 +14,25 @@ function loadBuilder() {
       "import { formatEnglishDisplayText } from '../../utils/displayText';",
       "const formatEnglishDisplayText = (value) => String(value || '');",
     );
+  // The builder's one local import, the shared highlighting layer.
+  const textHighlights = evaluateModule(fs.readFileSync('src/components/chc/textHighlights.ts', 'utf8'), 'textHighlights.ts', require);
+  const localRequire = (name) => (name === './textHighlights' ? textHighlights : require(name));
+  return evaluateModule(source, 'bibleDocumentHtml.ts', localRequire).buildBibleChapterHtml;
+}
+
+function evaluateModule(source, filename, moduleRequire) {
   const javascript = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const moduleObject = { exports: {} };
   new Function('exports', 'require', 'module', '__filename', '__dirname', javascript)(
     moduleObject.exports,
-    require,
+    moduleRequire,
     moduleObject,
-    'bibleDocumentHtml.ts',
+    filename,
     process.cwd(),
   );
-  return moduleObject.exports.buildBibleChapterHtml;
+  return moduleObject.exports;
 }
 
 test('Bible slideshow emits valid presentation JavaScript and max-size safeguards', () => {
@@ -71,4 +78,48 @@ test('Bible slideshow emits valid presentation JavaScript and max-size safeguard
 test('Bible slideshow route excludes the Now Playing overlay from pagination', () => {
   const route = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
   assert.match(route, /bottomContentInset:\s*preferences\.slideshowMode\s*\?\s*0\s*:\s*nowPlayingInset/);
+});
+
+test('Bible reading view highlights by stored chapter and verse, and offers Copy', () => {
+  const buildBibleChapterHtml = loadBuilder();
+  const html = buildBibleChapterHtml({
+    verses: [{
+      verseNumber: 1,
+      sourceChapter: 9,
+      sourceVerse: 22,
+      english: 'Why, O Lord, do You stand afar off?',
+      englishNkjv: '',
+      englishFromCoptic: '',
+      coptic: '',
+      greek: '',
+      arabic: 'يَا رَبُّ',
+      arabicFromCoptic: '',
+      french: '',
+    }],
+    languageKeys: ['english', 'arabic'],
+    fontSize: 18,
+    copticFontDataUri: 'data:font/ttf;base64,AA==',
+    selectText: true,
+    highlighting: true,
+    highlightLabels: { copy: 'Copy', remove: 'Remove' },
+  });
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+  assert.equal(scripts.length, 2);
+  for (const script of scripts) assert.doesNotThrow(() => new Function(script));
+  // A masoretic Psalm verse anchors to the Septuagint chapter:verse it is stored under.
+  assert.match(html, /data-sermon-verse-id="9:22" data-sermon-language="english"/);
+  assert.match(html, /data-sermon-verse-id="9:22" data-sermon-language="arabic"/);
+  assert.match(html, /"copy":"copyBibleText"/);
+  assert.match(html, /addAction\('copy', "Copy"\)/);
+  assert.match(html, /window\.__chcBiblePost = post/);
+
+  const slideshow = buildBibleChapterHtml({
+    verses: [{ verseNumber: 1, english: 'In the beginning', englishNkjv: '', englishFromCoptic: '', coptic: '', greek: '', arabic: '', arabicFromCoptic: '', french: '' }],
+    languageKeys: ['english'],
+    fontSize: 18,
+    copticFontDataUri: 'data:font/ttf;base64,AA==',
+    isSlideshow: true,
+    highlighting: true,
+  });
+  assert.doesNotMatch(slideshow, /sermon-annotatable-text"/);
 });

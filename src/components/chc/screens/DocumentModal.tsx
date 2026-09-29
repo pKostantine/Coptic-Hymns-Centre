@@ -262,6 +262,24 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     });
   }, [onClose, isCovered, screenWidth]);
 
+  // Calendar and Settings open over this modal rather than as screens of
+  // their own, so they don't get the navigator's swipe-back. The same
+  // left-edge swipe closes them here: back into the subdocument, or from the
+  // season list back to the calendar it was opened from.
+  const overlaySwipePanResponder = useMemo(() => {
+    const closeOverlay = () => setOverlayScreen((screen) => (screen === 'seasons' ? 'calendar' : null));
+    return PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (event, gestureState) => {
+        if (isStylusGestureEvent(event)) return false;
+        return gestureState.x0 < 56 && gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderRelease: (event, gestureState) => {
+        if (isStylusGestureEvent(event)) return;
+        if (gestureState.x0 < 56 && gestureState.dx > 60) closeOverlay();
+      },
+    });
+  }, []);
+
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
       <SafeAreaView
@@ -355,14 +373,16 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           onRequestClose={() => setOverlayScreen(null)}
           supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
         >
-          {overlayScreen === 'calendar' ? (
-            <CalendarScreen
-              onClose={() => setOverlayScreen(null)}
-              onOpenSeasonSelector={() => setOverlayScreen('seasons')}
-            />
-          ) : null}
-          {overlayScreen === 'seasons' ? <SeasonSelectorScreen onClose={() => setOverlayScreen('calendar')} /> : null}
-          {overlayScreen === 'settings' ? <SettingsScreen onClose={() => setOverlayScreen(null)} /> : null}
+          <View style={styles.overlayFrame} {...(isMobileDocument ? overlaySwipePanResponder.panHandlers : {})}>
+            {overlayScreen === 'calendar' ? (
+              <CalendarScreen
+                onClose={() => setOverlayScreen(null)}
+                onOpenSeasonSelector={() => setOverlayScreen('seasons')}
+              />
+            ) : null}
+            {overlayScreen === 'seasons' ? <SeasonSelectorScreen onClose={() => setOverlayScreen('calendar')} /> : null}
+            {overlayScreen === 'settings' ? <SettingsScreen onClose={() => setOverlayScreen(null)} /> : null}
+          </View>
         </Modal>
         <DocumentModal
           visible={Boolean(nestedModal)}
@@ -407,6 +427,7 @@ export function AntiphonaryModal({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
+  overlayFrame: { flex: 1, backgroundColor: COLORS.black },
   documentFrame: { flex: 1, position: 'relative' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
   loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },

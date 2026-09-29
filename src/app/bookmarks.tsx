@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,7 +11,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { bookmarkKeyFor, CATEGORIES, DIVINE_LITURGY_SERVICES, HOLY_WEEK_HOURS, holyWeekHourHref, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
 import { goBack } from '@/utils/navigation';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { getBibleChapterDisplayLabel, getBibleBooks, type BibleBook } from '@/utils/bibleService';
+import { isBibleBookmark } from '@/components/chc/screens/BibleBookmarks';
 
 interface BookmarkEntry {
   id: string;
@@ -81,37 +81,12 @@ export default function BookmarksScreen() {
   const { bookmarks, preferences } = useReadingPreferences();
   const showEnglish = preferences.appLanguage === 'en';
   const showArabic = preferences.appLanguage === 'ar';
-  const [bibleBooks, setBibleBooks] = useState<BibleBook[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getBibleBooks()
-      .then((books) => {
-        if (!cancelled) setBibleBooks(books);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  // Bible chapters have their own bookmarks, in the Bible (BibleBookmarks).
   const entries = useMemo(() => {
     return bookmarks
+      .filter((id) => !isBibleBookmark(id))
       .map((id): BookmarkEntry | null => {
-        if (id.startsWith('bible:')) {
-          const [, , bookKey, chapter] = id.split(':');
-          const book = bibleBooks.find((b) => b.bookKey === bookKey);
-          if (!book) return null;
-          const chapterNumber = Number(chapter);
-          const englishChapter = getBibleChapterDisplayLabel(bookKey, chapterNumber, 'en');
-          const arabicChapter = getBibleChapterDisplayLabel(bookKey, chapterNumber, 'ar');
-          return {
-            id,
-            title: `${book.titleEnglish} ${englishChapter}`,
-            arabic: `${book.titleArabic} ${arabicChapter}`,
-            href: `/bible/${bookKey}/${chapter}`,
-          };
-        }
         // Subdocument bookmarks: "${parentSchema}:${parentTable}:sub:${KEY}"
         const subMatch = id.match(/^(.+):sub:([^:]+)$/);
         if (subMatch) {
@@ -132,7 +107,7 @@ export default function BookmarksScreen() {
         return BOOKMARK_INDEX[id] || null;
       })
       .filter((entry): entry is BookmarkEntry => entry !== null);
-  }, [bookmarks, bibleBooks]);
+  }, [bookmarks]);
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>

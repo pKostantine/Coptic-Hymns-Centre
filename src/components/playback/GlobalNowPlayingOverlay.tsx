@@ -1,5 +1,5 @@
 import { usePathname } from 'expo-router';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useId, useState } from 'react';
 import { Alert, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -51,6 +51,7 @@ export default function GlobalNowPlayingOverlay() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { tabBarInset, reportNowPlayingInset } = useBottomChrome();
+  const overlayId = useId();
   const { preferences } = useReadingPreferences();
   const music = useMusicPlayer();
   const learning = useLearningPlayer();
@@ -106,7 +107,7 @@ export default function GlobalNowPlayingOverlay() {
     // Publishing its height while slideshow mode is active creates the exact
     // full-width dead band that the collapsed button is meant to avoid.
     if (!allowDisplay || preferences.slideshowMode) {
-      reportNowPlayingInset(0);
+      reportNowPlayingInset(overlayId, null);
       return;
     }
 
@@ -115,14 +116,15 @@ export default function GlobalNowPlayingOverlay() {
     // nested screen with no tab bar, include the device bottom safe area too.
     const safeAreaClearance = tabBarInset > 0 ? 0 : insets.bottom;
     const visibleHeight = isCollapsed ? 42 : expandedHeight;
-    reportNowPlayingInset(visibleHeight + FLOATING_GAP + safeAreaClearance);
+    reportNowPlayingInset(overlayId, visibleHeight + FLOATING_GAP + safeAreaClearance);
 
-    return () => reportNowPlayingInset(0);
+    return () => reportNowPlayingInset(overlayId, null);
   }, [
     allowDisplay,
     expandedHeight,
     insets.bottom,
     isCollapsed,
+    overlayId,
     preferences.slideshowMode,
     reportNowPlayingInset,
     tabBarInset,

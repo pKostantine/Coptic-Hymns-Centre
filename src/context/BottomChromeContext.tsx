@@ -9,7 +9,12 @@ interface BottomChromeContextValue {
   /** Vertical content clearance required by the global now-playing overlay. */
   nowPlayingInset: number;
   reportTabBar: (id: string, inset: number | null) => void;
-  reportNowPlayingInset: (inset: number) => void;
+  /**
+   * Each now-playing bar reports its own clearance (null when it goes away).
+   * More than one can be mounted at once — a document's subdocument renders
+   * its own over the app's — so one closing must not clear another's.
+   */
+  reportNowPlayingInset: (id: string, inset: number | null) => void;
 }
 
 const BottomChromeContext = createContext<BottomChromeContextValue>({
@@ -27,7 +32,7 @@ const BottomChromeContext = createContext<BottomChromeContextValue>({
  */
 export function BottomChromeProvider({ children }: { children: ReactNode }) {
   const [insets, setInsets] = useState<Record<string, number>>({});
-  const [nowPlayingInset, setNowPlayingInset] = useState(0);
+  const [nowPlayingInsets, setNowPlayingInsets] = useState<Record<string, number>>({});
 
   const reportTabBar = useCallback((id: string, inset: number | null) => {
     setInsets((current) => {
@@ -42,11 +47,21 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const reportNowPlayingInset = useCallback((inset: number) => {
-    const nextInset = Math.max(0, Math.round(inset));
-    setNowPlayingInset((current) => (current === nextInset ? current : nextInset));
+  const reportNowPlayingInset = useCallback((id: string, inset: number | null) => {
+    setNowPlayingInsets((current) => {
+      if (inset == null) {
+        if (!(id in current)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      const nextInset = Math.max(0, Math.round(inset));
+      if (current[id] === nextInset) return current;
+      return { ...current, [id]: nextInset };
+    });
   }, []);
 
+  const nowPlayingInset = Math.max(0, ...Object.values(nowPlayingInsets));
   const value = useMemo(() => ({
     tabBarInset: Math.max(0, ...Object.values(insets)),
     nowPlayingInset,

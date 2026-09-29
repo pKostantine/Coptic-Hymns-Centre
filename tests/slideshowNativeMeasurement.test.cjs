@@ -18,7 +18,8 @@ test('liturgical slideshow pagination is independent of Now Playing geometry', (
 
   assert.doesNotMatch(slideshowBranch, /nowPlayingInset|bottomContentInset/);
   assert.doesNotMatch(container, /bottomContentInset/);
-  assert.match(overlay, /if \(!allowDisplay \|\| preferences\.slideshowMode\) \{\s*reportNowPlayingInset\(0\)/);
+  // In slideshow mode the bar withdraws its clearance entirely.
+  assert.match(overlay, /if \(!allowDisplay \|\| preferences\.slideshowMode\) \{\s*reportNowPlayingInset\(overlayId, null\)/);
 });
 
 test('collapsed Now Playing control cannot create a full-width slideshow mask', () => {

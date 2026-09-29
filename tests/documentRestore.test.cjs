@@ -138,3 +138,27 @@ test('Bible verse selector freezes its opening verse across successive language 
   assert.match(html, /message\.readerId = readerId/);
   assert.match(html, /initialAnchorVerse = restoreVerse \|\| initialVerse/);
 });
+
+test('A document never reloads for the Now Playing bar or an unchanged language set', () => {
+  // Reloading the reader throws its place away; a subdocument opened a moment
+  // ago has no remembered place, so it landed back at the top.
+  for (const file of ['src/components/chc/DocumentWebView.tsx', 'src/components/chc/DocumentWebView.web.tsx']) {
+    const view = fs.readFileSync(file, 'utf8');
+    const buildDeps = view.slice(view.indexOf('const html = useMemo('), view.indexOf('],', view.indexOf('const html = useMemo(')));
+    assert.match(buildDeps, /bottomContentInset: 0/, file);
+    assert.doesNotMatch(buildDeps.split('[').pop(), /bottomContentInset/, file);
+    assert.match(view, /const applyBottomInset = \(\) =>/, file);
+  }
+  const surface = fs.readFileSync('src/components/chc/DocumentSurface.tsx', 'utf8');
+  assert.match(surface, /visibleColumns=\{visibleColumns\}/);
+  assert.match(surface, /const visibleColumns = useMemo\(/);
+  const chrome = fs.readFileSync('src/context/BottomChromeContext.tsx', 'utf8');
+  assert.match(chrome, /reportNowPlayingInset: \(id: string, inset: number \| null\) => void/);
+});
+
+test('Calendar and Settings opened from a subdocument close with the edge swipe', () => {
+  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  assert.match(modal, /const overlaySwipePanResponder = useMemo\(/);
+  assert.match(modal, /isMobileDocument \? overlaySwipePanResponder\.panHandlers/);
+  assert.match(modal, /screen === 'seasons' \? 'calendar' : null/);
+});

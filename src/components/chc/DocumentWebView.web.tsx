@@ -159,7 +159,23 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       return () => window.removeEventListener('message', handleMessage);
     }, [onAction]);
 
+    // The Now Playing bar's clearance is applied to the loaded page, never
+    // built into it: the bar appears, collapses and re-measures while a
+    // document is open (a subdocument even mounts its own copy), and
+    // rebuilding for that reloaded the document and dropped the reader's place.
+    const applyBottomInset = () => {
+      const page = iframeRef.current?.contentDocument?.querySelector<HTMLElement>('.document');
+      if (page) page.style.paddingBottom = `${Math.max(0, Math.round(bottomContentInset))}px`;
+    };
+
+    useEffect(() => {
+      applyBottomInset();
+      // Only the value matters; the helper itself is rebuilt every render.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [bottomContentInset]);
+
     const handleLoad = () => {
+      applyBottomInset();
       const win = iframeRef.current?.contentWindow as
         | (Window & { scrollToSection?: (candidates: Array<{ sectionId: string; edge: 'start' | 'end' }>) => void })
         | null
@@ -214,7 +230,8 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               copticRecitedPrayers,
               copticGospelRite,
               suppressAllSpeakerLabels,
-              bottomContentInset,
+              // Applied after load instead — see applyBottomInset.
+              bottomContentInset: 0,
               sermonPlannerMode,
             })
           : null,
@@ -231,7 +248,6 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         copticRecitedPrayers,
         copticGospelRite,
         suppressAllSpeakerLabels,
-        bottomContentInset,
         sermonPlannerMode,
       ],
     );

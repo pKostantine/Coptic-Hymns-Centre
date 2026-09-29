@@ -206,6 +206,16 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       [onAction, rememberCollapseState],
     );
 
+    // One object for as long as the three toggles are unchanged. The reader
+    // rebuilds its whole document -- and reloads, losing the reader's place --
+    // whenever this changes identity, so a fresh literal on every render made
+    // any re-render (a scroll report, a collapse toggle) a reload.
+    const { english: showEnglish, coptic: showCoptic, arabic: showArabic } = preferences.visibleLanguages;
+    const visibleColumns = useMemo(
+      () => ({ english: showEnglish, coptic: showCoptic, arabic: showArabic }),
+      [showEnglish, showCoptic, showArabic],
+    );
+
     // Slideshow mode only. The scrolling reader gets the raw sections plus the
     // collapse map as its own prop, so that a toggle there never changes what
     // its document is built from — see the ref in DocumentWebView. Slideshow
@@ -317,11 +327,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         sections={sections}
         collapsedSectionIds={collapsedSectionIds}
         fontSize={fontSize}
-        visibleColumns={{
-          english: preferences.visibleLanguages.english,
-          coptic: preferences.visibleLanguages.coptic,
-          arabic: preferences.visibleLanguages.arabic,
-        }}
+        visibleColumns={visibleColumns}
         appLanguage={preferences.appLanguage}
         selectText={effectiveSelectText}
         displayComments={preferences.displayComments}
