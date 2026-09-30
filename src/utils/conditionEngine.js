@@ -132,12 +132,20 @@ function fetchDerivedLentFlags(isoDate) {
 
       const weekday = utcWeekdayForIsoDate(isoDate);
       const isWeekend = weekday === 0 || weekday === 6;
-      const flags = {
-        Lent: true,
-        [isWeekend ? "LentWeekends" : "LentWeekdays"]: true,
-      };
+      const flags = {};
 
+      // Great Lent ends on its last Friday, the day before Lazarus Saturday,
+      // so every Lent flag comes from the lent range alone. The holy-week
+      // range below must never set one: Lazarus Saturday, Palm Sunday and
+      // Holy Week are Pascha, not Lent, and get_context_flags already says so
+      // -- deriving Lent from holy-week here used to overwrite that correct
+      // answer, because the derived flags are spread last in
+      // fetchContextFlags. Conditions in the data assume this split; several
+      // list LazarusSaturday beside LentWeekdays precisely because the two
+      // never overlap.
       if (greatFastRange) {
+        flags.Lent = true;
+        flags[isWeekend ? "LentWeekends" : "LentWeekdays"] = true;
         flags.GreatFast = true;
         if (weekday === 1 && daysBetweenIsoDates(greatFastRange.start_date, isoDate) < 7) {
           flags.FirstMondayOfLent = true;
@@ -175,12 +183,14 @@ async function fetchContextFlags(isoDate, extraContext) {
       ]);
       if (error) throw new Error(`Unable to load context flags for ${isoDate}: ${error.message}`);
       const flags = { ...(data || {}), ...derivedLentFlags };
-      if (derivedLentFlags.Lent) {
+      if (derivedLentFlags.Lent || derivedLentFlags.Pascha) {
         // Older RPC deployments may incorrectly include ordinary-fast or
-        // annual flags during Lent. Never allow those to overlap Lent's
-        // seasonal hour and hymn placements.
+        // annual flags during Lent or Pascha week. Never allow those to
+        // overlap either season's hour and hymn placements.
         delete flags.NormalFastingDays;
         delete flags.Annual;
+      }
+      if (derivedLentFlags.Lent) {
         delete flags.Joyful29thOfTheMonth;
         flags.Fasts = true;
       }
@@ -331,8 +341,10 @@ export async function getContextFlags(date, extraContext = {}, weekdayDate) {
   const withWeekday = weekdayFlags ? withWeekdayFlagsFrom(baseFlags, weekdayFlags) : baseFlags;
   const flags = { ...withWeekday, ...gospelAuthorFlags, ...extraContext };
   // Even if a caller supplies these as extra context, the two ordinary
-  // conditions must not be active during Great Lent or Holy Week.
-  if (flags.Lent) {
+  // conditions must not be active during Great Lent or Holy Week. Pascha is
+  // named alongside Lent because Lent now stops at its last Friday, so from
+  // Lazarus Saturday onward Pascha is what marks the season.
+  if (flags.Lent || flags.Pascha) {
     delete flags.NormalFastingDays;
     delete flags.Annual;
   }

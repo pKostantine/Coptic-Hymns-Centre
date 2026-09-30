@@ -97,11 +97,50 @@ test('Holy Week does not inherit annual or normal fasting conditions', async () 
     '2026-04-06': { Annual: true, NormalFastingDays: true, Pascha: true },
   });
   const flags = await getContextFlags('2026-04-06', { Annual: true, NormalFastingDays: true });
-  assert.equal(flags.Lent, true);
   assert.equal(flags.HolyWeek, true);
   assert.equal(flags.Pascha, true);
+  // Pascha, not Lent, is what suppresses these from Lazarus Saturday onward.
+  assert.equal(Boolean(flags.Lent), false);
   assert.equal(Boolean(flags.Annual), false);
   assert.equal(Boolean(flags.NormalFastingDays), false);
+});
+
+test('Great Lent ends on its last Friday, not on Palm Sunday', async () => {
+  // 2026-04-03 is the last Friday of Lent, 04-04 Lazarus Saturday, 04-05 Palm
+  // Sunday. The lent range stops at the Friday; the holy-week range covers
+  // the rest and must not carry any Lent flag into it.
+  const { getContextFlags } = loadEngine();
+  const lastFriday = await getContextFlags('2026-04-03');
+  assert.equal(lastFriday.Lent, true);
+  assert.equal(lastFriday.GreatFast, true);
+  assert.equal(lastFriday.LastFridayOfLent, true);
+
+  for (const isoDate of ['2026-04-04', '2026-04-05', '2026-04-06', '2026-04-11']) {
+    const flags = await getContextFlags(isoDate);
+    for (const flag of ['Lent', 'GreatFast', 'LentWeekdays', 'LentWeekends', 'Fasts', 'LastFridayOfLent']) {
+      assert.equal(Boolean(flags[flag]), false, `${flag} must not be active on ${isoDate}`);
+    }
+    assert.equal(flags.Pascha, true, `Pascha must be active on ${isoDate}`);
+  }
+});
+
+test('Lazarus Saturday and Palm Sunday keep their own feast flags', async () => {
+  // These two days are inside the holy-week range but before HolyWeek proper,
+  // so they must come back as Pascha days with nothing Lenten attached.
+  const { getContextFlags } = loadEngine({
+    '2026-04-04': { LazarusSaturday: true, Feasts: true },
+    '2026-04-05': { PalmSunday: true, HosannaSunday: true, Feasts: true },
+  });
+  const lazarusSaturday = await getContextFlags('2026-04-04');
+  const palmSunday = await getContextFlags('2026-04-05');
+
+  assert.equal(lazarusSaturday.LazarusSaturday, true);
+  assert.equal(lazarusSaturday.Feasts, true);
+  assert.equal(Boolean(lazarusSaturday.LentWeekends), false);
+
+  assert.equal(palmSunday.PalmSunday, true);
+  assert.equal(palmSunday.HosannaSunday, true);
+  assert.equal(Boolean(palmSunday.LentWeekends), false);
 });
 
 test('HolyWeek starts with Monday Eve, not with the season on Lazarus Saturday', async () => {
