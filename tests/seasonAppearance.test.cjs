@@ -82,9 +82,10 @@ test('the user-specified seasons carry the colours they were given', () => {
   }
 });
 
-test('a card never draws light text on a light background', () => {
-  // The heading and footnote are near-white and sit straight on the gradient,
-  // so every stop has to stay dark however light the season's name colour is.
+test('every card keeps its text legible on its own background', () => {
+  // Every stop the text can sit over has to carry the card's own text, so a
+  // season's accent is a text colour rather than its card colour. The one
+  // exemption is a stop the sweep puts in a corner the text never reaches.
   const { SEASON_COLOUR_FAMILIES } = loadAppearance();
   const luminance = (hex) => {
     const channel = (i) => {
@@ -93,20 +94,57 @@ test('a card never draws light text on a light background', () => {
     };
     return 0.2126 * channel(0) + 0.7152 * channel(1) + 0.0722 * channel(2);
   };
-  const contrastWithWhite = (hex) => 1.05 / (luminance(hex) + 0.05);
+  const contrast = (a, b) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
 
   for (const [name, theme] of Object.entries(SEASON_COLOUR_FAMILIES)) {
-    for (const stop of theme.gradient) {
-      assert.ok(
-        contrastWithWhite(stop) >= 4.5,
-        `${name} gradient stop ${stop} is only ${contrastWithWhite(stop).toFixed(2)}:1 against white text`,
-      );
+    for (const [index, stop] of theme.gradient.entries()) {
+      if (index === theme.farStop) continue;
+      for (const role of ['heading', 'muted', 'accent']) {
+        const ratio = contrast(theme[role], stop);
+        assert.ok(ratio >= 4.5, `${name}.${role} (${theme[role]}) is only ${ratio.toFixed(2)}:1 on ${stop}`);
+      }
     }
-    // The accent carries the chip text and the date line over that gradient,
-    // so it has to be clearly lighter than the stop it sits on.
-    assert.ok(
-      luminance(theme.accent) > luminance(theme.gradient[0]),
-      `${name} accent ${theme.accent} is not lighter than its own gradient`,
-    );
   }
+  // The exemption is meant for exactly one card; a second would mean the rule
+  // is being worked around rather than followed.
+  const exempt = Object.values(SEASON_COLOUR_FAMILIES).filter((theme) => theme.farStop !== undefined);
+  assert.equal(exempt.length, 1);
+});
+
+test('the white seasons really are white, and Holy Week really is black', () => {
+  const { SEASON_COLOUR_FAMILIES: f } = loadAppearance();
+  const luminance = (hex) => {
+    const channel = (i) => {
+      const v = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(0) + 0.7152 * channel(1) + 0.0722 * channel(2);
+  };
+
+  // Holy 50 Days: a white card, which means dark text on it.
+  assert.ok(luminance(f.holyFifty.gradient[0]) > 0.85, 'the Holy 50 card must actually be white');
+  assert.ok(luminance(f.holyFifty.heading) < 0.1, 'a white card needs dark text');
+
+  // Holy Week: black.
+  assert.ok(luminance(f.holyWeek.gradient[0]) < 0.03, 'Holy Week must actually be black');
+
+  // Bright Saturday: both, with the black under the text and the white opposite.
+  assert.ok(luminance(f.brightSaturday.gradient[0]) < 0.03, 'Bright Saturday must start black');
+  assert.ok(luminance(f.brightSaturday.gradient[2]) > 0.85, 'Bright Saturday must end white');
+  assert.deepEqual(f.brightSaturday.start, { x: 0, y: 1 });
+  assert.deepEqual(f.brightSaturday.end, { x: 1, y: 0 });
+});
+
+test('Lazarus Saturday is an ordinary day, and Palm Sunday is not Holy Week', () => {
+  const { SEASON_APPEARANCE: a } = loadAppearance();
+  assert.equal(a['lazarus-saturday'], a.annual, 'Lazarus Saturday shows as annual');
+  assert.equal(a['palm-sunday'], a['feast-of-the-cross'], 'Palm Sunday keeps the light green');
+  assert.notEqual(a['palm-sunday'], a['holy-week'], 'Palm Sunday must not be Holy Week black');
+  assert.notEqual(a['bright-saturday'], a['holy-week'], 'Bright Saturday must not be plain black');
+  assert.equal(a['holy-thursday'], a['holy-week']);
+  assert.equal(a['good-friday'], a['holy-week']);
+  assert.equal(a.resurrection, a['holy-50-days']);
 });

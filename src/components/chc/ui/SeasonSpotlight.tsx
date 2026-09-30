@@ -3,9 +3,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { getSeasonAppearance } from '../../../constants/seasonAppearance';
+import { DEFAULT_GRADIENT_END, DEFAULT_GRADIENT_START, getSeasonAppearance } from '../../../constants/seasonAppearance';
 import { HOLY_WEEK_DAYS, HOLY_WEEK_ROWS, type HolyWeekDayDef } from '../../../constants/manifest';
-import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
+import { TYPOGRAPHY } from '../../../constants/theme';
 import { useCalendar } from '../../../context/CalendarContext';
 import { getCopticDate, getSeasonIndicatorLabel, type CopticDate } from '../../../utils/calendarService';
 import { holyWeekRowDate, type HolyWeekSchedule } from '../../../utils/holyWeek';
@@ -58,10 +58,11 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
   const seasonLabel = season?.key === seasonKey ? season.label : null;
   const current = holyWeek ? HOLY_WEEK_DAYS.find((day) => day.id === holyWeek.currentDayId) ?? null : null;
   const pascha = Boolean(holyWeek && current);
-  // The card wears the day's own season. While Holy Week is being prayed the
-  // card is its navigation, so it takes Holy Week's colours whatever the
-  // indicator resolved to for the particular day.
-  const theme = getSeasonAppearance(pascha ? 'holy-week' : season?.key === seasonKey ? season.indicatorKey : null);
+  // Always the day's own season, never Pascha as a blanket. During Holy Week
+  // the card becomes its navigation, but Palm Sunday is still green and named
+  // Palm Sunday, Bright Saturday is still its own black-and-white, and only
+  // Monday Eve through Good Friday are Holy Week's black.
+  const theme = getSeasonAppearance(season?.key === seasonKey ? season.indicatorKey : null);
 
   let chip = seasonLabel ?? '';
   let overline = formatWeekdayDate(effectiveDate, arabic);
@@ -71,7 +72,6 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
   if (pascha && holyWeek && current) {
     const rowIndex = HOLY_WEEK_ROWS.findIndex((row) => row.days.some((day) => day.id === current.id));
     const eve = current.id.endsWith('-eve');
-    chip = tr('PASCHA', 'PÂQUE', 'البصخة المقدسة');
     overline = eve
       ? `${tr('Tonight', 'Ce soir', 'الليلة')} · ${formatWeekdayDate(holyWeekRowDate(holyWeek.palmSunday, rowIndex), arabic)}`
       : `${tr('Today', 'Aujourd’hui', 'اليوم')} · ${formatWeekdayDate(effectiveDate, arabic)}`;
@@ -96,7 +96,12 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
     // calendar button and pills sit beside it rather than inside it, so no
     // button is ever nested in another (invalid on web).
     <View style={[styles.card, { borderColor: `${theme.accent}73` }]}>
-      <LinearGradient colors={theme.gradient} start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={theme.gradient}
+        start={theme.start ?? DEFAULT_GRADIENT_START}
+        end={theme.end ?? DEFAULT_GRADIENT_END}
+        style={StyleSheet.absoluteFill}
+      />
       <View style={[styles.watermark, arabic ? styles.watermarkLeft : styles.watermarkRight]} pointerEvents="none">
         <CopticCross size={230} color={`${theme.accent}24`} />
       </View>
@@ -109,7 +114,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
 
       <View style={[styles.topRow, arabic && styles.rowReverse]} pointerEvents="box-none">
         {chip ? (
-          <View style={[styles.chip, { borderColor: `${theme.accent}59` }]} pointerEvents="none">
+          <View style={[styles.chip, { backgroundColor: theme.scrim, borderColor: `${theme.accent}59` }]} pointerEvents="none">
             <Text style={[styles.chipText, { color: theme.accent }, arabic && styles.arabicChip]} maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={2}>
               {chip}
             </Text>
@@ -120,7 +125,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
           accessibilityLabel={tr('Open the calendar', 'Ouvrir le calendrier', 'افتح التقويم')}
           hitSlop={8}
           onPress={onOpenCalendar}
-          style={[styles.roundButton, { borderColor: `${theme.accent}59` }]}
+          style={[styles.roundButton, { backgroundColor: theme.scrim, borderColor: `${theme.accent}59` }]}
         >
           <Icon name="calendar-outline" size={19} color={theme.accent} />
         </Pressable>
@@ -132,7 +137,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
           {overline}
         </Text>
         <Text
-          style={[styles.heading, arabic && styles.arabicHeading]}
+          style={[styles.heading, { color: theme.heading }, arabic && styles.arabicHeading]}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           numberOfLines={1}
           adjustsFontSizeToFit
@@ -141,7 +146,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
           {heading}
         </Text>
         {footnote ? (
-          <Text style={[styles.footnote, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1}>{footnote}</Text>
+          <Text style={[styles.footnote, { color: theme.muted }, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1}>{footnote}</Text>
         ) : null}
         </View>
 
@@ -152,7 +157,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
                 accessibilityRole="button"
                 hitSlop={6}
                 onPress={onOpenHolyWeek}
-                style={[styles.pill, { borderColor: `${theme.accent}66` }, arabic && styles.rowReverse]}
+                style={[styles.pill, { backgroundColor: theme.scrim, borderColor: `${theme.accent}66` }, arabic && styles.rowReverse]}
               >
                 <Text style={[styles.pillText, { color: theme.accent }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('All of Holy Week', 'Toute la Semaine sainte', 'أسبوع الآلام')}</Text>
                 <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={14} color={theme.accent} />
@@ -163,7 +168,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
                 accessibilityRole="button"
                 hitSlop={6}
                 onPress={goLive}
-                style={[styles.pill, { borderColor: `${theme.accent}66` }, arabic && styles.rowReverse]}
+                style={[styles.pill, { backgroundColor: theme.scrim, borderColor: `${theme.accent}66` }, arabic && styles.rowReverse]}
               >
                 <Icon name="time-outline" size={14} color={theme.accent} />
                 <Text style={[styles.pillText, { color: theme.accent }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Back to today', 'Revenir à aujourd’hui', 'العودة إلى اليوم')}</Text>
@@ -193,7 +198,6 @@ const styles = StyleSheet.create({
   rowReverse: { flexDirection: 'row-reverse' },
   topRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   chip: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 999,
     borderWidth: 1,
     flexShrink: 1,
@@ -205,7 +209,6 @@ const styles = StyleSheet.create({
   arabicChip: { fontFamily: TYPOGRAPHY.arabic, fontSize: 12.5, letterSpacing: 0, lineHeight: 19 },
   roundButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 20,
     borderWidth: 1,
     height: 40,
@@ -214,14 +217,13 @@ const styles = StyleSheet.create({
   },
   body: { marginTop: 22 },
   overline: { fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
-  heading: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 34, fontWeight: '700', marginTop: 4 },
+  heading: { fontFamily: TYPOGRAPHY.title, fontSize: 34, fontWeight: '700', marginTop: 4 },
   arabicHeading: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  footnote: { color: 'rgba(255, 240, 210, 0.8)', fontFamily: TYPOGRAPHY.body, fontSize: 14, marginTop: 4 },
+  footnote: { fontFamily: TYPOGRAPHY.body, fontSize: 14, marginTop: 4 },
   arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
   pill: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: 'row',
