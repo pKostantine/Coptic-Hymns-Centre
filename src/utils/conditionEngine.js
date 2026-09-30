@@ -249,7 +249,7 @@ function withWeekdayFlagsFrom(baseFlags, weekdayFlags) {
 // structural flag is already in extraContext by the time this runs),
 // matching the same service->book_key resolution getGospelRiteSections
 // (readingsService.ts) already uses for the "[AUTHOR]" placeholder itself.
-const gospelAuthorsByDateCache = new Map(); // isoDate -> Promise<Record<service, bookKey>>
+const gospelAuthorsByDateCache = new Map(); // isoDate -> Promise<Record<service, bookKey[]>>
 const gospelBookKeyCache = new Map(); // calendar book number -> Promise<bookKey>
 
 function getGospelBookKey(readingReference) {
@@ -282,7 +282,9 @@ function getGospelAuthorsByService(isoDate) {
       const byService = {};
       gospelRows.forEach((row, index) => {
         const bookKey = resolvedBooks[index];
-        if (bookKey) byService[row.service] = bookKey;
+        if (!bookKey) return;
+        if (!byService[row.service]) byService[row.service] = [];
+        if (!byService[row.service].includes(bookKey)) byService[row.service].push(bookKey);
       });
       return byService;
     })();
@@ -295,8 +297,11 @@ async function computeGospelAuthorFlags(isoDate, extraContext) {
   const activeGospelService = extraContext?.Liturgy ? "Liturgy" : extraContext?.Matins ? "Matins" : extraContext?.Vespers ? "Vespers" : null;
   if (!activeGospelService) return {};
   const authorsByService = await getGospelAuthorsByService(isoDate);
-  const bookKey = authorsByService[activeGospelService];
-  if (!bookKey) return {};
+  const bookKeys = authorsByService[activeGospelService] || [];
+  // A service reading several evangelists (Palm Sunday's Liturgy reads all
+  // four) has no one author; its rows name theirs by ordinal (FirstGospel, …).
+  if (bookKeys.length !== 1) return {};
+  const [bookKey] = bookKeys;
   return { [`Gospel${bookKey.charAt(0).toUpperCase()}${bookKey.slice(1)}`]: true };
 }
 

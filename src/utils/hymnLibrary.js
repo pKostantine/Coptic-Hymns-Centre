@@ -25,6 +25,9 @@ export const SUBDOCUMENT_MAP = {
   // Good Friday. Their readings come from the hour (PASCHA_RITE_READINGS).
   MOURNFUL_GOSPEL_RITE: { schema: "gospel_rite", table: "mournful_gospel_rite" },
   MOURNFUL_4_GOSPELS_RITE: { schema: "gospel_rite", table: "mournful_4_gospels_rite" },
+  // Palm Sunday's Liturgy: two Psalms and four Gospels, each row naming which
+  // (implying_conditions) and its readings picked by ordinal (FIRST_LITURGY_…).
+  PALM_SUNDAY_LITURGY_GOSPEL_RITE: { schema: "gospel_rite", table: "palm_sunday_liturgy_gospel_rite" },
   GOSPEL_RESPONSES: { schema: "gospel_responses", table: "gospel_responses" },
   THE_FIVE_SHORT_LITANIES: { schema: "litanies", table: "the_five_short_litanies" },
   THREE_GREAT_LITANIES: { schema: "litanies", table: "the_three_great_litanies" },
@@ -93,7 +96,7 @@ function humanizeSentinelKey(key) {
 }
 
 /** The whole-table splices that carry the in-document "Coptic Gospel Rite" toggle. */
-const GOSPEL_RITE_KEYS = new Set(["GOSPEL_RITE", "MOURNFUL_GOSPEL_RITE", "MOURNFUL_4_GOSPELS_RITE"]);
+const GOSPEL_RITE_KEYS = new Set(["GOSPEL_RITE", "PALM_SUNDAY_LITURGY_GOSPEL_RITE", "MOURNFUL_GOSPEL_RITE", "MOURNFUL_4_GOSPELS_RITE"]);
 
 /**
  * A Gospel rite (GOSPEL_RITE_KEYS) always gets its "Coptic Gospel Rite" toggle button rendered
@@ -157,6 +160,19 @@ export const READING_SENTINELS = new Set([
   // working while the database finishes converging on the canonical keys.
   "LITURGY_GOSPEL_WITH_COPTIC",
   "LITURGY_GOSPEL_WITHOUT_COPTIC",
+  // Palm Sunday's Liturgy reads two Psalms and four Gospels, in order.
+  "FIRST_LITURGY_PSALM_WITH_COPTIC",
+  "FIRST_LITURGY_PSALM_WITHOUT_COPTIC",
+  "SECOND_LITURGY_PSALM_WITH_COPTIC",
+  "SECOND_LITURGY_PSALM_WITHOUT_COPTIC",
+  "FIRST_LITURGY_GOSPEL_WITH_COPTIC",
+  "FIRST_LITURGY_GOSPEL_WITHOUT_COPTIC",
+  "SECOND_LITURGY_GOSPEL_WITH_COPTIC",
+  "SECOND_LITURGY_GOSPEL_WITHOUT_COPTIC",
+  "THIRD_LITURGY_GOSPEL_WITH_COPTIC",
+  "THIRD_LITURGY_GOSPEL_WITHOUT_COPTIC",
+  "FOURTH_LITURGY_GOSPEL_WITH_COPTIC",
+  "FOURTH_LITURGY_GOSPEL_WITHOUT_COPTIC",
   // The actual scripture-text sentinels nested inside readings.pauline_epistle/
   // catholic_epistle/praxis/coptic_* (see SUBDOCUMENT_MAP) — everything
   // around them (intro/conclusion, title, minimization) now comes from
@@ -200,7 +216,32 @@ const READING_SENTINEL_MAP = {
   VESPERS_PSALM_WITHOUT_COPTIC: { service: "Vespers", readingType: "Psalm", withCoptic: false },
   LITURGY_GOSPEL_WITH_COPTIC: { service: "Liturgy", readingType: "Gospel", withCoptic: true },
   LITURGY_GOSPEL_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Gospel", withCoptic: false },
+  // `index`: which of the service's readings of that type, in reading_code
+  // order (l_psalm_1, l_psalm_2; l_gospel_1 … l_gospel_4).
+  FIRST_LITURGY_PSALM_WITH_COPTIC: { service: "Liturgy", readingType: "Psalm", index: 0, withCoptic: true },
+  FIRST_LITURGY_PSALM_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Psalm", index: 0, withCoptic: false },
+  SECOND_LITURGY_PSALM_WITH_COPTIC: { service: "Liturgy", readingType: "Psalm", index: 1, withCoptic: true },
+  SECOND_LITURGY_PSALM_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Psalm", index: 1, withCoptic: false },
+  FIRST_LITURGY_GOSPEL_WITH_COPTIC: { service: "Liturgy", readingType: "Gospel", index: 0, withCoptic: true },
+  FIRST_LITURGY_GOSPEL_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Gospel", index: 0, withCoptic: false },
+  SECOND_LITURGY_GOSPEL_WITH_COPTIC: { service: "Liturgy", readingType: "Gospel", index: 1, withCoptic: true },
+  SECOND_LITURGY_GOSPEL_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Gospel", index: 1, withCoptic: false },
+  THIRD_LITURGY_GOSPEL_WITH_COPTIC: { service: "Liturgy", readingType: "Gospel", index: 2, withCoptic: true },
+  THIRD_LITURGY_GOSPEL_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Gospel", index: 2, withCoptic: false },
+  FOURTH_LITURGY_GOSPEL_WITH_COPTIC: { service: "Liturgy", readingType: "Gospel", index: 3, withCoptic: true },
+  FOURTH_LITURGY_GOSPEL_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Gospel", index: 3, withCoptic: false },
 };
+
+function readingCodeOrder(row) {
+  return Number(/(\d+)$/.exec(row?.reading_code || "")?.[1] || 0);
+}
+
+/** A sentinel's reading among the day's rows: the index-th (default the first) of its service and type, in reading_code order. */
+function selectSentinelReading(mapping, readings) {
+  return readings
+    .filter((row) => row.service === mapping.service && row.reading_type === mapping.readingType)
+    .sort((left, right) => readingCodeOrder(left) - readingCodeOrder(right))[mapping.index ?? 0] || null;
+}
 
 // The mournful Gospel rites' readings (gospel_rite.mournful_gospel_rite and
 // mournful_4_gospels_rite). Like the sentinels above they come with or
@@ -208,10 +249,16 @@ const READING_SENTINEL_MAP = {
 // own Psalm and Gospel — its only Gospel, or the first to fourth of the four
 // read on Friday Eve and Good Friday — out of holy_week.reading_rules (see
 // resolvePaschaRiteReading).
+//
+// `ownTitle`: the Coptic Psalm and the one Coptic Gospel are titled, with
+// their reading ("Coptic Gospel (Mark 11:12-24)"). Every other one is known by
+// its reference alone, as a normal Liturgy's readings are: its section has no
+// title, and the content selector, pills and modal name it by its citation
+// ("John 13:33-14:25").
 const PASCHA_RITE_READINGS = {
-  PSALM_WITH_COPTIC: { readingType: "Psalm", index: 0, withCoptic: true },
+  PSALM_WITH_COPTIC: { readingType: "Psalm", index: 0, withCoptic: true, ownTitle: true },
   PSALM_WITHOUT_COPTIC: { readingType: "Psalm", index: 0, withCoptic: false },
-  GOSPEL_WITH_COPTIC: { readingType: "Gospel", index: 0, withCoptic: true },
+  GOSPEL_WITH_COPTIC: { readingType: "Gospel", index: 0, withCoptic: true, ownTitle: true },
   GOSPEL_WITHOUT_COPTIC: { readingType: "Gospel", index: 0, withCoptic: false },
   FIRST_GOSPEL_WITH_COPTIC: { readingType: "Gospel", index: 0, withCoptic: true },
   FIRST_GOSPEL_WITHOUT_COPTIC: { readingType: "Gospel", index: 0, withCoptic: false },
@@ -373,6 +420,7 @@ async function buildReadingCitation(readingRow) {
       english: `${bookTitle.english} ${chapters[0]}:${verseList}`.trim(),
       arabic: `${bookTitle.arabic} ${chapters[0]}:${verseList}`.trim(),
       french: `${bookTitle.french || bookTitle.english} ${chapters[0]}:${verseList}`.trim(),
+      reference: `${chapters[0]}:${verseList}`,
     };
   }
 
@@ -387,6 +435,7 @@ async function buildReadingCitation(readingRow) {
       english: `${bookTitle.english} ${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`.trim(),
       arabic: `${bookTitle.arabic} ${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`.trim(),
       french: `${bookTitle.french || bookTitle.english} ${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`.trim(),
+      reference: `${start.chapter_number}:${start.verse_number}-${end.chapter_number}:${end.verse_number}`,
     };
   }
 
@@ -406,6 +455,7 @@ async function buildReadingCitation(readingRow) {
     english: `${bookTitle.english} ${citation}`.trim(),
     arabic: `${bookTitle.arabic} ${citation}`.trim(),
     french: `${bookTitle.french || bookTitle.english} ${citation}`.trim(),
+    reference: citation,
   };
 }
 
@@ -426,7 +476,7 @@ async function resolveReadingSentinelVerses(sentinel, isoDate, flags) {
   const mapping = READING_SENTINEL_MAP[normalizeReadingSentinel(sentinel)];
   if (!mapping) return { verses: [], citation: null };
   const readings = await getReadingsForDate(isoDate);
-  const match = readings.find((r) => r.service === mapping.service && r.reading_type === mapping.readingType);
+  const match = selectSentinelReading(mapping, readings);
   const verses = buildReadingVerses(match, mapping.withCoptic, mapping.readingType === "Psalm");
   const citation = verses.length ? await buildReadingCitation(match) : null;
   return { verses, citation };
@@ -447,6 +497,39 @@ const READING_TYPE_TITLES = {
   Gospel: { english: "Gospel", arabic: "الإنجيل", french: "Évangile" },
   Psalm: { english: "Psalm", arabic: "المزمور", french: "Psaume" },
 };
+
+/**
+ * Whether a reading's title names its reading (titleWithCitation): Palm
+ * Sunday's FIRST_/SECOND_/… Liturgy readings, one of several of a kind that
+ * day, and Holy Week's titled Coptic Psalm and Gospel (PASCHA_RITE_READINGS).
+ */
+function citesReadingInTitle(sentinel) {
+  const key = normalizeReadingSentinel(sentinel);
+  return READING_SENTINEL_MAP[key]?.index !== undefined || Boolean(PASCHA_RITE_READINGS[key]?.ownTitle);
+}
+
+/** A Holy Week reading known by its reference alone (see PASCHA_RITE_READINGS). */
+function isKnownByReference(sentinel) {
+  const mapping = PASCHA_RITE_READINGS[normalizeReadingSentinel(sentinel)];
+  return Boolean(mapping && !mapping.ownTitle);
+}
+
+/**
+ * "Coptic Psalm (80:3,1-2)", "Coptic Gospel (Matthew 21:1-17)": a title
+ * naming its reading (citesReadingInTitle) — on Palm Sunday so its several
+ * Psalms and Gospels can be told apart. A Psalm gives just its verses — its
+ * title already says Psalm.
+ */
+function titleWithCitation(title, citation, isPsalm) {
+  const reading = (language) => (isPsalm ? citation.reference : citation[language] || citation.english);
+  const append = (text, language) => (text ? `${text} (${reading(language)})` : text);
+  return {
+    ...title,
+    english: append(title.english, "english"),
+    arabic: formatArabicDigits(append(title.arabic, "arabic") || ""),
+    french: append(title.french, "french"),
+  };
+}
 
 /**
  * Resolves a reading sentinel into either a standalone titled section (when
@@ -472,9 +555,14 @@ async function resolveReadingSentinelSplice(sentinel, isoDate, titleShown, minim
     const key = normalizeReadingSentinel(sentinel);
     const mapping = READING_SENTINEL_MAP[key] || PASCHA_RITE_READINGS[key];
     const readingType = mapping?.readingType;
-    const title = mapping?.withCoptic === false
+    const typeTitle = mapping?.withCoptic === false
       ? READING_TYPE_TITLES[readingType] || { english: readingType || "", arabic: "" }
       : COPTIC_READING_TYPE_TITLES[readingType] || { english: `Coptic ${readingType || ""}`.trim(), arabic: "" };
+    const title = isKnownByReference(key)
+      ? { english: "", arabic: "" }
+      : citation && citesReadingInTitle(key)
+        ? titleWithCitation(typeTitle, citation, readingType === "Psalm")
+        : typeTitle;
     return {
       kind: "section",
       section: {
@@ -490,7 +578,7 @@ async function resolveReadingSentinelSplice(sentinel, isoDate, titleShown, minim
     };
   }
 
-  return { kind: "flat", verses: [...citationVerse, ...verses] };
+  return { kind: "flat", verses: [...citationVerse, ...verses], citation };
 }
 
 function getSynaxariumForDate(isoDate) {
@@ -1051,7 +1139,10 @@ function mergeNestedSectionsAsOneHymn(callingSection, nestedSections) {
 
 // ─── Raw row fetch (ported from stuff for claude/slideshowData.js) ──────────
 
-const ORDER_FIELDS = "item_order, hymn_key, condition, minimization, item_type";
+// Every column rather than a list: implying_conditions exists only on the
+// order tables that use it (gospel_rite.palm_sunday_liturgy_gospel_rite), and
+// naming it would fail on every other table.
+const ORDER_FIELDS = "*";
 const SERVICE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, title_french, category, toggled, prayer_type";
 // Note: line_id is deliberately NOT selected here — doxologies.hymn_texts is
 // missing that column (every other schema's hymn_texts has it), and line_id
@@ -1076,7 +1167,10 @@ const SCHEMAS_WITHOUT_HYMN_TITLES = new Set([
 // Hymn-key resolution always starts in the calling schema, then walks the
 // shared/common pools in this exact order. If the calling schema is one of
 // these, it stays first and is skipped later in the fallback list.
-const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "psalmody", "agpeya", "veneration", "doxologies"];
+// litanies: the Liturgies, Raising of Incense, the Gospel rites and Holy Week
+// name its litanies (litanyOfTheGospel, litanyOfTheSeasonOfAir, ...) directly,
+// and since they moved out of public it is the only place they are.
+const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "psalmody", "agpeya", "veneration", "doxologies", "litanies"];
 
 // A document read from an installed offline book resolves its hymn keys only
 // from resources installed on the device. Its book's dependency graph
@@ -1223,6 +1317,7 @@ function createFlatServiceRow(orderRow, title, line) {
     item_order: normalizeNumeric(orderRow.item_order),
     hymn_key: normalizeText(orderRow.hymn_key),
     placement_condition: normalizeText(orderRow.condition),
+    implying_conditions: normalizeText(orderRow.implying_conditions),
     placement_item_type: normalizeText(orderRow.item_type),
     minimization: normalizeText(orderRow.minimization),
     title_english: normalizeText(title.title_english),
@@ -1269,6 +1364,7 @@ export function assembleServiceSections(rawRows) {
         id: `${row.hymn_key}-${row.item_order}`,
         hymn_key: row.hymn_key,
         condition: normalizeText(row.placement_condition),
+        implyingConditions: normalizeText(row.implying_conditions) || null,
         minimization: minimization || null,
         collapsible: minimization === "Minimizable" || minimization === "Minimized",
         defaultCollapsed: minimization === "Minimized",
@@ -1813,6 +1909,20 @@ function dropDuplicateSaintHymns(sections) {
   });
 }
 
+/**
+ * An order row's implying_conditions: flags the row switches on (or, as
+ * "!Flag", off) for its own hymn and everything that hymn splices in.
+ * gospel_rite.palm_sunday_liturgy_gospel_rite reads the same hymns for two
+ * Psalms and four Gospels, and each row names which one it is (FirstPsalm,
+ * FourthGospel, ...).
+ */
+function withImpliedConditions(flags, implyingConditions) {
+  const tokens = String(implyingConditions || "").split(/[\s,;&|()]+/).filter(Boolean);
+  if (!tokens.length) return flags;
+  const implied = Object.fromEntries(tokens.map((token) => (token.startsWith("!") ? [token.slice(1), false] : [token, true])));
+  return { ...flags, ...implied };
+}
+
 async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, sectionFlagsForRow = null, preloadedRows = null) {
   // preloadedRows: the same table's rows already fetched by a caller that
   // hydrates it many times over (each prophecy in its frame).
@@ -1822,7 +1932,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
   const visibleSections = dropDuplicateSaintHymns(
     sections
       .map((section) => {
-        const flags = sectionFlagsForRow ? sectionFlagsForRow(section) : documentFlags;
+        const flags = withImpliedConditions(sectionFlagsForRow ? sectionFlagsForRow(section) : documentFlags, section.implyingConditions);
         const visibility = evaluateBishopAwareVisibility(section.condition, flags);
         return visibility.visible
           ? { ...section, bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }
@@ -1835,7 +1945,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
   for (const section of visibleSections) {
     // Scoped service flags also flow into the hymn's own verses and nested
     // inline reading resolutions, not only its order-table condition.
-    const flags = sectionFlagsForRow ? sectionFlagsForRow(section) : documentFlags;
+    const flags = withImpliedConditions(sectionFlagsForRow ? sectionFlagsForRow(section) : documentFlags, section.implyingConditions);
     // A Hyperlink placeholder leaves this document altogether for another
     // service, so — unlike a Subdocument, whose content is prefetched here and
     // stashed for its modal — there is nothing to hydrate: the destination
@@ -2064,6 +2174,10 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
     let verses = [];
     let splitIndex = 0;
     let pushedAnything = false;
+    // The hymn's title, or — when it houses one of Palm Sunday's ordinal
+    // readings ("Coptic Psalm" around FIRST_LITURGY_PSALM_WITH_COPTIC) — that
+    // title naming its reading (titleWithCitation).
+    let firstChunkTitle = section.title;
 
     const flushVerses = () => {
       if (!verses.length && pushedAnything) {
@@ -2075,7 +2189,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       // resumes after a shown-title inline splice interrupted the flow is a
       // continuation of the same hymn, not a new one, so it must not repeat
       // the title again.
-      const title = splitIndex === 0 ? section.title : { english: "", arabic: "" };
+      const title = splitIndex === 0 ? firstChunkTitle : { english: "", arabic: "" };
       hydrated.push(applyCopticCaseToSection({ ...section, id, title, hymnKey: section.hymn_key, verses }));
       splitIndex += 1;
       pushedAnything = true;
@@ -2098,14 +2212,14 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         // top-level Minimizable/Minimized unit here (its own order-table row
         // carries that), so a second, nested collapse just for this splice
         // would wrongly split it off as if it were its own separate hymn.
-        // The exception is a mournful rite's reading marked to show its
-        // title inside a hymn with none (mournfulPsalmAndGospel,
-        // mournful4CopticGospels): with nothing around it to navigate by,
-        // each Psalm and Gospel there becomes its own section.
+        // The exception is a reading marked to show its title inside a hymn
+        // with none (palmSunday2ndAnd3rdGospels, mournfulPsalmAndGospel,
+        // mournful4CopticGospels): with no hymn title around it to collapse
+        // or navigate by, it becomes its own section, with its own
+        // inline_hymn_minimization — as copticGospel's readings already do.
         if (isReadingSentinel(verse.inlineHymnKey) && isoDate) {
           const ownSection =
             Boolean(verse.inlineHymnTitleShown) &&
-            isPaschaRiteReading(verse.inlineHymnKey) &&
             !(section.title?.english || section.title?.arabic);
           const spliced = await resolveReadingSentinelSplice(
             verse.inlineHymnKey,
@@ -2121,6 +2235,11 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
             pushedAnything = true;
           } else if (spliced) {
             verses.push(...spliced.verses);
+            if (splitIndex === 0 && spliced.citation && citesReadingInTitle(verse.inlineHymnKey)) {
+              const key = normalizeReadingSentinel(verse.inlineHymnKey);
+              const isPsalm = (READING_SENTINEL_MAP[key] || PASCHA_RITE_READINGS[key]).readingType === "Psalm";
+              firstChunkTitle = titleWithCitation(section.title, spliced.citation, isPsalm);
+            }
           }
           continue;
         }

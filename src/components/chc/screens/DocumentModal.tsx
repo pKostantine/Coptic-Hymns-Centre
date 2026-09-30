@@ -52,8 +52,9 @@ const ANTIPHONARY_GROUPS: { key: 'introduction' | 'adam' | 'vatos'; label: strin
 // SUBDOCUMENT_MAP in hymnLibrary.js) each include one untitled reading
 // section whose citation (e.g. "Romans 1:1-7") lives as a readingReference
 // verse inside it, not as a section title. This lets the pill row use that
-// citation as the visible label.
-const COPTIC_READINGS_SUBDOCUMENT_KEYS = new Set(['COPTIC_PAULINE_EPISTLE', 'COPTIC_CATHOLIC_EPISTLE', 'COPTIC_PRAXIS']);
+// citation as the visible label. Holy Week's four Coptic Gospels
+// (mournful4CopticGospels) are four such sections, "John 13:33-14:25" and on.
+const COPTIC_READINGS_SUBDOCUMENT_KEYS = new Set(['COPTIC_PAULINE_EPISTLE', 'COPTIC_CATHOLIC_EPISTLE', 'COPTIC_PRAXIS', 'mournful4CopticGospels']);
 
 /** A section's own title (with its citation, for a reading titled like one), or — for the untitled reading section in a Coptic readings subdocument — its reading-reference citation verse, so the pill row can represent it without ever giving that section a real title (which would render as its own yellow header in the document body). */
 function getPillLabel(section: DocumentSection, includeReadingReference: boolean): string | null {

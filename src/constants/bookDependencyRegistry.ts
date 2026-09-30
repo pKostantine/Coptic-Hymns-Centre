@@ -37,9 +37,10 @@ export const CONTENT_RESOURCE_DEPENDENCIES: Readonly<Record<string, readonly str
   ],
   // Holy Week's hymns live in holy_week and public; each hour's prophecies,
   // epistles and gospels are read from bible via holy_week.reading_rules,
-  // each prophecy is framed by readings.prophecy/coptic_prophecy, and the
-  // Psalm and Gospel by gospel_rite's mournful rites.
-  holy_week: ['public', 'bible', 'calendar', 'readings', 'gospel_rite'],
+  // each prophecy is framed by readings.prophecy/coptic_prophecy, the Psalm
+  // and Gospel by gospel_rite's mournful rites, and the Holy Thursday hours
+  // pray litanies by name.
+  holy_week: ['public', 'bible', 'calendar', 'readings', 'gospel_rite', 'litanies'],
 });
 
 export const DOWNLOADABLE_BOOKS: Readonly<Record<DownloadableBookKey, {

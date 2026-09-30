@@ -134,7 +134,7 @@ const SEASON_INDICATOR_PRIORITIES: Record<string, number> = {
   'nativity-period': 40,
   'theophany-period': 40,
   'holy-50-days': 60,
-  'holy-week': 60,
+  'holy-week': 50,
   'nayrouz-period': 40,
   'st-mary-fast': 30,
   'apostles-fast': 30,
@@ -155,8 +155,8 @@ const EVENT_INDICATOR_PRIORITIES: Record<string, number> = {
   'bright-saturday': 80,
   ascension: 70,
   pentecost: 70,
-  annunciation: 50,
-  'palm-sunday': 50,
+  annunciation: 70,
+  'palm-sunday': 80,
   'feast-of-the-cross': 50,
   nayrouz: 50,
   'joyful-29': 50,
@@ -176,8 +176,19 @@ const EVENT_INDICATOR_PRIORITIES: Record<string, number> = {
   'lent-sunday-4': 30,
   'lent-sunday-5': 30,
   'lent-sunday-6': 30,
-  'lazarus-saturday': 30,
+  'lazarus-saturday': 60,
 };
+
+// Precedence no number can hold, because it goes round in a circle: the
+// Annunciation outranks Lazarus Saturday, Lazarus Saturday outranks Holy Week,
+// and Holy Week outranks the Annunciation. The numbers above give the first
+// two (70 > 60 > 50); each entry here adds one more. `key` gives way to `to`
+// when both fall on the day — unless `unless` does too: it outranks `to`, so
+// `to` has no claim left. Holy Week's range opens on Lazarus Saturday, which
+// is how the Annunciation on that day still shows.
+const INDICATOR_YIELDS: { key: string; to: string; unless?: string }[] = [
+  { key: 'annunciation', to: 'holy-week', unless: 'lazarus-saturday' },
+];
 
 type SeasonIndicatorItem = { key: string; date?: string };
 
@@ -190,7 +201,15 @@ export function getSeasonIndicatorName(
     ...activeEvents.map((event) => ({ key: event.key, priority: EVENT_INDICATOR_PRIORITIES[event.key] ?? 0 })),
   ].filter((candidate) => candidate.priority > 0);
 
-  const selected = candidates.sort((a, b) => b.priority - a.priority)[0];
+  const active = new Set(candidates.map((candidate) => candidate.key));
+  const yielding = new Set(
+    INDICATOR_YIELDS
+      .filter(({ key, to, unless }) => active.has(key) && active.has(to) && !(unless && active.has(unless)))
+      .map(({ key }) => key),
+  );
+  const selected = candidates
+    .filter((candidate) => !yielding.has(candidate.key))
+    .sort((a, b) => b.priority - a.priority)[0];
   if (!selected) return appText(SEASON_SHORT_NAMES.annual);
 
   const name = EVENT_SHORT_NAMES[selected.key] || SEASON_SHORT_NAMES[selected.key] || SEASON_SHORT_NAMES.annual;

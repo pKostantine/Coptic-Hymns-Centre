@@ -155,6 +155,20 @@ test('the mournful rites read the hour\'s Psalm and its Gospels in order', () =>
   for (const [sentinel, mapping] of Object.entries(readings)) {
     assert.equal(mapping.withCoptic, sentinel.endsWith('_WITH_COPTIC'), sentinel);
   }
+  // Only the Coptic Psalm and the one Coptic Gospel carry a title; the rest
+  // (the English/Arabic readings, the four Coptic Gospels) go by their reference.
+  assert.deepEqual(Object.keys(readings).filter((sentinel) => readings[sentinel].ownTitle), ['PSALM_WITH_COPTIC', 'GOSPEL_WITH_COPTIC']);
+});
+
+test('a Holy Week reading known by its reference has no title; a titled one names its reading', () => {
+  const branch = hymnLibrarySource.slice(
+    hymnLibrarySource.indexOf('async function resolveReadingSentinelSplice('),
+    hymnLibrarySource.indexOf('return { kind: "flat"'),
+  );
+  assert.match(branch, /isKnownByReference\(key\)\s+\? \{ english: "", arabic: "" \}\s+: citation && citesReadingInTitle\(key\)/);
+  // The four Coptic Gospels' subdocument pills are their references.
+  const modalSource = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  assert.match(modalSource, /const COPTIC_READINGS_SUBDOCUMENT_KEYS = new Set\(\[[^\]]*'mournful4CopticGospels'\]\)/);
 });
 
 test('an hour\'s evangelist comes from its own Gospels, every other one switched off', () => {
@@ -168,9 +182,9 @@ test('an hour\'s evangelist comes from its own Gospels, every other one switched
 test('Holy Week hours splice the mournful rites like GOSPEL_RITE, toggle and all', () => {
   assert.match(hymnLibrarySource, /MOURNFUL_GOSPEL_RITE: \{ schema: "gospel_rite", table: "mournful_gospel_rite" \}/);
   assert.match(hymnLibrarySource, /MOURNFUL_4_GOSPELS_RITE: \{ schema: "gospel_rite", table: "mournful_4_gospels_rite" \}/);
-  assert.match(hymnLibrarySource, /const GOSPEL_RITE_KEYS = new Set\(\["GOSPEL_RITE", "MOURNFUL_GOSPEL_RITE", "MOURNFUL_4_GOSPELS_RITE"\]\)/);
+  assert.match(hymnLibrarySource, /const GOSPEL_RITE_KEYS = new Set\(\[[^\]]*"MOURNFUL_GOSPEL_RITE", "MOURNFUL_4_GOSPELS_RITE"\]\)/);
   assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) return null;/);
-  assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) \{\n\s+return safeHydrateNested/);
+  assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) \{\r?\n\s+return safeHydrateNested/);
 
   // The rites' reading rows resolve as reading sentinels.
   const start = hymnLibrarySource.indexOf('export const READING_SENTINELS');
