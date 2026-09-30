@@ -1,158 +1,237 @@
 /**
- * The colour the Season Spotlight wears for the day it is showing, keyed by
- * the winning indicator key (see getSeasonIndicatorKey in seasonNames.ts).
+ * The colours of the Books day block, and of the calendar sheet's header, for
+ * the liturgical day it shows — "CHC — Season colour spec for the Books day
+ * block" (Claude Design, "CHC Home Books Calendar", section 5).
  *
- * A season is not just an accent here: the Holy 50 Days is a white card with
- * dark text on it, so every text colour on the card comes from the theme
- * rather than being fixed. `gradient[0]` is the corner the text column sits
- * in, which is why `heading`, `muted` and `accent` are checked against the
- * first two stops only — the third is the far corner, and Bright Saturday
- * deliberately puts white there, opposite its black.
+ * The theme follows the day's winning indicator key (getSeasonIndicatorKey in
+ * seasonNames.ts), which already settles which season or feast a day is named
+ * after; getDayThemeKey adds the one thing the name does not say — a minor
+ * feast inside a fast keeps the fast's colour. The spec's OKLCH stops are
+ * written here as the sRGB hex React Native can draw, the source beside each.
  */
-export interface SeasonTheme {
-  gradient: [string, string, string];
-  /** Where the gradient runs from and to. Defaults to the top-left → bottom-right sweep every other card uses. */
-  start?: { x: number; y: number };
-  end?: { x: number; y: number };
-  /** Chip text, card border, calendar button, and the date line above the heading. */
-  accent: string;
-  /** The Coptic date, the card's largest text. */
-  heading: string;
-  /** The year-of-the-martyrs line beneath it. */
+
+export type SeasonThemeKey =
+  | 'annual'
+  | 'gold'
+  | 'natfast'
+  | 'nativity'
+  | 'theophany'
+  | 'lent'
+  | 'palm'
+  | 'holyweek'
+  | 'resurrection'
+  | 'apostles'
+  | 'marian';
+
+export interface DayBlockTheme {
+  key: SeasonThemeKey;
+  /** The block's 160° gradient: `from` at 0, `to` at `toAt`. */
+  from: string;
+  to: string;
+  toAt: number;
+  border: string;
+  /** The Coptic date, weekday numbers and the next season's name. */
+  text: string;
+  /** The Gregorian date, weekday letters and the "Next season" label. */
   muted: string;
-  /** Behind the chip, the calendar button and the pills, so they read on a white card as well as a black one. */
-  scrim: string;
-  /**
-   * The index of a gradient stop the text column never reaches, exempt from
-   * the contrast floor. Only Bright Saturday has one: its sweep runs away from
-   * the text, so the white lands in the opposite corner behind the watermark.
-   */
-  farStop?: number;
+  /** The week strip's Coptic day numbers and the "· N days" count. */
+  strong: string;
+  /** The sun button and the season chip's chevron. */
+  accent: string;
+  /** The sun button's ring. */
+  accentBorder: string;
+  /** The selected day's pill in the week strip, and the text on it. */
+  selected: string;
+  selectedText: string;
+  /** Behind the season chip. */
+  chip: string;
+  /** The Live dot sits on red and gold as well as navy, so off navy it wears a white ring. */
+  liveRing: 'halo' | 'white';
 }
 
-/** Text for a card dark enough to carry white type. */
-const ON_DARK = { heading: '#FFFFFF', muted: '#F8F5ED', scrim: 'rgba(0, 0, 0, 0.3)' };
-/** Text for a light card — the Holy 50 Days, and Bright Saturday's white corner. */
-const ON_LIGHT = { heading: '#101820', muted: '#3B4652', scrim: 'rgba(255, 255, 255, 0.55)' };
+const GOLD = '#C9A227';
+const NAVY_DARK = '#001D3D';
 
-const FAMILIES = {
-  /** Light red. */
-  nayrouz: { gradient: ['#9E4047', '#4E1A1F', '#180708'], accent: '#FFD6D9', ...ON_DARK },
-  /** Bright red. */
-  nativityFast: { gradient: ['#B02020', '#5A0D0D', '#190303'], accent: '#FFC4BE', ...ON_DARK },
-  /** Dark red. */
-  nativity: { gradient: ['#5C0F16', '#300409', '#110102'], accent: '#E7A3AA', ...ON_DARK },
-  /** Sky blue. */
-  theophany: { gradient: ['#1D6FA6', '#0C3552', '#04141F'], accent: '#D5EEFF', ...ON_DARK },
-  /** Dark green. */
-  lent: { gradient: ['#14452B', '#092516', '#030E08'], accent: '#8ED3A4', ...ON_DARK },
-  /** Light green — Palm Sunday and both feasts of the Cross. */
-  hosanna: { gradient: ['#3C7A33', '#1C3F18', '#081405'], accent: '#DEF5D3', ...ON_DARK },
-  /** Black — Monday Eve, prayed on Palm Sunday night, through Good Friday. */
-  holyWeek: { gradient: ['#1A1A1A', '#0B0B0B', '#000000'], accent: '#CFC8B8', ...ON_DARK },
-  /**
-   * Black and white together: the mourning of the week just ended and the
-   * light of the night to come. The sweep runs bottom-left to top-right so the
-   * black sits under the text column and the white breaks in at the far
-   * corner, rather than washing out the heading.
-   */
-  brightSaturday: {
-    gradient: ['#050505', '#1E1E1E', '#F4F4F4'],
-    start: { x: 0, y: 1 },
-    end: { x: 1, y: 0 },
-    accent: '#F2F2F2',
-    farStop: 2,
-    ...ON_DARK,
-  },
-  /** White. An actually white card, so its text goes dark. */
-  holyFifty: { gradient: ['#FFFFFF', '#F3F6FA', '#DCE4EE'], accent: '#2A3542', ...ON_LIGHT },
-  /** Royal blue. */
-  stMary: { gradient: ['#1F3391', '#101A47', '#05081A'], accent: '#A9BEFF', ...ON_DARK },
-  /** Violet — nothing else in the year claims it, so the Apostles get it. */
-  apostles: { gradient: ['#4A2470', '#26103C', '#0D0516'], accent: '#D6AEF5', ...ON_DARK },
-  /** Gold — every feast without a season of its own. */
-  feast: { gradient: ['#8E6B1A', '#4A330A', '#120C03'], accent: '#FFF5D6', ...ON_DARK },
-  /** Dark blue — an ordinary day, and the fallback for an unmapped key. */
-  annual: { gradient: ['#0E2A4A', '#071728', '#02080F'], accent: '#93B9E0', ...ON_DARK },
-} satisfies Record<string, SeasonTheme>;
-
-const SEASON_APPEARANCE: Record<string, SeasonTheme> = {
-  'nayrouz-period': FAMILIES.nayrouz,
-  nayrouz: FAMILIES.nayrouz,
-
-  'nativity-fast': FAMILIES.nativityFast,
-
-  'nativity-paramoun': FAMILIES.nativity,
-  nativity: FAMILIES.nativity,
-  'nativity-period': FAMILIES.nativity,
-  annunciation: FAMILIES.nativity,
-
-  'theophany-paramoun': FAMILIES.theophany,
-  theophany: FAMILIES.theophany,
-  'second-day-of-theophany': FAMILIES.theophany,
-  'theophany-period': FAMILIES.theophany,
-
-  lent: FAMILIES.lent,
-  'first-monday-of-lent': FAMILIES.lent,
-  'lent-sunday-1': FAMILIES.lent,
-  'lent-sunday-2': FAMILIES.lent,
-  'lent-sunday-3': FAMILIES.lent,
-  'lent-sunday-4': FAMILIES.lent,
-  'lent-sunday-5': FAMILIES.lent,
-  'lent-sunday-6': FAMILIES.lent,
-  'last-friday-of-lent': FAMILIES.lent,
-  'jonahs-fast': FAMILIES.lent,
-  'jonahs-feast': FAMILIES.lent,
-
-  // Lazarus Saturday is an ordinary day that happens to carry a feast's name:
-  // Lent has ended and Pascha has not begun (currentHolyWeekDayId returns null
-  // for it, a day before Palm Sunday), so it keeps the annual colours.
-  'lazarus-saturday': FAMILIES.annual,
-
-  'palm-sunday': FAMILIES.hosanna,
-  'feast-of-the-cross': FAMILIES.hosanna,
-  'feast-of-the-cross-paremhotep': FAMILIES.hosanna,
-
-  'holy-week': FAMILIES.holyWeek,
-  'holy-thursday': FAMILIES.holyWeek,
-  'good-friday': FAMILIES.holyWeek,
-
-  'bright-saturday': FAMILIES.brightSaturday,
-
-  // The Resurrection and the fifty days it opens share one white.
-  'holy-50-days': FAMILIES.holyFifty,
-  resurrection: FAMILIES.holyFifty,
-  'thomas-sunday': FAMILIES.holyFifty,
-  ascension: FAMILIES.holyFifty,
-  pentecost: FAMILIES.holyFifty,
-
-  'st-mary-fast': FAMILIES.stMary,
-  'st-marys-feast': FAMILIES.stMary,
-
-  'apostles-fast': FAMILIES.apostles,
-  'apostles-feast': FAMILIES.apostles,
-
-  'joyful-29': FAMILIES.feast,
-  circumcision: FAMILIES.feast,
-  'wedding-at-cana': FAMILIES.feast,
-  'entry-into-temple': FAMILIES.feast,
-  transfiguration: FAMILIES.feast,
-  'entry-into-egypt': FAMILIES.feast,
-  'kiahk-sunday-1': FAMILIES.feast,
-  'kiahk-sunday-2': FAMILIES.feast,
-  'kiahk-sunday-3': FAMILIES.feast,
-  'kiahk-sunday-4': FAMILIES.feast,
-
-  annual: FAMILIES.annual,
+/** What every theme but Annual shares (spec §1, "Shared rules"). */
+const ON_COLOUR = {
+  toAt: 0.75,
+  border: 'rgba(255, 255, 255, 0.16)',
+  text: '#FFFFFF',
+  muted: 'rgba(255, 255, 255, 0.72)',
+  strong: 'rgba(255, 255, 255, 0.85)',
+  accent: GOLD,
+  accentBorder: GOLD,
+  selected: GOLD,
+  selectedText: NAVY_DARK,
+  chip: 'rgba(255, 255, 255, 0.08)',
+  liveRing: 'white' as const,
 };
 
-/** Where the gradient runs when a season does not say otherwise. */
-export const DEFAULT_GRADIENT_START = { x: 0, y: 0 };
-export const DEFAULT_GRADIENT_END = { x: 0.7, y: 1 };
+export const DAY_BLOCK_THEMES: Record<SeasonThemeKey, DayBlockTheme> = {
+  /** Navy — the design's own block. */
+  annual: {
+    ...ON_COLOUR,
+    key: 'annual',
+    from: '#0C3158',
+    to: NAVY_DARK,
+    border: 'rgba(201, 162, 39, 0.30)',
+    muted: '#C9D3DC',
+    strong: '#D8C77A',
+    liveRing: 'halo',
+  },
+  /** Gold, for feasts: oklch(0.64 0.11 85) → oklch(0.34 0.07 72). The gold accents turn white so they don't sink into it. */
+  gold: {
+    ...ON_COLOUR,
+    key: 'gold',
+    from: '#AB8632',
+    to: '#4E3104',
+    accent: '#FFFFFF',
+    accentBorder: '#FFFFFF',
+    selected: '#FFFFFF',
+  },
+  /** Deep rose: oklch(0.48 0.16 352) → oklch(0.22 0.09 345). */
+  natfast: { ...ON_COLOUR, key: 'natfast', from: '#9C2A67', to: '#340124', toAt: 0.78 },
+  /** Scarlet: oklch(0.50 0.19 26) → oklch(0.22 0.10 22). */
+  nativity: { ...ON_COLOUR, key: 'nativity', from: '#B71920', to: '#3D0003', toAt: 0.8 },
+  /** Sky blue: oklch(0.62 0.11 232) → oklch(0.35 0.09 240). */
+  theophany: { ...ON_COLOUR, key: 'theophany', from: '#2F91BD', to: '#003F64' },
+  /** Dark green: oklch(0.36 0.07 155) → oklch(0.17 0.04 155). */
+  lent: { ...ON_COLOUR, key: 'lent', from: '#19482C', to: '#011408' },
+  /** Light green: oklch(0.68 0.15 130) → oklch(0.46 0.12 140). */
+  palm: { ...ON_COLOUR, key: 'palm', from: '#79AA3B', to: '#2E6720' },
+  /** Black. */
+  holyweek: { ...ON_COLOUR, key: 'holyweek', from: '#141414', to: '#000000', border: 'rgba(201, 162, 39, 0.35)' },
+  /** White, with dark text and a darker gold. */
+  resurrection: {
+    ...ON_COLOUR,
+    key: 'resurrection',
+    from: '#FFFDF7',
+    to: '#E8E2D2',
+    border: 'rgba(201, 162, 39, 0.55)',
+    text: '#10223A',
+    muted: '#5B6573',
+    strong: '#9A7A14',
+    accent: '#9A7A14',
+    accentBorder: '#B8921F',
+    chip: 'rgba(16, 34, 58, 0.07)',
+  },
+  /** Purple: oklch(0.42 0.12 300) → oklch(0.20 0.07 300). The spec's placeholder pick. */
+  apostles: { ...ON_COLOUR, key: 'apostles', from: '#583A84', to: '#1B0C30' },
+  /** Royal blue: oklch(0.46 0.17 262) → oklch(0.24 0.11 262). */
+  marian: { ...ON_COLOUR, key: 'marian', from: '#1C50B5', to: '#001852' },
+};
 
-/** The day's colours. An unmapped or absent key is an ordinary day. */
-export function getSeasonAppearance(key: string | null | undefined): SeasonTheme {
-  return (key ? SEASON_APPEARANCE[key] : undefined) ?? FAMILIES.annual;
+/** Every indicator key the day can be named after, and the colour it wears (spec §2). */
+const THEME_BY_INDICATOR_KEY: Record<string, SeasonThemeKey> = {
+  annual: 'annual',
+  // Lazarus Saturday is its own day but keeps the plain annual colour (§2 A3).
+  'lazarus-saturday': 'annual',
+
+  nayrouz: 'gold',
+  'nayrouz-period': 'gold',
+
+  'feast-of-the-cross': 'palm',
+  'feast-of-the-cross-paremhotep': 'palm',
+  'palm-sunday': 'palm',
+
+  'nativity-fast': 'natfast',
+  'kiahk-sunday-1': 'natfast',
+  'kiahk-sunday-2': 'natfast',
+  'kiahk-sunday-3': 'natfast',
+  'kiahk-sunday-4': 'natfast',
+
+  nativity: 'nativity',
+  'nativity-period': 'nativity',
+
+  theophany: 'theophany',
+  'second-day-of-theophany': 'theophany',
+  'theophany-period': 'theophany',
+
+  // Every Paramoun wears the Lent green (§2 C12, C14).
+  'nativity-paramoun': 'lent',
+  'theophany-paramoun': 'lent',
+  lent: 'lent',
+  'first-monday-of-lent': 'lent',
+  'lent-sunday-1': 'lent',
+  'lent-sunday-2': 'lent',
+  'lent-sunday-3': 'lent',
+  'lent-sunday-4': 'lent',
+  'lent-sunday-5': 'lent',
+  'lent-sunday-6': 'lent',
+  'last-friday-of-lent': 'lent',
+  'jonahs-fast': 'lent',
+  'jonahs-feast': 'lent',
+
+  // Holy Saturday is Bright Saturday here (سبت النور), still Holy Week's black.
+  'holy-week': 'holyweek',
+  'holy-thursday': 'holyweek',
+  'good-friday': 'holyweek',
+  'bright-saturday': 'holyweek',
+
+  resurrection: 'resurrection',
+  'holy-50-days': 'resurrection',
+  'thomas-sunday': 'resurrection',
+  ascension: 'resurrection',
+  pentecost: 'resurrection',
+
+  'apostles-fast': 'apostles',
+  'apostles-feast': 'apostles',
+
+  'st-mary-fast': 'marian',
+  'st-marys-feast': 'marian',
+  annunciation: 'marian',
+
+  circumcision: 'gold',
+  'wedding-at-cana': 'gold',
+  'entry-into-temple': 'gold',
+  transfiguration: 'gold',
+  'entry-into-egypt': 'gold',
+  'joyful-29': 'gold',
+};
+
+/** The fasts, and the colour a lesser feast inside one keeps. */
+const FAST_THEMES: Record<string, SeasonThemeKey> = {
+  lent: 'lent',
+  'jonahs-fast': 'lent',
+  'nativity-fast': 'natfast',
+  'apostles-fast': 'apostles',
+  'st-mary-fast': 'marian',
+};
+
+/**
+ * Feasts that name the day but, inside a fast, leave it the fast's colour
+ * (§2 C10, C19–D21): the Joyful 29th, the lesser feasts of the Lord, and the
+ * second Feast of the Cross in Lent.
+ */
+const KEEPS_FAST_COLOUR = new Set([
+  'joyful-29',
+  'circumcision',
+  'wedding-at-cana',
+  'entry-into-temple',
+  'transfiguration',
+  'entry-into-egypt',
+  'feast-of-the-cross-paremhotep',
+]);
+
+/**
+ * The day's colour. `indicatorKey` is what the day is named after; `activeKeys`
+ * is every season and feast running that day, so a lesser feast can find the
+ * fast around it. An unmapped or absent key is an ordinary day.
+ */
+export function getDayThemeKey(indicatorKey: string | null | undefined, activeKeys: readonly string[] = []): SeasonThemeKey {
+  if (indicatorKey && KEEPS_FAST_COLOUR.has(indicatorKey)) {
+    const fast = activeKeys.find((key) => FAST_THEMES[key]);
+    if (fast) return FAST_THEMES[fast];
+  }
+  return (indicatorKey ? THEME_BY_INDICATOR_KEY[indicatorKey] : undefined) ?? 'annual';
 }
 
-export { FAMILIES as SEASON_COLOUR_FAMILIES, SEASON_APPEARANCE };
+export function getDayTheme(indicatorKey: string | null | undefined, activeKeys: readonly string[] = []): DayBlockTheme {
+  return DAY_BLOCK_THEMES[getDayThemeKey(indicatorKey, activeKeys)];
+}
+
+/** Where the 160° gradient runs, as expo-linear-gradient's unit-square points. */
+export const DAY_BLOCK_GRADIENT_START = { x: 0.33, y: 0 };
+export const DAY_BLOCK_GRADIENT_END = { x: 0.67, y: 1 };
+
+export { THEME_BY_INDICATOR_KEY };

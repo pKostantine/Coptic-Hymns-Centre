@@ -6,10 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/chc/ui/AppHeader';
 import BibleTestamentMenu from '@/components/chc/screens/BibleTestamentMenu';
-import BookMenuScaffold from '@/components/chc/screens/BookMenuScaffold';
+import BookPage from '@/components/chc/screens/BookPage';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
 import { TESTAMENTS } from '@/constants/bibleTestaments';
-import { appText } from '@/utils/appText';
+import { appText, tr } from '@/utils/appText';
 import { getBookTheme } from '@/constants/bookTheme';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -87,7 +87,8 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
   const title = { english: loadedBook?.titleEnglish || bookKey, arabic: loadedBook?.titleArabic || '', french: loadedBook?.titleFrench || '' };
   const testament = loadedBook ? TESTAMENTS[loadedBook.testament] : null;
   const theme = testament?.theme ?? getBookTheme('bible');
-  const accent = theme.accent;
+  // The chapters are gold on the page's navy, as the rest of the Bible's pages are.
+  const accent = COLORS.gold;
 
   // A one-chapter book opens straight onto its text; until then (or while
   // the chapter list loads) the page holds the splash rather than an empty grid.
@@ -103,12 +104,13 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
   }
 
   return (
-    <BookMenuScaffold
-      theme={theme}
+    <BookPage
       title={title}
-      overline={testament ? (showArabic ? testament.arabic : appText(testament).toUpperCase()) : undefined}
+      kicker={testament ? appText(testament) : undefined}
       arabic={showArabic}
       backHref={loadedBook ? `/bible/${loadedBook.testament}` : '/bible'}
+      action={{ icon: 'search-outline', label: tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس'), onPress: () => router.push('/bible/search') }}
+      padded
     >
       {error ? (
         <Text style={styles.error}>{error}</Text>
@@ -128,7 +130,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
                     style={[styles.segment, isSelected && { backgroundColor: accent }]}
                     onPress={() => setPsalmNumbering(option.key)}
                   >
-                    <Text style={[styles.segmentText, showArabic && styles.segmentArabic, { color: isSelected ? '#1E1604' : accent }]}>
+                    <Text style={[styles.segmentText, showArabic && styles.segmentArabic, { color: isSelected ? COLORS.navyDark : accent }]}>
                       {label}
                     </Text>
                   </Pressable>
@@ -195,7 +197,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
           </View>
         </>
       )}
-    </BookMenuScaffold>
+    </BookPage>
   );
 }
 

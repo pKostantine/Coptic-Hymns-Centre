@@ -1,24 +1,28 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import AppHeader from '@/components/chc/ui/AppHeader';
 import BottomTabBar from '@/components/chc/ui/BottomTabBar';
 import Icon from '@/components/chc/ui/Icon';
-import MusicArtwork from '@/components/music/MusicArtwork';
+import { CrownOrnament, VineDivider } from '@/components/chc/ui/Ornaments';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { getSeasonIndicatorFullName } from '@/constants/seasonNames';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { homeService, type HomeSynaxariumEvent } from '@/services/homeService';
-import { getSundayMessageForDate } from '@/utils/readingsService';
-import { musicService } from '@/services/musicService';
-import type { MusicConsumerReleaseSummary } from '@/types/musicConsumer';
+import { getCopticDate, getDayOverview, type CopticDate } from '@/utils/calendarService';
 import { localDateAtUtcMidnight } from '@/utils/dateUtils';
+import { formatCopticDayMonth, formatDayMonthDate } from '@/utils/localeFormat';
+import { agpeyaHourAt } from '@/utils/agpeyaHours';
+import { getSundayMessageForDate } from '@/utils/readingsService';
 
-import { appLocale, tr } from '../../../utils/appText';
+import { tr } from '../../../utils/appText';
+
 function addUtcDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
@@ -29,71 +33,66 @@ function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** This Sunday's message on a Sunday morning and from Saturday evening; otherwise last Sunday's. */
 function sundayForHome(rawDate: Date, period: 'morning' | 'evening') {
   const weekday = rawDate.getUTCDay();
-
-  if (weekday === 6 && period === 'evening') {
-    return { date: addUtcDays(rawDate, 1), relation: 'this' as const };
-  }
-
-  if (weekday === 0) {
-    return {
-      date: rawDate,
-      relation: period === 'morning' ? 'this' as const : 'last' as const,
-    };
-  }
-
-  return {
-    date: addUtcDays(rawDate, -weekday),
-    relation: 'last' as const,
-  };
+  if (weekday === 6 && period === 'evening') return { date: addUtcDays(rawDate, 1), relation: 'this' as const };
+  if (weekday === 0) return { date: rawDate, relation: period === 'morning' ? 'this' as const : 'last' as const };
+  return { date: addUtcDays(rawDate, -weekday), relation: 'last' as const };
 }
 
-function formatDate(date: Date, locale: string) {
-  return date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : appLocale() === 'fr' ? 'fr-FR' : 'en-CA', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
+/**
+ * "The Departure of Pope Athanasius the Second, the Twenty-Eighth Patriarch…"
+ * reads as the saint, then who he was: the design sets the second part on its
+ * own line, smaller. Only an English title with such a clause is split.
+ */
+function splitSaintTitle(title: string): { main: string; detail: string | null } {
+  const match = /^(.+?), the (.+)$/.exec(title);
+  if (!match) return { main: title, detail: null };
+  return { main: match[1], detail: match[2].charAt(0).toUpperCase() + match[2].slice(1) };
 }
 
+/**
+ * Home (CHC design, "Home"): the seal on a navy glow with the day beneath it,
+ * the Agpeya hour to pray now, the Sunday message under a gold crown, and the
+ * saints of today and tomorrow. Home always shows the live day, whatever date
+ * the Books screen has been moved to.
+ */
 export default function HomeScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { preferences } = useReadingPreferences();
   const [now, setNow] = useState(() => new Date());
-  const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
-  const isArabic = locale === 'ar';
-  const wide = width >= 760;
-  const heroLogoSize = wide ? 180 : Math.min(156, Math.max(112, width * 0.31));
+  const arabic = preferences.appLanguage === 'ar';
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
 
-  // Home is always live. Books can be pinned to another calendar date without
-  // changing anything here. Keep the date object stable within a day so the
-  // home cards do not re-query every minute just because the live clock ticks.
+  // Stable within a day, so the cards don't re-query every minute the clock ticks.
   const liveIso = isoDate(localDateAtUtcMidnight(now));
   const liveDate = useMemo(() => new Date(`${liveIso}T00:00:00Z`), [liveIso]);
   const livePeriod = now.getHours() >= 17 ? 'evening' as const : 'morning' as const;
-  const sunday = useMemo(
-    () => sundayForHome(liveDate, livePeriod),
-    [liveDate, livePeriod],
-  );
+  const sunday = useMemo(() => sundayForHome(liveDate, livePeriod), [liveDate, livePeriod]);
   const sundayIso = isoDate(sunday.date);
-  const synaxToday = liveDate;
-  const synaxTomorrow = useMemo(() => addUtcDays(liveDate, 1), [liveDate]);
+  const tomorrow = useMemo(() => addUtcDays(liveDate, 1), [liveDate]);
+  const hour = agpeyaHourAt(now.getHours());
 
+  const [coptic, setCoptic] = useState<CopticDate | null>(null);
   const [sundayMessage, setSundayMessage] = useState<string | null>(null);
+  const [sundayName, setSundayName] = useState<string | null>(null);
   const [sundayLoading, setSundayLoading] = useState(true);
+  const [synaxDay, setSynaxDay] = useState<'today' | 'tomorrow'>('today');
   const [todayEvents, setTodayEvents] = useState<HomeSynaxariumEvent[]>([]);
   const [tomorrowEvents, setTomorrowEvents] = useState<HomeSynaxariumEvent[]>([]);
   const [synaxLoading, setSynaxLoading] = useState(true);
-  const [releases, setReleases] = useState<MusicConsumerReleaseSummary[]>([]);
-  const [musicLoading, setMusicLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void getCopticDate(liveDate).then((value) => { if (active) setCoptic(value); });
+    return () => { active = false; };
+  }, [liveDate]);
 
   useEffect(() => {
     let active = true;
@@ -102,20 +101,21 @@ export default function HomeScreen() {
       .then((message) => { if (active) setSundayMessage(message); })
       .catch(() => { if (active) setSundayMessage(null); })
       .finally(() => { if (active) setSundayLoading(false); });
+    void getDayOverview(sundayIso).then((overview) => {
+      if (active) setSundayName(overview?.indicatorKey ? getSeasonIndicatorFullName(overview.indicatorKey) : null);
+    });
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the Sunday's date, not the Date instance
   }, [sundayIso]);
 
   useEffect(() => {
     let active = true;
     setSynaxLoading(true);
-    Promise.all([
-      homeService.getSynaxariumEvents(isoDate(synaxToday)),
-      homeService.getSynaxariumEvents(isoDate(synaxTomorrow)),
-    ])
-      .then(([today, tomorrow]) => {
+    Promise.all([homeService.getSynaxariumEvents(liveIso), homeService.getSynaxariumEvents(isoDate(tomorrow))])
+      .then(([today, next]) => {
         if (!active) return;
         setTodayEvents(today);
-        setTomorrowEvents(tomorrow);
+        setTomorrowEvents(next);
       })
       .catch(() => {
         if (!active) return;
@@ -124,23 +124,13 @@ export default function HomeScreen() {
       })
       .finally(() => { if (active) setSynaxLoading(false); });
     return () => { active = false; };
-  }, [synaxToday, synaxTomorrow]);
-
-  useEffect(() => {
-    let active = true;
-    setMusicLoading(true);
-    musicService.getHome(locale)
-      .then((payload) => {
-        if (active) setReleases(payload.latestReleases.slice(0, 8));
-      })
-      .catch(() => { if (active) setReleases([]); })
-      .finally(() => { if (active) setMusicLoading(false); });
-    return () => { active = false; };
-  }, [locale]);
+  }, [liveIso, tomorrow]);
 
   const sundayTitle = sunday.relation === 'this'
-    ? (tr("This Sunday's Message", 'Message de ce dimanche', 'رسالة هذا الأحد'))
-    : (tr("Last Sunday's Message", 'Message de dimanche dernier', 'رسالة الأحد الماضي'));
+    ? tr("This Sunday's Message", 'Message de ce dimanche', 'رسالة هذا الأحد')
+    : tr("Last Sunday's Message", 'Message de dimanche dernier', 'رسالة الأحد الماضي');
+  const sundayDate = formatDayMonthDate(sunday.date, arabic);
+  const events = synaxDay === 'today' ? todayEvents : tomorrowEvents;
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -148,149 +138,125 @@ export default function HomeScreen() {
         <title>{tr('Coptic Hymns Centre', 'Coptic Hymns Centre', 'كوبتك هيمنز سنتر')}</title>
       </Head>
 
-      <AppHeader
-        title={{ english: 'Coptic Hymns Centre', arabic: 'كوبتك هيمنز سنتر', french: 'Coptic Hymns Centre' }}
-        visibleLanguages={{ english: !isArabic, arabic: isArabic }}
-      />
-
-      <NowPlayingAwareScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-        <View style={styles.intro}>
-          <Image
-            accessible
-            accessibilityLabel="Coptic Hymns Centre logo"
-            source={require('../../../../assets/images/CHC.png')}
-            style={[styles.introLogo, { height: heroLogoSize, width: heroLogoSize }]}
-          />
-          <View style={styles.introCopy}>
-            <Text style={[styles.introEyebrow, isArabic && styles.arabic]}>
-              {tr('TODAY IN THE CHURCH', 'AUJOURD’HUI DANS L’ÉGLISE', 'اليوم في الكنيسة')}
-            </Text>
-            <Text style={[styles.introTitle, !wide && styles.introTitleMobile, isArabic && styles.arabic]}>
+      <NowPlayingAwareScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <HeroGlow />
+        <View style={styles.column}>
+          <View style={[styles.hero, { paddingTop: insets.top + 30 }]}>
+            <View style={styles.halo}>
+              {/* The seal's shadow, cast by a circle the seal's own size behind
+                  it. On the image itself it was clipped to the image's square
+                  box on the web, which drew a dark square behind the logo. */}
+              <View style={styles.sealShadow} pointerEvents="none" />
+              <Image
+                accessible
+                accessibilityLabel="Coptic Hymns Centre"
+                source={require('../../../../assets/images/CHC.png')}
+                style={styles.logo}
+              />
+            </View>
+            <Text style={[styles.tagline, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
               {tr('Pray. Read. Listen. Learn.', 'Prier. Lire. Écouter. Apprendre.', 'صلِّ. اقرأ. استمع. تعلّم.')}
             </Text>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.cardHeadingRow}>
-            <View style={styles.headingIcon}>
-              <Icon name="book" size={19} color={COLORS.goldBright} />
-            </View>
-            <View style={styles.headingText}>
-              <Text style={[styles.cardTitle, isArabic && styles.arabic]}>{sundayTitle}</Text>
-              <Text style={[styles.cardSubtitle, isArabic && styles.arabic]}>
-                {formatDate(sunday.date, locale)}
-              </Text>
-            </View>
+            <Text style={[styles.heroDate, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
+              {formatDayMonthDate(liveDate, arabic)}
+              {coptic ? <Text style={styles.heroCoptic}>{` · ${formatCopticDayMonth(coptic.monthName, coptic.day, arabic)}`}</Text> : null}
+            </Text>
           </View>
 
-          <Text style={[styles.messageText, isArabic && styles.arabic]}>
-            {sundayLoading
-              ? (tr('Loading message…', 'Chargement du message…', 'جارٍ تحميل الرسالة…'))
-              : sundayMessage
-                ? sundayMessage
-                : (tr('A message has not been added for this Sunday yet.', 'Aucun message n’a encore été ajouté pour ce dimanche.', 'لم تتم إضافة رسالة لهذا الأحد بعد.'))}
-          </Text>
-        </View>
+          <View style={styles.heroDivider} pointerEvents="none">
+            <VineDivider width={250} height={32} />
+          </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeadingRow}>
-            <View style={styles.headingIcon}>
-              <Icon name="calendar-outline" size={19} color={COLORS.goldBright} />
-            </View>
-            <View style={styles.headingText}>
-              <Text style={[styles.cardTitle, isArabic && styles.arabic]}>
-                {tr('Synaxarium', 'Synaxaire', 'السنكسار')}
-              </Text>
-              <Text style={[styles.cardSubtitle, isArabic && styles.arabic]}>
-                {tr('Today and tomorrow', 'Aujourd’hui et demain', 'اليوم وغداً')}
-              </Text>
+          <View style={[styles.card, styles.pray, arabic && styles.rowReverse]}>
+            <View style={styles.flex}>
+              <Text style={[styles.prayKicker, arabic && styles.arabic]}>{tr('Pray now · Agpeya', 'Prier maintenant · Agpia', 'صلِّ الآن · الأجبية')}</Text>
+              <Text style={[styles.prayTitle, arabic && styles.arabic]} numberOfLines={1}>{tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}</Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={tr('Search Synaxarium', 'Rechercher dans le Synaxaire', 'بحث في السنكسار')}
-              onPress={() => router.push('/synaxarium')}
-              style={({ pressed }) => [styles.synaxSearchButton, pressed && styles.pressed]}
+              accessibilityLabel={`${tr('Pray', 'Prier', 'صلِّ')}: ${tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}`}
+              onPress={() => router.push(`/agpeya/${hour.id}` as never)}
+              style={({ pressed }) => [styles.prayButton, arabic && styles.rowReverse, pressed && styles.pressed]}
             >
-              <Icon name="search-outline" size={17} color={COLORS.goldBright} />
-              <Text style={[styles.synaxSearchText, isArabic && styles.arabic]}>
-                {tr('Search', 'Rechercher', 'بحث')}
-              </Text>
+              <Icon name="play" size={16} color={COLORS.navyDark} />
+              <Text style={[styles.prayButtonText, arabic && styles.arabicTight]}>{tr('Pray', 'Prier', 'صلِّ')}</Text>
             </Pressable>
           </View>
 
-          <View style={[styles.synaxColumns, wide && styles.synaxColumnsWide]}>
-            <SynaxDay
-              title={tr('Today', 'Aujourd’hui', 'اليوم')}
-              date={synaxToday}
-              events={todayEvents}
-              loading={synaxLoading}
-              locale={locale}
-            />
-            <View style={wide ? styles.synaxDividerVertical : styles.synaxDividerHorizontal} />
-            <SynaxDay
-              title={tr('Tomorrow', 'Demain', 'غداً')}
-              date={synaxTomorrow}
-              events={tomorrowEvents}
-              loading={synaxLoading}
-              locale={locale}
-            />
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.cardHeadingRow}>
-            <View style={styles.headingIcon}>
-              <Icon name="musical-notes" size={19} color={COLORS.goldBright} />
+          <View style={[styles.card, styles.message]}>
+            <LinearGradient colors={['#0A2644', COLORS.navyDark]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+            <View style={styles.crown} pointerEvents="none">
+              <CrownOrnament width={300} height={58} />
             </View>
-            <View style={styles.headingText}>
-              <Text style={[styles.cardTitle, isArabic && styles.arabic]}>
-                {tr('Latest Music Releases', 'Dernières parutions musicales', 'أحدث الإصدارات')}
-              </Text>
-              <Text style={[styles.cardSubtitle, isArabic && styles.arabic]}>
-                {tr('New on CHC Music', 'Nouveau sur CHC Music', 'الجديد في CHC Music')}
+            <View style={styles.messageBody}>
+              <Text style={[styles.messageKicker, arabic && styles.arabicTight]}>{sundayTitle}</Text>
+              <Text style={[styles.messageTitle, arabic && styles.arabicCentered]}>{sundayName ?? sundayDate}</Text>
+              {sundayName ? <Text style={[styles.messageDate, arabic && styles.arabicCentered]}>{sundayDate}</Text> : null}
+              <Text style={[styles.messageText, arabic && styles.arabicCentered]}>
+                {sundayLoading
+                  ? tr('Loading message…', 'Chargement du message…', 'جارٍ تحميل الرسالة…')
+                  : sundayMessage ?? tr('A message has not been added for this Sunday yet.', 'Aucun message n’a encore été ajouté pour ce dimanche.', 'لم تتم إضافة رسالة لهذا الأحد بعد.')}
               </Text>
             </View>
-            <Pressable onPress={() => router.push('/music')} style={styles.seeAllButton}>
-              <Text style={[styles.seeAllText, isArabic && styles.arabic]}>{tr('See all', 'Tout voir', 'الكل')}</Text>
-              <Icon name="chevron-forward" size={15} color={COLORS.goldBright} />
-            </Pressable>
           </View>
 
-          {musicLoading ? (
-            <Text style={[styles.emptyText, isArabic && styles.arabic]}>
-              {tr('Loading releases…', 'Chargement des parutions…', 'جارٍ تحميل الإصدارات…')}
-            </Text>
-          ) : releases.length ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.releaseRow}
-            >
-              {releases.map((release) => (
-                <Pressable
-                  key={release.id}
-                  style={styles.releaseCard}
-                  onPress={() => router.push(`/music/release/${release.id}`)}
-                >
-                  <MusicArtwork asset={release.coverAsset} size={144} label={release.title} />
-                  <Text numberOfLines={1} style={[styles.releaseTitle, isArabic && styles.arabic]}>
-                    {release.title}
-                  </Text>
-                  <Text numberOfLines={1} style={[styles.releaseArtist, isArabic && styles.arabic]}>
-                    {release.primaryArtist?.displayName ?? 'Coptic Hymns Centre'}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          ) : (
-            <Text style={[styles.emptyText, isArabic && styles.arabic]}>
-              {tr('No published releases yet.', 'Aucune parution publiée pour l’instant.', 'لا توجد إصدارات منشورة بعد.')}
-            </Text>
-          )}
+          <View style={styles.card}>
+            <View style={[styles.synaxHeader, arabic && styles.rowReverse]}>
+              <View style={styles.flex}>
+                <Text style={[styles.synaxTitle, arabic && styles.arabic]}>{tr('Synaxarium', 'Synaxaire', 'السنكسار')}</Text>
+                <Text style={[styles.synaxSubtitle, arabic && styles.arabic]}>{tr('Saints commemorated', 'Saints commémorés', 'تذكارات القديسين')}</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={tr('Search the Synaxarium', 'Rechercher dans le Synaxaire', 'ابحث في السنكسار')}
+                onPress={() => router.push('/synaxarium')}
+                style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
+              >
+                <Icon name="search-outline" size={20} color={COLORS.gold} />
+              </Pressable>
+            </View>
+
+            <View style={[styles.segment, arabic && styles.rowReverse]}>
+              {(['today', 'tomorrow'] as const).map((option) => {
+                const active = synaxDay === option;
+                return (
+                  <Pressable
+                    key={option}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    onPress={() => setSynaxDay(option)}
+                    style={[styles.segmentOption, active && styles.segmentOptionActive]}
+                  >
+                    <Text style={[styles.segmentText, active && styles.segmentTextActive, arabic && styles.arabicTight]}>
+                      {option === 'today' ? tr('Today', 'Aujourd’hui', 'اليوم') : tr('Tomorrow', 'Demain', 'غدًا')}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.saints}>
+              {synaxLoading ? (
+                <Text style={[styles.empty, arabic && styles.arabic]}>{tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}</Text>
+              ) : events.length ? (
+                events.map((event, index) => {
+                  const title = arabic ? event.titleArabic || event.titleEnglish || '' : event.titleEnglish || event.titleArabic || '';
+                  const { main, detail } = arabic || preferences.appLanguage === 'fr' ? { main: title, detail: null } : splitSaintTitle(title);
+                  return (
+                    <View key={event.entryKey} style={[styles.saint, index === events.length - 1 && styles.saintLast, arabic && styles.rowReverse]}>
+                      <View style={styles.saintDot} />
+                      <View style={styles.flex}>
+                        <Text style={[styles.saintName, arabic && styles.arabic]}>{main}</Text>
+                        {detail ? <Text style={styles.saintDetail}>{detail}</Text> : null}
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={[styles.empty, arabic && styles.arabic]}>{tr('No saints listed.', 'Aucun saint indiqué.', 'لا توجد تذكارات مدرجة.')}</Text>
+              )}
+            </View>
+          </View>
         </View>
       </NowPlayingAwareScrollView>
 
@@ -299,85 +265,109 @@ export default function HomeScreen() {
   );
 }
 
-function SynaxDay({
-  title,
-  date,
-  events,
-  loading,
-  locale,
-}: {
-  title: string;
-  date: Date;
-  events: HomeSynaxariumEvent[];
-  loading: boolean;
-  locale: 'en' | 'ar';
-}) {
-  const isArabic = locale === 'ar';
-
+/** The navy glow behind the seal: a radial light over a navy-to-black fall. */
+function HeroGlow() {
   return (
-    <View style={styles.synaxDay}>
-      <Text style={[styles.synaxDayTitle, isArabic && styles.arabic]}>{title}</Text>
-      <Text style={[styles.synaxDate, isArabic && styles.arabic]}>{formatDate(date, locale)}</Text>
-      {loading ? (
-        <Text style={[styles.emptyText, isArabic && styles.arabic]}>
-          {tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}
-        </Text>
-      ) : events.length ? (
-        <View style={styles.eventList}>
-          {events.map((event) => (
-            <View key={event.entryKey} style={styles.eventRow}>
-              <View style={styles.eventDot} />
-              <Text style={[styles.eventText, isArabic && styles.arabic]}>
-                {isArabic ? event.titleArabic || event.titleEnglish : event.titleEnglish || event.titleArabic}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <Text style={[styles.emptyText, isArabic && styles.arabic]}>
-          {tr('No events listed.', 'Aucun événement.', 'لا توجد أحداث مدرجة.')}
-        </Text>
-      )}
+    <View style={styles.glow} pointerEvents="none">
+      <LinearGradient colors={['#002A52', '#001D3D', '#000000']} locations={[0, 0.4, 1]} style={StyleSheet.absoluteFill} />
+      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <RadialGradient id="homeGlow" cx="50%" cy="18%" rx="120%" ry="75%" fx="50%" fy="18%">
+            <Stop offset="0" stopColor="#004A8C" stopOpacity="0.85" />
+            <Stop offset="0.28" stopColor="#003566" stopOpacity="0.7" />
+            <Stop offset="0.55" stopColor="#001D3D" stopOpacity="0.45" />
+            <Stop offset="0.85" stopColor="#000000" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#homeGlow)" />
+      </Svg>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: SPACING.md, paddingBottom: SPACING.xl * 2, gap: SPACING.md },
-  intro: { alignItems: 'center', flexDirection: 'row', gap: SPACING.lg, paddingHorizontal: 4, paddingVertical: SPACING.md },
-  introLogo: { resizeMode: 'contain' },
-  introCopy: { flex: 1, minWidth: 0 },
-  introEyebrow: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
-  introTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 27, fontWeight: '700', marginTop: 5 },
-  introTitleMobile: { fontSize: 24, lineHeight: 27 },
-  card: { backgroundColor: COLORS.navyDark, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADII.lg, padding: SPACING.lg, overflow: 'hidden' },
-  cardHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  headingIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.goldSoft, borderWidth: 1, borderColor: COLORS.goldLine },
-  headingText: { flex: 1, minWidth: 0 },
-  cardTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 20, fontWeight: '800' },
-  cardSubtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
-  messageText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, lineHeight: 25, marginTop: SPACING.lg },
-  synaxColumns: { marginTop: SPACING.lg, gap: SPACING.lg },
-  synaxColumnsWide: { flexDirection: 'row', gap: SPACING.lg },
-  synaxDay: { flex: 1, minWidth: 0 },
-  synaxDayTitle: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '800' },
-  synaxDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3, marginBottom: SPACING.sm },
-  synaxDividerHorizontal: { height: 1, backgroundColor: COLORS.border },
-  synaxDividerVertical: { width: 1, backgroundColor: COLORS.border },
-  eventList: { gap: 8 },
-  eventRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
-  eventDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.gold, marginTop: 8 },
-  eventText: { flex: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20 },
-  emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19, marginTop: SPACING.sm },
-  seeAllButton: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 8 },
-  seeAllText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
-  releaseRow: { gap: SPACING.md, paddingTop: SPACING.lg, paddingRight: SPACING.lg },
-  releaseCard: { width: 144 },
-  releaseTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800', marginTop: 8 },
-  releaseArtist: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 3 },
-  synaxSearchButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 11, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.goldSoft },
-  synaxSearchText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
-  pressed: { opacity: 0.68, transform: [{ scale: 0.97 }] },
+  content: { paddingBottom: 28 },
+  column: { alignSelf: 'center', maxWidth: 640, width: '100%' },
+  flex: { flex: 1, minWidth: 0 },
+  rowReverse: { flexDirection: 'row-reverse' },
+  glow: { height: 560, left: 0, position: 'absolute', right: 0, top: 0 },
+  hero: { alignItems: 'center', paddingHorizontal: 24 },
+  halo: { alignItems: 'center', height: 212, justifyContent: 'center', width: 212 },
+  logo: { height: 188, resizeMode: 'contain', width: 188 },
+  // CHC.png's seal fills 178 of its 188 points; the shadow circle matches it
+  // and hides behind it, in the seal's own navy.
+  sealShadow: {
+    backgroundColor: '#01305A',
+    borderRadius: 89,
+    boxShadow: '0px 16px 30px rgba(0, 0, 0, 0.55)',
+    height: 178,
+    position: 'absolute',
+    width: 178,
+  },
+  tagline: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', marginTop: 26, textAlign: 'center' },
+  heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 8, textAlign: 'center' },
+  heroCoptic: { color: COLORS.goldBright, fontWeight: '600' },
+  heroDivider: { alignItems: 'center', marginBottom: 22, marginTop: 20 },
+  card: {
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 14,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+  },
+  pray: { alignItems: 'center', flexDirection: 'row', gap: 14, paddingBottom: 14, paddingLeft: 18, paddingRight: 14, paddingTop: 14 },
+  prayKicker: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12 },
+  prayTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700', marginTop: 2 },
+  prayButton: {
+    alignItems: 'center',
+    backgroundColor: COLORS.gold,
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  prayButtonText: { color: COLORS.navyDark, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700' },
+  message: { borderColor: 'rgba(201, 162, 39, 0.3)' },
+  crown: { alignItems: 'center', left: 8, opacity: 0.85, position: 'absolute', right: 8, top: 8 },
+  messageBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 44 },
+  messageKicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', letterSpacing: 1.7, textAlign: 'center', textTransform: 'uppercase' },
+  messageTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 25, fontWeight: '700', lineHeight: 30, marginTop: 10, textAlign: 'center' },
+  messageDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 6, textAlign: 'center' },
+  messageText: { color: '#DFE6EC', fontFamily: TYPOGRAPHY.body, fontSize: 15, lineHeight: 24, marginTop: 14, textAlign: 'center' },
+  synaxHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 18 },
+  synaxTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
+  synaxSubtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 2 },
+  roundButton: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
+  segment: {
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.border,
+    borderRadius: 99,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: 4,
+    marginHorizontal: 18,
+    marginTop: 14,
+    padding: 4,
+  },
+  segmentOption: { alignItems: 'center', borderRadius: 99, flex: 1, paddingVertical: 8 },
+  segmentOptionActive: { backgroundColor: COLORS.gold },
+  segmentText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
+  segmentTextActive: { color: COLORS.navyDark },
+  saints: { paddingBottom: 8, paddingHorizontal: 18, paddingTop: 2 },
+  saint: { borderBottomColor: 'rgba(255, 255, 255, 0.07)', borderBottomWidth: 1, flexDirection: 'row', gap: 12, paddingVertical: 13 },
+  saintLast: { borderBottomWidth: 0 },
+  saintDot: { backgroundColor: COLORS.gold, borderRadius: 3, height: 6, marginTop: 8, width: 6 },
+  saintName: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, lineHeight: 22 },
+  saintDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 2 },
+  empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, paddingVertical: 13 },
+  pressed: { opacity: 0.7 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabicTight: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },
 });

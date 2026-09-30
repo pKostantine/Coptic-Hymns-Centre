@@ -44,7 +44,12 @@ export type IconName =
   | 'heart'
   | 'heart-outline'
   | 'share-outline'
-  | 'musical-notes';
+  | 'musical-notes'
+  | 'musical-notes-outline'
+  | 'cloudy-night-outline'
+  | 'moon-outline'
+  | 'sunny-outline'
+  | 'create-outline';
 
 interface IconProps {
   name: IconName;
@@ -408,6 +413,77 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
           <Rect x={18.8} y={2.6} width={1.7} height={13} fill={color} />
           <Circle cx={6.6} cy={17.6} r={3.3} fill={color} />
           <Circle cx={16.5} cy={15.6} r={3.3} fill={color} />
+        </Svg>
+      );
+    case 'musical-notes-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M192 218v-6c0-14.84 10-27 24.24-30.59l174.59-46.68A20 20 0 0 1 416 154v22" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Path
+            d="M416 295.94v80c0 13.91-8.93 25.59-22 30l-22 8c-25.9 8.72-52-10.42-52-38a33.37 33.37 0 0 1 23-32l51-18.15c13.07-4.4 22-15.94 22-29.85V58a10 10 0 0 0-12.6-9.61L204 102a16.48 16.48 0 0 0-12 16v226c0 13.91-8.93 25.6-22 30l-52 18c-13.88 4.68-22 17.22-22 32 0 27.58 26.52 46.55 52 38l22-8c13.07-4.4 22-16.08 22-30v-80"
+            fill="none"
+            stroke={color}
+            strokeWidth={32}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    case 'cloudy-night-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M388.31 272c47.75 0 89.77-27.77 107.69-68.92-14.21 6.18-30.9 8.61-47.38 8.61A116.31 116.31 0 0 1 332.31 95.38c0-16.48 2.43-33.17 8.61-47.38C299.77 65.92 272 107.94 272 155.69a116.31 116.31 0 0 0 3.44 28.18"
+            fill="none"
+            stroke={color}
+            strokeWidth={32}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M90.61 306.85A16.07 16.07 0 0 0 104 293.6C116.09 220.17 169.63 176 232 176c57.93 0 96.62 37.75 112.2 77.74a15.84 15.84 0 0 0 12.2 9.87c50 8.15 91.6 41.54 91.6 99.59 0 59.4-48.6 100.8-108 100.8H106c-49.5 0-90-24.7-90-79.2 0-48.47 38.67-72.22 74.61-77.95z"
+            fill="none"
+            stroke={color}
+            strokeWidth={32}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    case 'moon-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M160 136c0-30.62 4.51-61.61 16-88C99.57 81.27 48 159.32 48 248c0 119.29 96.71 216 216 216 88.68 0 166.73-51.57 200-128-26.39 11.49-57.38 16-88 16-119.29 0-216-96.71-216-216z"
+            fill="none"
+            stroke={color}
+            strokeWidth={32}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    case 'sunny-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M256 48v48M256 416v48M403.08 108.92l-33.94 33.94M142.86 369.14l-33.94 33.94M464 256h-48M96 256H48M403.08 403.08l-33.94-33.94M142.86 142.86l-33.94-33.94"
+            fill="none"
+            stroke={color}
+            strokeWidth={32}
+            strokeLinecap="round"
+            strokeMiterlimit={10}
+          />
+          <Circle cx="256" cy="256" r="80" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeMiterlimit={10} />
+        </Svg>
+      );
+    case 'create-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M384 224v184a40 40 0 0 1-40 40H104a40 40 0 0 1-40-40V168a40 40 0 0 1 40-40h167.48" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Path
+            d="M459.94 53.25a16.06 16.06 0 0 0-23.22-.56L424.35 65a8 8 0 0 0 0 11.31l11.34 11.32a8 8 0 0 0 11.34 0l12.06-12c6.1-6.09 6.67-16.01.85-22.38zM399.34 90 218.82 270.2a9 9 0 0 0-2.31 3.93L208.16 299a3.91 3.91 0 0 0 4.86 4.86l24.85-8.35a9 9 0 0 0 3.93-2.31L422 112.66a9 9 0 0 0 0-12.66l-9.95-10a9 9 0 0 0-12.71 0z"
+            fill={color}
+          />
         </Svg>
       );
     case 'shuffle':

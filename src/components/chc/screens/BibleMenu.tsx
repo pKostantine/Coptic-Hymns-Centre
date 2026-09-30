@@ -3,139 +3,158 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import BookMenuScaffold, { TileRow } from './BookMenuScaffold';
-import CopticCross from '../ui/CopticCross';
+import BookPage from './BookPage';
 import Icon from '../ui/Icon';
-import JewelTile from '../ui/JewelTile';
-import { getBookTheme } from '../../../constants/bookTheme';
+import { BuddedCross } from '../ui/Ornaments';
+import { TESTAMENTS, type Testament } from '../../../constants/bibleTestaments';
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
-import { TESTAMENTS, type Testament } from '../../../constants/bibleTestaments';
-
 import { appText, tr } from '../../../utils/appText';
+
 const MAX_FONT_SCALE = 1.25;
 
+/** Each testament's card: what it holds, and its navy — the New a shade brighter. */
+const COVERS: Record<Testament, { kicker: { english: string; arabic: string; french: string }; gradient: readonly [string, string, ...string[]]; locations: readonly [number, number, ...number[]] }> = {
+  OT: {
+    kicker: { english: 'The Law and the Prophets', arabic: 'الناموس والأنبياء', french: 'La Loi et les Prophètes' },
+    gradient: ['#0C3158', '#001D3D'],
+    locations: [0, 0.75],
+  },
+  NT: {
+    kicker: { english: 'The Gospels and Epistles', arabic: 'الأناجيل والرسائل', french: 'Les Évangiles et les Épîtres' },
+    gradient: ['#123E6B', '#002447', '#001D3D'],
+    locations: [0, 0.45, 1],
+  },
+};
+
 /**
- * The Bible: a search field to find any passage, the reader's bookmarked
- * chapters, then the two testaments as a pair of covers — each opening on
- * its first words, "In the beginning".
+ * The Bible (CHC design, "Book Pages"): a search for any verse, word or
+ * reference beside the saved chapters, then the two testaments.
  */
 export default function BibleMenu() {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
   const arabic = preferences.appLanguage === 'ar';
-  const theme = getBookTheme('bible');
 
   return (
-    <BookMenuScaffold
-      theme={theme}
+    <BookPage
       title={{ english: 'Bible', arabic: 'الكتاب المقدس', french: 'Bible' }}
-      overline={tr('HOLY SCRIPTURE', 'SAINTES ÉCRITURES', 'الأسفار المقدسة')}
+      kicker={tr('Holy Scripture', 'Saintes Écritures', 'الأسفار المقدسة')}
       arabic={arabic}
       backHref="/books"
     >
-      <Pressable
-        accessibilityRole="search"
-        accessibilityLabel={tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس')}
-        onPress={() => router.push('/bible/search')}
-        style={({ pressed }) => [styles.search, { borderColor: `${theme.accent}40` }, arabic && styles.rowReverse, pressed && styles.searchPressed]}
-      >
-        <View><Icon name="search-outline" size={19} color={theme.accent} /></View>
-        <Text style={[styles.searchText, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-          {tr('Search a verse, word or reference', 'Rechercher un verset, un mot ou une référence', 'ابحث عن آية أو كلمة أو شاهد')}
-        </Text>
-      </Pressable>
+      <View style={[styles.searchBar, arabic && styles.rowReverse]}>
+        <Pressable
+          accessibilityRole="search"
+          accessibilityLabel={tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس')}
+          onPress={() => router.push('/bible/search')}
+          style={({ pressed }) => [styles.search, arabic && styles.rowReverse, pressed && styles.pressed]}
+        >
+          <Icon name="search-outline" size={19} color={COLORS.gold} />
+          <Text style={[styles.searchText, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {tr('Search a verse, word or reference', 'Rechercher un verset, un mot ou une référence', 'ابحث عن آية أو كلمة أو شاهد')}
+          </Text>
+        </Pressable>
+        {/* The chapters saved from their verse lists. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={tr('Bible bookmarks', 'Signets de la Bible', 'محفوظات الكتاب المقدس')}
+          onPress={() => router.push('/bible/bookmarks')}
+          style={({ pressed }) => [styles.bookmarks, pressed && styles.pressed]}
+        >
+          <Icon name="bookmark-outline" size={20} color={COLORS.gold} />
+        </Pressable>
+      </View>
 
-      {/* The chapters saved from their verse lists — a place of its own in the Bible, first thing under the search. */}
-      <JewelTile
-        layout="row"
-        gradient={theme.gradient}
-        accent={theme.accent}
-        icon="bookmark"
-        title={tr('Bookmarks', 'Favoris', 'المحفوظات')}
-        minHeight={68}
-        arabic={arabic}
-        onPress={() => router.push('/bible/bookmarks')}
-      />
-
-      <TileRow arabic={arabic}>
+      <View style={styles.testaments}>
         {(Object.keys(TESTAMENTS) as Testament[]).map((key) => (
-          <TestamentCover
+          <TestamentCard
             key={key}
             testament={key}
             arabic={arabic}
             onPress={() => router.push({ pathname: '/bible/[bookKey]', params: { bookKey: key } })}
           />
         ))}
-      </TileRow>
-    </BookMenuScaffold>
+      </View>
+    </BookPage>
   );
 }
 
-function TestamentCover({ testament, arabic, onPress }: { testament: Testament; arabic: boolean; onPress: () => void }) {
+function TestamentCard({ testament, arabic, onPress }: { testament: Testament; arabic: boolean; onPress: () => void }) {
   const look = TESTAMENTS[testament];
+  const cover = COVERS[testament];
   const title = appText(look);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={`${title}, ${appText(look.range)}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.cover, { borderColor: `${look.theme.accent}33` }, pressed && styles.coverPressed]}
+      style={({ pressed }) => [styles.card, arabic && styles.rowReverse, pressed && styles.pressed]}
     >
-      <LinearGradient colors={look.theme.gradient} start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }} style={[StyleSheet.absoluteFill, styles.coverFill]} />
-      <View style={[styles.frame, { borderColor: `${look.theme.accent}2E` }]} pointerEvents="none" />
-      <View style={[styles.watermark, arabic ? styles.watermarkLeft : styles.watermarkRight]} pointerEvents="none">
-        <CopticCross size={132} color={`${look.theme.accent}1F`} />
+      <LinearGradient colors={cover.gradient} locations={cover.locations} start={{ x: 0.33, y: 0 }} end={{ x: 0.67, y: 1 }} style={StyleSheet.absoluteFill} />
+      <View style={[styles.watermark, arabic ? styles.watermarkArabic : null]} pointerEvents="none">
+        <BuddedCross size={96} />
       </View>
-
-      <View>
-        <Text style={[styles.coverTitle, arabic && styles.coverTitleArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
-        <Text style={[styles.verse, { color: `${look.theme.accent}CC` }, arabic && styles.verseArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-          {appText(look.verse)}
+      <View style={styles.cardText}>
+        <Text style={[styles.cardKicker, arabic && styles.cardKickerArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          {arabic ? cover.kicker.arabic : appText(cover.kicker).toUpperCase()}
         </Text>
+        <Text style={[styles.cardTitle, arabic && styles.arabicTitle]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
+        <Text style={[styles.cardRange, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{appText(look.range)}</Text>
       </View>
-      <Text style={[styles.range, { color: look.theme.accent }, arabic && styles.rangeArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-        {appText(look.range)}
-      </Text>
+      <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={20} color={COLORS.gold} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   rowReverse: { flexDirection: 'row-reverse' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicTitle: { fontFamily: TYPOGRAPHY.arabic, fontSize: 25, lineHeight: 38, textAlign: 'right', writingDirection: 'rtl' },
+  pressed: { opacity: 0.8 },
+
+  searchBar: { flexDirection: 'row', gap: 10, marginBottom: 14, marginHorizontal: 16 },
   search: {
     alignItems: 'center',
-    backgroundColor: 'rgba(22, 17, 6, 0.92)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderColor: COLORS.goldLine,
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+    height: 48,
+    paddingHorizontal: 16,
+  },
+  searchText: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15 },
+  bookmarks: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderColor: COLORS.goldLine,
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+
+  testaments: { gap: 12, paddingHorizontal: 16 },
+  card: {
+    alignItems: 'center',
+    borderColor: 'rgba(201, 162, 39, 0.3)',
+    borderRadius: 22,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 12,
-    minHeight: 54,
-    paddingHorizontal: 18,
-  },
-  searchPressed: { backgroundColor: 'rgba(60, 45, 12, 0.95)' },
-  searchText: { color: 'rgba(255, 255, 255, 0.6)', flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15 },
-  cover: {
-    borderRadius: 20,
-    borderWidth: 1,
-    flexGrow: 1,
-    justifyContent: 'space-between',
-    minHeight: 236,
+    gap: 16,
     overflow: 'hidden',
-    padding: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
   },
-  coverFill: { borderRadius: 19 },
-  coverPressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
-  // A hairline set in from the edge, like the tooled frame on a bound cover.
-  frame: { borderRadius: 14, borderWidth: 1, bottom: 7, left: 7, position: 'absolute', right: 7, top: 7 },
-  watermark: { bottom: -22, position: 'absolute' },
-  watermarkRight: { right: -26 },
-  watermarkLeft: { left: -26 },
-  coverTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 25, fontWeight: '700', lineHeight: 29 },
-  coverTitleArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 24, lineHeight: 36, textAlign: 'right', writingDirection: 'rtl' },
-  verse: { fontFamily: TYPOGRAPHY.title, fontSize: 13.5, fontStyle: 'italic', lineHeight: 19, marginTop: 12 },
-  verseArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 14.5, fontStyle: 'normal', lineHeight: 24, textAlign: 'right', writingDirection: 'rtl' },
-  range: { fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '800', letterSpacing: 0.2, marginTop: 16 },
-  rangeArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 12.5, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  watermark: { marginTop: -48, opacity: 0.12, position: 'absolute', right: 34, top: '50%' },
+  watermarkArabic: { left: 34, right: undefined },
+  cardText: { flex: 1, minWidth: 0 },
+  cardKicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
+  cardKickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  cardTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 26, fontWeight: '700', marginTop: 6 },
+  cardRange: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, marginTop: 4 },
 });

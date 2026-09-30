@@ -81,5 +81,8 @@ test('artist artwork is circular and tab headers no longer carry the logo', () =
   assert.doesNotMatch(webHeader, /CHC_sm_web/);
   assert.doesNotMatch(books, /CHC_sm/);
   assert.match(home, /assets\/images\/CHC\.png/);
-  assert.match(home, /width \* 0\.31/);
+  // The CHC design's hero: the seal at 188 in a 212 halo, its shadow cast by a
+  // circle behind it rather than by the square image.
+  assert.match(home, /logo: \{ height: 188, resizeMode: 'contain', width: 188 \}/);
+  assert.match(home, /sealShadow: \{[^}]*borderRadius: 89,[^}]*boxShadow:/);
 });

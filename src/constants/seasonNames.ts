@@ -37,9 +37,9 @@ export const SEASON_SHORT_NAMES: Record<string, FormalName> = {
   'holy-week': { english: 'Holy Week', arabic: 'أسبوع الآلام', french: 'Semaine sainte' },
   'jonahs-fast': { english: "Jonah's Fast", arabic: 'صوم يونان', french: 'Jeûne de Jonas' },
   'nativity-fast': { english: 'Nativity Fast', arabic: 'صوم الميلاد', french: 'Jeûne de la Nativité' },
-  'holy-50-days': { english: "Holy 50's", arabic: 'الخمسين المقدسة', french: 'Cinquante jours saints' },
+  'holy-50-days': { english: 'Holy Fifty Days', arabic: 'الخمسين المقدسة', french: 'Cinquante jours saints' },
   'st-mary-fast': { english: "St. Mary's Fast", arabic: 'صوم العذراء', french: 'Jeûne de la Vierge' },
-  'nayrouz-period': { english: 'Nayrouz Period', arabic: 'فترة النيروز', french: 'Temps du Nayrouz' },
+  'nayrouz-period': { english: 'Nayrouz', arabic: 'النيروز', french: 'Nayrouz' },
   'nativity-period': { english: 'Nativity Period', arabic: 'فترة الميلاد', french: 'Temps de la Nativité' },
   'theophany-period': { english: 'Theophany Period', arabic: 'فترة الغطاس', french: 'Temps de la Théophanie' },
   'second-day-of-theophany': { english: '2nd Day of Theophany', arabic: 'ثاني أيام الغطاس', french: '2e jour de la Théophanie' },
@@ -97,13 +97,13 @@ export const EVENT_SHORT_NAMES: Record<string, FormalName> = {
   'jonahs-feast': { english: "Jonah's Feast", arabic: 'فصح يونان', french: 'Fête de Jonas' },
   'lazarus-saturday': { english: 'Lazarus Saturday', arabic: 'سبت لعازر', french: 'Samedi de Lazare' },
   'apostles-feast': { english: "Apostles' Feast", arabic: 'عيد الرسل', french: 'Fête des Apôtres' },
-  'feast-of-the-cross': { english: 'Cross', arabic: 'الصليب', french: 'Croix' },
-  'feast-of-the-cross-paremhotep': { english: 'Cross', arabic: 'الصليب', french: 'Croix' },
+  'feast-of-the-cross': { english: 'Feast of the Cross', arabic: 'عيد الصليب', french: 'Fête de la Croix' },
+  'feast-of-the-cross-paremhotep': { english: 'Feast of the Cross', arabic: 'عيد الصليب', french: 'Fête de la Croix' },
   'theophany-paramoun': { english: 'Theophany Paramoun', arabic: 'برامون الغطاس', french: 'Paramoun de la Théophanie' },
   theophany: { english: 'Theophany', arabic: 'الغطاس', french: 'Théophanie' },
   ascension: { english: 'Ascension', arabic: 'الصعود', french: 'Ascension' },
   'nativity-paramoun': { english: 'Nativity Paramoun', arabic: 'برامون الميلاد', french: 'Paramoun de la Nativité' },
-  nativity: { english: 'Nativity', arabic: 'الميلاد', french: 'Nativité' },
+  nativity: { english: 'Feast of the Nativity', arabic: 'عيد الميلاد', french: 'Fête de la Nativité' },
   pentecost: { english: 'Pentecost', arabic: 'العنصرة', french: 'Pentecôte' },
   nayrouz: { english: 'Nayrouz', arabic: 'النيروز', french: 'Nayrouz' },
   'entry-into-egypt': { english: 'Entry into Egypt', arabic: 'دخول مصر', french: 'Entrée en Égypte' },
@@ -236,7 +236,11 @@ export function getSeasonIndicatorName(
   activeSeasons: SeasonIndicatorItem[],
   activeEvents: SeasonIndicatorItem[],
 ): string {
-  const key = getSeasonIndicatorKey(activeSeasons, activeEvents);
+  return getSeasonIndicatorShortName(getSeasonIndicatorKey(activeSeasons, activeEvents));
+}
+
+/** The short name of an indicator key already chosen — the season chip on the Books day block and the calendar sheet. */
+export function getSeasonIndicatorShortName(key: string | null | undefined): string {
   if (!key) return appText(SEASON_SHORT_NAMES.annual);
   return appText(EVENT_SHORT_NAMES[key] || SEASON_SHORT_NAMES[key] || SEASON_SHORT_NAMES.annual);
 }

@@ -1,13 +1,18 @@
 import { contentDataClient as supabase } from '../services/contentDataClient';
 import { computeMovableFeastDates, FIXED_FEASTS } from './fixedFeasts';
 import { toIsoDate } from './dateUtils';
-import { getSeasonIndicatorFullName, getSeasonIndicatorKey } from '../constants/seasonNames';
+import { getSeasonIndicatorKey } from '../constants/seasonNames';
+import { pickNextSeason } from './nextSeason';
 
 export interface CalendarDay {
   gregorianDate: string;
   displayDay: number;
   weekday: string;
   isSunday: boolean;
+  /** The same day in the other calendar, for the small number under each cell. */
+  otherDay: number;
+  /** Set when `otherDay` is the Coptic first of a month, so the cell can name it ("Thoout 1"). */
+  otherMonthName: string | null;
 }
 
 export interface SeasonRange {
@@ -27,7 +32,7 @@ export async function getGregorianMonthGrid(year: number, month: number): Promis
   const { data, error } = await supabase
     .schema('calendar')
     .from('coptic_date_conversions')
-    .select('gregorian_date, gregorian_day, weekday, sunday_ordinal_in_coptic_month')
+    .select('gregorian_date, gregorian_day, weekday, sunday_ordinal_in_coptic_month, coptic_day, coptic_month_name')
     .gte('gregorian_date', firstDate)
     .lte('gregorian_date', lastDate)
     .order('gregorian_date');
@@ -39,6 +44,8 @@ export async function getGregorianMonthGrid(year: number, month: number): Promis
     displayDay: row.gregorian_day,
     weekday: row.weekday,
     isSunday: row.weekday === 'Sunday',
+    otherDay: row.coptic_day,
+    otherMonthName: row.coptic_day === 1 ? row.coptic_month_name : null,
   }));
 }
 
@@ -59,6 +66,8 @@ export async function getCopticMonthGrid(copticYear: number, copticMonth: number
     displayDay: row.coptic_day,
     weekday: row.weekday,
     isSunday: row.weekday === 'Sunday',
+    otherDay: Number(String(row.gregorian_date).slice(8, 10)),
+    otherMonthName: null,
   }));
 }
 
@@ -203,6 +212,9 @@ const CONTEXT_FLAG_TO_INDICATOR_KEY: Record<string, string> = {
   ParamounTheophany: 'theophany-paramoun',
   FeastOfTheCross: 'feast-of-the-cross',
   HolyCross: 'feast-of-the-cross',
+  // The observed Joyful 29th only: the calendar leaves it off where a greater
+  // feast takes the 29th (Kiahk 29 is the Nativity), which only the Raw flag carries.
+  Joyful29thOfTheMonth: 'joyful-29',
 };
 
 /** Context-backed periods and feast observances running on the given liturgical date. */
@@ -312,34 +324,121 @@ function getYearIndicatorSources(copticYear: number) {
   return cached;
 }
 
+function addDaysIso(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Every season and feast running on a liturgical day, split the way getSeasonIndicatorKey weighs them. */
+async function getActiveIndicators(isoDate: string, copticYear: number) {
+  const [{ seasons, events }, contextKeys] = await Promise.all([
+    getYearIndicatorSources(copticYear),
+    getContextIndicatorKeys(isoDate),
+  ]);
+  const activeSeasons = [
+    ...seasons.filter((season) => season.startDate <= isoDate && season.endDate >= isoDate).map((season) => ({ key: season.rangeKey })),
+    ...contextKeys.filter((key) => key.endsWith('-period')).map((key) => ({ key })),
+  ];
+  const activeEvents = [
+    ...events.filter((event) => event.date === isoDate).map((event) => ({ key: event.key })),
+    ...contextKeys.filter((key) => !key.endsWith('-period')).map((key) => ({ key })),
+  ];
+  return { activeSeasons, activeEvents };
+}
+
+export interface DayOverview {
+  /** What the day is named after — the season chip's key, and what chooses the block's colours. Null on an ordinary day. */
+  indicatorKey: string | null;
+  /** Every season and feast running that day, so a lesser feast can keep the colour of the fast around it. */
+  activeKeys: string[];
+  /** The next great season or feast (see nextSeason.ts). */
+  nextSeason: { key: string; date: string; days: number } | null;
+}
+
 /**
- * The season pill for one liturgical day — the same seasons, feasts and
- * context periods the calendar screen's indicator weighs, so the Books menu
- * and the calendar always name the day alike. Null when it can't be read.
+ * The Books day block's reading of a liturgical day: the same seasons, feasts
+ * and context periods the calendar's pill weighs, so the two always name the
+ * day alike. Null when it can't be read (offline without the calendar).
  */
-/**
- * The day's season as the Season Spotlight wants it: the winning indicator
- * key, which chooses the card's colours, and that key's full formal name.
- */
-export async function getSeasonIndicatorLabel(isoDate: string): Promise<{ key: string | null; label: string } | null> {
+export async function getDayOverview(isoDate: string): Promise<DayOverview | null> {
   try {
     const copticYear = await getCopticYearForDate(new Date(`${isoDate}T00:00:00Z`));
     if (copticYear === null) return null;
-    const [{ seasons, events }, contextKeys] = await Promise.all([
+    const [{ activeSeasons, activeEvents }, thisYear, nextYear] = await Promise.all([
+      getActiveIndicators(isoDate, copticYear),
       getYearIndicatorSources(copticYear),
-      getContextIndicatorKeys(isoDate),
+      // The next season can be next year's: from Mesore it is Nayrouz.
+      getYearIndicatorSources(copticYear + 1).catch(() => ({ seasons: [] as SeasonRange[], events: [] as SingleDayEvent[] })),
     ]);
-    const activeSeasons = [
-      ...seasons.filter((season) => season.startDate <= isoDate && season.endDate >= isoDate).map((season) => ({ key: season.rangeKey })),
-      ...contextKeys.filter((key) => key.endsWith('-period')).map((key) => ({ key })),
-    ];
-    const activeEvents = [
-      ...events.filter((event) => event.date === isoDate).map((event) => ({ key: event.key })),
-      ...contextKeys.filter((key) => !key.endsWith('-period')).map((key) => ({ key })),
-    ];
-    const key = getSeasonIndicatorKey(activeSeasons, activeEvents);
-    return { key, label: getSeasonIndicatorFullName(key) };
+    return {
+      indicatorKey: getSeasonIndicatorKey(activeSeasons, activeEvents),
+      activeKeys: [...activeSeasons, ...activeEvents].map((item) => item.key),
+      nextSeason: pickNextSeason(
+        isoDate,
+        [...thisYear.seasons, ...nextYear.seasons],
+        [...thisYear.events, ...nextYear.events],
+      ),
+    };
   } catch {
     return null;
   }
+}
+
+export interface WeekStripDay {
+  isoDate: string;
+  gregorianDay: number;
+  copticDay: number | null;
+  /** A named feast falls on this day — the strip marks it with a gold dot. */
+  hasFeast: boolean;
+}
+
+/** The Sunday-to-Saturday week around a day, each with its Coptic day number. */
+export async function getWeekStrip(isoDate: string): Promise<WeekStripDay[]> {
+  const weekday = new Date(`${isoDate}T00:00:00Z`).getUTCDay();
+  const days = Array.from({ length: 7 }, (_, index) => addDaysIso(isoDate, index - weekday));
+  const [copticDates, feastDates] = await Promise.all([
+    getCopticDatesBetween(days[0], days[6]).catch(() => new Map<string, CopticDate>()),
+    getFeastDatesBetween(days[0], days[6]).catch(() => new Set<string>()),
+  ]);
+  return days.map((day) => ({
+    isoDate: day,
+    gregorianDay: Number(day.slice(8, 10)),
+    copticDay: copticDates.get(day)?.day ?? null,
+    hasFeast: feastDates.has(day),
+  }));
+}
+
+/**
+ * The days between two dates (inclusive) that carry a named single-day feast:
+ * the gold dots of the week strip and the month grid. The Sundays of Kiahk are
+ * left out — they are the season's own Sundays, not feasts of their own.
+ */
+export async function getFeastDatesBetween(fromDate: string, toDate: string): Promise<Set<string>> {
+  const years = new Set<number>();
+  for (const date of [fromDate, toDate]) {
+    const year = await getCopticYearForDate(new Date(`${date}T00:00:00Z`));
+    if (year !== null) years.add(year);
+  }
+  const sources = await Promise.all([...years].map((year) => getYearIndicatorSources(year)));
+  return new Set(
+    sources
+      .flatMap(({ events }) => events)
+      .filter((event) => event.date >= fromDate && event.date <= toDate && !event.key.startsWith('kiahk-sunday'))
+      .map((event) => event.date),
+  );
+}
+
+/** The Coptic date of every day in a span, keyed by Gregorian ISO date. */
+export async function getCopticDatesBetween(fromDate: string, toDate: string): Promise<Map<string, CopticDate>> {
+  const { data, error } = await supabase
+    .schema('calendar')
+    .from('coptic_date_conversions')
+    .select('gregorian_date, coptic_month_name, coptic_day, coptic_year')
+    .gte('gregorian_date', fromDate)
+    .lte('gregorian_date', toDate);
+  if (error) throw new Error(`Unable to load Coptic dates: ${error.message}`);
+  return new Map(
+    (data || []).map((row) => [row.gregorian_date as string, { monthName: row.coptic_month_name, day: row.coptic_day, year: row.coptic_year }]),
+  );
 }

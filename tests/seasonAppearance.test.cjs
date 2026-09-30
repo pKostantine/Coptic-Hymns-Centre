@@ -3,9 +3,9 @@ const fs = require('node:fs');
 const test = require('node:test');
 const ts = require('typescript');
 
-/** seasonAppearance.ts imports only a type, which transpiles away. */
-function loadAppearance() {
-  const source = fs.readFileSync('src/constants/seasonAppearance.ts', 'utf8');
+/** seasonAppearance.ts and nextSeason.ts import nothing at runtime, so a plain transpile loads them. */
+function load(path) {
+  const source = fs.readFileSync(path, 'utf8');
   const javascript = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
@@ -14,8 +14,11 @@ function loadAppearance() {
   return moduleObject.exports;
 }
 
-// seasonNames.ts reaches the app-language store, so the priority tables and
-// name tables are read from the source text rather than imported.
+const appearance = load('src/constants/seasonAppearance.ts');
+const nextSeason = load('src/utils/nextSeason.ts');
+
+// seasonNames.ts reaches the app-language store, so the priority and name
+// tables are read from the source text rather than imported.
 const seasonNamesSource = fs.readFileSync('src/constants/seasonNames.ts', 'utf8');
 
 function block(constName) {
@@ -28,7 +31,7 @@ function keysIn(constName) {
   return [...block(constName).matchAll(/^\s+'?([a-zA-Z][\w-]*)'?:/gm)].map((match) => match[1]);
 }
 
-/** Every key that can ever win the indicator and be shown on the card. */
+/** Every key that can ever win the indicator and name the day. */
 const INDICATOR_KEYS = [...keysIn('SEASON_INDICATOR_PRIORITIES'), ...keysIn('EVENT_INDICATOR_PRIORITIES')];
 
 test('the priority tables are actually being read', () => {
@@ -39,112 +42,148 @@ test('the priority tables are actually being read', () => {
   assert.ok(INDICATOR_KEYS.includes('feast-of-the-cross-paremhotep'));
 });
 
-test('every season that can win the indicator has its own colours', () => {
-  // An unmapped key falls back to the ordinary dark blue, which would quietly
-  // show a feast as though it were an ordinary day.
-  const { SEASON_APPEARANCE } = loadAppearance();
+test('every season or feast that can name the day has a colour and a chip name', () => {
+  // An unmapped key falls back to the annual navy, which would quietly show a
+  // feast as though it were an ordinary day; an unnamed one would read "Annual".
+  const shortNames = ['EVENT_SHORT_NAMES', 'SEASON_SHORT_NAMES'].map(block);
   for (const key of INDICATOR_KEYS) {
-    assert.ok(SEASON_APPEARANCE[key], `${key} has no entry in SEASON_APPEARANCE`);
+    assert.ok(appearance.THEME_BY_INDICATOR_KEY[key], `${key} has no colour`);
+    assert.ok(shortNames.some((table) => new RegExp(`^\\s+'?${key}'?:`, 'm').test(table)), `${key} has no short name`);
   }
 });
 
-test('every season that can win the indicator has a full name', () => {
-  // getSeasonIndicatorFullName falls through the formal tables to the short
-  // ones; a key in none of the four would render as 'Annual'.
-  const tables = ['EVENT_FORMAL_NAMES', 'SEASON_FORMAL_NAMES', 'EVENT_SHORT_NAMES', 'SEASON_SHORT_NAMES'].map(block);
-  for (const key of INDICATOR_KEYS) {
-    const named = tables.some((table) => new RegExp(`^\\s+'?${key}'?:`, 'm').test(table));
-    assert.ok(named, `${key} has no name in any of the four name tables`);
-  }
-});
-
-test('the user-specified seasons carry the colours they were given', () => {
-  const { SEASON_APPEARANCE: a } = loadAppearance();
-  const sameFamily = (x, y) => assert.equal(a[x], a[y], `${x} and ${y} should share one colour family`);
-
-  sameFamily('nativity', 'annunciation');          // dark red
-  sameFamily('lent', 'jonahs-fast');               // dark green
-  sameFamily('palm-sunday', 'feast-of-the-cross'); // light green
-  sameFamily('feast-of-the-cross', 'feast-of-the-cross-paremhotep');
-  sameFamily('st-mary-fast', 'st-marys-feast');    // royal blue
-  sameFamily('apostles-fast', 'apostles-feast');   // violet
-  sameFamily('holy-50-days', 'resurrection');      // white
-
-  // ...and the ones that must NOT share, or the year would read as one colour.
-  for (const [x, y] of [
-    ['nayrouz', 'nativity-fast'],
-    ['nativity-fast', 'nativity'],
-    ['lent', 'palm-sunday'],
-    ['holy-week', 'holy-50-days'],
-    ['annual', 'joyful-29'],
-  ]) {
-    assert.notEqual(a[x], a[y], `${x} and ${y} must be distinguishable`);
-  }
-});
-
-test('every card keeps its text legible on its own background', () => {
-  // Every stop the text can sit over has to carry the card's own text, so a
-  // season's accent is a text colour rather than its card colour. The one
-  // exemption is a stop the sweep puts in a corner the text never reaches.
-  const { SEASON_COLOUR_FAMILIES } = loadAppearance();
-  const luminance = (hex) => {
-    const channel = (i) => {
-      const v = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
-      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-    };
-    return 0.2126 * channel(0) + 0.7152 * channel(1) + 0.0722 * channel(2);
+test('each season wears the colour the spec gives it', () => {
+  const theme = (key, active) => appearance.getDayThemeKey(key, active);
+  const expected = {
+    annual: 'annual',
+    'lazarus-saturday': 'annual',
+    'palm-sunday': 'palm',
+    'holy-week': 'holyweek',
+    'holy-thursday': 'holyweek',
+    'good-friday': 'holyweek',
+    // سبت النور — Holy Saturday, E−1 — is still Holy Week's black.
+    'bright-saturday': 'holyweek',
+    resurrection: 'resurrection',
+    'holy-50-days': 'resurrection',
+    'thomas-sunday': 'resurrection',
+    ascension: 'resurrection',
+    pentecost: 'resurrection',
+    'jonahs-fast': 'lent',
+    'jonahs-feast': 'lent',
+    lent: 'lent',
+    'lent-sunday-3': 'lent',
+    'last-friday-of-lent': 'lent',
+    'apostles-fast': 'apostles',
+    'apostles-feast': 'apostles',
+    'feast-of-the-cross': 'palm',
+    'feast-of-the-cross-paremhotep': 'palm',
+    'nayrouz-period': 'gold',
+    nayrouz: 'gold',
+    'nativity-fast': 'natfast',
+    'kiahk-sunday-2': 'natfast',
+    'nativity-paramoun': 'lent',
+    nativity: 'nativity',
+    'nativity-period': 'nativity',
+    circumcision: 'gold',
+    'theophany-paramoun': 'lent',
+    theophany: 'theophany',
+    'second-day-of-theophany': 'theophany',
+    'wedding-at-cana': 'gold',
+    'st-mary-fast': 'marian',
+    'st-marys-feast': 'marian',
+    annunciation: 'marian',
+    'joyful-29': 'gold',
+    'entry-into-egypt': 'gold',
+    transfiguration: 'gold',
   };
-  const contrast = (a, b) => {
-    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-    return (hi + 0.05) / (lo + 0.05);
-  };
+  for (const [key, colour] of Object.entries(expected)) assert.equal(theme(key, [key]), colour, key);
+  assert.equal(theme(null), 'annual');
+  assert.equal(theme('something-new'), 'annual');
+});
 
-  for (const [name, theme] of Object.entries(SEASON_COLOUR_FAMILIES)) {
-    for (const [index, stop] of theme.gradient.entries()) {
-      if (index === theme.farStop) continue;
-      for (const role of ['heading', 'muted', 'accent']) {
-        const ratio = contrast(theme[role], stop);
-        assert.ok(ratio >= 4.5, `${name}.${role} (${theme[role]}) is only ${ratio.toFixed(2)}:1 on ${stop}`);
-      }
-    }
+test('a lesser feast inside a fast keeps the fast colour; a great one does not', () => {
+  const theme = appearance.getDayThemeKey;
+  assert.equal(theme('joyful-29', ['nativity-fast', 'joyful-29']), 'natfast');
+  assert.equal(theme('joyful-29', ['lent', 'joyful-29']), 'lent');
+  assert.equal(theme('joyful-29', ['apostles-fast', 'joyful-29']), 'apostles');
+  assert.equal(theme('transfiguration', ['st-mary-fast', 'transfiguration']), 'marian');
+  assert.equal(theme('entry-into-temple', ['jonahs-fast', 'entry-into-temple']), 'lent');
+  // The second Feast of the Cross, in Lent, is Lent's.
+  assert.equal(theme('feast-of-the-cross-paremhotep', ['lent', 'feast-of-the-cross-paremhotep']), 'lent');
+  // The Annunciation keeps its own blue in Lent.
+  assert.equal(theme('annunciation', ['lent', 'annunciation']), 'marian');
+  assert.equal(theme('feast-of-the-cross', ['nayrouz-period', 'feast-of-the-cross']), 'palm');
+});
+
+test('the themes carry the spec’s tokens', () => {
+  const t = appearance.DAY_BLOCK_THEMES;
+  assert.deepEqual([t.annual.from, t.annual.to], ['#0C3158', '#001D3D']);
+  assert.equal(t.annual.border, 'rgba(201, 162, 39, 0.30)');
+  assert.equal(t.annual.strong, '#D8C77A');
+  assert.equal(t.natfast.toAt, 0.78);
+  assert.equal(t.nativity.toAt, 0.8);
+  assert.equal(t.lent.toAt, 0.75);
+  // Gold: the selected day and the accents turn white so they don't blend in.
+  assert.equal(t.gold.selected, '#FFFFFF');
+  assert.equal(t.gold.accent, '#FFFFFF');
+  assert.equal(t.lent.selected, '#C9A227');
+  // Resurrection: a white block with dark text and a darker gold.
+  assert.equal(t.resurrection.text, '#10223A');
+  assert.equal(t.resurrection.muted, '#5B6573');
+  assert.equal(t.resurrection.accent, '#9A7A14');
+  assert.deepEqual([t.holyweek.from, t.holyweek.to], ['#141414', '#000000']);
+  assert.equal(t.holyweek.border, 'rgba(201, 162, 39, 0.35)');
+  for (const theme of Object.values(t)) {
+    assert.equal(theme.liveRing, theme.key === 'annual' ? 'halo' : 'white', theme.key);
   }
-  // The exemption is meant for exactly one card; a second would mean the rule
-  // is being worked around rather than followed.
-  const exempt = Object.values(SEASON_COLOUR_FAMILIES).filter((theme) => theme.farStop !== undefined);
-  assert.equal(exempt.length, 1);
 });
 
-test('the white seasons really are white, and Holy Week really is black', () => {
-  const { SEASON_COLOUR_FAMILIES: f } = loadAppearance();
-  const luminance = (hex) => {
-    const channel = (i) => {
-      const v = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
-      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-    };
-    return 0.2126 * channel(0) + 0.7152 * channel(1) + 0.0722 * channel(2);
+// A 1743 A.M. year laid out as the database gives it (2026–27).
+const SEASONS = [
+  { rangeKey: 'nativity-fast', startDate: '2026-11-25' },
+  { rangeKey: 'jonahs-fast', startDate: '2027-02-22' },
+  { rangeKey: 'lent', startDate: '2027-03-08' },
+  { rangeKey: 'holy-week', startDate: '2027-04-24' },
+  { rangeKey: 'holy-50-days', startDate: '2027-05-02' },
+  { rangeKey: 'apostles-fast', startDate: '2027-06-21' },
+  { rangeKey: 'st-mary-fast', startDate: '2027-08-07' },
+];
+const EVENTS = [
+  { key: 'feast-of-the-cross', date: '2026-09-27' },
+  { key: 'nativity', date: '2027-01-07' },
+  { key: 'theophany', date: '2027-01-19' },
+  { key: 'wedding-at-cana', date: '2027-01-21' },
+  { key: 'annunciation', date: '2027-04-07' },
+  { key: 'lazarus-saturday', date: '2027-04-24' },
+  { key: 'palm-sunday', date: '2027-04-25' },
+  { key: 'resurrection', date: '2027-05-02' },
+  { key: 'ascension', date: '2027-06-10' },
+  { key: 'pentecost', date: '2027-06-20' },
+  { key: 'apostles-feast', date: '2027-07-12' },
+  { key: 'st-marys-feast', date: '2027-08-22' },
+  { key: 'nayrouz', date: '2027-09-11' },
+];
+
+test('the next season skips the lesser feasts and counts the days, as in the design', () => {
+  const next = (date) => {
+    const found = nextSeason.pickNextSeason(date, SEASONS, EVENTS);
+    return found && `${found.key} ${found.days}`;
   };
-
-  // Holy 50 Days: a white card, which means dark text on it.
-  assert.ok(luminance(f.holyFifty.gradient[0]) > 0.85, 'the Holy 50 card must actually be white');
-  assert.ok(luminance(f.holyFifty.heading) < 0.1, 'a white card needs dark text');
-
-  // Holy Week: black.
-  assert.ok(luminance(f.holyWeek.gradient[0]) < 0.03, 'Holy Week must actually be black');
-
-  // Bright Saturday: both, with the black under the text and the white opposite.
-  assert.ok(luminance(f.brightSaturday.gradient[0]) < 0.03, 'Bright Saturday must start black');
-  assert.ok(luminance(f.brightSaturday.gradient[2]) > 0.85, 'Bright Saturday must end white');
-  assert.deepEqual(f.brightSaturday.start, { x: 0, y: 1 });
-  assert.deepEqual(f.brightSaturday.end, { x: 1, y: 0 });
-});
-
-test('Lazarus Saturday is an ordinary day, and Palm Sunday is not Holy Week', () => {
-  const { SEASON_APPEARANCE: a } = loadAppearance();
-  assert.equal(a['lazarus-saturday'], a.annual, 'Lazarus Saturday shows as annual');
-  assert.equal(a['palm-sunday'], a['feast-of-the-cross'], 'Palm Sunday keeps the light green');
-  assert.notEqual(a['palm-sunday'], a['holy-week'], 'Palm Sunday must not be Holy Week black');
-  assert.notEqual(a['bright-saturday'], a['holy-week'], 'Bright Saturday must not be plain black');
-  assert.equal(a['holy-thursday'], a['holy-week']);
-  assert.equal(a['good-friday'], a['holy-week']);
-  assert.equal(a.resurrection, a['holy-50-days']);
+  assert.equal(next('2026-09-30'), 'nativity-fast 56');
+  assert.equal(next('2026-09-27'), 'nativity-fast 59');
+  assert.equal(next('2026-12-02'), 'nativity 36');
+  assert.equal(next('2027-01-07'), 'theophany 12');
+  assert.equal(next('2027-01-19'), 'jonahs-fast 34');   // past the Wedding at Cana
+  assert.equal(next('2027-03-17'), 'palm-sunday 39');   // past the Annunciation and Lazarus Saturday
+  assert.equal(next('2027-04-07'), 'palm-sunday 18');
+  assert.equal(next('2027-04-25'), 'holy-week 1');      // Holy Week from the Monday
+  assert.equal(next('2027-04-29'), 'resurrection 3');
+  assert.equal(next('2027-05-10'), 'pentecost 41');     // past the Ascension
+  assert.equal(next('2027-06-28'), 'apostles-feast 14');
+  assert.equal(next('2027-08-12'), 'st-marys-feast 10');
+  assert.equal(next('2027-09-01'), 'nayrouz 10');
+  assert.equal(next('2027-09-12'), null);
+  for (const key of ['nativity-fast', 'holy-week', 'resurrection', 'st-marys-feast', 'nayrouz']) {
+    assert.ok(nextSeason.NEXT_SEASON_NAMES[key]?.english, `${key} has no name`);
+  }
 });

@@ -103,6 +103,38 @@ export function formatWeekdayDate(date: Date, isArabic: boolean) {
   return `${WEEKDAYS_EN[weekday]}, ${GREGORIAN_MONTHS_EN[date.getUTCMonth()]} ${date.getUTCDate()}`;
 }
 
+/** "Wednesday, 30 September" / "Mercredi 30 septembre" / "الأربعاء ٣٠ سبتمبر" — the Home hero's date, day before month as the CHC design writes it. */
+export function formatDayMonthDate(date: Date, isArabic: boolean) {
+  const weekday = date.getUTCDay();
+  if (isArabic) return `${WEEKDAYS_AR[weekday]} ${toEasternArabicDigits(date.getUTCDate())} ${GREGORIAN_MONTHS_AR[date.getUTCMonth()]}`;
+  if (isFrench(isArabic)) return `${capitalize(WEEKDAYS_FR[weekday])} ${date.getUTCDate()} ${GREGORIAN_MONTHS_FR[date.getUTCMonth()]}`;
+  return `${WEEKDAYS_EN[weekday]}, ${date.getUTCDate()} ${GREGORIAN_MONTHS_EN[date.getUTCMonth()]}`;
+}
+
+/** The same with the year: "Wednesday, 30 September 2026" — the Books day block's Gregorian line. */
+export function formatDayMonthYearDate(date: Date, isArabic: boolean) {
+  const year = isArabic ? toEasternArabicDigits(date.getUTCFullYear()) : String(date.getUTCFullYear());
+  return `${formatDayMonthDate(date, isArabic)} ${year}`;
+}
+
+/** "25 April – 1 May 2027" / "25 avril – 1 mai 2027" / "٢٥ أبريل – ١ مايو ٢٠٢٧": a span of days, the year said once. */
+export function formatDayMonthRange(start: Date, end: Date, isArabic: boolean) {
+  const months = isArabic ? GREGORIAN_MONTHS_AR : isFrench(isArabic) ? GREGORIAN_MONTHS_FR : GREGORIAN_MONTHS_EN;
+  const digits = (value: number) => (isArabic ? toEasternArabicDigits(value) : String(value));
+  const dayMonth = (date: Date) => `${digits(date.getUTCDate())} ${months[date.getUTCMonth()]}`;
+  const year = digits(end.getUTCFullYear());
+  if (start.getUTCFullYear() !== end.getUTCFullYear()) return `${dayMonth(start)} ${digits(start.getUTCFullYear())} – ${dayMonth(end)} ${year}`;
+  if (start.getUTCMonth() === end.getUTCMonth()) return `${digits(start.getUTCDate())} – ${dayMonth(end)} ${year}`;
+  return `${dayMonth(start)} – ${dayMonth(end)} ${year}`;
+}
+
+/** A Coptic day and month: "Thoout 20" / "20 Thoout" / "٢٠ توت". */
+export function formatCopticDayMonth(monthName: string, day: number, isArabic: boolean) {
+  if (isArabic) return `${toEasternArabicDigits(day)} ${formatCopticMonthName(monthName, true)}`;
+  if (isFrench(isArabic)) return `${day} ${monthName}`;
+  return `${monthName} ${day}`;
+}
+
 /** A Coptic date as "Thoout 16, 1743" / "16 Thoout 1743" / "١٦ توت ١٧٤٣". */
 export function formatCopticDate(monthName: string, day: number, year: number, isArabic: boolean) {
   if (isArabic) return `${toEasternArabicDigits(day)} ${formatCopticMonthName(monthName, true)} ${toEasternArabicDigits(year)}`;

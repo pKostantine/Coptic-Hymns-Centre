@@ -1,17 +1,15 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import BookMenuScaffold, { MenuSectionLabel, TileRow } from './BookMenuScaffold';
+import BookPage, { BookRow, RowList, SectionHeading } from './BookPage';
 import { sectionIndexFor, TESTAMENTS, type Testament } from '../../../constants/bibleTestaments';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
-import { getBibleBooks, getBibleChapterKeys, getCachedBibleChapterKeys, type BibleBook } from '../../../utils/bibleService';
-
 import { appText, tr } from '../../../utils/appText';
-const MAX_FONT_SCALE = 1.25;
+import { getBibleBooks, getBibleChapterKeys, getCachedBibleChapterKeys, type BibleBook } from '../../../utils/bibleService';
+import { toEasternArabicDigits } from '../../../utils/localeFormat';
 
 type LoadedBooks = { testament: Testament; books: BibleBook[] };
 
@@ -20,25 +18,25 @@ function prefetchBookChapters(book: BibleBook) {
   void getBibleChapterKeys(book.bookKey).catch(() => {});
 }
 
-/** Warms each book's chapter list in reading order, one at a time, so a one-chapter book can open straight onto its text. */
-async function prefetchInTurn(books: BibleBook[], cancelled: () => boolean) {
+/**
+ * Warms each book's chapter list in reading order, one at a time, so a
+ * one-chapter book can open straight onto its text — and so each book's
+ * chapter count can be shown as it arrives.
+ */
+async function prefetchInTurn(books: BibleBook[], cancelled: () => boolean, onLoaded: () => void) {
   for (const book of books) {
     if (cancelled()) return;
-    await getBibleChapterKeys(book.bookKey).catch(() => {});
+    const cached = getCachedBibleChapterKeys(book.bookKey);
+    if (cached) continue;
+    await getBibleChapterKeys(book.bookKey).then(onLoaded, () => {});
   }
 }
 
-function pairs<T>(items: T[]): T[][] {
-  const rows: T[][] = [];
-  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
-  return rows;
-}
-
 /**
- * One testament's books, grouped as the Church reads them — the Law, the
- * Historical Books, the Psalms and Wisdom, the Prophets; the Gospels, the
- * Pauline and Catholic Epistles, the Apocalypse — two to a row, each group in
- * its own shade of the Bible's bronze.
+ * One testament's books as a contents list (CHC design, "Book Pages"),
+ * grouped as the Church reads them — the Law, the Historical Books, the
+ * Psalms and Wisdom, the Prophets; the Gospels, the Pauline and Catholic
+ * Epistles, the Apocalypse — each with its number of chapters.
  */
 export default function BibleTestamentMenu({ testament }: { testament: Testament }) {
   const router = useRouter();
@@ -47,6 +45,8 @@ export default function BibleTestamentMenu({ testament }: { testament: Testament
   const look = TESTAMENTS[testament];
   const [loaded, setLoaded] = useState<LoadedBooks | null>(null);
   const [error, setError] = useState<{ testament: Testament; message: string } | null>(null);
+  // Bumped as each book's chapter list arrives, so its count appears.
+  const [, setChaptersLoaded] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +55,7 @@ export default function BibleTestamentMenu({ testament }: { testament: Testament
         if (cancelled) return;
         const books = allBooks.filter((book) => book.testament === testament).sort((a, b) => a.bookOrder - b.bookOrder);
         setLoaded({ testament, books });
-        void prefetchInTurn(books, () => cancelled);
+        void prefetchInTurn(books, () => cancelled, () => setChaptersLoaded((count) => count + 1));
       })
       .catch((err) => {
         if (!cancelled) setError({ testament, message: err.message });
@@ -83,96 +83,49 @@ export default function BibleTestamentMenu({ testament }: { testament: Testament
     router.push({ pathname: '/bible/[bookKey]', params: { bookKey: book.bookKey } });
   };
 
+  const chapterCount = (book: BibleBook) => {
+    const chapters = getCachedBibleChapterKeys(book.bookKey);
+    if (!chapters) return '';
+    return arabic ? toEasternArabicDigits(chapters.length) : String(chapters.length);
+  };
+
   return (
-    <BookMenuScaffold
-      theme={look.theme}
+    <BookPage
       title={{ english: look.english, arabic: look.arabic, french: look.french }}
-      overline={tr('BIBLE', 'BIBLE', 'الكتاب المقدس')}
-      description={appText(look.range)}
+      kicker={tr('Bible', 'Bible', 'الكتاب المقدس')}
+      subtitle={appText(look.range)}
       arabic={arabic}
       backHref="/bible"
+      action={{ icon: 'search-outline', label: tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس'), onPress: () => router.push('/bible/search') }}
     >
       {failure ? (
         <Text style={styles.error}>{failure}</Text>
       ) : !books ? (
-        <ActivityIndicator style={styles.loading} color={look.theme.accent} />
+        <ActivityIndicator style={styles.loading} color={COLORS.gold} />
       ) : (
         groups.map(({ section, books: sectionBooks }) => (
-          <View key={section.from} style={styles.group}>
-            <MenuSectionLabel text={appText(section)} arabic={arabic} accent={look.theme.accent} />
-            {pairs(sectionBooks).map((row) => (
-              <TileRow key={row[0].bookKey} arabic={arabic}>
-                {row.map((book) => (
-                  <BookTile
-                    key={book.bookKey}
-                    title={appText({ english: book.titleEnglish, arabic: book.titleArabic, french: book.titleFrench })}
-                    gradient={section.gradient}
-                    accent={look.theme.accent}
-                    arabic={arabic}
-                    onPrefetch={() => prefetchBookChapters(book)}
-                    onPress={() => openBook(book)}
-                  />
-                ))}
-              </TileRow>
-            ))}
+          <View key={section.from}>
+            <SectionHeading title={appText(section)} arabic={arabic} />
+            <RowList>
+              {sectionBooks.map((book) => (
+                <BookRow
+                  key={book.bookKey}
+                  title={appText({ english: book.titleEnglish, arabic: book.titleArabic, french: book.titleFrench })}
+                  count={chapterCount(book)}
+                  arabic={arabic}
+                  onPrefetch={() => prefetchBookChapters(book)}
+                  onPress={() => openBook(book)}
+                />
+              ))}
+            </RowList>
           </View>
         ))
       )}
-    </BookMenuScaffold>
-  );
-}
-
-interface BookTileProps {
-  title: string;
-  gradient: readonly [string, string, ...string[]];
-  accent: string;
-  arabic: boolean;
-  onPrefetch: () => void;
-  onPress: () => void;
-}
-
-/** A book of the Bible on its shelf: a short bound spine of colour down its leading edge, and its name. */
-function BookTile({ title, gradient, accent, arabic, onPrefetch, onPress }: BookTileProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      onPress={onPress}
-      onPressIn={onPrefetch}
-      onHoverIn={onPrefetch}
-      style={({ pressed }) => [styles.tile, arabic && styles.rowReverse, pressed && styles.pressed]}
-    >
-      {/* Lit from the spine's side, which is the right in Arabic. */}
-      <LinearGradient colors={gradient} start={{ x: arabic ? 1 : 0, y: 0 }} end={{ x: arabic ? 0 : 1, y: 1 }} style={[StyleSheet.absoluteFill, styles.fill]} />
-      <View style={[styles.spine, { backgroundColor: accent }]} />
-      <Text style={[styles.tileTitle, arabic && styles.arabicText]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-        {title}
-      </Text>
-    </Pressable>
+    </BookPage>
   );
 }
 
 const styles = StyleSheet.create({
   loading: { marginTop: SPACING.xl },
-  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 16, marginTop: SPACING.lg, textAlign: 'center' },
-  group: { gap: 10 },
-  rowReverse: { flexDirection: 'row-reverse' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, fontSize: 16.5, textAlign: 'right', writingDirection: 'rtl' },
-  tile: {
-    alignItems: 'center',
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    flexGrow: 1,
-    gap: 12,
-    minHeight: 64,
-    overflow: 'hidden',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  fill: { borderRadius: 13 },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  spine: { alignSelf: 'stretch', borderRadius: 2, marginVertical: 4, opacity: 0.55, width: 3 },
-  tileTitle: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 15.5, fontWeight: '700', lineHeight: 20 },
+  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 16, marginHorizontal: 16, marginTop: SPACING.lg, textAlign: 'center' },
 });

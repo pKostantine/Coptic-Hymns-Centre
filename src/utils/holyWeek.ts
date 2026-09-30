@@ -59,6 +59,18 @@ export async function loadHolyWeekSchedule(effectiveDate: Date, isEvening: boole
   return currentDayId ? { palmSunday, currentDayId } : null;
 }
 
+/**
+ * Palm Sunday of the Holy Week being prayed, or else of the next one — what
+ * the Holy Week page dates itself by all year. Null if the calendar has none
+ * within the coming year.
+ */
+export async function loadUpcomingPalmSunday(fromDate: Date): Promise<Date | null> {
+  const from = toIsoDate(fromDate);
+  const ranges = await getSeasonRanges(from, toIsoDate(addUtcDays(fromDate, 400) as Date));
+  const range = ranges.find((entry) => entry.rangeKey === 'holy-week' && entry.endDate >= from);
+  return range ? (addUtcDays(parseIsoDate(range.startDate), 1) as Date) : null;
+}
+
 const WEEKDAYS = {
   english: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   arabic: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
