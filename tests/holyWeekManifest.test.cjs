@@ -21,7 +21,9 @@ function loadPaschaHelpers() {
   const start = hymnLibrarySource.indexOf('const PASCHA_READING_SENTINELS');
   const end = hymnLibrarySource.indexOf('const paschaReadingsCache', start);
   assert.ok(start >= 0 && end > start, 'Pascha reading helpers not found');
-  return new Function(`${hymnLibrarySource.slice(start, end)}\nreturn { paschaHourOf, selectPaschaReadings, paschaHymnKeyForTitle };`)();
+  return new Function(
+    `${hymnLibrarySource.slice(start, end)}\nreturn { paschaHourOf, selectPaschaReadings, paschaHymnKeyForTitle, selectPaschaRiteReading, gospelAuthorFlagsOf };`,
+  )();
 }
 
 const manifest = loadManifest();
@@ -121,8 +123,73 @@ test('Pascha sentinels pick their readings, interpretations following what they 
   assert.deepEqual(ids('PASCHA_PROPHECIES'), ['0', '1', '2']);
   assert.deepEqual(ids('PASCHA_HOMILIES'), ['3']);
   assert.deepEqual(ids('PASCHA_PAULINE_EPISTLE'), ['4']);
-  assert.deepEqual(ids('MOURNFUL_GOSPEL_RITE'), ['5', '6', '7']);
+  assert.deepEqual(ids('PASCHA_GOSPEL_INTERPRETATIONS'), ['7']);
+  // The Psalm and Gospel are the mournful rites' now, not a sentinel's.
+  assert.deepEqual(ids('MOURNFUL_GOSPEL_RITE'), []);
   assert.deepEqual(ids('PASCHA_EXPOSITION'), []);
+});
+
+test('the mournful rites read the hour\'s Psalm and its Gospels in order', () => {
+  const { selectPaschaRiteReading } = loadPaschaHelpers();
+  const rows = [
+    { reading_type: 'Prophecy', reading_rule_id: 'prophecy' },
+    { reading_type: 'Psalm', reading_rule_id: 'psalm' },
+    { reading_type: 'Gospel', reading_rule_id: 'matthew' },
+    { reading_type: 'Gospel', reading_rule_id: 'mark' },
+    { reading_type: 'Gospel', reading_rule_id: 'luke' },
+    { reading_type: 'Gospel', reading_rule_id: 'john' },
+    { reading_type: 'Interpretation', reading_rule_id: 'interpretation' },
+  ];
+  const start = hymnLibrarySource.indexOf('const PASCHA_RITE_READINGS');
+  const end = hymnLibrarySource.indexOf('};', start) + 2;
+  const readings = new Function(`${hymnLibrarySource.slice(start, end)}\nreturn PASCHA_RITE_READINGS;`)();
+  const read = (sentinel) => selectPaschaRiteReading(readings[sentinel], rows)?.reading_rule_id ?? null;
+  assert.equal(read('PSALM_WITH_COPTIC'), 'psalm');
+  assert.equal(read('PSALM_WITHOUT_COPTIC'), 'psalm');
+  assert.equal(read('GOSPEL_WITH_COPTIC'), 'matthew');
+  assert.equal(read('FIRST_GOSPEL_WITHOUT_COPTIC'), 'matthew');
+  assert.equal(read('SECOND_GOSPEL_WITH_COPTIC'), 'mark');
+  assert.equal(read('THIRD_GOSPEL_WITHOUT_COPTIC'), 'luke');
+  assert.equal(read('FOURTH_GOSPEL_WITH_COPTIC'), 'john');
+  assert.equal(selectPaschaRiteReading(readings.SECOND_GOSPEL_WITH_COPTIC, rows.slice(0, 3)), null);
+  for (const [sentinel, mapping] of Object.entries(readings)) {
+    assert.equal(mapping.withCoptic, sentinel.endsWith('_WITH_COPTIC'), sentinel);
+  }
+});
+
+test('an hour\'s evangelist comes from its own Gospels, every other one switched off', () => {
+  const { gospelAuthorFlagsOf } = loadPaschaHelpers();
+  assert.deepEqual(gospelAuthorFlagsOf([{ reading_type: 'Psalm', book_key: 'psalms' }, { reading_type: 'Gospel', book_key: 'luke' }]), {
+    GospelMatthew: false, GospelMark: false, GospelLuke: true, GospelJohn: false,
+  });
+  assert.deepEqual(gospelAuthorFlagsOf([]), { GospelMatthew: false, GospelMark: false, GospelLuke: false, GospelJohn: false });
+});
+
+test('Holy Week hours splice the mournful rites like GOSPEL_RITE, toggle and all', () => {
+  assert.match(hymnLibrarySource, /MOURNFUL_GOSPEL_RITE: \{ schema: "gospel_rite", table: "mournful_gospel_rite" \}/);
+  assert.match(hymnLibrarySource, /MOURNFUL_4_GOSPELS_RITE: \{ schema: "gospel_rite", table: "mournful_4_gospels_rite" \}/);
+  assert.match(hymnLibrarySource, /const GOSPEL_RITE_KEYS = new Set\(\["GOSPEL_RITE", "MOURNFUL_GOSPEL_RITE", "MOURNFUL_4_GOSPELS_RITE"\]\)/);
+  assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) return null;/);
+  assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) \{\n\s+return safeHydrateNested/);
+
+  // The rites' reading rows resolve as reading sentinels.
+  const start = hymnLibrarySource.indexOf('export const READING_SENTINELS');
+  const end = hymnLibrarySource.indexOf('\nlet readingsForDateCache', start);
+  const { isReadingSentinel } = new Function(
+    `${hymnLibrarySource.slice(start, end).replace('export const', 'const')}\nreturn { isReadingSentinel };`,
+  )();
+  assert.equal(isReadingSentinel('PSALM_WITH_COPTIC'), true);
+  assert.equal(isReadingSentinel('FOURTH_GOSPEL_WITHOUT_COPTIC'), true);
+  assert.equal(isReadingSentinel('VESPERS_GOSPEL_WITH_COPTIC'), true);
+  assert.equal(isReadingSentinel('FIFTH_GOSPEL_WITH_COPTIC'), false);
+});
+
+test('FridayEve1stHour is raised by the Friday Eve 1st hour alone', () => {
+  const raising = manifest.HOLY_WEEK_HOURS.filter((hour) => hour.extraContext?.FridayEve1stHour === true);
+  assert.deepEqual(raising.map((hour) => hour.id), ['friday_eve_1st']);
+  assert.equal(raising[0].table, 'pascha_hour');
+  assert.equal(raising[0].extraContext.GoodFriday, true);
+  assert.equal(raising[0].extraContext.PaschaEveHour, true);
 });
 
 test('homily and interpretation titles name their holy_week hymns', () => {

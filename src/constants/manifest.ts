@@ -262,8 +262,14 @@ function hourSuffix(hour: PaschaHourNumber): string {
 }
 
 /** The five hours of an eve (1st, 3rd, 6th, 9th, 11th), all on the shared pascha_hour document. */
-function paschaEveHours(prefix: string, day: HolyWeekDayToken): HolyWeekHourSeed[] {
-  return ([1, 3, 6, 9, 11] as const).map((hour) => paschaHour(`${prefix}_eve_${hourSuffix(hour)}`, day, 'Eve', hour));
+function paschaEveHours(
+  prefix: string,
+  day: HolyWeekDayToken,
+  extraByHour: Partial<Record<PaschaHourNumber, Record<string, boolean>>> = {},
+): HolyWeekHourSeed[] {
+  return ([1, 3, 6, 9, 11] as const).map((hour) =>
+    paschaHour(`${prefix}_eve_${hourSuffix(hour)}`, day, 'Eve', hour, 'pascha_hour', extraByHour[hour]),
+  );
 }
 
 /** The daytime hours (1st, 3rd, 6th, 9th, 11th) on the shared pascha_hour document. */
@@ -323,7 +329,14 @@ const HOLY_WEEK_ROW_SEEDS: HolyWeekDaySeed[][] = [
         paschaHour('thursday_11th', 'HolyThursday', 'Day', 11, 'pascha_hour', { CovenantThursday11thHour: true }),
       ],
     },
-    { id: 'friday-eve', title: 'Friday Eve', arabic: 'ليلة الجمعة', french: 'Veille du vendredi', hours: paschaEveHours('friday', 'GoodFriday') },
+    {
+      id: 'friday-eve',
+      title: 'Friday Eve',
+      arabic: 'ليلة الجمعة',
+      french: 'Veille du vendredi',
+      // The 1st hour's four Gospels are all John's (FridayEve1stHour, raised here alone).
+      hours: paschaEveHours('friday', 'GoodFriday', { 1: { FridayEve1stHour: true } }),
+    },
   ],
   [
     {

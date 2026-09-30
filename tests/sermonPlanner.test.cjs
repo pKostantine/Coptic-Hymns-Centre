@@ -15,19 +15,20 @@ function extractFunction(startMarker, endMarker) {
   return hymnLibrarySource.slice(start, end).replace(/^export /, '');
 }
 
-function loadHydrateService(getContextFlags, hydrateWithFlags) {
+function loadHydrateService(getContextFlags, hydrateWithFlags, paschaGospelAuthorFlags = async () => ({})) {
   const definition = extractFunction(
     'export async function hydrateSupabaseServiceHymn(',
     '\n// A single misconfigured',
   );
   return new Function(
-    'deriveStructuralFlags', 'getContextFlags', 'toIsoDateString', 'hydrateWithFlags',
+    'deriveStructuralFlags', 'getContextFlags', 'toIsoDateString', 'hydrateWithFlags', 'paschaGospelAuthorFlags',
     definition + '\nreturn hydrateSupabaseServiceHymn;',
   )(
     () => ({}),
     getContextFlags,
     (date) => date.toISOString().slice(0, 10),
     hydrateWithFlags,
+    paschaGospelAuthorFlags,
   );
 }
 
@@ -89,6 +90,18 @@ test('Unrelated Lectionary services retain the ordinary one-context hydrator', a
   assert.equal(calls.length, 1);
   assert.equal(received.length, 5);
   assert.equal(received[2].Matins, true);
+});
+
+test('A Holy Week hour reads its own evangelist, not the calendar Matins one', async () => {
+  let received;
+  const hydrate = loadHydrateService(
+    async (_date, flags) => ({ ...flags, GospelMark: true }),
+    async (...args) => { received = args; return ['hour']; },
+    async (flags) => (flags.PaschaDayHour ? { GospelMatthew: false, GospelMark: false, GospelLuke: true, GospelJohn: false } : {}),
+  );
+  await hydrate('holy_week', 'thursday_first_hour', new Date('2027-04-29T00:00:00Z'), { Matins: true, PaschaDayHour: true });
+  assert.equal(received[2].GospelLuke, true);
+  assert.equal(received[2].GospelMark, false);
 });
 
 function loadLookupSchemas(installedSchemas) {

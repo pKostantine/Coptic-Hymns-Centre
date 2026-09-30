@@ -185,96 +185,111 @@ test('a reload or a jump never lets the page\'s first "at the top" report replac
   assert.match(modal, /function jumpToSection\(id: string\) \{[\s\S]*?setCurrentSectionId\(id\);/);
 });
 
-// The document page's own jump hold (documentHtml.ts), run against a minimal
-// window. On the phone the native scroll view can put back its own offset
-// after a jump has landed -- the subdocument "went there and shot back to the
-// top" -- so a jump the app asked for is held briefly against anything that
-// moves the page, but never against the reader.
+// The document page's own jumps (documentHtml.ts), run against a minimal
+// window: made a task after the call that asked, then held briefly against
+// anything else moving the page, but never against the reader.
 function loadJumpHold() {
   const source = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
-  const start = source.indexOf('      function currentScrollY() {');
+  const start = source.indexOf("      var pageScroller = document.querySelector('.page-scroller');");
   const end = source.indexOf('      window.scrollToTune = function');
   assert.ok(start > 0 && end > start, 'jump hold script not found');
   const script = source.slice(start, end);
   assert.doesNotMatch(script, /\$\{/, 'the extracted script must not depend on template values');
 
   const listeners = {};
+  const on = (type, handler) => (listeners[type] ||= []).push(handler);
   const sectionTops = { a: 0, b: 2000, c: 4000 };
-  const win = {
-    pageYOffset: 0,
-    innerHeight: 800,
-    scrollTo(xOrOptions, y) {
-      const top = typeof xOrOptions === 'object' ? xOrOptions.top : y;
-      win.pageYOffset = top;
-    },
-    addEventListener(type, handler) {
-      (listeners[type] ||= []).push(handler);
-    },
+  // The document scrolls in .page-scroller, which fills the web view.
+  const scroller = {
+    scrollTop: 0,
+    scrollHeight: 6000,
+    clientHeight: 800,
+    getBoundingClientRect: () => ({ top: 0 }),
+    addEventListener: on,
   };
+  const win = { addEventListener: on };
   const doc = {
-    documentElement: { scrollHeight: 6000, scrollTop: 0 },
+    querySelector: (selector) => (selector === '.page-scroller' ? scroller : null),
     getElementById(id) {
       if (!(id in sectionTops)) return null;
       return {
         isConnected: true,
         getBoundingClientRect: () => ({
-          top: sectionTops[id] - win.pageYOffset,
-          bottom: sectionTops[id] + 1500 - win.pageYOffset,
+          top: sectionTops[id] - scroller.scrollTop,
+          bottom: sectionTops[id] + 1500 - scroller.scrollTop,
         }),
       };
     },
-    querySelector: () => null,
   };
-  new Function('window', 'document', script)(win, doc);
+  new Function('window', 'document', 'postAction', script)(win, doc, () => undefined);
   const fire = (type) => (listeners[type] || []).forEach((handler) => handler({ type }));
-  // Something outside the page moving it, as the native scroll view does.
+  // Something outside the page moving it, as a native scroll view does.
   const moveFromOutside = (top) => {
-    win.pageYOffset = top;
+    scroller.scrollTop = top;
     fire('scroll');
   };
-  return { win, fire, moveFromOutside };
+  return { win, scroller, fire, moveFromOutside };
 }
 
 test('a jump holds against the page being moved back to the top, but never against the reader', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
-  const { win, fire, moveFromOutside } = loadJumpHold();
+  const { win, scroller, fire, moveFromOutside } = loadJumpHold();
 
   assert.equal(win.scrollToSection('b'), true);
-  assert.equal(win.pageYOffset, 1999);
+  assert.equal(scroller.scrollTop, 0, 'not scrolled inside the call that asked');
+  t.mock.timers.tick(0);
+  assert.equal(scroller.scrollTop, 1999);
   moveFromOutside(0);
-  assert.equal(win.pageYOffset, 1999, 'a reset right after the jump is undone');
+  assert.equal(scroller.scrollTop, 1999, 'a reset right after the jump is undone');
 
   // Undone on a schedule too, for a reset that sends no scroll event.
-  win.pageYOffset = 0;
+  scroller.scrollTop = 0;
   t.mock.timers.tick(700);
-  assert.equal(win.pageYOffset, 1999);
+  assert.equal(scroller.scrollTop, 1999);
 
   // The reader's own touch ends the hold at once.
   fire('touchstart');
   moveFromOutside(350);
-  assert.equal(win.pageYOffset, 350);
+  assert.equal(scroller.scrollTop, 350);
 
   // And it lapses on its own: long after a jump, nothing is pulled back.
   win.scrollToSection('c');
-  assert.equal(win.pageYOffset, 3999);
+  t.mock.timers.tick(0);
+  assert.equal(scroller.scrollTop, 3999);
   t.mock.timers.tick(3000);
   moveFromOutside(10);
-  assert.equal(win.pageYOffset, 10);
+  assert.equal(scroller.scrollTop, 10);
 });
 
 test('a restore to a hymn\'s end and a verse jump are held the same way', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
-  const { win, moveFromOutside } = loadJumpHold();
+  const { win, scroller, moveFromOutside } = loadJumpHold();
   // Restore candidates, as DocumentWebView's load handler sends them.
   win.scrollToSection([{ sectionId: 'missing', edge: 'start' }, { sectionId: 'b', edge: 'end' }]);
-  assert.equal(win.pageYOffset, 2000 + 1500 - 800 + 16);
+  t.mock.timers.tick(0);
+  assert.equal(scroller.scrollTop, 2000 + 1500 - 800 + 16);
   moveFromOutside(0);
-  assert.equal(win.pageYOffset, 2716);
+  assert.equal(scroller.scrollTop, 2716);
   // A smooth scroll can't be held, and ends an earlier hold rather than
   // being pulled back to it.
   win.releaseHeldJump();
   moveFromOutside(5);
-  assert.equal(win.pageYOffset, 5);
+  assert.equal(scroller.scrollTop, 5);
+});
+
+test('the document scrolls in its own scroller, never as the page', () => {
+  // On iPhone/iPad the web view's own scroll view answers iOS's
+  // scroll-to-top; a subdocument pill jump kept sliding back to the top a
+  // third of a second later. WebKit never offers an inner scroller to it.
+  const html = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
+  const rootRule = html.slice(html.indexOf('      html, body {'), html.indexOf('      .page-scroller {'));
+  assert.match(rootRule, /height: 100%;/);
+  assert.match(rootRule, /overflow: hidden;/);
+  assert.match(html, /\.page-scroller \{[^}]*overflow-y: auto;/);
+  assert.match(html, /<div class="page-scroller"><main class="document">/);
+  assert.match(html, /pageScroller\.addEventListener\('scroll', scheduleReport/);
+  assert.doesNotMatch(html, /window\.addEventListener\('scroll'/);
+  assert.doesNotMatch(html, /window\.scrollTo\(/);
 });
 
 test('a subdocument (and its Settings/Calendar) can be swiped out from a landscape phone\'s notch inset', () => {
@@ -287,6 +302,17 @@ test('a subdocument (and its Settings/Calendar) can be swiped out from a landsca
   assert.match(modal, /if \(start\.edge === 'left' && dx > 60\) onSwipeFromLeft\(\);/);
   assert.match(modal, /isMobileDocument \? insetEdgeSwipe\.handlers/);
   assert.match(modal, /isMobileDocument \? overlayInsetEdgeSwipe\.handlers/);
-  assert.match(modal, /isStylusGestureEvent\(_\) \|\| startsInInset\(gestureState\.x0\)\) return false;/);
-  assert.match(modal, /isStylusGestureEvent\(event\) \|\| startsInInset\(gestureState\.x0\)\) return;/);
+  assert.match(modal, /isStylusGestureEvent\(_\) \|\| startsInInset\(startX\)\) return false;/);
+});
+
+test('a subdocument\'s edge swipes know where they started, in slideshow mode too', () => {
+  // gestureState.x0 is 0 until a responder is granted, and granting resets
+  // dx; reading either made every swipe look like it began at the left edge,
+  // so the content list could never be swiped open over a slideshow.
+  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  assert.match(modal, /return gestureState\.moveX - gestureState\.dx;/);
+  assert.doesNotMatch(modal, /gestureState\.x0\s*[<>]|\(gestureState\.x0\)/);
+  assert.match(modal, /if \(isCloseSwipe \|\| isSelectorSwipe\) swipeTakenFromXRef\.current = startX;/);
+  assert.match(modal, /takenFromX > screenWidth - selectorEdgeWidth && travelled < -36\) \{\s*setSelectorOpen\(true\);/);
+  assert.match(modal, /if \(isCloseSwipe\) overlaySwipeTakenFromXRef\.current = startX;/);
 });

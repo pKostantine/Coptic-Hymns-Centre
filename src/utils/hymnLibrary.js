@@ -21,6 +21,10 @@ export const SUBDOCUMENT_MAP = {
   CANONS: { schema: "canons", table: "canons" },
   DOXOLOGIES: { schema: "doxologies", table: "doxologies" },
   GOSPEL_RITE: { schema: "gospel_rite", table: "gospel_rite" },
+  // Holy Week's Psalm and Gospel: one Gospel an hour, four on Friday Eve and
+  // Good Friday. Their readings come from the hour (PASCHA_RITE_READINGS).
+  MOURNFUL_GOSPEL_RITE: { schema: "gospel_rite", table: "mournful_gospel_rite" },
+  MOURNFUL_4_GOSPELS_RITE: { schema: "gospel_rite", table: "mournful_4_gospels_rite" },
   GOSPEL_RESPONSES: { schema: "gospel_responses", table: "gospel_responses" },
   THE_FIVE_SHORT_LITANIES: { schema: "litanies", table: "the_five_short_litanies" },
   THREE_GREAT_LITANIES: { schema: "litanies", table: "the_three_great_litanies" },
@@ -88,8 +92,11 @@ function humanizeSentinelKey(key) {
     .join(" ");
 }
 
+/** The whole-table splices that carry the in-document "Coptic Gospel Rite" toggle. */
+const GOSPEL_RITE_KEYS = new Set(["GOSPEL_RITE", "MOURNFUL_GOSPEL_RITE", "MOURNFUL_4_GOSPELS_RITE"]);
+
 /**
- * GOSPEL_RITE always gets its "Coptic Gospel Rite" toggle button rendered
+ * A Gospel rite (GOSPEL_RITE_KEYS) always gets its "Coptic Gospel Rite" toggle button rendered
  * immediately after its content's own title (see
  * pushWholeTableInlineSections below), wherever it's spliced in. This is its
  * own dedicated zero-verse pseudo-section (rather than a flag mutated onto
@@ -101,7 +108,7 @@ function humanizeSentinelKey(key) {
  * every state up front, tag the result" no-refetch approach.
  */
 function buildGospelRiteToggleSection(hymnKey, anchorId) {
-  if (hymnKey !== "GOSPEL_RITE") return null;
+  if (!GOSPEL_RITE_KEYS.has(hymnKey)) return null;
   return {
     id: `${anchorId}-gospel-rite-toggle`,
     title: { english: "", arabic: "" },
@@ -195,12 +202,37 @@ const READING_SENTINEL_MAP = {
   LITURGY_GOSPEL_WITHOUT_COPTIC: { service: "Liturgy", readingType: "Gospel", withCoptic: false },
 };
 
+// The mournful Gospel rites' readings (gospel_rite.mournful_gospel_rite and
+// mournful_4_gospels_rite). Like the sentinels above they come with or
+// without the Coptic, but they name no service: they are the Holy Week hour's
+// own Psalm and Gospel — its only Gospel, or the first to fourth of the four
+// read on Friday Eve and Good Friday — out of holy_week.reading_rules (see
+// resolvePaschaRiteReading).
+const PASCHA_RITE_READINGS = {
+  PSALM_WITH_COPTIC: { readingType: "Psalm", index: 0, withCoptic: true },
+  PSALM_WITHOUT_COPTIC: { readingType: "Psalm", index: 0, withCoptic: false },
+  GOSPEL_WITH_COPTIC: { readingType: "Gospel", index: 0, withCoptic: true },
+  GOSPEL_WITHOUT_COPTIC: { readingType: "Gospel", index: 0, withCoptic: false },
+  FIRST_GOSPEL_WITH_COPTIC: { readingType: "Gospel", index: 0, withCoptic: true },
+  FIRST_GOSPEL_WITHOUT_COPTIC: { readingType: "Gospel", index: 0, withCoptic: false },
+  SECOND_GOSPEL_WITH_COPTIC: { readingType: "Gospel", index: 1, withCoptic: true },
+  SECOND_GOSPEL_WITHOUT_COPTIC: { readingType: "Gospel", index: 1, withCoptic: false },
+  THIRD_GOSPEL_WITH_COPTIC: { readingType: "Gospel", index: 2, withCoptic: true },
+  THIRD_GOSPEL_WITHOUT_COPTIC: { readingType: "Gospel", index: 2, withCoptic: false },
+  FOURTH_GOSPEL_WITH_COPTIC: { readingType: "Gospel", index: 3, withCoptic: true },
+  FOURTH_GOSPEL_WITHOUT_COPTIC: { readingType: "Gospel", index: 3, withCoptic: false },
+};
+
 function normalizeReadingSentinel(value) {
   return String(value || "").trim().toUpperCase();
 }
 
+function isPaschaRiteReading(value) {
+  return Object.prototype.hasOwnProperty.call(PASCHA_RITE_READINGS, normalizeReadingSentinel(value));
+}
+
 function isReadingSentinel(value) {
-  return READING_SENTINELS.has(normalizeReadingSentinel(value));
+  return READING_SENTINELS.has(normalizeReadingSentinel(value)) || isPaschaRiteReading(value);
 }
 
 let readingsForDateCache = null; // { isoDate, promise }
@@ -389,6 +421,8 @@ async function resolveReadingSentinelVerses(sentinel, isoDate, flags) {
     if (!verses.length || (withCoptic && !verses.some((verse) => verse.coptic))) return { verses: [], citation: null };
     return { verses, citation: await buildReadingCitation(reading) };
   }
+  const paschaRite = PASCHA_RITE_READINGS[normalizeReadingSentinel(sentinel)];
+  if (paschaRite) return resolvePaschaRiteReading(paschaRite, flags);
   const mapping = READING_SENTINEL_MAP[normalizeReadingSentinel(sentinel)];
   if (!mapping) return { verses: [], citation: null };
   const readings = await getReadingsForDate(isoDate);
@@ -407,6 +441,11 @@ async function resolveReadingSentinelVerses(sentinel, isoDate, flags) {
 const COPTIC_READING_TYPE_TITLES = {
   Gospel: { english: "Coptic Gospel", arabic: "الإنجيل القبطي", french: "Évangile copte" },
   Psalm: { english: "Coptic Psalm", arabic: "المزمور القبطي", french: "Psaume copte" },
+};
+// ...and the same reading without its Coptic (the mournful rites title theirs).
+const READING_TYPE_TITLES = {
+  Gospel: { english: "Gospel", arabic: "الإنجيل", french: "Évangile" },
+  Psalm: { english: "Psalm", arabic: "المزمور", french: "Psaume" },
 };
 
 /**
@@ -430,8 +469,12 @@ async function resolveReadingSentinelSplice(sentinel, isoDate, titleShown, minim
   const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, french: citation.french || citation.english, coptic: "" }] : [];
 
   if (titleShown) {
-    const readingType = READING_SENTINEL_MAP[sentinel]?.readingType;
-    const title = COPTIC_READING_TYPE_TITLES[readingType] || { english: `Coptic ${readingType || ""}`.trim(), arabic: "" };
+    const key = normalizeReadingSentinel(sentinel);
+    const mapping = READING_SENTINEL_MAP[key] || PASCHA_RITE_READINGS[key];
+    const readingType = mapping?.readingType;
+    const title = mapping?.withCoptic === false
+      ? READING_TYPE_TITLES[readingType] || { english: readingType || "", arabic: "" }
+      : COPTIC_READING_TYPE_TITLES[readingType] || { english: `Coptic ${readingType || ""}`.trim(), arabic: "" };
     return {
       kind: "section",
       section: {
@@ -607,11 +650,14 @@ async function resolveReadingSentinelSection(section, isoDate, flags) {
 // — and holy_week.reading_rules keys every reading by exactly that
 // (day_key, part, hour), in the order it is read.
 
+// The Psalm and Gospel are not among them: those are read in the mournful
+// Gospel rites (MOURNFUL_GOSPEL_RITE, MOURNFUL_4_GOSPELS_RITE — see
+// SUBDOCUMENT_MAP and PASCHA_RITE_READINGS).
 const PASCHA_READING_SENTINELS = new Set([
   "PASCHA_PROPHECIES",
   "PASCHA_HOMILIES",
   "PASCHA_PAULINE_EPISTLE",
-  "MOURNFUL_GOSPEL_RITE",
+  "PASCHA_GOSPEL_INTERPRETATIONS",
   // reading_rules has no exposition rows yet, so this resolves to nothing.
   "PASCHA_EXPOSITION",
 ]);
@@ -619,7 +665,6 @@ const PASCHA_DAY_FLAGS = ["PalmSunday", "HolyMonday", "HolyTuesday", "HolyWednes
 const PASCHA_HOUR_FLAGS = { FirstHour: 1, ThirdHour: 3, SixthHour: 6, NinthHour: 9, EleventhHour: 11, TwelfthHour: 12 };
 const PASCHA_READING_TITLES = {
   "Pauline Epistle": { english: "Pauline Epistle", arabic: "البولس", french: "Épître de saint Paul" },
-  Gospel: { english: "Gospel", arabic: "الإنجيل", french: "Évangile" },
 };
 
 /** The (day_key, part, hour) of the Holy Week hour a document's flags describe, or null outside one. */
@@ -646,12 +691,32 @@ function selectPaschaReadings(sentinel, rows) {
         return row.reading_type === "Homily";
       case "PASCHA_PAULINE_EPISTLE":
         return row.reading_type === "Pauline Epistle";
-      case "MOURNFUL_GOSPEL_RITE":
-        return row.reading_type === "Psalm" || row.reading_type === "Gospel" || (row.reading_type === "Interpretation" && !beforePsalm(index));
+      case "PASCHA_GOSPEL_INTERPRETATIONS":
+        return row.reading_type === "Interpretation" && !beforePsalm(index);
       default:
         return false;
     }
   });
+}
+
+/** The hour's reading a mournful rite sentinel reads (a PASCHA_RITE_READINGS entry): the index-th of its type, in reading order. */
+function selectPaschaRiteReading({ readingType, index }, rows) {
+  return rows.filter((row) => row.reading_type === readingType)[index] || null;
+}
+
+/**
+ * The evangelist flags (GospelJohn, ...) for the Gospels an hour reads,
+ * which pick the mournful rite's "…according to Saint John" lines. Every one
+ * is set, false included, so no calendar Gospel can add a second evangelist.
+ */
+function gospelAuthorFlagsOf(rows) {
+  const flags = { GospelMatthew: false, GospelMark: false, GospelLuke: false, GospelJohn: false };
+  for (const row of rows) {
+    if (row.reading_type === "Gospel" && row.book_key) {
+      flags[`Gospel${row.book_key.charAt(0).toUpperCase()}${row.book_key.slice(1)}`] = true;
+    }
+  }
+  return flags;
 }
 
 /**
@@ -693,6 +758,53 @@ function getPaschaHourReadings({ day, part, hour }) {
     paschaReadingsCache.set(key, cached);
   }
   return cached;
+}
+
+/** A Holy Week hour's evangelist flags (gospelAuthorFlagsOf), or none outside one. */
+async function paschaGospelAuthorFlags(flags) {
+  const hour = paschaHourOf(flags);
+  if (!hour) return {};
+  try {
+    return gospelAuthorFlagsOf(await getPaschaHourReadings(hour));
+  } catch (error) {
+    console.warn(`Failed to load the Holy Week Gospel: ${error?.message || error}`);
+    return {};
+  }
+}
+
+// A Holy Week Psalm hymn opens with its own "A Psalm of David." line.
+const PSALM_HEADING_RE = /^\s*A Psalm of David\.?\s*$/i;
+
+/**
+ * A mournful rite's Psalm or Gospel (PASCHA_RITE_READINGS) for the hour
+ * being prayed. The Psalm is the hour's own holy_week hymn (psalm_hymn_key),
+ * as it is sung, less its "A Psalm of David." line — the rite says that
+ * itself — and, read without the Coptic, less the rubric naming its Coptic
+ * tune. The Gospel is read from the Bible.
+ */
+async function resolvePaschaRiteReading(mapping, flags) {
+  const hour = paschaHourOf(flags);
+  const row = hour ? selectPaschaRiteReading(mapping, await getPaschaHourReadings(hour)) : null;
+  if (!row) return { verses: [], citation: null };
+  const reading = row.reading_reference
+    ? { ...row, resolved_verses: (await resolveBibleReadingReference(row.reading_reference)).resolvedSegments }
+    : null;
+  const citation = reading ? await buildReadingCitation(reading) : null;
+  const isPsalm = mapping.readingType === "Psalm";
+
+  const hymnRows = isPsalm && row.psalm_hymn_key ? await fetchInlineHymnVerses("holy_week", row.psalm_hymn_key) : [];
+  const hymnVerses = hymnRows.flatMap((textRow) => {
+    if (PSALM_HEADING_RE.test(textRow.english || "")) return [];
+    if (!mapping.withCoptic && textRow.person_type === "Comment") return [];
+    const visibility = evaluateBishopAwareVisibility(textRow.condition, flags);
+    if (!visibility.visible) return [];
+    // Read like the Gospel beside it: the text alone, without a second
+    // "Reader:" after the rite's own heading line and the citation.
+    const verse = buildVerseFromTextRow(textRow.person_type === "Comment" ? textRow : { ...textRow, person_type: null });
+    return [{ ...verse, coptic: mapping.withCoptic ? verse.coptic : "", bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }];
+  });
+  if (hymnVerses.length) return { verses: applyCopticCaseToReadingVerses(hymnVerses), citation };
+  return { verses: buildReadingVerses(reading, mapping.withCoptic, isPsalm), citation };
 }
 
 /** A holy_week hymn (a Psalm, homily, or interpretation) as its own titled section, its lines filtered by the document's flags. */
@@ -748,9 +860,10 @@ async function resolvePaschaReadingSections(section, flags, depth, isoDate) {
     }
     const { resolvedSegments } = await resolveBibleReadingReference(row.reading_reference);
     const reading = { ...row, resolved_verses: resolvedSegments };
-    // The Gospel is read in Coptic here as well; the prophecies' Coptic has
-    // its own subdocument (COPTIC_PROPHECY), and nothing else is.
-    const verses = buildReadingVerses(reading, row.reading_type === "Gospel", false);
+    // Only the Pauline Epistle is read from here now, without Coptic: the
+    // prophecies' Coptic has its own subdocument (COPTIC_PROPHECY), and the
+    // Gospel its mournful rite.
+    const verses = buildReadingVerses(reading, false, false);
     if (!verses.length) continue;
     const citation = await buildReadingCitation(reading);
     const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, french: citation.french || citation.english, coptic: "" }] : [];
@@ -1488,7 +1601,8 @@ export async function hydrateSupabaseServiceHymn(schema, table, date, extraConte
   }
 
   const flags = await getContextFlags(date, { ...structuralFlags, ...extraContext }, weekdayDate);
-  return hydrateWithFlags(schema, table, flags, depth, isoDate);
+  // A Holy Week hour's evangelist is its own, not the calendar date's.
+  return hydrateWithFlags(schema, table, { ...flags, ...(await paschaGospelAuthorFlags(flags)) }, depth, isoDate);
 }
 
 // A single misconfigured or inaccessible nested schema (e.g. one not yet
@@ -1505,7 +1619,8 @@ async function safeHydrateNested(schema, table, flags, depth, isoDate) {
 }
 
 /**
- * GOSPEL_RITE's own nested content (gospel_rite.gospel_rite) includes rows
+ * A Gospel rite's own nested content (gospel_rite.gospel_rite, or Holy Week's
+ * mournful rites — GOSPEL_RITE_KEYS) includes rows
  * conditioned on the in-document "Coptic Gospel Rite" toggle (the button
  * rendered via startsGospelRiteToggle/renderGospelRiteToggle) — same
  * "hydrate every state up front, tag the result, let the client toggle
@@ -1518,7 +1633,7 @@ async function safeHydrateNested(schema, table, flags, depth, isoDate) {
  * target has no such toggle, so it's just a single ordinary hydration.
  */
 async function hydrateWholeTableInlineNested(hymnKey, target, flags, depth, isoDate) {
-  if (hymnKey !== "GOSPEL_RITE") {
+  if (!GOSPEL_RITE_KEYS.has(hymnKey)) {
     return safeHydrateNested(target.schema, target.table, flags, depth, isoDate);
   }
 
@@ -1750,6 +1865,41 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
     if (section.isSubdocumentPlaceholder) {
       const target = SUBDOCUMENT_MAP[section.hymn_key];
       if (!target) {
+        // A Subdocument row naming one hymn rather than a whole table
+        // (mournful_4_gospels_rite's mournful4CopticGospels, the four Coptic
+        // Gospels): that hymn alone, hydrated like any other, opens in the
+        // modal — untitled there, since its button already names it.
+        if (!ALL_CAPS_KEY_REGEX.test(section.hymn_key)) {
+          if (depth >= 3) continue;
+          const hymnRows = rawRows
+            .filter((row) => `${row.hymn_key}-${row.item_order}` === section.id)
+            .map((row) => ({
+              ...row,
+              placement_item_type: null,
+              placement_condition: null,
+              minimization: null,
+              title_english: null,
+              title_arabic: null,
+              title_french: null,
+            }));
+          const subdocumentSections = await hydrateWithFlags(schema, table, flags, depth + 1, isoDate, null, hymnRows);
+          if (subdocumentSections.length) {
+            hydrated.push({
+              id: section.id,
+              title: { english: section.title.english || humanizeSentinelKey(section.hymn_key), arabic: section.title.arabic, french: section.title.french },
+              verses: [],
+              isSubdocumentButton: true,
+              subdocumentKey: section.hymn_key,
+              subdocumentTarget: null,
+              subdocumentSections,
+              alternateEvery: null,
+              forceWhiteVerses: true,
+              bishopOnly: section.bishopOnly,
+              priestOnly: section.priestOnly,
+            });
+          }
+          continue;
+        }
         // The Coptic prophecies: every prophecy read here that there is Coptic
         // for, framed in readings.coptic_prophecy, as one subdocument placed
         // ahead of the first English/Arabic prophecy.
@@ -1948,9 +2098,30 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         // top-level Minimizable/Minimized unit here (its own order-table row
         // carries that), so a second, nested collapse just for this splice
         // would wrongly split it off as if it were its own separate hymn.
+        // The exception is a mournful rite's reading marked to show its
+        // title inside a hymn with none (mournfulPsalmAndGospel,
+        // mournful4CopticGospels): with nothing around it to navigate by,
+        // each Psalm and Gospel there becomes its own section.
         if (isReadingSentinel(verse.inlineHymnKey) && isoDate) {
-          const spliced = await resolveReadingSentinelSplice(verse.inlineHymnKey, isoDate, false, null, `${section.id}-inline-${verse.inlineHymnKey}`, flags);
-          if (spliced) verses.push(...spliced.verses);
+          const ownSection =
+            Boolean(verse.inlineHymnTitleShown) &&
+            isPaschaRiteReading(verse.inlineHymnKey) &&
+            !(section.title?.english || section.title?.arabic);
+          const spliced = await resolveReadingSentinelSplice(
+            verse.inlineHymnKey,
+            isoDate,
+            ownSection,
+            ownSection ? verse.inlineHymnMinimization : null,
+            `${section.id}-inline-${verse.inlineHymnKey}`,
+            flags,
+          );
+          if (spliced?.kind === "section") {
+            flushVerses();
+            hydrated.push({ ...spliced.section, bishopOnly: verseVisibility.bishopOnly, priestOnly: verseVisibility.priestOnly });
+            pushedAnything = true;
+          } else if (spliced) {
+            verses.push(...spliced.verses);
+          }
           continue;
         }
 

@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type GestureResponderEvent, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { type GestureResponderEvent, Modal, PanResponder, type PanResponderGestureState, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -68,6 +68,11 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
   const reference = section.verses.find((v) => v.type === 'readingReference');
   if (reference && getCurrentAppLanguage() === 'fr' && reference.french) return reference.french;
   return reference ? reference.english || reference.arabic || null : null;
+}
+
+/** Where a swipe began, in page coordinates -- see swipeGesturePanResponder. */
+function swipeStartX(gestureState: PanResponderGestureState) {
+  return gestureState.moveX - gestureState.dx;
 }
 
 /**
@@ -309,29 +314,43 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   // so swiping only dismisses the topmost level, not both at once.
   // A swipe that starts in the side inset of a landscape phone is read by
   // useInsetEdgeSwipe instead -- never by both.
+  //
+  // Where a swipe started is worked out from where the finger is when the
+  // swipe is taken, and kept for its release. gestureState.x0 is only filled
+  // in once a responder has been granted -- while these handlers decide
+  // whether to take the swipe it is still 0 -- and granting resets dx, so
+  // neither says where the finger first went down afterwards either. Every
+  // swipe had looked like it began at the left edge and none at the right:
+  // in slideshow mode, with no page underneath to catch it instead, the
+  // content list could never be swiped open.
   const insetEdgeSwipe = useInsetEdgeSwipe(!isCovered, onClose, () => setSelectorOpen(true));
   const { startsInInset } = insetEdgeSwipe;
+  const swipeTakenFromXRef = useRef(0);
   const swipeGesturePanResponder = useMemo(() => {
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
+    // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
     return PanResponder.create({
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        if (isCovered || isStylusGestureEvent(_) || startsInInset(gestureState.x0)) return false;
+        const startX = swipeStartX(gestureState);
+        if (isCovered || isStylusGestureEvent(_) || startsInInset(startX)) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal) return false;
-        const isCloseSwipe = gestureState.x0 < 56 && gestureState.dx > 12;
+        const isCloseSwipe = startX < 56 && gestureState.dx > 12;
         const isSelectorSwipe =
-          gestureState.x0 > screenWidth - selectorEdgeWidth &&
+          startX > screenWidth - selectorEdgeWidth &&
           gestureState.dx < -12;
+        if (isCloseSwipe || isSelectorSwipe) swipeTakenFromXRef.current = startX;
         return isCloseSwipe || isSelectorSwipe;
       },
       onPanResponderRelease: (event, gestureState) => {
-        if (isCovered || isStylusGestureEvent(event) || startsInInset(gestureState.x0)) return;
-        if (gestureState.x0 < 56 && gestureState.dx > 60) {
+        if (isCovered || isStylusGestureEvent(event)) return;
+        const takenFromX = swipeTakenFromXRef.current;
+        const travelled = gestureState.moveX - takenFromX;
+        if (takenFromX < 56 && travelled > 60) {
           onClose();
           return;
         }
-        const selectorEdge = Math.min(240, Math.max(128, screenWidth * 0.18));
-        if (gestureState.x0 > screenWidth - selectorEdge && gestureState.dx < -36) {
+        if (takenFromX > screenWidth - selectorEdgeWidth && travelled < -36) {
           setSelectorOpen(true);
         }
       },
@@ -346,16 +365,23 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     setOverlayScreen((screen) => (screen === 'seasons' ? 'calendar' : null)),
   );
   const overlayStartsInInset = overlayInsetEdgeSwipe.startsInInset;
+  const overlaySwipeTakenFromXRef = useRef(0);
   const overlaySwipePanResponder = useMemo(() => {
     const closeOverlay = () => setOverlayScreen((screen) => (screen === 'seasons' ? 'calendar' : null));
+    // Start kept from when the swipe is taken -- see swipeGesturePanResponder.
+    // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
     return PanResponder.create({
       onMoveShouldSetPanResponderCapture: (event, gestureState) => {
-        if (isStylusGestureEvent(event) || overlayStartsInInset(gestureState.x0)) return false;
-        return gestureState.x0 < 56 && gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        const startX = swipeStartX(gestureState);
+        if (isStylusGestureEvent(event) || overlayStartsInInset(startX)) return false;
+        const isCloseSwipe = startX < 56 && gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        if (isCloseSwipe) overlaySwipeTakenFromXRef.current = startX;
+        return isCloseSwipe;
       },
       onPanResponderRelease: (event, gestureState) => {
-        if (isStylusGestureEvent(event) || overlayStartsInInset(gestureState.x0)) return;
-        if (gestureState.x0 < 56 && gestureState.dx > 60) closeOverlay();
+        if (isStylusGestureEvent(event)) return;
+        const takenFromX = overlaySwipeTakenFromXRef.current;
+        if (takenFromX < 56 && gestureState.moveX - takenFromX > 60) closeOverlay();
       },
     });
   }, [overlayStartsInInset]);

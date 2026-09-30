@@ -275,8 +275,21 @@ export function buildDocumentHtml(
         margin: 0;
         padding: 0;
         width: 100%;
+        height: 100%;
+        overflow: hidden;
         -webkit-text-size-adjust: none;
         text-size-adjust: none;
+      }
+      /* The document scrolls in here, not as the page itself -- see
+         pageScroller in the script below. */
+      .page-scroller {
+        height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: none;
+        overscroll-behavior-y: contain;
+        touch-action: pan-y;
       }
       body {
         font-family: Georgia, serif;
@@ -526,7 +539,7 @@ export function buildDocumentHtml(
     </style>
   </head>
   <body>
-    <main class="document">${htmlSections}</main>
+    <div class="page-scroller"><main class="document">${htmlSections}</main></div>
     <script>
       function postAction(type, payload) {
         var message = JSON.stringify(Object.assign({ type: type }, payload || {}));
@@ -546,14 +559,23 @@ export function buildDocumentHtml(
       // preview — has no other way to know: the content is laid out in here.
       // Reported once the fonts and layout have settled, and again whenever
       // the width changes and the columns reflow.
+      // The document scrolls inside .page-scroller, never as the page itself.
+      // On iPhone and iPad the web view's own scroll view answers iOS's
+      // scroll-to-top, and in a subdocument it kept being sent one about a
+      // third of a second after a pill was tapped: the jump landed, then slid
+      // back to the top -- every time but the first, when the page was still
+      // at the top anyway (logged on an iPad). WebKit never offers an inner
+      // scroller to scroll-to-top, and with the page no taller than the web
+      // view, its own scroll view has nothing left to move.
+      var pageScroller = document.querySelector('.page-scroller');
+      // How tall the document actually is. Anything embedding this at its
+      // natural size rather than in a full screen — the saint picker's hymn
+      // preview — has no other way to know: the content is laid out in here.
+      // Reported once the fonts and layout have settled, and again whenever
+      // the width changes and the columns reflow.
       var lastReportedContentHeight = -1;
       function reportContentHeight() {
-        var body = document.body;
-        var html = document.documentElement;
-        var height = Math.max(
-          body ? body.scrollHeight : 0,
-          html ? html.scrollHeight : 0,
-        );
+        var height = pageScroller ? pageScroller.scrollHeight : 0;
         if (Math.abs(height - lastReportedContentHeight) <= 1) return;
         lastReportedContentHeight = height;
         postAction('contentHeight', {
@@ -566,20 +588,23 @@ export function buildDocumentHtml(
       });
       window.addEventListener('resize', reportContentHeight);
       function currentScrollY() {
-        return window.pageYOffset || document.documentElement.scrollTop || 0;
+        return pageScroller.scrollTop || 0;
+      }
+      function scrollPageTo(top) {
+        pageScroller.scrollTop = top;
+      }
+      /** Where a point on screen sits in the scrolled document. */
+      function documentTop(viewportY) {
+        return viewportY - pageScroller.getBoundingClientRect().top + currentScrollY();
       }
       function clampScrollTop(top) {
-        var maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        var maxScroll = Math.max(0, pageScroller.scrollHeight - pageScroller.clientHeight);
         return Math.min(Math.max(top, 0), maxScroll);
       }
       // A jump the app asks for (a pill, the content list, a restore after a
-      // reload) is held for a moment. In a WKWebView the page doesn't own its
-      // scrolling -- the app's native scroll view does, and it can put back
-      // its own position after the page has moved: an animation still
-      // running, or a content height it hasn't caught up with yet. On the
-      // phone that is a jump that lands and then shoots back to the top. So
-      // whatever moves the page off a jump in that moment, the jump is put
-      // back. Anything the reader does themselves ends the hold at once.
+      // reload) is made by the first check of a short hold, a task after the
+      // call that asked for it, and then held against anything else moving
+      // the page until the reader touches it.
       var heldJump = null;
       function releaseHeldJump() {
         heldJump = null;
@@ -595,18 +620,19 @@ export function buildDocumentHtml(
           heldJump = null;
           return;
         }
-        if (Math.abs(currentScrollY() - top) > 2) window.scrollTo(0, top);
+        if (Math.abs(currentScrollY() - top) > 2) scrollPageTo(top);
       }
-      function holdJump(resolveTop) {
+      function jumpAndHold(resolveTop) {
         heldJump = { resolveTop: resolveTop, until: Date.now() + 2500 };
-        // Checked on a schedule as well as on scroll: a scroll view that
-        // quietly keeps its own offset sends no scroll event to answer.
+        // The first check (0ms) is the jump itself; the rest hold it, on a
+        // schedule as well as on scroll, since a scroll view that quietly
+        // keeps its own offset sends no scroll event to answer.
         [0, 60, 160, 320, 640, 1000, 1500, 2000, 2500].forEach(function (delay) {
           setTimeout(enforceHeldJump, delay);
         });
       }
       window.releaseHeldJump = releaseHeldJump;
-      window.addEventListener('scroll', enforceHeldJump, { passive: true });
+      pageScroller.addEventListener('scroll', enforceHeldJump, { passive: true });
       ['touchstart', 'mousedown', 'wheel', 'keydown'].forEach(function (type) {
         window.addEventListener(type, releaseHeldJump, { passive: true, capture: true });
       });
@@ -616,8 +642,8 @@ export function buildDocumentHtml(
         // the END of its closest surviving predecessor, not its title.
         // For a surviving hymn every settings change uses its START.
         var target = targetEdge === 'end'
-          ? element.getBoundingClientRect().bottom + currentScrollY() - window.innerHeight + 16
-          : element.getBoundingClientRect().top + currentScrollY() - 1;
+          ? documentTop(element.getBoundingClientRect().bottom) - pageScroller.clientHeight + 16
+          : documentTop(element.getBoundingClientRect().top) - 1;
         return clampScrollTop(target);
       }
       window.scrollToSection = function (sectionId, edge) {
@@ -628,8 +654,7 @@ export function buildDocumentHtml(
           var targetEdge = typeof candidate === 'string' ? edge : candidate && candidate.edge;
           var element = id && document.getElementById(id);
           if (element) {
-            window.scrollTo({ top: sectionScrollTop(element, targetEdge), behavior: 'auto' });
-            holdJump(function () { return sectionScrollTop(element, targetEdge); });
+            jumpAndHold(function () { return sectionScrollTop(element, targetEdge); });
             return true;
           }
         }
@@ -639,10 +664,9 @@ export function buildDocumentHtml(
         var element = document.querySelector('[data-verse-id="' + verseId + '"]');
         if (!element) return false;
         var verseTop = function () {
-          return element.isConnected ? clampScrollTop(element.getBoundingClientRect().top + currentScrollY() - 1) : null;
+          return element.isConnected ? clampScrollTop(documentTop(element.getBoundingClientRect().top) - 1) : null;
         };
-        window.scrollTo({ top: verseTop(), behavior: 'auto' });
-        holdJump(verseTop);
+        jumpAndHold(verseTop);
         return true;
       };
       window.scrollToTune = function (tune) {
@@ -650,8 +674,11 @@ export function buildDocumentHtml(
         if (element) {
           // A smooth scroll moves through every position on its way, so it
           // can't be held; it only has to stop an earlier hold pulling back.
+          // Started a task later for the same reason as jumpAndHold.
           releaseHeldJump();
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setTimeout(function () {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 0);
         }
       };
       document.addEventListener('click', function (event) {
@@ -887,7 +914,7 @@ export function buildDocumentHtml(
           pending = true;
           requestAnimationFrame(reportCurrentSection);
         }
-        window.addEventListener('scroll', scheduleReport, { passive: true });
+        pageScroller.addEventListener('scroll', scheduleReport, { passive: true });
         scheduleReport();
       })();
       (function () {
