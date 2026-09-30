@@ -10,6 +10,18 @@ export interface FixedFeast {
   day: number;
   key: string;
   title: string;
+  /**
+   * Whether this feast's own Daily katameros outranks Great Lent / the Sunday
+   * book on its date — the tier-2 test in readingsService's priority chain.
+   *
+   * True for every Feast of the Lord, which is why the field exists at all:
+   * Paremhotep 10's Feast of the Cross is the one entry that is false. It
+   * falls inside Great Lent every year (the DB flags it `GreatLent` and
+   * `LentWeekdays` alongside `ParemhotepFeastOfTheCross`), and the Lenten
+   * readings hold that day. It is listed here so the Season Selector and the
+   * hymn conditions can see it, not to redirect the lectionary.
+   */
+  overridesSeasonalReadings: boolean;
 }
 
 export interface DateRange {
@@ -24,17 +36,21 @@ export interface SingleDayFeast {
 }
 
 export const FIXED_FEASTS: FixedFeast[] = [
-  { monthName: 'Thoout', day: 1, key: 'nayrouz', title: 'Nayrouz (Coptic New Year)' },
-  { monthName: 'Thoout', day: 17, key: 'feast-of-the-cross', title: 'Feast of the Cross' },
-  { monthName: 'Kiahk', day: 29, key: 'nativity', title: 'Nativity' },
-  { monthName: 'Tobe', day: 6, key: 'circumcision', title: 'Circumcision' },
-  { monthName: 'Tobe', day: 11, key: 'theophany', title: 'Theophany' },
-  { monthName: 'Tobe', day: 12, key: 'second-day-of-theophany', title: 'Second Day of Theophany' },
-  { monthName: 'Tobe', day: 13, key: 'wedding-at-cana', title: 'Wedding at Cana' },
-  { monthName: 'Meshir', day: 8, key: 'entry-into-temple', title: 'Entry into the Temple' },
-  { monthName: 'Paremhotep', day: 29, key: 'annunciation', title: 'Annunciation' },
-  { monthName: 'Pashons', day: 24, key: 'entry-into-egypt', title: 'Entry into Egypt' },
-  { monthName: 'Mesore', day: 13, key: 'transfiguration', title: 'Transfiguration' },
+  { monthName: 'Thoout', day: 1, key: 'nayrouz', title: 'Nayrouz (Coptic New Year)', overridesSeasonalReadings: true },
+  { monthName: 'Thoout', day: 17, key: 'feast-of-the-cross', title: 'Feast of the Cross', overridesSeasonalReadings: true },
+  { monthName: 'Kiahk', day: 29, key: 'nativity', title: 'Nativity', overridesSeasonalReadings: true },
+  { monthName: 'Tobe', day: 6, key: 'circumcision', title: 'Circumcision', overridesSeasonalReadings: true },
+  { monthName: 'Tobe', day: 11, key: 'theophany', title: 'Theophany', overridesSeasonalReadings: true },
+  { monthName: 'Tobe', day: 12, key: 'second-day-of-theophany', title: 'Second Day of Theophany', overridesSeasonalReadings: true },
+  { monthName: 'Tobe', day: 13, key: 'wedding-at-cana', title: 'Wedding at Cana', overridesSeasonalReadings: true },
+  { monthName: 'Meshir', day: 8, key: 'entry-into-temple', title: 'Entry into the Temple', overridesSeasonalReadings: true },
+  // The Cross is kept twice a year: Thoout 17 above (three days, in the open
+  // season after the Nayrouz period) and Paremhotep 10 here, St. Helen's
+  // finding of the Cross, which always lands inside Great Lent.
+  { monthName: 'Paremhotep', day: 10, key: 'feast-of-the-cross-paremhotep', title: 'Feast of the Cross', overridesSeasonalReadings: false },
+  { monthName: 'Paremhotep', day: 29, key: 'annunciation', title: 'Annunciation', overridesSeasonalReadings: true },
+  { monthName: 'Pashons', day: 24, key: 'entry-into-egypt', title: 'Entry into Egypt', overridesSeasonalReadings: true },
+  { monthName: 'Mesore', day: 13, key: 'transfiguration', title: 'Transfiguration', overridesSeasonalReadings: true },
 ];
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;

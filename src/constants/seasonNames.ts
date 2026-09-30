@@ -59,7 +59,11 @@ export const EVENT_FORMAL_NAMES: Record<string, FormalName> = {
   'lazarus-saturday': { english: 'Lazarus Saturday', arabic: 'سبت لعازر', french: 'Samedi de Lazare' },
   'apostles-feast': { english: 'Feast of the Apostles', arabic: 'عيد الرسل', french: 'Fête des Apôtres' },
   'feast-of-the-cross': { english: 'Feast of the Cross', arabic: 'عيد الصليب', french: 'Fête de la Croix' },
+  // Both Coptic feasts of the Cross carry the same name; the date beside
+  // each row in the Season Selector is what tells them apart.
+  'feast-of-the-cross-paremhotep': { english: 'Feast of the Cross', arabic: 'عيد الصليب', french: 'Fête de la Croix' },
   theophany: { english: 'Glorious Feast of the Theophany', arabic: 'عيد الغطاس المجيد', french: 'Glorieuse fête de la Théophanie' },
+  'second-day-of-theophany': { english: 'Second Day of Theophany', arabic: 'ثاني أيام الغطاس', french: 'Deuxième jour de la Théophanie' },
   ascension: { english: 'Feast of the Ascension', arabic: 'عيد الصعود', french: 'Fête de l’Ascension' },
   nativity: { english: 'Glorious Feast of the Nativity', arabic: 'عيد الميلاد المجيد', french: 'Glorieuse fête de la Nativité' },
   pentecost: { english: 'Feast of Pentecost', arabic: 'عيد العنصرة', french: 'Fête de la Pentecôte' },
@@ -89,6 +93,7 @@ export const EVENT_SHORT_NAMES: Record<string, FormalName> = {
   'lazarus-saturday': { english: 'Lazarus Saturday', arabic: 'سبت لعازر', french: 'Samedi de Lazare' },
   'apostles-feast': { english: "Apostles' Feast", arabic: 'عيد الرسل', french: 'Fête des Apôtres' },
   'feast-of-the-cross': { english: 'Cross', arabic: 'الصليب', french: 'Croix' },
+  'feast-of-the-cross-paremhotep': { english: 'Cross', arabic: 'الصليب', french: 'Croix' },
   'theophany-paramoun': { english: 'Theophany Paramoun', arabic: 'برامون الغطاس', french: 'Paramoun de la Théophanie' },
   theophany: { english: 'Theophany', arabic: 'الغطاس', french: 'Théophanie' },
   ascension: { english: 'Ascension', arabic: 'الصعود', french: 'Ascension' },
@@ -158,6 +163,9 @@ const EVENT_INDICATOR_PRIORITIES: Record<string, number> = {
   annunciation: 70,
   'palm-sunday': 80,
   'feast-of-the-cross': 50,
+  // Same rank as the Thoout feast, and above Lent's 20, so Paremhotep 10
+  // shows as the Cross rather than as another Lenten weekday.
+  'feast-of-the-cross-paremhotep': 50,
   nayrouz: 50,
   'joyful-29': 50,
   circumcision: 50,

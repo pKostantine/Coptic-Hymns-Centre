@@ -190,12 +190,16 @@ function pickHighestPriorityPerServiceType(rules: ReadingRule[]): ReadingRule[] 
  *   1. Holy 50 Days (Pascha through Pentecost) — if today falls anywhere in
  *      it, that's the only book referenced, full stop.
  *   2. A fixed-date Feast of the Lord, Nayrouz, or the Feast of the Cross
- *      (see FIXED_FEASTS) — that day's own Daily reading overrides Lent/
- *      Sunday even if today would otherwise fall within one of those. The
- *      Feast of the Cross is a 3-day feast (Thoout 17-19), but FIXED_FEASTS
- *      only lists day 17 (the feast's first day) — days 18-19 fall straight
- *      through to the normal chain below, exactly as intended (e.g. if day
- *      18 is a Sunday, the Sunday katameros takes priority as usual).
+ *      (the FIXED_FEASTS entries marked `overridesSeasonalReadings`) — that
+ *      day's own Daily reading overrides Lent/Sunday even if today would
+ *      otherwise fall within one of those. The Thoout Feast of the Cross is a
+ *      3-day feast (Thoout 17-19), but FIXED_FEASTS only lists day 17 (the
+ *      feast's first day) — days 18-19 fall straight through to the normal
+ *      chain below, exactly as intended (e.g. if day 18 is a Sunday, the
+ *      Sunday katameros takes priority as usual). The second Feast of the
+ *      Cross, Paremhotep 10, is deliberately NOT one of these: it falls in
+ *      Great Lent every year and keeps the Lenten readings, so it skips this
+ *      tier and lands on Great Lent below.
  *   3. Great Lent.
  *   4. An annual Sunday — only actual Sundays have a Sunday-katameros entry.
  *      In a Coptic year with no Sunday during Nesi, the final Mesore Sunday
@@ -216,6 +220,7 @@ async function resolveReadingRules(isoDate: string, activeFlags: Set<string>): P
     rules = await queryReadingRules({ cycle_type: 'Pentecost', pentecost_week: pentecostWeek, day_of_week: copticDate.weekdayNumber });
   } else if (
     FIXED_FEASTS.some((feast) => {
+      if (!feast.overridesSeasonalReadings) return false;
       if (feast.monthName !== copticDate.copticMonthName || feast.day !== copticDate.copticDay) return false;
       // Suppressed (e.g. Annunciation falling in Holy Week some years) means
       // it isn't actually being celebrated today — don't grant feast priority.
