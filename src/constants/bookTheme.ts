@@ -36,8 +36,3 @@ export const PASCHA_TILE_THEMES = {
   brightSaturday: { gradient: ['#6E5213', '#2E2107', '#0A0702'], accent: '#FFE9A8' },
 } satisfies Record<string, BookTheme>;
 
-/** The Books menu's day card: gold for an ordinary day, crimson while Pascha is being prayed. */
-export const SPOTLIGHT_THEMES = {
-  day: { gradient: ['#8E6B1A', '#4A330A', '#120C03'], accent: '#FFE9A8' },
-  pascha: { gradient: ['#6A1119', '#2A070A', '#0E0203'], accent: '#E7C46A' },
-} satisfies Record<string, BookTheme>;

@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { SPOTLIGHT_THEMES } from '../../../constants/bookTheme';
+import { getSeasonAppearance } from '../../../constants/seasonAppearance';
 import { HOLY_WEEK_DAYS, HOLY_WEEK_ROWS, type HolyWeekDayDef } from '../../../constants/manifest';
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { useCalendar } from '../../../context/CalendarContext';
@@ -40,7 +40,7 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
   const dateKey = effectiveDate.toISOString().slice(0, 10);
   // Both are kept with the day they belong to, so a stale value drops out by key.
   const [coptic, setCoptic] = useState<{ key: string; date: CopticDate | null } | null>(null);
-  const [season, setSeason] = useState<{ key: string; label: string | null } | null>(null);
+  const [season, setSeason] = useState<{ key: string; indicatorKey: string | null; label: string | null } | null>(null);
   // The season's name is read in the App Language, so it belongs to that too.
   const { preferences } = useReadingPreferences();
   const seasonKey = `${dateKey}:${preferences.appLanguage}`;
@@ -48,7 +48,9 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
   useEffect(() => {
     let active = true;
     void getCopticDate(new Date(`${dateKey}T00:00:00Z`)).then((date) => { if (active) setCoptic({ key: dateKey, date }); });
-    void getSeasonIndicatorLabel(dateKey).then((label) => { if (active) setSeason({ key: seasonKey, label }); });
+    void getSeasonIndicatorLabel(dateKey).then((result) => {
+      if (active) setSeason({ key: seasonKey, indicatorKey: result?.key ?? null, label: result?.label ?? null });
+    });
     return () => { active = false; };
   }, [dateKey, seasonKey]);
 
@@ -56,7 +58,10 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
   const seasonLabel = season?.key === seasonKey ? season.label : null;
   const current = holyWeek ? HOLY_WEEK_DAYS.find((day) => day.id === holyWeek.currentDayId) ?? null : null;
   const pascha = Boolean(holyWeek && current);
-  const theme = pascha ? SPOTLIGHT_THEMES.pascha : SPOTLIGHT_THEMES.day;
+  // The card wears the day's own season. While Holy Week is being prayed the
+  // card is its navigation, so it takes Holy Week's colours whatever the
+  // indicator resolved to for the particular day.
+  const theme = getSeasonAppearance(pascha ? 'holy-week' : season?.key === seasonKey ? season.indicatorKey : null);
 
   let chip = seasonLabel ?? '';
   let overline = formatWeekdayDate(effectiveDate, arabic);
@@ -90,10 +95,10 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
     // A plain card: one full-size tap target lies behind the text, and the
     // calendar button and pills sit beside it rather than inside it, so no
     // button is ever nested in another (invalid on web).
-    <View style={[styles.card, { borderColor: pascha ? 'rgba(231,196,106,0.5)' : 'rgba(216,199,122,0.45)' }]}>
+    <View style={[styles.card, { borderColor: `${theme.accent}73` }]}>
       <LinearGradient colors={theme.gradient} start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }} style={StyleSheet.absoluteFill} />
       <View style={[styles.watermark, arabic ? styles.watermarkLeft : styles.watermarkRight]} pointerEvents="none">
-        <CopticCross size={230} color={pascha ? 'rgba(231,196,106,0.14)' : 'rgba(255,233,168,0.14)'} />
+        <CopticCross size={230} color={`${theme.accent}24`} />
       </View>
       <Pressable
         accessibilityRole="button"
@@ -105,8 +110,8 @@ export default function SeasonSpotlight({ arabic, holyWeek, onOpenCalendar, onOp
       <View style={[styles.topRow, arabic && styles.rowReverse]} pointerEvents="box-none">
         {chip ? (
           <View style={[styles.chip, { borderColor: `${theme.accent}59` }]} pointerEvents="none">
-            <Text style={[styles.chipText, { color: theme.accent }, arabic && styles.arabicChip]} maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1}>
-              {arabic ? chip : chip.toUpperCase()}
+            <Text style={[styles.chipText, { color: theme.accent }, arabic && styles.arabicChip]} maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={2}>
+              {chip}
             </Text>
           </View>
         ) : <View pointerEvents="none" />}
@@ -196,8 +201,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  chipText: { fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
-  arabicChip: { fontFamily: TYPOGRAPHY.arabic, fontSize: 12, letterSpacing: 0 },
+  chipText: { fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', letterSpacing: 0.2, lineHeight: 15 },
+  arabicChip: { fontFamily: TYPOGRAPHY.arabic, fontSize: 12.5, letterSpacing: 0, lineHeight: 19 },
   roundButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.3)',

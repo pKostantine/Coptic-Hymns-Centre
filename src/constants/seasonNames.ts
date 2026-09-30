@@ -25,6 +25,9 @@ export const SEASON_FORMAL_NAMES: Record<string, FormalName> = {
   'nativity-fast': { english: 'Fast of the Nativity (Advent)', arabic: 'صوم الميلاد', french: 'Jeûne de la Nativité (Avent)' },
   'holy-50-days': { english: 'Holy 50 Days', arabic: 'الخمسين المقدسة', french: 'Les cinquante jours saints' },
   'st-mary-fast': { english: "Fast of the Virgin Mary", arabic: 'صوم العذراء مريم', french: 'Jeûne de la Vierge Marie' },
+  'nayrouz-period': { english: 'Nayrouz Period', arabic: 'فترة النيروز', french: 'Période du Nayrouz' },
+  'nativity-period': { english: 'Nativity Period', arabic: 'فترة الميلاد', french: 'Période de la Nativité' },
+  'theophany-period': { english: 'Theophany Period', arabic: 'فترة الغطاس', french: 'Période de la Théophanie' },
 };
 
 export const SEASON_SHORT_NAMES: Record<string, FormalName> = {
@@ -64,6 +67,8 @@ export const EVENT_FORMAL_NAMES: Record<string, FormalName> = {
   'feast-of-the-cross-paremhotep': { english: 'Feast of the Cross', arabic: 'عيد الصليب', french: 'Fête de la Croix' },
   theophany: { english: 'Glorious Feast of the Theophany', arabic: 'عيد الغطاس المجيد', french: 'Glorieuse fête de la Théophanie' },
   'second-day-of-theophany': { english: 'Second Day of Theophany', arabic: 'ثاني أيام الغطاس', french: 'Deuxième jour de la Théophanie' },
+  'nativity-paramoun': { english: 'Paramoun of the Nativity', arabic: 'برامون الميلاد', french: 'Paramoun de la Nativité' },
+  'theophany-paramoun': { english: 'Paramoun of the Theophany', arabic: 'برامون الغطاس', french: 'Paramoun de la Théophanie' },
   ascension: { english: 'Feast of the Ascension', arabic: 'عيد الصعود', french: 'Fête de l’Ascension' },
   nativity: { english: 'Glorious Feast of the Nativity', arabic: 'عيد الميلاد المجيد', french: 'Glorieuse fête de la Nativité' },
   pentecost: { english: 'Feast of Pentecost', arabic: 'عيد العنصرة', french: 'Fête de la Pentecôte' },
@@ -200,10 +205,15 @@ const INDICATOR_YIELDS: { key: string; to: string; unless?: string }[] = [
 
 type SeasonIndicatorItem = { key: string; date?: string };
 
-export function getSeasonIndicatorName(
+/**
+ * Which single season or feast the day is named after — the one key the pill
+ * and the Season Spotlight both speak for. Null when nothing scores, which
+ * the callers read as an ordinary (Annual) day.
+ */
+export function getSeasonIndicatorKey(
   activeSeasons: SeasonIndicatorItem[],
   activeEvents: SeasonIndicatorItem[],
-): string {
+): string | null {
   const candidates = [
     ...activeSeasons.map((season) => ({ key: season.key, priority: SEASON_INDICATOR_PRIORITIES[season.key] ?? 0 })),
     ...activeEvents.map((event) => ({ key: event.key, priority: EVENT_INDICATOR_PRIORITIES[event.key] ?? 0 })),
@@ -218,10 +228,34 @@ export function getSeasonIndicatorName(
   const selected = candidates
     .filter((candidate) => !yielding.has(candidate.key))
     .sort((a, b) => b.priority - a.priority)[0];
-  if (!selected) return appText(SEASON_SHORT_NAMES.annual);
+  return selected?.key ?? null;
+}
 
-  const name = EVENT_SHORT_NAMES[selected.key] || SEASON_SHORT_NAMES[selected.key] || SEASON_SHORT_NAMES.annual;
-  return appText(name);
+/** The short name for the calendar screen's small pill. */
+export function getSeasonIndicatorName(
+  activeSeasons: SeasonIndicatorItem[],
+  activeEvents: SeasonIndicatorItem[],
+): string {
+  const key = getSeasonIndicatorKey(activeSeasons, activeEvents);
+  if (!key) return appText(SEASON_SHORT_NAMES.annual);
+  return appText(EVENT_SHORT_NAMES[key] || SEASON_SHORT_NAMES[key] || SEASON_SHORT_NAMES.annual);
+}
+
+/**
+ * The full, formal name for the same key — what the Season Spotlight shows,
+ * where there is room to say "Fast of the Apostles" rather than "Apostles'
+ * Fast". Falls back through the short tables so a key that has only a short
+ * name still reads as something rather than as 'Annual'.
+ */
+export function getSeasonIndicatorFullName(key: string | null | undefined): string {
+  if (!key) return appText(SEASON_SHORT_NAMES.annual);
+  return appText(
+    EVENT_FORMAL_NAMES[key]
+      || SEASON_FORMAL_NAMES[key]
+      || EVENT_SHORT_NAMES[key]
+      || SEASON_SHORT_NAMES[key]
+      || SEASON_SHORT_NAMES.annual,
+  );
 }
 
 export function getSeasonFormalName(rangeKey: string, fallbackEnglish: string): FormalName {

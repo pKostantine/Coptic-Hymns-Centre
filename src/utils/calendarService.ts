@@ -1,7 +1,7 @@
 import { contentDataClient as supabase } from '../services/contentDataClient';
 import { computeMovableFeastDates, FIXED_FEASTS } from './fixedFeasts';
 import { toIsoDate } from './dateUtils';
-import { getSeasonIndicatorName } from '../constants/seasonNames';
+import { getSeasonIndicatorFullName, getSeasonIndicatorKey } from '../constants/seasonNames';
 
 export interface CalendarDay {
   gregorianDate: string;
@@ -317,7 +317,11 @@ function getYearIndicatorSources(copticYear: number) {
  * context periods the calendar screen's indicator weighs, so the Books menu
  * and the calendar always name the day alike. Null when it can't be read.
  */
-export async function getSeasonIndicatorLabel(isoDate: string): Promise<string | null> {
+/**
+ * The day's season as the Season Spotlight wants it: the winning indicator
+ * key, which chooses the card's colours, and that key's full formal name.
+ */
+export async function getSeasonIndicatorLabel(isoDate: string): Promise<{ key: string | null; label: string } | null> {
   try {
     const copticYear = await getCopticYearForDate(new Date(`${isoDate}T00:00:00Z`));
     if (copticYear === null) return null;
@@ -333,7 +337,8 @@ export async function getSeasonIndicatorLabel(isoDate: string): Promise<string |
       ...events.filter((event) => event.date === isoDate).map((event) => ({ key: event.key })),
       ...contextKeys.filter((key) => !key.endsWith('-period')).map((key) => ({ key })),
     ];
-    return getSeasonIndicatorName(activeSeasons, activeEvents);
+    const key = getSeasonIndicatorKey(activeSeasons, activeEvents);
+    return { key, label: getSeasonIndicatorFullName(key) };
   } catch {
     return null;
   }
