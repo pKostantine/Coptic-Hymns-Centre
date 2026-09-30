@@ -76,19 +76,19 @@ test('the long titles take the names they were given', () => {
     dox('doxEntryIntoEgypt', 'Doxology for the Entrance of the Lord Christ into the Land of Egypt', "Doxologie de l'entrée du Christ en Egypte"),
     dox('doxEntryIntoTheTemple', 'Doxology for the Presentation of the Lord Christ in the Temple'),
     dox('doxStruggleMantledSaintsTheCrossBearers', 'Doxology for the Struggle-mantled Saints, the Cross-bearers'),
-    dox('doxSaturdaysAndSundaysOfTheGreatFast', 'Doxology for Saturdays and Sundays of the Great Fast'),
+    dox('doxSaturdaysAndSundaysOfTheGreatFast', 'Doxology for Saturdays and Sundays of Lent'),
   ], false), ['Entry of the Holy Family into Egypt', 'Entry of Christ into the Temple', 'Cross-bearers', 'Weekends of Lent']);
   // No French name was given, so a French pill shortens the French title.
   assert.deepEqual(doxologyPillNames([
     dox('doxEntryIntoEgypt', 'Doxology for the Entrance of the Lord Christ into the Land of Egypt', "Doxologie de l'entrée du Christ en Egypte"),
-    dox('doxSaturdaysAndSundaysOfTheGreatFast', 'Doxology for Saturdays and Sundays of the Great Fast'),
+    dox('doxSaturdaysAndSundaysOfTheGreatFast', 'Doxology for Saturdays and Sundays of Lent'),
   ], true), ['Entrée du Christ en Egypte', 'Weekends of Lent']);
 });
 
 test('every other doxology title keeps its full name once "Doxology for" is gone', () => {
   assert.deepEqual(shortEnglishDoxologyName('Doxology For Any Female Martyr or Saint'), { name: 'Any Female Martyr or Saint' });
   assert.deepEqual(shortEnglishDoxologyName('The Vespers Doxology for the Virgin'), { name: 'Vespers Virgin' });
-  assert.deepEqual(shortEnglishDoxologyName('Fourth Doxology for the Great Fast'), { name: 'Great Fast', index: 4 });
+  assert.deepEqual(shortEnglishDoxologyName('Fourth Doxology for Lent'), { name: 'Lent', index: 4 });
   assert.deepEqual(shortEnglishDoxologyName('Melody for the Feast of Palm Sunday (2)'), { name: 'Melody for the Feast of Palm Sunday', index: 2 });
   assert.deepEqual(shortEnglishDoxologyName('Matins of the Resurrection by Hegumen Philotheous'), { name: 'Matins of the Resurrection by Hegumen Philotheous' });
 });
