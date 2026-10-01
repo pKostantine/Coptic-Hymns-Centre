@@ -12,11 +12,12 @@ import SideBar from '@/components/chc/ui/SideBar';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
-import { BottomChromeProvider } from '@/context/BottomChromeContext';
+import { BottomChromeProvider, useBottomChrome } from '@/context/BottomChromeContext';
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import type { OrientationMode } from '@/utils/preferencesStorage';
+import { keepsWholeWindow } from '@/utils/desktopChrome';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
 SplashScreen.preventAutoHideAsync();
@@ -65,12 +66,6 @@ function AppStack() {
   );
 }
 
-/** The reader and the full players keep the whole window; every other page sits beside the desktop sidebar. */
-function isImmersiveRoute(segments: string[]): boolean {
-  return segments.some((segment) => segment === '[serviceId]' || segment === '[chapter]' || segment === '[hourId]' || segment === 'now-playing')
-    || segments[0] === 'veneration';
-}
-
 /**
  * On a desktop browser the app sits beside the left sidebar (Coptic Vine,
  * "Layout and spacing"), which takes the place of the bottom tab bar; on the
@@ -82,7 +77,10 @@ function AppFrame() {
   const pathname = usePathname();
   const segments = useSegments() as string[];
   const { preferences } = useReadingPreferences();
-  const showSideBar = layout === 'desktop' && !isImmersiveRoute(segments);
+  // A full now-playing screen is an overlay, not a route, so the segments alone
+  // cannot tell us it is open — the overlay reports it instead.
+  const { nowPlayingExpanded } = useBottomChrome();
+  const showSideBar = layout === 'desktop' && !keepsWholeWindow(segments) && !nowPlayingExpanded;
 
   return (
     <View style={{ flex: 1, flexDirection: preferences.appLanguage === 'ar' ? 'row-reverse' : 'row', backgroundColor: COLORS.black }}>

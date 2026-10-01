@@ -4,13 +4,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PageGlow } from '@/components/chc/screens/BookPage';
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import SubPageHeader from '@/components/chc/ui/SubPageHeader';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { getEventFormalName, getSeasonFormalName } from '@/constants/seasonNames';
+import { useBottomChrome } from '@/context/BottomChromeContext';
 import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
@@ -89,6 +91,9 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
   const { selectDate } = useCalendar();
   const { preferences } = useReadingPreferences();
   const insets = useSafeAreaInsets();
+  // The bar sits at the very bottom, so it has to ride above the now-playing
+  // bar when one is up rather than hide under it.
+  const { nowPlayingInset } = useBottomChrome();
   // On the iPad and desktop the list keeps a centred column, the year bar beneath it.
   const wide = useLayoutMode() !== 'phone';
   const isArabic = preferences.appLanguage === 'ar';
@@ -239,7 +244,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
         {year === null || !rows ? (
           <ActivityIndicator color={COLORS.gold} style={{ marginTop: SPACING.xl }} />
         ) : (
-          <ScrollView contentContainerStyle={[styles.list, { paddingBottom: YEAR_BAR_CLEARANCE + insets.bottom }]} showsVerticalScrollIndicator={false}>
+          <NowPlayingAwareScrollView contentContainerStyle={[styles.list, { paddingBottom: YEAR_BAR_CLEARANCE + insets.bottom }]} showsVerticalScrollIndicator={false}>
             {lineAfterKey === '__start__' ? liveBar : null}
             {rows.map((row) => (
               <Fragment key={row.key}>
@@ -271,12 +276,17 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
                 {lineAfterKey === row.key ? liveBar : null}
               </Fragment>
             ))}
-          </ScrollView>
+          </NowPlayingAwareScrollView>
         )}
       </View>
 
       {year !== null ? (
-        <View style={[styles.yearBar, wide ? styles.yearBarWide : { bottom: 24 + insets.bottom }, isArabic && styles.rowReverse]}>
+        <View style={[
+          styles.yearBar,
+          wide ? styles.yearBarWide : null,
+          { bottom: (wide ? 12 : 12 + insets.bottom) + nowPlayingInset },
+          isArabic && styles.rowReverse,
+        ]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={tr('Previous year', 'Année précédente', 'السنة السابقة')}
@@ -303,8 +313,12 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
   );
 }
 
-/** Room under the list for the floating year bar: its height and the gap beneath it. */
-const YEAR_BAR_CLEARANCE = 60 + 24 + 20;
+/**
+ * Room under the list for the floating year bar: its height and the gap
+ * beneath it. There is no tab bar on this screen, so the bar sits close to the
+ * window's edge rather than where one would have been.
+ */
+const YEAR_BAR_CLEARANCE = 60 + 12 + 20;
 
 /** Each kind of card's fill: single days green, seasons gold, a season's own feasts a quieter green. */
 const CARD_FILLS = {
@@ -377,7 +391,7 @@ const styles = StyleSheet.create({
   frame: { flex: 1 },
   // The design's 720pt column, with the list's own 16pt gutters either side.
   frameWide: { alignSelf: 'center', maxWidth: 752, paddingTop: 22, width: '100%' },
-  yearBarWide: { bottom: 28, left: '50%', marginLeft: -260, right: undefined, width: 520 },
+  yearBarWide: { left: '50%', marginLeft: -260, right: undefined, width: 520 },
   rowReverse: { flexDirection: 'row-reverse' },
   list: { gap: 8, paddingHorizontal: 16, paddingTop: 4 },
   card: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },

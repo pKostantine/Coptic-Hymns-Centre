@@ -7,7 +7,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, LinearGradient as SvgLinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import BottomTabBar from '../ui/BottomTabBar';
 import Icon, { type IconName } from '../ui/Icon';
 import { BuddedCross, VineRule } from '../ui/Ornaments';
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
@@ -131,7 +130,13 @@ const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
       </Head>
       <NowPlayingAwareScrollView
         ref={ref}
-        contentContainerStyle={[styles.content, wideLayout && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        // No tab bar sits under this scroll view any more, so the page itself
+        // has to clear the home indicator.
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: 28 + insets.bottom },
+          wideLayout && [styles.contentWide, { paddingTop: insets.top + 28 }],
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <PageGlow kind={glow} tall={wideLayout} />
@@ -163,7 +168,6 @@ const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
           </View>
         )}
       </NowPlayingAwareScrollView>
-      <BottomTabBar active="books" />
     </SafeAreaView>
   );
 });

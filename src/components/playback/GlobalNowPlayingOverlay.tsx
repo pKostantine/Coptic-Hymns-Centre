@@ -56,6 +56,7 @@ export default function GlobalNowPlayingOverlay() {
   const {
     tabBarInset,
     reportNowPlayingInset,
+    reportNowPlayingExpanded,
     nowPlayingCollapsed: isCollapsed,
     setNowPlayingCollapsed: setIsCollapsed,
   } = useBottomChrome();
@@ -107,6 +108,15 @@ export default function GlobalNowPlayingOverlay() {
       useNativeDriver: true,
     }).start();
   }, [collapseAnimation, isCollapsed]);
+
+  // The desktop sidebar steps aside while a full player is open, so the player
+  // gets the whole window. Reported per overlay and cleared on unmount, the
+  // same way the inset is, because a subdocument can mount one of its own over
+  // the app's.
+  useEffect(() => {
+    reportNowPlayingExpanded(overlayId, isPopupOpen && allowDisplay);
+    return () => reportNowPlayingExpanded(overlayId, false);
+  }, [allowDisplay, isPopupOpen, overlayId, reportNowPlayingExpanded]);
 
   useEffect(() => {
     // The slideshow deliberately renders underneath the floating player. The
