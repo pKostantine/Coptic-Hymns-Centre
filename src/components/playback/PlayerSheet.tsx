@@ -140,17 +140,19 @@ export default function PlayerSheet({
 
 const styles = StyleSheet.create({
   root: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 60, elevation: 60 },
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 6, 14, 0.62)' },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.62)' },
   sheet: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#08192B',
+    // The sheet is chrome rising over the page, so it wears the same deep
+    // green and gold hairline as the tab bar and the mini player.
+    backgroundColor: COLORS.greenDeep,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: COLORS.goldLine,
     overflow: 'hidden',
     ...Platform.select({
       web: { boxShadow: '0 -12px 40px rgba(0, 0, 0, 0.5)' } as object,
@@ -164,6 +166,6 @@ const styles = StyleSheet.create({
     }),
   },
   grabBar: { height: 32, alignItems: 'center', justifyContent: 'center' },
-  grabber: { width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.28)' },
+  grabber: { width: 44, height: 5, borderRadius: 3, backgroundColor: COLORS.goldLine },
   body: { flex: 1, minHeight: 0 },
 });

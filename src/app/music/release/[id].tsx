@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
   },
   artBox: { alignItems: 'center', justifyContent: 'center' },
-  artBoxDesktop: { padding: SPACING.lg, backgroundColor: '#0B1E33', borderRightWidth: 1, borderRightColor: COLORS.border },
+  artBoxDesktop: { padding: SPACING.lg, backgroundColor: COLORS.surfaceSoft, borderRightWidth: 1, borderRightColor: COLORS.border },
   meta: { width: '100%', maxWidth: 680, alignItems: 'center', marginTop: SPACING.lg },
   metaDesktop: { flex: 1, maxWidth: undefined, alignItems: 'flex-start', justifyContent: 'center', marginTop: 0, padding: SPACING.xl },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 28, fontWeight: '700', textAlign: 'center' },

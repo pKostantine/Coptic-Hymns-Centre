@@ -963,7 +963,9 @@ const styles = StyleSheet.create({
   sidePanel: { flex: 1, minWidth: 0, minHeight: 0 },
   playerPanel: {
     justifyContent: 'center',
-    backgroundColor: '#0B1E33',
+    // Lifted off the plain `panel` surface beside it, inside the gold edge
+    // the rebrand already gave this one.
+    backgroundColor: COLORS.surfaceSoft,
     borderColor: 'rgba(227, 181, 59, 0.22)',
   },
   panelHeader: {
@@ -1075,7 +1077,7 @@ const styles = StyleSheet.create({
   sheetQueue: { flex: 1, marginTop: 0, backgroundColor: 'transparent', borderWidth: 0, borderRadius: 0 },
 
   fullscreen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100, elevation: 100, backgroundColor: COLORS.black },
-  fullscreenScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 8, 18, 0.78)' },
+  fullscreenScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.78)' },
   fullscreenTop: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -145,9 +145,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: '#0E2238',
+    // Same chrome as the tab bar it floats above: deep green under a gold
+   // hairline (Coptic Vine, "TabBar").
+    backgroundColor: COLORS.greenDeep,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: COLORS.goldLine,
     ...Platform.select({
       web: { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)' } as object,
       default: {
@@ -172,8 +174,8 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.75 },
   textWrap: { flex: 1, minWidth: 0 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
-  titleSuffix: { color: 'rgba(201, 211, 220, 0.78)', fontWeight: '500' },
-  subtitle: { color: 'rgba(201, 211, 220, 0.8)', fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
+  titleSuffix: { color: COLORS.muted, fontWeight: '500' },
+  subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
   playButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   playNudge: { marginLeft: 2 },
   iconButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
@@ -186,7 +188,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 2,
     borderRadius: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: COLORS.goldSoft,
     overflow: 'hidden',
   },
   progressFill: { height: 2, borderRadius: 1 },
