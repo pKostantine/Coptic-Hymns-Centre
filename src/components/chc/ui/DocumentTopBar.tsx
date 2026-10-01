@@ -115,7 +115,7 @@ export default function DocumentTopBar({
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: COLORS.navy,
+    backgroundColor: COLORS.green,
     // A hairline rather than the menus' full gold rule: at this height a 1px
     // solid line is a third of the bar's visual weight.
     borderBottomColor: COLORS.goldLine,

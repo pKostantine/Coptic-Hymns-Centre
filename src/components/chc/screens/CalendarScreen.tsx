@@ -39,7 +39,7 @@ export default function CalendarScreen({ onClose, onOpenSeasonSelector }: Calend
           over a document, this screen is an overlay on that document's page. */}
       {isHosted ? null : (
         <Head>
-          <title>{`CHC ${title}`}</title>
+          <title>{`Coptic Vine ${title}`}</title>
         </Head>
       )}
       <SubPageHeader title={title} arabic={preferences.appLanguage === 'ar'} onBack={closeScreen} backLabel={tr('Close the calendar', 'Fermer le calendrier', 'أغلق التقويم')} />

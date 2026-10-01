@@ -45,7 +45,7 @@ async function prepareNativeNotifications(requestPermission: boolean) {
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-      name: 'Coptic Hymns Centre',
+      name: 'Coptic Vine',
       importance: Notifications.AndroidImportance.MAX,
       sound: 'default',
       enableVibrate: true,

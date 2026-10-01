@@ -940,10 +940,10 @@ function CollapseButton({ collapsed, onPress }) {
       style={styles.collapseButton}
       hitSlop={8}
     >
-      <View style={[styles.collapseButtonCircle, { borderColor: "#C9A227" }]}>
-        <View style={[styles.collapseBar, styles.collapseBarHorizontal, { backgroundColor: "#C9A227" }]} />
+      <View style={[styles.collapseButtonCircle, { borderColor: COLORS.gold }]}>
+        <View style={[styles.collapseBar, styles.collapseBarHorizontal, { backgroundColor: COLORS.gold }]} />
         {collapsed ? (
-          <View style={[styles.collapseBar, styles.collapseBarVertical, { backgroundColor: "#C9A227" }]} />
+          <View style={[styles.collapseBar, styles.collapseBarVertical, { backgroundColor: COLORS.gold }]} />
         ) : null}
       </View>
     </Pressable>

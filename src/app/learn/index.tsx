@@ -46,7 +46,7 @@ export default function LearningHomeScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
-        <title>{tr('Learn & Study — Coptic Hymns Centre', 'Apprendre — Coptic Hymns Centre', 'تعلّم وادرس — كوبتك هيمنز سنتر')}</title>
+        <title>{tr('Learn & Study — Coptic Vine', 'Apprendre — Coptic Vine', 'تعلّم وادرس — كوبتك فاين')}</title>
       </Head>
       <AppHeader
         title={{ english: 'Learn & Study', arabic: 'تعلّم وادرس', french: 'Apprendre' }}

@@ -30,7 +30,7 @@ interface AppHeaderProps {
 
 /** CHC web header, with room for the safe area in edge-to-edge browsers. */
 export default function AppHeader({
-  title = 'Coptic Hymns Centre',
+  title = 'Coptic Vine',
   canGoBack = false,
   onBack,
   rightLeadingIcon,
@@ -138,7 +138,7 @@ export default function AppHeader({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.navy,
+    backgroundColor: COLORS.green,
     borderBottomColor: COLORS.gold,
     borderBottomWidth: 1,
     paddingBottom: SPACING.md + 4,
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     alignItems: 'center',
-    borderColor: 'rgba(201, 162, 39, 0.45)',
+    borderColor: 'rgba(227, 181, 59, 0.45)',
     borderRadius: 20,
     borderWidth: 1,
     height: 48,

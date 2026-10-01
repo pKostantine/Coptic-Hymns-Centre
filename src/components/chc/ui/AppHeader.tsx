@@ -31,7 +31,7 @@ const ICON_BUTTON_SIZE = 40;
 
 /** CHC Header — ported 1:1 from Header.js/Header.web.js: generic icon-toolbar chrome shared by every screen. */
 export default function AppHeader({
-  title = 'Coptic Hymns Centre',
+  title = 'Coptic Vine',
   canGoBack = false,
   onBack,
   rightLeadingIcon,
@@ -118,7 +118,7 @@ export default function AppHeader({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.navy,
+    backgroundColor: COLORS.green,
     borderBottomColor: COLORS.gold,
     borderBottomWidth: 1,
     paddingBottom: SPACING.sm,
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     alignItems: 'center',
-    borderColor: 'rgba(201, 162, 39, 0.45)',
+    borderColor: 'rgba(227, 181, 59, 0.45)',
     borderRadius: 18,
     borderWidth: 1,
     height: 40,

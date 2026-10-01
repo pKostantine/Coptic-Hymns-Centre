@@ -13,16 +13,16 @@ import { appText, tr } from '../../../utils/appText';
 
 const MAX_FONT_SCALE = 1.25;
 
-/** Each testament's card: what it holds, and its navy — the New a shade brighter. */
+/** Each testament's card: what it holds, and its vine green — the New a shade brighter. */
 const COVERS: Record<Testament, { kicker: { english: string; arabic: string; french: string }; gradient: readonly [string, string, ...string[]]; locations: readonly [number, number, ...number[]] }> = {
   OT: {
     kicker: { english: 'The Law and the Prophets', arabic: 'الناموس والأنبياء', french: 'La Loi et les Prophètes' },
-    gradient: ['#0C3158', '#001D3D'],
+    gradient: ['#2B5A30', '#14301B'],
     locations: [0, 0.75],
   },
   NT: {
     kicker: { english: 'The Gospels and Epistles', arabic: 'الأناجيل والرسائل', french: 'Les Évangiles et les Épîtres' },
-    gradient: ['#123E6B', '#002447', '#001D3D'],
+    gradient: ['#2F6435', '#1A3F22', '#14301B'],
     locations: [0, 0.45, 1],
   },
 };
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   testaments: { gap: 12, paddingHorizontal: 16 },
   card: {
     alignItems: 'center',
-    borderColor: 'rgba(201, 162, 39, 0.3)',
+    borderColor: 'rgba(227, 181, 59, 0.3)',
     borderRadius: 22,
     borderWidth: 1,
     flexDirection: 'row',

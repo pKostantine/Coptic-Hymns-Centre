@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   rowDragging: {
-    backgroundColor: COLORS.navyDark,
+    backgroundColor: COLORS.greenDeep,
     elevation: 8,
     opacity: 0.96,
     shadowColor: COLORS.black,

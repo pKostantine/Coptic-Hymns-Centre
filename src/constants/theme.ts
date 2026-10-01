@@ -1,30 +1,33 @@
 /**
- * CHC design tokens — ported 1:1 from the predecessor app's
- * `constants/theme.js` (Coptic-Hymns-Centre-Old) plus the literal color/size
- * values hardcoded throughout its components (Header.js, CategoryCard.js,
- * HymnCard.js, HymnDisplayScreen.js, LanguageToggleBar.js,
- * CalendarDatePicker.js, SeasonSelector.js). This file is the single source
- * of truth for CHC styling; there is no light mode.
+ * Coptic Vine design tokens (Claude Design, "Coptic Vine" design system:
+ * tokens.json). Vine green carries the chrome, gold is the one accent, on
+ * true black; there is no light mode. The reader's rubric colours below keep
+ * the values the services have always been read in.
  */
 
 export const COLORS = {
-  // Brand palette (base) — exact old-app COLORS.primary/primaryDark/etc.
-  navy: '#003566',
-  navyDark: '#001D3D',
-  gold: '#C9A227',
+  // Brand palette — cv-green, cv-green-deep, cv-gold and the surfaces.
+  green: '#2B5A30',
+  greenDeep: '#14301B',
+  // The hero glow's linear fade starts here; the brightest green marks the current season.
+  greenMid: '#1D4424',
+  greenGlow: '#3A7A3F',
+  gold: '#E3B53B',
   black: '#000000',
-  surface: '#071A2A',
-  surfaceSoft: '#0D2740',
+  surface: '#0B1C10',
+  surfaceSoft: '#133020',
+  // Top of the book and row cards' fade down to `surface`.
+  surfaceDeep: '#10291A',
   white: '#FFFFFF',
-  muted: '#C9D3DC',
-  border: '#262626',
+  muted: '#CDD8CB',
+  border: '#23301F',
   rowBlue: '#8EC5FF',
   shadow: '#000000',
 
-  // Gold tints (derived, used verbatim throughout the old app's inline styles)
-  goldSoft: 'rgba(201, 162, 39, 0.13)',
-  goldLine: 'rgba(201, 162, 39, 0.45)',
-  goldBright: '#D8C77A',
+  // Gold tints — cv-gold-soft, cv-gold-line, cv-gold-bright.
+  goldSoft: 'rgba(227, 181, 59, 0.13)',
+  goldLine: 'rgba(227, 181, 59, 0.45)',
+  goldBright: '#ECD48A',
 
   // Hyperlink (teleport-to-another-service) accent. Deliberately its own trio
   // rather than reusing `refrain` — that green means "this verse is a refrain",
@@ -35,7 +38,7 @@ export const COLORS = {
   linkLine: 'rgba(87, 192, 138, 0.45)',
 
   // Learn & Study uses a restrained teal accent so it reads as a focused
-  // educational space while retaining CHC's navy, gold, type, and surfaces.
+  // educational space while keeping the app's green, gold, type, and surfaces.
   learning: '#73C7B5',
   learningBright: '#A8E2D5',
   learningSoft: 'rgba(115, 199, 181, 0.13)',
@@ -60,9 +63,9 @@ export const COLORS = {
   nightLine: 'rgba(156, 201, 255, 0.32)',
   nightSurface: '#050E1D',
 
-  // Card outlines tinted to the navy family rather than the neutral `border`
-  // gray, so a card on black reads as part of the brand's blue.
-  cardLine: 'rgba(142, 197, 255, 0.14)',
+  // Card outlines: Coptic Vine cards carry only the faint cv-border hairline,
+  // which barely shows on black — depth comes from gradients, not outlines.
+  cardLine: '#23301F',
 
   // Liturgical speaker & verse colors (from HymnDisplayScreen.js constants)
   priest: '#D64545',

@@ -792,7 +792,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           source of that bug — disabled here in favor of it. */}
       <Stack.Screen options={{ gestureEnabled: false }} />
       <Head>
-        <title>{`CHC ${title}`}</title>
+        <title>{`Coptic Vine ${title}`}</title>
       </Head>
       {!isMobileDocument ? (
         <DocumentTopBar

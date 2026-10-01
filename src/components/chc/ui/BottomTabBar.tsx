@@ -95,10 +95,11 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
-  shell: { backgroundColor: COLORS.navy },
+  // The tab bar sits on the deep green under a gold hairline (Coptic Vine, "TabBar").
+  shell: { backgroundColor: COLORS.greenDeep },
   bar: {
-    backgroundColor: COLORS.navy,
-    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.greenDeep,
+    borderTopColor: COLORS.goldLine,
     borderTopWidth: 1,
     flexDirection: 'row',
   },

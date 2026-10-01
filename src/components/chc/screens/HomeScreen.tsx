@@ -53,7 +53,7 @@ function splitSaintTitle(title: string): { main: string; detail: string | null }
 }
 
 /**
- * Home (CHC design, "Home"): the seal on a navy glow with the day beneath it,
+ * Home (Coptic Vine design system, "HomeHero"): the seal on a green glow with the day beneath it,
  * the Agpeya hour to pray now, the Sunday message under a gold crown, and the
  * saints of today and tomorrow. Home always shows the live day, whatever date
  * the Books screen has been moved to.
@@ -135,7 +135,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
-        <title>{tr('Coptic Hymns Centre', 'Coptic Hymns Centre', 'كوبتك هيمنز سنتر')}</title>
+        <title>{tr('Coptic Vine', 'Coptic Vine', 'كوبتك فاين')}</title>
       </Head>
 
       <NowPlayingAwareScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -149,13 +149,13 @@ export default function HomeScreen() {
               <View style={styles.sealShadow} pointerEvents="none" />
               <Image
                 accessible
-                accessibilityLabel="Coptic Hymns Centre"
-                source={require('../../../../assets/images/CHC.png')}
+                accessibilityLabel="Coptic Vine"
+                source={require('../../../../assets/images/coptic-vine-seal.png')}
                 style={styles.logo}
               />
             </View>
             <Text style={[styles.tagline, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
-              {tr('Pray. Read. Listen. Learn.', 'Prier. Lire. Écouter. Apprendre.', 'صلِّ. اقرأ. استمع. تعلّم.')}
+              {tr('Pray. Read. Learn.', 'Prier. Lire. Apprendre.', 'صلِّ. اقرأ. تعلّم.')}
             </Text>
             <Text style={[styles.heroDate, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
               {formatDayMonthDate(liveDate, arabic)}
@@ -178,13 +178,13 @@ export default function HomeScreen() {
               onPress={() => router.push(`/agpeya/${hour.id}` as never)}
               style={({ pressed }) => [styles.prayButton, arabic && styles.rowReverse, pressed && styles.pressed]}
             >
-              <Icon name="play" size={16} color={COLORS.navyDark} />
+              <Icon name="play" size={16} color={COLORS.greenDeep} />
               <Text style={[styles.prayButtonText, arabic && styles.arabicTight]}>{tr('Pray', 'Prier', 'صلِّ')}</Text>
             </Pressable>
           </View>
 
           <View style={[styles.card, styles.message]}>
-            <LinearGradient colors={['#0A2644', COLORS.navyDark]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+            <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
             <View style={styles.crown} pointerEvents="none">
               <CrownOrnament width={300} height={58} />
             </View>
@@ -265,17 +265,17 @@ export default function HomeScreen() {
   );
 }
 
-/** The navy glow behind the seal: a radial light over a navy-to-black fall. */
+/** The green glow behind the seal: a radial light over a green-to-black fall. */
 function HeroGlow() {
   return (
     <View style={styles.glow} pointerEvents="none">
-      <LinearGradient colors={['#002A52', '#001D3D', '#000000']} locations={[0, 0.4, 1]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[COLORS.greenMid, COLORS.greenDeep, '#000000']} locations={[0, 0.4, 1]} style={StyleSheet.absoluteFill} />
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
         <Defs>
           <RadialGradient id="homeGlow" cx="50%" cy="18%" rx="120%" ry="75%" fx="50%" fy="18%">
-            <Stop offset="0" stopColor="#004A8C" stopOpacity="0.85" />
-            <Stop offset="0.28" stopColor="#003566" stopOpacity="0.7" />
-            <Stop offset="0.55" stopColor="#001D3D" stopOpacity="0.45" />
+            <Stop offset="0" stopColor="#346E3A" stopOpacity="0.85" />
+            <Stop offset="0.28" stopColor="#224C28" stopOpacity="0.7" />
+            <Stop offset="0.55" stopColor="#14301B" stopOpacity="0.45" />
             <Stop offset="0.85" stopColor="#000000" stopOpacity="0" />
           </RadialGradient>
         </Defs>
@@ -295,15 +295,15 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingHorizontal: 24 },
   halo: { alignItems: 'center', height: 212, justifyContent: 'center', width: 212 },
   logo: { height: 188, resizeMode: 'contain', width: 188 },
-  // CHC.png's seal fills 178 of its 188 points; the shadow circle matches it
-  // and hides behind it, in the seal's own navy.
+  // The seal fills 184 of its 188 points inside a gold rim; the shadow circle
+  // hides behind it, in the seal's own deep green.
   sealShadow: {
-    backgroundColor: '#01305A',
-    borderRadius: 89,
+    backgroundColor: '#14301A',
+    borderRadius: 92,
     boxShadow: '0px 16px 30px rgba(0, 0, 0, 0.55)',
-    height: 178,
+    height: 184,
     position: 'absolute',
-    width: 178,
+    width: 184,
   },
   tagline: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', marginTop: 26, textAlign: 'center' },
   heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 8, textAlign: 'center' },
@@ -331,8 +331,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  prayButtonText: { color: COLORS.navyDark, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700' },
-  message: { borderColor: 'rgba(201, 162, 39, 0.3)' },
+  prayButtonText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700' },
+  message: { borderColor: 'rgba(227, 181, 59, 0.3)' },
   crown: { alignItems: 'center', left: 8, opacity: 0.85, position: 'absolute', right: 8, top: 8 },
   messageBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 44 },
   messageKicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', letterSpacing: 1.7, textAlign: 'center', textTransform: 'uppercase' },
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
   segmentOption: { alignItems: 'center', borderRadius: 99, flex: 1, paddingVertical: 8 },
   segmentOptionActive: { backgroundColor: COLORS.gold },
   segmentText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
-  segmentTextActive: { color: COLORS.navyDark },
+  segmentTextActive: { color: COLORS.greenDeep },
   saints: { paddingBottom: 8, paddingHorizontal: 18, paddingTop: 2 },
   saint: { borderBottomColor: 'rgba(255, 255, 255, 0.07)', borderBottomWidth: 1, flexDirection: 'row', gap: 12, paddingVertical: 13 },
   saintLast: { borderBottomWidth: 0 },

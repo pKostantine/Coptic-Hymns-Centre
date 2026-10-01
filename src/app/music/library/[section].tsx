@@ -310,7 +310,7 @@ export default function MusicLibraryFolderScreen() {
 
     const visibleDownloads = downloads.filter((item) => includesSearch([item.title, item.entityType, item.status], normalizedQuery));
     if (Platform.OS === 'web') {
-      return <View style={styles.emptyCard}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('Offline downloads are available in the CHC iOS and Android apps.', 'Les téléchargements hors ligne sont disponibles dans les applications CHC pour iOS et Android.', 'تتوفر التنزيلات في تطبيق CHC للهاتف.')}</Text></View>;
+      return <View style={styles.emptyCard}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('Offline downloads are available in the Coptic Vine iOS and Android apps.', 'Les téléchargements hors ligne sont disponibles dans les applications Coptic Vine pour iOS et Android.', 'تتوفر التنزيلات في تطبيق كوبتك فاين للهاتف.')}</Text></View>;
     }
     return visibleDownloads.length ? <View style={styles.list}>{visibleDownloads.map((item) => (
       <View key={item.packageKey} style={styles.entityRow}>
@@ -386,14 +386,14 @@ const styles = StyleSheet.create({
   textAction: { alignItems: 'center', borderColor: COLORS.border, borderRadius: RADII.pill, borderWidth: 1, justifyContent: 'center', minHeight: 36, paddingHorizontal: SPACING.md },
   textActionLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800' },
   downloadIcon: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
-  emptyCard: { backgroundColor: COLORS.navyDark, borderColor: COLORS.border, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.sm, padding: SPACING.lg },
+  emptyCard: { backgroundColor: COLORS.greenDeep, borderColor: COLORS.border, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.sm, padding: SPACING.lg },
   emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 20, fontWeight: '800' },
   emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
   primaryButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: COLORS.gold, borderRadius: RADII.pill, justifyContent: 'center', minHeight: 40, paddingHorizontal: SPACING.lg },
   primaryButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
   newPlaylistButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: COLORS.gold, borderRadius: RADII.pill, flexDirection: 'row', gap: SPACING.xs, minHeight: 40, paddingHorizontal: SPACING.lg },
   newPlaylistText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
-  creator: { backgroundColor: COLORS.navyDark, borderColor: COLORS.border, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.sm, padding: SPACING.md },
+  creator: { backgroundColor: COLORS.greenDeep, borderColor: COLORS.border, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.sm, padding: SPACING.md },
   input: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, minHeight: 46, paddingHorizontal: SPACING.md },
   descriptionInput: { minHeight: 78, paddingTop: 12, textAlignVertical: 'top' },
   visibilityControl: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', padding: 3 },

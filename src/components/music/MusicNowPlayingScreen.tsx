@@ -260,7 +260,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     if (!libraryAuthenticated) {
       Alert.alert(
         tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
-        tr('Sign in to your CHC account to save Liked Songs.', 'Connectez-vous à votre compte CHC pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'),
+        tr('Sign in to your Coptic Vine account to save Liked Songs.', 'Connectez-vous à votre compte Coptic Vine pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب كوبتك فاين لحفظ الأغاني المعجبة.'),
       );
       return;
     }
@@ -320,7 +320,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     );
   }
 
-  const performerLine = formatMusicTrackPerformers(currentItem.track, 'Coptic Hymns Centre');
+  const performerLine = formatMusicTrackPerformers(currentItem.track, 'Coptic Vine');
   const isCollectionTrack = currentItem.releaseType === 'album' || currentItem.releaseType === 'ep';
   const albumLine = isCollectionTrack ? currentItem.releaseTitle ?? null : null;
   const classifierLine = [currentItem.recordingType, currentItem.musicType].filter(Boolean).join(' • ');
@@ -964,7 +964,7 @@ const styles = StyleSheet.create({
   playerPanel: {
     justifyContent: 'center',
     backgroundColor: '#0B1E33',
-    borderColor: 'rgba(201, 162, 39, 0.22)',
+    borderColor: 'rgba(227, 181, 59, 0.22)',
   },
   panelHeader: {
     flexDirection: 'row',

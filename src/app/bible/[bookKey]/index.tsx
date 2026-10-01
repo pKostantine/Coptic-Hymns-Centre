@@ -10,7 +10,6 @@ import BookPage from '@/components/chc/screens/BookPage';
 import LoadingScreen from '@/components/chc/ui/LoadingScreen';
 import { TESTAMENTS } from '@/constants/bibleTestaments';
 import { appText, tr } from '@/utils/appText';
-import { getBookTheme } from '@/constants/bookTheme';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { getBibleBook, getBibleChapterDisplayLabel, getBibleChapterKeys, getBibleSpecialChapterTitle, getCachedBibleChapterKeys, isBibleLxxAdditionChapter, PsalmNumbering, type BibleBook } from '@/utils/bibleService';
@@ -86,8 +85,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
 
   const title = { english: loadedBook?.titleEnglish || bookKey, arabic: loadedBook?.titleArabic || '', french: loadedBook?.titleFrench || '' };
   const testament = loadedBook ? TESTAMENTS[loadedBook.testament] : null;
-  const theme = testament?.theme ?? getBookTheme('bible');
-  // The chapters are gold on the page's navy, as the rest of the Bible's pages are.
+  // The chapters are gold on the page's green, as the rest of the Bible's pages are.
   const accent = COLORS.gold;
 
   // A one-chapter book opens straight onto its text; until then (or while
@@ -95,7 +93,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
   if (!error && (!chapters || chapters.length === 1)) {
     return (
       <SafeAreaView edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : []} style={styles.screen}>
-        <AppHeader title={title} canGoBack onBack={() => goBack(router, '/bible')} tint={theme.gradient[0]} titleVisible={false} />
+        <AppHeader title={title} canGoBack onBack={() => goBack(router, '/bible')} titleVisible={false} />
         <View style={styles.loadingArea}>
           <LoadingScreen />
         </View>
@@ -130,7 +128,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
                     style={[styles.segment, isSelected && { backgroundColor: accent }]}
                     onPress={() => setPsalmNumbering(option.key)}
                   >
-                    <Text style={[styles.segmentText, showArabic && styles.segmentArabic, { color: isSelected ? COLORS.navyDark : accent }]}>
+                    <Text style={[styles.segmentText, showArabic && styles.segmentArabic, { color: isSelected ? COLORS.greenDeep : accent }]}>
                       {label}
                     </Text>
                   </Pressable>

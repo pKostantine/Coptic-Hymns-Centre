@@ -101,7 +101,7 @@ export default function MenuRow({
           ) : null}
         </View>
         {isBookmarked ? <Icon name="bookmark" size={16} color={COLORS.gold} /> : null}
-        <Icon name={arabicOnly ? 'chevron-back' : 'chevron-forward'} size={16} color={accent ?? (night ? COLORS.nightLine : 'rgba(201, 162, 39, 0.7)')} />
+        <Icon name={arabicOnly ? 'chevron-back' : 'chevron-forward'} size={16} color={accent ?? (night ? COLORS.nightLine : 'rgba(227, 181, 59, 0.7)')} />
       </View>
     </Pressable>
   );

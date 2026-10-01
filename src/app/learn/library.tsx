@@ -182,7 +182,7 @@ export default function LearningLibraryScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>{tr('My Learning - Coptic Hymns Centre', 'Mon apprentissage - Coptic Hymns Centre', 'تعلّمي - مركز الألحان القبطية')}</title></Head>
+      <Head><title>{tr('My Learning - Coptic Vine', 'Mon apprentissage - Coptic Vine', 'تعلّمي - كوبتك فاين')}</title></Head>
       <AppHeader title={{ english: 'Learn & Study', arabic: 'التعلّم والدراسة', french: 'Apprendre' }} />
       <LearningSectionNav active="library" />
       <NowPlayingAwareScrollView

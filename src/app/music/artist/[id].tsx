@@ -85,7 +85,7 @@ export default function MusicArtistScreen() {
     if (!libraryAuthenticated) {
       Alert.alert(
         tr('Follow artist', 'Suivre l’artiste', 'متابعة الفنان'),
-        tr('Sign in to your CHC account to follow artists.', 'Connectez-vous à votre compte CHC pour suivre des artistes.', 'سجّل الدخول إلى حساب CHC لمتابعة الفنانين.'),
+        tr('Sign in to your Coptic Vine account to follow artists.', 'Connectez-vous à votre compte Coptic Vine pour suivre des artistes.', 'سجّل الدخول إلى حساب كوبتك فاين لمتابعة الفنانين.'),
       );
       return;
     }
@@ -129,7 +129,7 @@ export default function MusicArtistScreen() {
       {artist ? (
         <ShareMetadata
           title={artist.displayName}
-          description={artist.biography || 'Listen on Coptic Hymns Centre'}
+          description={artist.biography || 'Listen on Coptic Vine'}
           canonicalUrl={publicUrl(`/music/artist/${artist.id}`)}
           imageUrl={shareImageUrl}
           type="profile"

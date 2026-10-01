@@ -13,10 +13,10 @@ export default function ShareMetadata({
   imageUrl?: string | null;
   type?: 'website' | 'music.song' | 'music.album' | 'profile';
 }) {
-  const fullTitle = title.includes('Coptic Hymns Centre')
+  const fullTitle = title.includes('Coptic Vine')
     ? title
-    : title + ' — Coptic Hymns Centre';
-  const summary = description?.trim() || 'Coptic Hymns Centre';
+    : title + ' — Coptic Vine';
+  const summary = description?.trim() || 'Coptic Vine';
   let fallbackImage = 'https://chc.pierrek.ca/apple-touch-icon.png';
   try {
     fallbackImage = new URL('/apple-touch-icon.png', canonicalUrl).toString();
@@ -30,7 +30,7 @@ export default function ShareMetadata({
       <title>{fullTitle}</title>
       <meta name="description" content={summary} />
       <link rel="canonical" href={canonicalUrl} />
-      <meta property="og:site_name" content="Coptic Hymns Centre" />
+      <meta property="og:site_name" content="Coptic Vine" />
       <meta property="og:type" content={type} />
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={summary} />

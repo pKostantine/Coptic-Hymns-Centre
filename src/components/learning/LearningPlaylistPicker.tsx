@@ -173,7 +173,7 @@ export default function LearningPlaylistPicker({
 const styles = StyleSheet.create({
   trigger: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: COLORS.learningSoft, borderWidth: 1, borderColor: COLORS.learningLine },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.72)' },
-  sheet: { maxHeight: '78%', padding: SPACING.md, paddingBottom: SPACING.xl, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: COLORS.navyDark, borderWidth: 1, borderColor: COLORS.learningLine },
+  sheet: { maxHeight: '78%', padding: SPACING.md, paddingBottom: SPACING.xl, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: COLORS.greenDeep, borderWidth: 1, borderColor: COLORS.learningLine },
   header: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   headerCopy: { flex: 1 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },

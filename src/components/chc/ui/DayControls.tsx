@@ -136,7 +136,7 @@ export default function DayControls({ theme, arabic, seasonLabel, onOpenSeasons,
   );
 }
 
-/** The red Live dot: a soft red halo on navy, a white ring on every other season's colour. */
+/** The red Live dot: a soft red halo on the annual green, a white ring on every other season's colour. */
 function LiveDot({ ring }: { ring: DayBlockTheme['liveRing'] }) {
   return (
     <View style={[styles.dotHalo, ring === 'white' ? styles.dotHaloWhite : styles.dotHaloRed]}>

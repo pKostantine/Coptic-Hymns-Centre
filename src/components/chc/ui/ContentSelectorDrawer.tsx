@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
   },
   selectorPanel: {
     backgroundColor: '#050505',
-    borderColor: 'rgba(201, 162, 39, 0.35)',
+    borderColor: 'rgba(227, 181, 59, 0.35)',
     borderLeftWidth: 1,
     paddingHorizontal: SPACING.md,
   },
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#111111',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(201, 162, 39, 0.28)',
+    borderBottomColor: 'rgba(227, 181, 59, 0.28)',
     flexDirection: 'row',
     justifyContent: 'center',
     marginHorizontal: -SPACING.md,
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111111',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#262626',
+    borderColor: COLORS.border,
     flexDirection: 'row',
     minHeight: 78,
     marginBottom: SPACING.sm,
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
   },
   selectorItemActive: {
     backgroundColor: '#171513',
-    borderColor: 'rgba(201, 162, 39, 0.72)',
+    borderColor: 'rgba(227, 181, 59, 0.72)',
   },
   selectorTitleRow: {
     alignItems: 'center',
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
   selectorToggleRow: {
     alignItems: 'center',
     borderTopWidth: 1,
-    borderColor: 'rgba(201, 162, 39, 0.28)',
+    borderColor: 'rgba(227, 181, 59, 0.28)',
     flexDirection: 'row',
     gap: SPACING.sm,
     justifyContent: 'center',
@@ -667,7 +667,7 @@ const styles = StyleSheet.create({
   selectorActionRow: {
     alignItems: 'center',
     backgroundColor: '#101010',
-    borderColor: 'rgba(201, 162, 39, 0.32)',
+    borderColor: 'rgba(227, 181, 59, 0.32)',
     borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -677,8 +677,8 @@ const styles = StyleSheet.create({
   },
   selectorIconButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(201, 162, 39, 0.06)',
-    borderColor: 'rgba(201, 162, 39, 0.24)',
+    backgroundColor: 'rgba(227, 181, 59, 0.06)',
+    borderColor: 'rgba(227, 181, 59, 0.24)',
     borderRadius: 20,
     borderWidth: 1,
     height: 40,

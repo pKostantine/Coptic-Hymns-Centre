@@ -32,8 +32,8 @@ interface BookPageProps {
   subtitle?: string;
   arabic: boolean;
   backHref: Href;
-  /** Holy Week's pages glow crimson; every other book, navy. */
-  glow?: 'navy' | 'crimson';
+  /** Holy Week's pages glow crimson; every other book, vine green. */
+  glow?: 'green' | 'crimson';
   /** The round button opposite Back. Bookmarks unless given another; null for none. */
   action?: BookPageAction | null;
   /** Sets the content in the page's 16pt gutter with 12pt between its pieces (for content that doesn't set its own margins). */
@@ -42,14 +42,14 @@ interface BookPageProps {
 }
 
 /**
- * The frame every book's own page shares (CHC design, "Book Pages"): a glow
+ * The frame every book's own page shares (Coptic Vine design system, "BookHero"): a glow
  * falling from the top of the page, round gold Back and Bookmarks buttons,
  * the book's medallion with its name beneath, then the page's own sections —
  * each a heading drawn out into a vine over a list of rows. The Books tab
  * stays at the foot, as it does on the Books screen.
  */
 const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
-  { title, kicker, subtitle, arabic, backHref, glow = 'navy', action, padded = false, children },
+  { title, kicker, subtitle, arabic, backHref, glow = 'green', action, padded = false, children },
   ref,
 ) {
   const router = useRouter();
@@ -61,7 +61,7 @@ const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
-        <title>{`CHC ${title.english}`}</title>
+        <title>{`Coptic Vine ${title.english}`}</title>
       </Head>
       <NowPlayingAwareScrollView ref={ref} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <PageGlow kind={glow} />
@@ -120,11 +120,11 @@ function RoundButton({ icon, label, onPress }: BookPageAction) {
 }
 
 /** The page's colour falling from the top to black, under its glow. */
-const NAVY_FALL: [string, string][] = [['0', '#002A52'], ['0.36', '#001D3D'], ['1', '#000000']];
+const GREEN_FALL: [string, string][] = [['0', '#1D4424'], ['0.36', '#14301B'], ['1', '#000000']];
 const CRIMSON_FALL: [string, string][] = [['0', '#160203'], ['0.3', '#070101'], ['1', '#000000']];
 
-/** The light falling from the top of the page: navy for the books, crimson for Holy Week. */
-function PageGlow({ kind }: { kind: 'navy' | 'crimson' }) {
+/** The light falling from the top of the page: green for the books, crimson for Holy Week. */
+function PageGlow({ kind }: { kind: 'green' | 'crimson' }) {
   // Unique per page: on web the pages of a stack share one document.
   const id = `glow${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const crimson = kind === 'crimson';
@@ -133,7 +133,7 @@ function PageGlow({ kind }: { kind: 'navy' | 'crimson' }) {
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
         <Defs>
           <SvgLinearGradient id={`${id}l`} x1="0" y1="0" x2="0" y2="1">
-            {(crimson ? CRIMSON_FALL : NAVY_FALL).map(([offset, color]) => <Stop key={offset} offset={offset} stopColor={color} />)}
+            {(crimson ? CRIMSON_FALL : GREEN_FALL).map(([offset, color]) => <Stop key={offset} offset={offset} stopColor={color} />)}
           </SvgLinearGradient>
           {crimson ? (
             <RadialGradient id={`${id}r`} cx="50%" cy="4%" rx="90%" ry="55%" fx="50%" fy="4%">
@@ -143,9 +143,9 @@ function PageGlow({ kind }: { kind: 'navy' | 'crimson' }) {
             </RadialGradient>
           ) : (
             <RadialGradient id={`${id}r`} cx="50%" cy="12%" rx="110%" ry="70%" fx="50%" fy="12%">
-              <Stop offset="0" stopColor="#004A8C" stopOpacity="0.75" />
-              <Stop offset="0.3" stopColor="#003566" stopOpacity="0.55" />
-              <Stop offset="0.58" stopColor="#001D3D" stopOpacity="0.3" />
+              <Stop offset="0" stopColor="#346E3A" stopOpacity="0.75" />
+              <Stop offset="0.3" stopColor="#224C28" stopOpacity="0.55" />
+              <Stop offset="0.58" stopColor="#14301B" stopOpacity="0.3" />
               <Stop offset="0.85" stopColor="#000000" stopOpacity="0" />
             </RadialGradient>
           )}
@@ -290,10 +290,10 @@ const styles = StyleSheet.create({
   medallion: {
     alignItems: 'center',
     backgroundColor: COLORS.goldSoft,
-    borderColor: 'rgba(201, 162, 39, 0.35)',
+    borderColor: 'rgba(227, 181, 59, 0.35)',
     borderRadius: 26,
     borderWidth: 1,
-    boxShadow: '0px 0px 30px rgba(201, 162, 39, 0.22)',
+    boxShadow: '0px 0px 30px rgba(227, 181, 59, 0.22)',
     height: 52,
     justifyContent: 'center',
     width: 52,

@@ -43,7 +43,7 @@ test('the priority tables are actually being read', () => {
 });
 
 test('every season or feast that can name the day has a colour and a chip name', () => {
-  // An unmapped key falls back to the annual navy, which would quietly show a
+  // An unmapped key falls back to the annual green, which would quietly show a
   // feast as though it were an ordinary day; an unnamed one would read "Annual".
   const shortNames = ['EVENT_SHORT_NAMES', 'SEASON_SHORT_NAMES'].map(block);
   for (const key of INDICATOR_KEYS) {
@@ -115,24 +115,28 @@ test('a lesser feast inside a fast keeps the fast colour; a great one does not',
   assert.equal(theme('feast-of-the-cross', ['nayrouz-period', 'feast-of-the-cross']), 'palm');
 });
 
-test('the themes carry the spec’s tokens', () => {
+test('the themes carry the Coptic Vine season colours', () => {
   const t = appearance.DAY_BLOCK_THEMES;
-  assert.deepEqual([t.annual.from, t.annual.to], ['#0C3158', '#001D3D']);
-  assert.equal(t.annual.border, 'rgba(201, 162, 39, 0.30)');
-  assert.equal(t.annual.strong, '#D8C77A');
+  // Annual is the vine green; the old CHC navy now belongs to the Apostles.
+  assert.deepEqual([t.annual.from, t.annual.to], ['#2B5A30', '#14301B']);
+  assert.equal(t.annual.border, 'rgba(227, 181, 59, 0.30)');
+  assert.equal(t.annual.strong, '#ECD48A');
+  assert.deepEqual([t.apostles.from, t.apostles.to], ['#0C3158', '#001D3D']);
   assert.equal(t.natfast.toAt, 0.78);
   assert.equal(t.nativity.toAt, 0.8);
   assert.equal(t.lent.toAt, 0.75);
   // Gold: the selected day and the accents turn white so they don't blend in.
   assert.equal(t.gold.selected, '#FFFFFF');
   assert.equal(t.gold.accent, '#FFFFFF');
-  assert.equal(t.lent.selected, '#C9A227');
+  assert.equal(t.lent.selected, '#E3B53B');
+  assert.equal(t.lent.selectedText, '#14301B');
   // Resurrection: a white block with dark text and a darker gold.
   assert.equal(t.resurrection.text, '#10223A');
   assert.equal(t.resurrection.muted, '#5B6573');
-  assert.equal(t.resurrection.accent, '#9A7A14');
+  assert.equal(t.resurrection.accent, '#8A6A12');
+  assert.equal(t.resurrection.accentBorder, '#B08A1C');
   assert.deepEqual([t.holyweek.from, t.holyweek.to], ['#141414', '#000000']);
-  assert.equal(t.holyweek.border, 'rgba(201, 162, 39, 0.35)');
+  assert.equal(t.holyweek.border, 'rgba(227, 181, 59, 0.35)');
   for (const theme of Object.values(t)) {
     assert.equal(theme.liveRing, theme.key === 'annual' ? 'halo' : 'white', theme.key);
   }

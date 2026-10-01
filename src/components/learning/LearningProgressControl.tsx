@@ -70,7 +70,7 @@ export default function LearningProgressControl({
           {tr('Sign in to save your progress', 'Connectez-vous pour enregistrer votre progression', 'سجّل الدخول لحفظ تقدّمك')}
         </Text>
         <Text style={[styles.authBody, isArabic && styles.arabic]}>
-          {tr('You can listen and watch without an account, but learning states are tied to your CHC account.', 'Vous pouvez écouter et regarder sans compte, mais votre progression est liée à votre compte CHC.', 'يمكنك الاستماع والمشاهدة بدون حساب، لكن حالات التعلّم مرتبطة بحساب CHC.')}
+          {tr('You can listen and watch without an account, but learning states are tied to your Coptic Vine account.', 'Vous pouvez écouter et regarder sans compte, mais votre progression est liée à votre compte Coptic Vine.', 'يمكنك الاستماع والمشاهدة بدون حساب، لكن حالات التعلّم مرتبطة بحساب كوبتك فاين.')}
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Pressable style={styles.accountButton} onPress={() => router.push('/account')}>

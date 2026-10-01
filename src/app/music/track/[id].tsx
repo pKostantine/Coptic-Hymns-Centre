@@ -182,7 +182,7 @@ export default function MusicTrackDetailScreen() {
     if (!libraryAuthenticated) {
       Alert.alert(
         tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
-        tr('Sign in to your CHC account to save Liked Songs.', 'Connectez-vous à votre compte CHC pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'),
+        tr('Sign in to your Coptic Vine account to save Liked Songs.', 'Connectez-vous à votre compte Coptic Vine pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب كوبتك فاين لحفظ الأغاني المعجبة.'),
       );
       return;
     }
@@ -242,7 +242,7 @@ export default function MusicTrackDetailScreen() {
     );
   }
 
-  const performers = formatMusicTrackPerformers(track, 'Coptic Hymns Centre');
+  const performers = formatMusicTrackPerformers(track, 'Coptic Vine');
   const release = track.release;
   const meta = [
     release?.recordingType,

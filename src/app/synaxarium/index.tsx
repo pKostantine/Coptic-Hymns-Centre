@@ -170,7 +170,7 @@ export default function SynaxariumBrowserScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>Synaxarium — Coptic Hymns Centre</title></Head>
+      <Head><title>Synaxarium — Coptic Vine</title></Head>
 
       <AppHeader
         title={{ english: 'Synaxarium', arabic: 'السنكسار', french: 'Synaxaire' }}
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADII.lg,
-    backgroundColor: COLORS.navyDark,
+    backgroundColor: COLORS.greenDeep,
     padding: SPACING.lg,
   },
   dayCardToday: {

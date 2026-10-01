@@ -20,7 +20,7 @@ export default function ToggleRow({ label, isArabic = false, active, onPress, di
       style={[styles.languageOption, disabled && styles.languageOptionDisabled]}
     >
       <Text style={[styles.languageLabel, isArabic && styles.languageLabelArabic, disabled && styles.languageLabelDisabled]}>{label}</Text>
-      <View style={[styles.switchTrack, { backgroundColor: effectiveActive ? COLORS.navy : '#1C1C1C', borderColor: effectiveActive ? COLORS.gold : COLORS.border, opacity: disabled ? 0.35 : 1 }]}>
+      <View style={[styles.switchTrack, { backgroundColor: effectiveActive ? COLORS.green : '#1C1C1C', borderColor: effectiveActive ? COLORS.gold : COLORS.border, opacity: disabled ? 0.35 : 1 }]}>
         <View
           style={[
             styles.switchThumb,

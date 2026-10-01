@@ -203,7 +203,7 @@ export default function GlobalNowPlayingOverlay() {
 
   let title = 'Now playing';
   let titleSuffix: string | null = null;
-  let subtitle = 'Coptic Hymns Centre';
+  let subtitle = 'Coptic Vine';
   let artwork: ReactNode = null;
 
   if (isMusic && music.currentItem) {
@@ -212,7 +212,7 @@ export default function GlobalNowPlayingOverlay() {
     titleSuffix = item.releaseType === 'album' || item.releaseType === 'ep'
       ? item.releaseTitle ?? null
       : null;
-    subtitle = formatMusicTrackPerformers(item.track) || 'Coptic Hymns Centre';
+    subtitle = formatMusicTrackPerformers(item.track) || 'Coptic Vine';
     artwork = (
       <MusicArtwork
         asset={item.coverAsset ?? null}
@@ -304,8 +304,8 @@ export default function GlobalNowPlayingOverlay() {
             Alert.alert(
               tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
               preferences.appLanguage === 'ar'
-                ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'
-                : `Sign in to your CHC account to save ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
+                ? 'سجّل الدخول إلى حساب كوبتك فاين لحفظ الأغاني المعجبة.'
+                : `Sign in to your Coptic Vine account to save ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
             );
             return;
           }

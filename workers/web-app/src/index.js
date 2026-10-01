@@ -1,7 +1,7 @@
 const SUPABASE_URL = 'https://wtuujmeinzqfikvuofmh.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_H0lG0vRL6io4Uy0htd77Cw_dlNbwx0n';
 const MEDIA_BASE_URL = 'https://chc-media-resolver.hrmpdd8d6c.workers.dev';
-const APP_NAME = 'Coptic Hymns Centre';
+const APP_NAME = 'Coptic Vine';
 const DEFAULT_DESCRIPTION = 'Coptic hymns, liturgical books, music, and structured learning.';
 
 const PUBLIC_BUCKET_ROUTES = {
@@ -223,8 +223,8 @@ function dedicatedShareResponse(request, entity) {
     + '<main style="max-width:680px;margin:64px auto;padding:24px;text-align:center">\n'
     + '<img src="' + safeImage + '" alt="" style="width:min(78vw,420px);aspect-ratio:1;object-fit:cover;border-radius:20px" />\n'
     + '<h1 style="font-size:26px;margin:24px 0 8px">' + escapeHtml(metadata.pageTitle) + '</h1>\n'
-    + '<p style="color:#c9d3dc">' + metadata.safeSummary + '</p>\n'
-    + '<p><a href="' + safeTarget + '" style="color:#d7ad23">Open in ' + APP_NAME + '</a></p>\n'
+    + '<p style="color:#cdd8cb">' + metadata.safeSummary + '</p>\n'
+    + '<p><a href="' + safeTarget + '" style="color:#e3b53b">Open in ' + APP_NAME + '</a></p>\n'
     + '</main>\n'
     + '<script>window.location.replace(' + JSON.stringify(targetUrl) + ');</script>\n'
     + '<noscript><meta http-equiv="refresh" content="0;url=' + safeTarget + '" /></noscript>\n'

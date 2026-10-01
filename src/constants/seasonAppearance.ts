@@ -1,7 +1,7 @@
 /**
  * The colours of the Books day block, and of the calendar sheet's header, for
- * the liturgical day it shows — "CHC — Season colour spec for the Books day
- * block" (Claude Design, "CHC Home Books Calendar", section 5).
+ * the liturgical day it shows — the Coptic Vine design system's "Season
+ * colours" (Claude Design, "Coptic Vine": season-colours.md).
  *
  * The theme follows the day's winning indicator key (getSeasonIndicatorKey in
  * seasonNames.ts), which already settles which season or feast a day is named
@@ -45,12 +45,12 @@ export interface DayBlockTheme {
   selectedText: string;
   /** Behind the season chip. */
   chip: string;
-  /** The Live dot sits on red and gold as well as navy, so off navy it wears a white ring. */
+  /** The Live dot sits on red and gold as well as green, so off the annual green it wears a white ring. */
   liveRing: 'halo' | 'white';
 }
 
-const GOLD = '#C9A227';
-const NAVY_DARK = '#001D3D';
+const GOLD = '#E3B53B';
+const GREEN_DEEP = '#14301B';
 
 /** What every theme but Annual shares (spec §1, "Shared rules"). */
 const ON_COLOUR = {
@@ -62,21 +62,21 @@ const ON_COLOUR = {
   accent: GOLD,
   accentBorder: GOLD,
   selected: GOLD,
-  selectedText: NAVY_DARK,
+  selectedText: GREEN_DEEP,
   chip: 'rgba(255, 255, 255, 0.08)',
   liveRing: 'white' as const,
 };
 
 export const DAY_BLOCK_THEMES: Record<SeasonThemeKey, DayBlockTheme> = {
-  /** Navy — the design's own block. */
+  /** Vine green — the design's own block. */
   annual: {
     ...ON_COLOUR,
     key: 'annual',
-    from: '#0C3158',
-    to: NAVY_DARK,
-    border: 'rgba(201, 162, 39, 0.30)',
-    muted: '#C9D3DC',
-    strong: '#D8C77A',
+    from: '#2B5A30',
+    to: GREEN_DEEP,
+    border: 'rgba(227, 181, 59, 0.30)',
+    muted: '#CDD8CB',
+    strong: '#ECD48A',
     liveRing: 'halo',
   },
   /** Gold, for feasts: oklch(0.64 0.11 85) → oklch(0.34 0.07 72). The gold accents turn white so they don't sink into it. */
@@ -100,23 +100,23 @@ export const DAY_BLOCK_THEMES: Record<SeasonThemeKey, DayBlockTheme> = {
   /** Light green: oklch(0.68 0.15 130) → oklch(0.46 0.12 140). */
   palm: { ...ON_COLOUR, key: 'palm', from: '#79AA3B', to: '#2E6720' },
   /** Black. */
-  holyweek: { ...ON_COLOUR, key: 'holyweek', from: '#141414', to: '#000000', border: 'rgba(201, 162, 39, 0.35)' },
+  holyweek: { ...ON_COLOUR, key: 'holyweek', from: '#141414', to: '#000000', border: 'rgba(227, 181, 59, 0.35)' },
   /** White, with dark text and a darker gold. */
   resurrection: {
     ...ON_COLOUR,
     key: 'resurrection',
     from: '#FFFDF7',
     to: '#E8E2D2',
-    border: 'rgba(201, 162, 39, 0.55)',
+    border: 'rgba(227, 181, 59, 0.55)',
     text: '#10223A',
     muted: '#5B6573',
-    strong: '#9A7A14',
-    accent: '#9A7A14',
-    accentBorder: '#B8921F',
+    strong: '#8A6A12',
+    accent: '#8A6A12',
+    accentBorder: '#B08A1C',
     chip: 'rgba(16, 34, 58, 0.07)',
   },
-  /** Purple: oklch(0.42 0.12 300) → oklch(0.20 0.07 300). The spec's placeholder pick. */
-  apostles: { ...ON_COLOUR, key: 'apostles', from: '#583A84', to: '#1B0C30' },
+  /** Navy — the old CHC navy, kept for the Apostles. */
+  apostles: { ...ON_COLOUR, key: 'apostles', from: '#0C3158', to: '#001D3D' },
   /** Royal blue: oklch(0.46 0.17 262) → oklch(0.24 0.11 262). */
   marian: { ...ON_COLOUR, key: 'marian', from: '#1C50B5', to: '#001852' },
 };

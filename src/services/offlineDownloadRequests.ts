@@ -96,7 +96,7 @@ function snapshot<T>(entityType: OfflineEntitySnapshot['entityType'], entityId: 
 }
 
 function primaryArtist(track: MusicConsumerTrack): string {
-  return formatMusicTrackPerformers(track, 'Coptic Hymns Centre');
+  return formatMusicTrackPerformers(track, 'Coptic Vine');
 }
 
 function musicTrackResources(

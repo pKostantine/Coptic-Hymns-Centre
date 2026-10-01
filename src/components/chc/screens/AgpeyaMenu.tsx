@@ -12,7 +12,7 @@ import { AGPEYA_HOURS, agpeyaHourAt, agpeyaHourEnd, formatAgpeyaClock, nextAgpey
 import { appText, entryLabel, tr } from '../../../utils/appText';
 import { toEasternArabicDigits } from '../../../utils/localeFormat';
 
-/** The Agpeya is prayed the same through the year, so its card keeps the plain navy. */
+/** The Agpeya is prayed the same through the year, so its card keeps the plain vine green. */
 const THEME = DAY_BLOCK_THEMES.annual;
 
 /** The clock hour, re-read every minute so the hour being prayed moves on by itself. */

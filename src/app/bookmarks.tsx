@@ -116,7 +116,7 @@ export default function BookmarksScreen() {
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
       <Head>
-        <title>CHC Bookmarks</title>
+        <title>Coptic Vine Bookmarks</title>
       </Head>
       <AppHeader title="Bookmarks" canGoBack onBack={() => goBack(router, '/books')} />
       {entries.length === 0 ? (

@@ -140,9 +140,9 @@ function GoButton({ action, arabic }: { action: TodayCardAction; arabic: boolean
       onPress={action.onPress}
       style={({ pressed }) => [styles.go, arabic && styles.rowReverse, pressed && styles.pressed]}
     >
-      {action.leadingIcon ? <Icon name={action.leadingIcon} size={14} color={COLORS.navyDark} /> : null}
+      {action.leadingIcon ? <Icon name={action.leadingIcon} size={14} color={COLORS.greenDeep} /> : null}
       <Text style={[styles.goText, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{action.label}</Text>
-      {action.trailingIcon ? <Icon name={action.trailingIcon} size={14} color={COLORS.navyDark} /> : null}
+      {action.trailingIcon ? <Icon name={action.trailingIcon} size={14} color={COLORS.greenDeep} /> : null}
     </Pressable>
   );
 }
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     height: 36,
     paddingHorizontal: 14,
   },
-  goText: { color: COLORS.navyDark, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  goText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   pressed: { opacity: 0.75 },
   arabicHeading: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },

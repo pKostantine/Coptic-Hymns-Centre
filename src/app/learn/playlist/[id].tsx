@@ -30,7 +30,7 @@ function toQueueItem(item: LearningPlaylistItem): LearningQueueItem | null {
       mediaAsset: item.recording.mediaAsset,
       containerId: item.recording.albumId,
       containerTitle: item.recording.albumTitle,
-      cantorName: 'Coptic Hymns Centre',
+      cantorName: 'Coptic Vine',
       coverAsset: null,
       hymnId: item.recording.hymnId ?? null,
     };
@@ -45,7 +45,7 @@ function toQueueItem(item: LearningPlaylistItem): LearningQueueItem | null {
     mediaAsset: item.lesson.mediaAsset,
     containerId: item.lesson.lessonSetId,
     containerTitle: item.lesson.lessonSetTitle,
-    cantorName: 'Coptic Hymns Centre',
+    cantorName: 'Coptic Vine',
     coverAsset: null,
     hymnId: null,
   };

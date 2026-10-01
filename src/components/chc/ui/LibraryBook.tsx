@@ -71,7 +71,7 @@ export default function LibraryBook({
 
   return (
     <View style={[styles.book, wide ? styles.bookWide : styles.bookTile]}>
-      <LinearGradient colors={['#0B2236', COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${title}. ${description}`}
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   medallion: {
     alignItems: 'center',
     backgroundColor: COLORS.goldSoft,
-    borderColor: 'rgba(201, 162, 39, 0.35)',
+    borderColor: 'rgba(227, 181, 59, 0.35)',
     borderRadius: 26,
     borderWidth: 1,
     height: 52,

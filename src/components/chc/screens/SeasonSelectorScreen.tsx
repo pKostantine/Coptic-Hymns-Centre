@@ -5,9 +5,8 @@ import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import CopticCross from '@/components/chc/ui/CopticCross';
 import SubPageHeader from '@/components/chc/ui/SubPageHeader';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { getEventFormalName, getSeasonFormalName } from '@/constants/seasonNames';
@@ -23,13 +22,10 @@ import {
 } from '@/utils/calendarService';
 import { localDateAtUtcMidnight, todayIsoDate } from '@/utils/dateUtils';
 import {
-  formatCalendarDay,
   formatCopticDayMonth,
   formatCopticYear,
+  formatGregorianDate,
   formatGregorianDateRange,
-  GREGORIAN_MONTHS_AR,
-  GREGORIAN_MONTHS_EN,
-  GREGORIAN_MONTHS_FR,
 } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
 import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
@@ -70,24 +66,19 @@ function rowEnd(row: TopRow) {
   return row.type === 'season' ? row.endDate : row.date;
 }
 
-/** "SEP" / "SEPT." / "سبتمبر" over each row's day number. */
-function monthAbbreviation(isoDate: string, arabic: boolean): string {
-  const month = Number(isoDate.slice(5, 7)) - 1;
-  if (arabic) return GREGORIAN_MONTHS_AR[month];
-  return tr(GREGORIAN_MONTHS_EN[month].slice(0, 3), GREGORIAN_MONTHS_FR[month].slice(0, 4).replace(/\.$/, ''), '').toUpperCase();
-}
-
 interface SeasonSelectorScreenProps {
   /** Set when this screen is rendered inside a modal rather than as its own route (see DocumentModal) — returns to whatever the host was showing instead of popping the navigation stack. */
   onClose?: () => void;
 }
 
 /**
- * The year's seasons and feasts (CHC design, "Season selector"): each under
- * its Gregorian date, with the Coptic date or the season's span beneath its
- * name; a red "Live · Today" rule where today falls; the season in progress
- * raised in navy and gold; and a season's own feasts nested under it. Choosing
- * one moves the whole app to that day.
+ * The year's seasons and feasts (Coptic Vine design system, "SeasonList"):
+ * single-day feasts on green cards, each with its Gregorian and Coptic date;
+ * the multi-day seasons on gold cards with their span, their own feasts
+ * hanging off a gold rail beneath; a red LIVE rule where today falls, and the
+ * season or feast today falls in (or the next to come) raised. The year is
+ * changed from a bar floating at the foot of the list. Choosing a row moves
+ * the whole app to that day.
  */
 export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenProps) {
   const router = useRouter();
@@ -95,6 +86,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
   const closeScreen = () => (onClose ? onClose() : goBack(router, '/books'));
   const { selectDate } = useCalendar();
   const { preferences } = useReadingPreferences();
+  const insets = useSafeAreaInsets();
   const isArabic = preferences.appLanguage === 'ar';
   const appLanguage = preferences.appLanguage;
   const [year, setYear] = useState<number | null>(null);
@@ -204,8 +196,8 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
     return { liveTopKey: null, liveChildKey: null, lineAfterKey: before?.key ?? '__start__' };
   }, [rows, todayInViewedYear, todayIso]);
 
-  // The row raised in navy and gold: the season or feast today falls in, or
-  // failing that the next one to come, just after the Live rule.
+  // The row raised: the season or feast today falls in, or failing that the
+  // next one to come, just after the Live rule.
   const raisedKey = useMemo(() => {
     if (!rows || !todayInViewedYear) return null;
     if (liveTopKey) return liveTopKey;
@@ -225,129 +217,137 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
   const liveBar = <LiveBar isArabic={isArabic} />;
   const title = tr('Seasons', 'Temps liturgiques', 'الفترات');
 
+  /** "Sep 27, 2026 · Tout 17": a feast's day in both calendars. */
+  const dayLine = (date: string) => [formatGregorianDate(date, isArabic), copticSubtitle(date)].filter(Boolean).join(' · ');
+
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.screen, DISABLED_TEXT_SELECTION_STYLE]}>
+    <SafeAreaView edges={['left', 'right']} style={[styles.screen, DISABLED_TEXT_SELECTION_STYLE]}>
       {/* See CalendarScreen — an overlay over a document isn't its own page. */}
       {isHosted ? null : (
         <Head>
-          <title>{`CHC ${title}`}</title>
+          <title>{`Coptic Vine ${title}`}</title>
         </Head>
       )}
       <SubPageHeader title={title} arabic={isArabic} onBack={closeScreen} backLabel={tr('Close the seasons', 'Fermer les temps liturgiques', 'أغلق الفترات')} />
 
-      {year === null ? (
+      {year === null || !rows ? (
         <ActivityIndicator color={COLORS.gold} style={{ marginTop: SPACING.xl }} />
       ) : (
-        <>
-          <View style={styles.yearRow}>
-            <Pressable accessibilityRole="button" accessibilityLabel={isArabic ? 'السنة التالية' : tr('Previous year', 'Année précédente', '')} style={styles.arrow} onPress={() => setYear((y) => (y ?? 0) + (isArabic ? 1 : -1))}>
-              <Icon name="chevron-back" size={17} color={COLORS.gold} />
-            </Pressable>
-            <View style={[styles.yearLabel, isArabic && styles.rowReverse]}>
-              {year === currentCopticYear ? <View style={styles.yearDot} /> : null}
-              <Text style={[styles.yearText, isArabic && styles.arabicText]}>{formatCopticYear(year, isArabic)}</Text>
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel={isArabic ? 'السنة السابقة' : tr('Next year', 'Année suivante', '')} style={styles.arrow} onPress={() => setYear((y) => (y ?? 0) + (isArabic ? -1 : 1))}>
-              <Icon name="chevron-forward" size={17} color={COLORS.gold} />
-            </Pressable>
-          </View>
-
-          {!rows ? (
-            <ActivityIndicator color={COLORS.gold} style={{ marginTop: SPACING.xl }} />
-          ) : (
-            <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-              {lineAfterKey === '__start__' ? liveBar : null}
-              {rows.map((row) => {
-                const current = raisedKey === row.key;
-                const past = rowEnd(row) < todayIso;
-                const date = rowStart(row);
-                const subtitle = row.type === 'season' ? formatGregorianDateRange(row.startDate, row.endDate, isArabic) : copticSubtitle(row.date);
-                return (
-                  <Fragment key={row.key}>
-                    {liveTopKey === row.key ? liveBar : null}
-                    <EventRow
-                      title={isArabic ? row.arabic || row.title : row.title}
-                      subtitle={subtitle}
-                      date={date}
-                      isArabic={isArabic}
-                      current={current}
-                      chevron={!past}
-                      onPress={() => selectDay(date)}
-                    />
-                    {row.type === 'season' && row.children.length ? (
-                      <View style={[styles.nest, isArabic && styles.nestArabic]}>
-                        {row.children.map((child, index) => (
-                          <Fragment key={child.key}>
-                            {liveChildKey === child.key ? liveBar : null}
-                            <EventRow
-                              title={isArabic ? child.arabic || child.title : child.title}
-                              date={child.date}
-                              isArabic={isArabic}
-                              nested
-                              last={index === row.children.length - 1}
-                              onPress={() => selectDay(child.date)}
-                            />
-                          </Fragment>
-                        ))}
-                      </View>
-                    ) : null}
-                    {lineAfterKey === row.key ? liveBar : null}
-                  </Fragment>
-                );
-              })}
-            </ScrollView>
-          )}
-        </>
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: YEAR_BAR_CLEARANCE + insets.bottom }]} showsVerticalScrollIndicator={false}>
+          {lineAfterKey === '__start__' ? liveBar : null}
+          {rows.map((row) => (
+            <Fragment key={row.key}>
+              {liveTopKey === row.key ? liveBar : null}
+              <SeasonCard
+                title={isArabic ? row.arabic || row.title : row.title}
+                subtitle={row.type === 'season' ? formatGregorianDateRange(row.startDate, row.endDate, isArabic) : dayLine(row.date)}
+                kind={row.type === 'season' ? 'season' : 'day'}
+                current={raisedKey === row.key}
+                isArabic={isArabic}
+                onPress={() => selectDay(rowStart(row))}
+              />
+              {row.type === 'season' && row.children.length ? (
+                <View style={[styles.nest, isArabic && styles.nestArabic]}>
+                  {row.children.map((child) => (
+                    <Fragment key={child.key}>
+                      {liveChildKey === child.key ? liveBar : null}
+                      <SeasonCard
+                        title={isArabic ? child.arabic || child.title : child.title}
+                        subtitle={formatGregorianDate(child.date, isArabic)}
+                        kind="nested"
+                        isArabic={isArabic}
+                        onPress={() => selectDay(child.date)}
+                      />
+                    </Fragment>
+                  ))}
+                </View>
+              ) : null}
+              {lineAfterKey === row.key ? liveBar : null}
+            </Fragment>
+          ))}
+        </ScrollView>
       )}
+
+      {year !== null ? (
+        <View style={[styles.yearBar, { bottom: 24 + insets.bottom }, isArabic && styles.rowReverse]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={tr('Previous year', 'Année précédente', 'السنة السابقة')}
+            style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}
+            onPress={() => setYear((y) => (y ?? 0) - 1)}
+          >
+            <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={17} color={COLORS.gold} />
+          </Pressable>
+          <View style={[styles.yearLabel, isArabic && styles.rowReverse]}>
+            {year === currentCopticYear ? <View style={styles.yearDot} /> : null}
+            <Text style={[styles.yearText, isArabic && styles.arabicText]}>{formatCopticYear(year, isArabic)}</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={tr('Next year', 'Année suivante', 'السنة التالية')}
+            style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}
+            onPress={() => setYear((y) => (y ?? 0) + 1)}
+          >
+            <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+          </Pressable>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
 
-function EventRow({
+/** Room under the list for the floating year bar: its height and the gap beneath it. */
+const YEAR_BAR_CLEARANCE = 60 + 24 + 20;
+
+/** Each kind of card's fill: single days green, seasons gold, a season's own feasts a quieter green. */
+const CARD_FILLS = {
+  day: { colors: ['#173A1F', '#0D2213'], locations: [0, 1] },
+  dayCurrent: { colors: [COLORS.greenGlow, '#1F4A26', COLORS.greenDeep], locations: [0, 0.55, 1] },
+  season: { colors: ['#F0C74E', '#D6A52C', '#A87C17'], locations: [0, 0.6, 1] },
+  nested: { colors: ['#12301A', COLORS.surface], locations: [0, 1] },
+} as const;
+
+function SeasonCard({
   title,
   subtitle,
-  date,
-  isArabic,
+  kind,
   current = false,
-  chevron = false,
-  nested = false,
-  last = false,
+  isArabic,
   onPress,
 }: {
   title: string;
-  subtitle?: string;
-  date: string;
-  isArabic: boolean;
+  subtitle: string;
+  kind: 'day' | 'season' | 'nested';
   current?: boolean;
-  chevron?: boolean;
-  nested?: boolean;
-  last?: boolean;
+  isArabic: boolean;
   onPress: () => void;
 }) {
+  const gold = kind === 'season';
+  const fill = gold ? CARD_FILLS.season : kind === 'nested' ? CARD_FILLS.nested : current ? CARD_FILLS.dayCurrent : CARD_FILLS.day;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={`${title}, ${subtitle}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, current && styles.rowCurrent, (last || current) && styles.rowLast, isArabic && styles.rowReverse, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        kind === 'nested' && styles.cardNested,
+        current && styles.cardCurrent,
+        current && (gold ? styles.glowGold : styles.glowGreen),
+        isArabic && styles.rowReverse,
+        pressed && styles.pressed,
+      ]}
     >
-      {current ? (
-        <>
-          <LinearGradient colors={['#0C3158', COLORS.navyDark]} start={{ x: 0.33, y: 0 }} end={{ x: 0.67, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
-          <View style={[styles.watermark, isArabic ? styles.watermarkLeft : styles.watermarkRight]} pointerEvents="none">
-            <CopticCross size={46} color="rgba(201, 162, 39, 0.35)" />
-          </View>
-        </>
-      ) : null}
-      <View style={styles.dateColumn}>
-        <Text style={[styles.month, current && styles.gold, isArabic && styles.arabicSmall]} numberOfLines={1}>{monthAbbreviation(date, isArabic)}</Text>
-        <Text style={[styles.day, nested && styles.dayNested, current && styles.gold]}>{formatCalendarDay(Number(date.slice(8, 10)), isArabic)}</Text>
-      </View>
+      <LinearGradient colors={fill.colors} locations={fill.locations} start={{ x: 0.33, y: 0 }} end={{ x: 0.67, y: 1 }} style={[StyleSheet.absoluteFill, styles.cardFill]} pointerEvents="none" />
       <View style={styles.text}>
-        <Text style={[styles.title, nested && styles.titleNested, isArabic && styles.arabicText]}>{title}</Text>
-        {subtitle ? <Text style={[styles.subtitle, isArabic && styles.arabicText]}>{subtitle}</Text> : null}
+        <Text style={[styles.title, kind === 'nested' && styles.titleNested, current && styles.titleCurrent, gold && styles.onGold, isArabic && styles.arabicText]}>
+          {title}
+        </Text>
+        <Text style={[styles.subtitle, kind === 'nested' && styles.subtitleNested, current && !gold && styles.subtitleCurrent, gold && styles.subtitleOnGold, isArabic && styles.arabicText]}>
+          {subtitle}
+        </Text>
       </View>
-      {chevron ? <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /> : null}
+      <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={gold ? COLORS.greenDeep : COLORS.gold} />
     </Pressable>
   );
 }
@@ -358,7 +358,7 @@ function LiveBar({ isArabic }: { isArabic: boolean }) {
       <View style={styles.liveDotHalo}>
         <View style={styles.liveDot} />
       </View>
-      <Text style={[styles.liveText, isArabic && styles.arabicSmall]}>{tr('LIVE · TODAY', 'EN DIRECT · AUJOURD’HUI', 'الآن · اليوم')}</Text>
+      <Text style={[styles.liveText, isArabic && styles.arabicSmall]}>{tr('LIVE', 'EN DIRECT', 'الآن')}</Text>
       <View style={styles.liveLine} />
     </View>
   );
@@ -367,60 +367,49 @@ function LiveBar({ isArabic }: { isArabic: boolean }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
   rowReverse: { flexDirection: 'row-reverse' },
-  yearRow: {
+  list: { gap: 8, paddingHorizontal: 16, paddingTop: 4 },
+  card: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
+  cardFill: { borderRadius: 16 },
+  cardNested: { paddingVertical: 10 },
+  cardCurrent: { padding: 16 },
+  glowGold: { boxShadow: '0px 10px 28px rgba(227, 181, 59, 0.3)' },
+  glowGreen: { boxShadow: '0px 10px 28px rgba(58, 122, 63, 0.35)' },
+  pressed: { opacity: 0.82 },
+  text: { flex: 1, minWidth: 0 },
+  title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '600' },
+  titleNested: { fontSize: 15 },
+  titleCurrent: { fontFamily: TYPOGRAPHY.title, fontSize: 20, fontWeight: '700' },
+  onGold: { color: COLORS.greenDeep },
+  subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 3 },
+  subtitleNested: { fontSize: 12.5 },
+  subtitleCurrent: { color: COLORS.goldBright },
+  subtitleOnGold: { color: '#2B4A1F' },
+  // A season's own feasts hang off a solid gold rail.
+  nest: { borderLeftColor: COLORS.gold, borderLeftWidth: 2, gap: 8, marginLeft: 10, paddingLeft: 18 },
+  nestArabic: { borderLeftWidth: 0, borderRightColor: COLORS.gold, borderRightWidth: 2, marginLeft: 0, marginRight: 10, paddingLeft: 0, paddingRight: 18 },
+  liveBar: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingVertical: 6 },
+  liveDotHalo: { alignItems: 'center', backgroundColor: 'rgba(214, 69, 69, 0.2)', borderRadius: 8, height: 16, justifyContent: 'center', width: 16 },
+  liveDot: { backgroundColor: COLORS.priest, borderRadius: 4, height: 8, width: 8 },
+  liveText: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
+  liveLine: { backgroundColor: COLORS.priest, flex: 1, height: 1, opacity: 0.6 },
+  // Floats over the foot of the list (nearly opaque, as the design's blurred bar reads).
+  yearBar: {
     alignItems: 'center',
-    borderBottomColor: COLORS.border,
-    borderBottomWidth: 1,
+    backgroundColor: 'rgba(11, 28, 16, 0.92)',
+    borderRadius: 22,
+    boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.55)',
     flexDirection: 'row',
+    height: 60,
     justifyContent: 'space-between',
-    paddingBottom: 14,
-    paddingHorizontal: 16,
+    left: 16,
+    paddingHorizontal: 10,
+    position: 'absolute',
+    right: 16,
   },
   arrow: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   yearLabel: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   yearDot: { backgroundColor: COLORS.priest, borderRadius: 4, height: 8, width: 8 },
   yearText: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700' },
-  list: { paddingBottom: 28, paddingHorizontal: 16, paddingTop: 6 },
-  row: {
-    alignItems: 'center',
-    borderBottomColor: 'rgba(255, 255, 255, 0.07)',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: 14,
-    paddingHorizontal: 4,
-    paddingVertical: 12,
-  },
-  rowCurrent: {
-    borderColor: COLORS.goldLine,
-    borderRadius: 18,
-    borderWidth: 1,
-    marginBottom: 6,
-    marginTop: 2,
-    overflow: 'hidden',
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-  },
-  rowLast: { borderBottomWidth: 0 },
-  pressed: { opacity: 0.7 },
-  watermark: { position: 'absolute', top: 3 },
-  watermarkRight: { right: 36 },
-  watermarkLeft: { left: 36 },
-  dateColumn: { alignItems: 'center', width: 44 },
-  month: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '700', letterSpacing: 0.9 },
-  day: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700', lineHeight: 24 },
-  dayNested: { fontSize: 18, lineHeight: 21 },
-  gold: { color: COLORS.gold },
-  text: { flex: 1, minWidth: 0 },
-  title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '600', lineHeight: 21 },
-  titleNested: { fontSize: 15, fontWeight: '500' },
-  subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 2 },
-  nest: { borderLeftColor: COLORS.goldLine, borderLeftWidth: 1, marginLeft: 26, paddingLeft: 18 },
-  nestArabic: { borderLeftWidth: 0, borderRightColor: COLORS.goldLine, borderRightWidth: 1, marginLeft: 0, marginRight: 26, paddingLeft: 0, paddingRight: 18 },
-  liveBar: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingVertical: 12 },
-  liveDotHalo: { alignItems: 'center', backgroundColor: 'rgba(214, 69, 69, 0.2)', borderRadius: 8, height: 16, justifyContent: 'center', width: 16 },
-  liveDot: { backgroundColor: COLORS.priest, borderRadius: 4, height: 8, width: 8 },
-  liveText: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  liveLine: { backgroundColor: COLORS.priest, flex: 1, height: 1, opacity: 0.6 },
   arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   arabicSmall: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },
 });

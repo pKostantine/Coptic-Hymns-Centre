@@ -211,7 +211,7 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
             d="M256 112c-39.21-31.36-86.4-48-136-48H80a32 32 0 0 0-32 32v272a32 32 0 0 0 32 32h40c49.6 0 96.79 16.64 136 48 39.21-31.36 86.4-48 136-48h40a32 32 0 0 0 32-32V96a32 32 0 0 0-32-32h-40c-49.6 0-96.79 16.64-136 48Z"
             fill={color}
           />
-          <Path d="M256 112v336" fill="none" stroke="#071A2A" strokeWidth={28} strokeLinecap="round" />
+          <Path d="M256 112v336" fill="none" stroke="#0B1C10" strokeWidth={28} strokeLinecap="round" />
         </Svg>
       );
     case 'library-outline':

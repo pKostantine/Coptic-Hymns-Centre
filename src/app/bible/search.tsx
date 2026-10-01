@@ -244,7 +244,7 @@ export default function BibleSearchScreen() {
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
       <Head>
-        <title>CHC Bible Search</title>
+        <title>Coptic Vine Bible Search</title>
       </Head>
       <AppHeader
         title={LABELS.title}

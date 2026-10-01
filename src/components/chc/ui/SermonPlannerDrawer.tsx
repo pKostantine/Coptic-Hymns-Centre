@@ -342,13 +342,13 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1 },
   panel: {
     backgroundColor: '#080A0C',
-    borderLeftColor: 'rgba(201, 162, 39, 0.4)',
+    borderLeftColor: 'rgba(227, 181, 59, 0.4)',
     borderLeftWidth: 1,
   },
   header: {
     alignItems: 'center',
     backgroundColor: '#101316',
-    borderBottomColor: 'rgba(201, 162, 39, 0.28)',
+    borderBottomColor: 'rgba(227, 181, 59, 0.28)',
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
   languageBar: {
-    borderBottomColor: 'rgba(201, 162, 39, 0.18)',
+    borderBottomColor: 'rgba(227, 181, 59, 0.18)',
     borderBottomWidth: 1,
     flexDirection: 'row',
     gap: SPACING.xs,
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   referenceNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800', width: 20 },
   referenceLabel: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 15, lineHeight: 20 },
   pressed: { opacity: 0.68 },
-  divider: { backgroundColor: 'rgba(201, 162, 39, 0.25)', height: 1, marginVertical: SPACING.lg },
+  divider: { backgroundColor: 'rgba(227, 181, 59, 0.25)', height: 1, marginVertical: SPACING.lg },
   outlineInput: {
     backgroundColor: '#11161A',
     borderColor: '#2D353C',
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   actionRow: {
     alignItems: 'center',
     backgroundColor: '#101316',
-    borderTopColor: 'rgba(201, 162, 39, 0.32)',
+    borderTopColor: 'rgba(227, 181, 59, 0.32)',
     borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -461,8 +461,8 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(201, 162, 39, 0.06)',
-    borderColor: 'rgba(201, 162, 39, 0.24)',
+    backgroundColor: 'rgba(227, 181, 59, 0.06)',
+    borderColor: 'rgba(227, 181, 59, 0.24)',
     borderRadius: 20,
     borderWidth: 1,
     height: 40,

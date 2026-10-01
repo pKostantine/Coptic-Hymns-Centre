@@ -1,7 +1,7 @@
 import { DOWNLOADABLE_BOOKS } from '@/constants/bookDependencyRegistry';
 import type { BookDownloadManager, BookDownloadProgress, DownloadableBookKey } from '@/types/bookDownloads';
 
-const unavailable = () => new Error('Offline books are available only in the CHC iOS and Android apps.');
+const unavailable = () => new Error('Offline books are available only in the Coptic Vine iOS and Android apps.');
 
 class WebBookDownloadManager implements BookDownloadManager {
   subscribe = (_listener: () => void) => () => undefined;
