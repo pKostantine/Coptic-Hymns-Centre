@@ -109,6 +109,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
       backHref={loadedBook ? `/bible/${loadedBook.testament}` : '/bible'}
       action={{ icon: 'search-outline', label: tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس'), onPress: () => router.push('/bible/search') }}
       padded
+      wide="single"
     >
       {error ? (
         <Text style={styles.error}>{error}</Text>

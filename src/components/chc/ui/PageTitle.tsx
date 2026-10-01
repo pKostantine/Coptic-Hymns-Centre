@@ -14,13 +14,15 @@ interface PageTitleProps {
   title: string;
   arabic: boolean;
   actions?: PageTitleAction[];
+  /** Inside the iPad's and desktop's columns: no gutter and no top inset of its own. */
+  flush?: boolean;
 }
 
 /** A tab's own page (CHC design, "Books"): its name large at the head, round gold buttons beside it. */
-export default function PageTitle({ title, arabic, actions = [] }: PageTitleProps) {
+export default function PageTitle({ title, arabic, actions = [], flush = false }: PageTitleProps) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.row, { paddingTop: insets.top + 6 }, arabic && styles.rowReverse]}>
+    <View style={[styles.row, flush ? styles.flush : { paddingTop: insets.top + 6 }, arabic && styles.rowReverse]}>
       <Text style={[styles.title, arabic && styles.arabic]} numberOfLines={1} accessibilityRole="header">
         {title}
       </Text>
@@ -44,6 +46,7 @@ export default function PageTitle({ title, arabic, actions = [] }: PageTitleProp
 
 const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16 },
+  flush: { paddingHorizontal: 0, paddingTop: 0 },
   rowReverse: { flexDirection: 'row-reverse' },
   title: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 34, fontWeight: '700' },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },

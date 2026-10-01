@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
-import BookPage, { BookRow, PageGutter, ReadingRow, RowList, SectionHeading } from './BookPage';
+import BookPage, { BookRow, ReadingRow, RowList, SectionHeading } from './BookPage';
 import DayControls from '../ui/DayControls';
 import Icon from '../ui/Icon';
 import TodayCard from '../ui/TodayCard';
@@ -134,24 +134,24 @@ export default function LectionaryMenu() {
       kicker={tr('Today’s Readings', 'Lectures du jour', 'قراءات اليوم')}
       arabic={arabic}
       backHref="/books"
+      aside={(
+          <TodayCard
+            theme={day.theme}
+            arabic={arabic}
+            controls={(
+              <DayControls
+                theme={day.theme}
+                arabic={arabic}
+                seasonLabel={day.seasonLabel}
+                onOpenSeasons={() => router.push('/season-selector')}
+                trailing="arrows"
+              />
+            )}
+            heading={day.coptic ? formatCopticDayMonth(day.coptic.monthName, day.coptic.day, arabic) : ' '}
+            subheading={formatDayMonthYearDate(day.date, arabic)}
+          />
+      )}
     >
-      <PageGutter>
-        <TodayCard
-          theme={day.theme}
-          arabic={arabic}
-          controls={(
-            <DayControls
-              theme={day.theme}
-              arabic={arabic}
-              seasonLabel={day.seasonLabel}
-              onOpenSeasons={() => router.push('/season-selector')}
-              trailing="arrows"
-            />
-          )}
-          heading={day.coptic ? formatCopticDayMonth(day.coptic.monthName, day.coptic.day, arabic) : ' '}
-          subheading={formatDayMonthYearDate(day.date, arabic)}
-        />
-      </PageGutter>
 
       {serviceSection('Vespers')}
       {serviceSection('Matins')}

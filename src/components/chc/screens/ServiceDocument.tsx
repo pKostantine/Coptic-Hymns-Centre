@@ -5,6 +5,7 @@ import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import DocumentTopBar from '../ui/DocumentTopBar';
+import CalendarSheet from '../ui/CalendarSheet';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import SermonPlannerDrawer from '../ui/SermonPlannerDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
@@ -196,6 +197,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // In-document toggle button state, rendered wherever GOSPEL_RITE is spliced in.
   const copticGospelRite = preferences.copticGospelRite;
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [activeSermonHighlightId, setActiveSermonHighlightId] = useState<string | null>(null);
   // Seeded from the same module-level store selectedSlideSectionId is (see
   // below): changing a setting can unmount this screen and mount it again,
@@ -550,7 +552,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   }, [preferences.slideshowMode]);
 
   // See navigatingAwayRef's declaration -- used for any navigation that
-  // leaves this screen mounted behind the destination (Settings, Calendar).
+  // leaves this screen mounted behind the destination (Settings, Seasons).
   const navigateAway = (href: Href) => {
     captureDocumentRestore(
       documentPositionKey,
@@ -561,6 +563,20 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     navigatingAwayRef.current = true;
     setSelectorOpen(false);
     router.push(href);
+  };
+
+  // The calendar opens over the document rather than as a page of its own.
+  // Choosing another day re-reads the document for it, so its place is kept
+  // first, as when leaving for another page.
+  const openCalendar = () => {
+    captureDocumentRestore(
+      documentPositionKey,
+      currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
+      readySections?.map(section => section.id) ?? [],
+      restoreSettingsSignature,
+    );
+    setSelectorOpen(false);
+    setCalendarOpen(true);
   };
 
   // A Hyperlink teleports to another service rather than opening anything over
@@ -872,7 +888,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
               }}
               bookmarked={bookmarked}
               onToggleBookmark={() => toggleBookmark(bookmarkId)}
-              onOpenCalendar={() => navigateAway('/calendar')}
+              onOpenCalendar={openCalendar}
               onOpenSettings={() => navigateAway('/book-settings')}
             />
           ) : (
@@ -894,7 +910,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             onOpenHyperlink={(hyperlinkKey) => openHyperlink(hyperlinkKey, { fromSelector: true })}
             bookmarked={bookmarked}
             onToggleBookmark={() => toggleBookmark(bookmarkId)}
-            onOpenCalendar={() => navigateAway('/calendar')}
+            onOpenCalendar={openCalendar}
             onOpenSettings={() => navigateAway('/book-settings')}
             bishopPresent={preferences.bishopPresent}
             onToggleBishopPresent={() => {
@@ -937,6 +953,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         collapseMemoryScope={antiphonaryModal?.collapseMemoryScope ?? `${documentPositionKey}:sub:antiphonary`}
         onClose={() => setAntiphonaryModal(null)}
       />
+      <CalendarSheet inline visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={() => navigateAway('/season-selector')} />
     </SafeAreaView>
   );
 }

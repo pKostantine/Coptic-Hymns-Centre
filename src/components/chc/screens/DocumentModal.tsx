@@ -13,9 +13,9 @@ import DocumentSurface from '../DocumentSurface';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import DocumentTopBar from '../ui/DocumentTopBar';
+import CalendarSheet from '../ui/CalendarSheet';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
-import CalendarScreen from './CalendarScreen';
 import SeasonSelectorScreen from './SeasonSelectorScreen';
 import SettingsScreen from './SettingsScreen';
 import { getCurrentAppLanguage } from '../../../utils/preferencesStorage';
@@ -472,12 +472,13 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           </>
         )}
         <GlobalNowPlayingOverlay />
-        {/* Rendered from inside this document's own Modal, so Calendar and
+        {/* Rendered from inside this document's own Modal, so Seasons and
             Settings appear OVER the subdocument instead of behind it, and
-            closing one drops straight back into it. */}
+            closing one drops straight back into it. (The calendar is drawn
+            inline below rather than as a modal of its own.) */}
         <Modal
           animationType="slide"
-          visible={overlayScreen !== null}
+          visible={overlayScreen === 'seasons' || overlayScreen === 'settings'}
           onRequestClose={() => setOverlayScreen(null)}
           supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
         >
@@ -486,12 +487,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             {...(isMobileDocument ? overlaySwipePanResponder.panHandlers : {})}
             {...(isMobileDocument ? overlayInsetEdgeSwipe.handlers : {})}
           >
-            {overlayScreen === 'calendar' ? (
-              <CalendarScreen
-                onClose={() => setOverlayScreen(null)}
-                onOpenSeasonSelector={() => setOverlayScreen('seasons')}
-              />
-            ) : null}
             {overlayScreen === 'seasons' ? <SeasonSelectorScreen onClose={() => setOverlayScreen('calendar')} /> : null}
             {overlayScreen === 'settings' ? <SettingsScreen onClose={() => setOverlayScreen(null)} /> : null}
           </View>
@@ -504,6 +499,14 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           subdocumentKey={nestedModal?.subdocumentKey}
           collapseMemoryScope={nestedModal?.collapseMemoryScope ?? `${collapseMemoryScope}:sub:unknown`}
           onClose={() => setNestedModal(null)}
+        />
+        {/* The calendar over the subdocument, in this modal's own page: iOS
+            presents one native modal at a time, and Seasons opens from it. */}
+        <CalendarSheet
+          inline
+          visible={overlayScreen === 'calendar'}
+          onClose={() => setOverlayScreen(null)}
+          onOpenSeasons={() => setOverlayScreen('seasons')}
         />
       </SafeAreaView>
     </Modal>

@@ -2,7 +2,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 
-import BookPage, { BookRow, PageGutter, RowList, SectionHeading } from './BookPage';
+import BookPage, { BookRow, RowList, SectionHeading } from './BookPage';
 import DayControls from '../ui/DayControls';
 import TodayCard, { DayStrip, type DayStripItem } from '../ui/TodayCard';
 import { bookmarkKeyFor, SERVICES_BY_CATEGORY, type ServiceDef } from '../../../constants/manifest';
@@ -70,32 +70,30 @@ export default function AgpeyaMenu() {
       kicker={tr('The Book of Hours', 'Le livre des heures', 'كتاب السواعي')}
       arabic={arabic}
       backHref="/books"
+      aside={nowService ? (
+        <TodayCard
+          theme={THEME}
+          arabic={arabic}
+          controls={<DayControls theme={THEME} arabic={arabic} status={tr('Now', 'Maintenant', 'الآن')} trailing="none" />}
+          heading={entryLabel(nowService)}
+          subheading={appText(now.traditional) === entryLabel(nowService) ? span : `${appText(now.traditional)} · ${span}`}
+          onPressHeading={() => open(nowService)}
+          headingAccessibilityLabel={`${entryLabel(nowService)}, ${appText(now.traditional)}`}
+          strip={<DayStrip items={strip} theme={THEME} arabic={arabic} variant="hours" />}
+          footer={{
+            label: tr('Next', 'Ensuite', 'التالية'),
+            value: nextService ? entryLabel(nextService) : ' ',
+            detail: tr(`at ${clock(next.from)}`, `à ${clock(next.from)}`, `في ${clock(next.from)}`),
+            action: {
+              label: tr('Pray', 'Prier', 'صلِّ'),
+              accessibilityLabel: `${tr('Pray', 'Prier', 'صلِّ')}: ${entryLabel(nowService)}`,
+              leadingIcon: 'play',
+              onPress: () => open(nowService),
+            },
+          }}
+        />
+      ) : undefined}
     >
-      {nowService ? (
-        <PageGutter>
-          <TodayCard
-            theme={THEME}
-            arabic={arabic}
-            controls={<DayControls theme={THEME} arabic={arabic} status={tr('Now', 'Maintenant', 'الآن')} trailing="none" />}
-            heading={entryLabel(nowService)}
-            subheading={appText(now.traditional) === entryLabel(nowService) ? span : `${appText(now.traditional)} · ${span}`}
-            onPressHeading={() => open(nowService)}
-            headingAccessibilityLabel={`${entryLabel(nowService)}, ${appText(now.traditional)}`}
-            strip={<DayStrip items={strip} theme={THEME} arabic={arabic} variant="hours" />}
-            footer={{
-              label: tr('Next', 'Ensuite', 'التالية'),
-              value: nextService ? entryLabel(nextService) : ' ',
-              detail: tr(`at ${clock(next.from)}`, `à ${clock(next.from)}`, `في ${clock(next.from)}`),
-              action: {
-                label: tr('Pray', 'Prier', 'صلِّ'),
-                accessibilityLabel: `${tr('Pray', 'Prier', 'صلِّ')}: ${entryLabel(nowService)}`,
-                leadingIcon: 'play',
-                onPress: () => open(nowService),
-              },
-            }}
-          />
-        </PageGutter>
-      ) : null}
 
       <SectionHeading title={tr('Other Prayers', 'Autres prières', 'صلوات أخرى')} arabic={arabic} />
       <RowList>

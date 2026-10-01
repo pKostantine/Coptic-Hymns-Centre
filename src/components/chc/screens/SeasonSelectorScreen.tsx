@@ -7,6 +7,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PageGlow } from '@/components/chc/screens/BookPage';
 import SubPageHeader from '@/components/chc/ui/SubPageHeader';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { getEventFormalName, getSeasonFormalName } from '@/constants/seasonNames';
@@ -28,6 +29,7 @@ import {
   formatGregorianDateRange,
 } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
 import { tr } from '../../../utils/appText';
@@ -87,6 +89,8 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
   const { selectDate } = useCalendar();
   const { preferences } = useReadingPreferences();
   const insets = useSafeAreaInsets();
+  // On the iPad and desktop the list keeps a centred column, the year bar beneath it.
+  const wide = useLayoutMode() !== 'phone';
   const isArabic = preferences.appLanguage === 'ar';
   const appLanguage = preferences.appLanguage;
   const [year, setYear] = useState<number | null>(null);
@@ -222,54 +226,57 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
 
   return (
     <SafeAreaView edges={['left', 'right']} style={[styles.screen, DISABLED_TEXT_SELECTION_STYLE]}>
-      {/* See CalendarScreen — an overlay over a document isn't its own page. */}
+      {/* Hosted over a document (DocumentModal) it's an overlay, not a page of its own. */}
       {isHosted ? null : (
         <Head>
           <title>{`Coptic Vine ${title}`}</title>
         </Head>
       )}
-      <SubPageHeader title={title} arabic={isArabic} onBack={closeScreen} backLabel={tr('Close the seasons', 'Fermer les temps liturgiques', 'أغلق الفترات')} />
+      {wide ? <PageGlow kind="green" tall /> : null}
+      <View style={[styles.frame, wide && styles.frameWide]}>
+        <SubPageHeader title={title} arabic={isArabic} onBack={closeScreen} backLabel={tr('Close the seasons', 'Fermer les temps liturgiques', 'أغلق الفترات')} />
 
-      {year === null || !rows ? (
-        <ActivityIndicator color={COLORS.gold} style={{ marginTop: SPACING.xl }} />
-      ) : (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: YEAR_BAR_CLEARANCE + insets.bottom }]} showsVerticalScrollIndicator={false}>
-          {lineAfterKey === '__start__' ? liveBar : null}
-          {rows.map((row) => (
-            <Fragment key={row.key}>
-              {liveTopKey === row.key ? liveBar : null}
-              <SeasonCard
-                title={isArabic ? row.arabic || row.title : row.title}
-                subtitle={row.type === 'season' ? formatGregorianDateRange(row.startDate, row.endDate, isArabic) : dayLine(row.date)}
-                kind={row.type === 'season' ? 'season' : 'day'}
-                current={raisedKey === row.key}
-                isArabic={isArabic}
-                onPress={() => selectDay(rowStart(row))}
-              />
-              {row.type === 'season' && row.children.length ? (
-                <View style={[styles.nest, isArabic && styles.nestArabic]}>
-                  {row.children.map((child) => (
-                    <Fragment key={child.key}>
-                      {liveChildKey === child.key ? liveBar : null}
-                      <SeasonCard
-                        title={isArabic ? child.arabic || child.title : child.title}
-                        subtitle={formatGregorianDate(child.date, isArabic)}
-                        kind="nested"
-                        isArabic={isArabic}
-                        onPress={() => selectDay(child.date)}
-                      />
-                    </Fragment>
-                  ))}
-                </View>
-              ) : null}
-              {lineAfterKey === row.key ? liveBar : null}
-            </Fragment>
-          ))}
-        </ScrollView>
-      )}
+        {year === null || !rows ? (
+          <ActivityIndicator color={COLORS.gold} style={{ marginTop: SPACING.xl }} />
+        ) : (
+          <ScrollView contentContainerStyle={[styles.list, { paddingBottom: YEAR_BAR_CLEARANCE + insets.bottom }]} showsVerticalScrollIndicator={false}>
+            {lineAfterKey === '__start__' ? liveBar : null}
+            {rows.map((row) => (
+              <Fragment key={row.key}>
+                {liveTopKey === row.key ? liveBar : null}
+                <SeasonCard
+                  title={isArabic ? row.arabic || row.title : row.title}
+                  subtitle={row.type === 'season' ? formatGregorianDateRange(row.startDate, row.endDate, isArabic) : dayLine(row.date)}
+                  kind={row.type === 'season' ? 'season' : 'day'}
+                  current={raisedKey === row.key}
+                  isArabic={isArabic}
+                  onPress={() => selectDay(rowStart(row))}
+                />
+                {row.type === 'season' && row.children.length ? (
+                  <View style={[styles.nest, isArabic && styles.nestArabic]}>
+                    {row.children.map((child) => (
+                      <Fragment key={child.key}>
+                        {liveChildKey === child.key ? liveBar : null}
+                        <SeasonCard
+                          title={isArabic ? child.arabic || child.title : child.title}
+                          subtitle={formatGregorianDate(child.date, isArabic)}
+                          kind="nested"
+                          isArabic={isArabic}
+                          onPress={() => selectDay(child.date)}
+                        />
+                      </Fragment>
+                    ))}
+                  </View>
+                ) : null}
+                {lineAfterKey === row.key ? liveBar : null}
+              </Fragment>
+            ))}
+          </ScrollView>
+        )}
+      </View>
 
       {year !== null ? (
-        <View style={[styles.yearBar, { bottom: 24 + insets.bottom }, isArabic && styles.rowReverse]}>
+        <View style={[styles.yearBar, wide ? styles.yearBarWide : { bottom: 24 + insets.bottom }, isArabic && styles.rowReverse]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={tr('Previous year', 'Année précédente', 'السنة السابقة')}
@@ -347,7 +354,8 @@ function SeasonCard({
           {subtitle}
         </Text>
       </View>
-      <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={gold ? COLORS.greenDeep : COLORS.gold} />
+      {/* Wrapped so it stacks above the gradient on web, where a bare SVG paints beneath positioned siblings. */}
+      <View><Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={gold ? COLORS.greenDeep : COLORS.gold} /></View>
     </Pressable>
   );
 }
@@ -366,6 +374,10 @@ function LiveBar({ isArabic }: { isArabic: boolean }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
+  frame: { flex: 1 },
+  // The design's 720pt column, with the list's own 16pt gutters either side.
+  frameWide: { alignSelf: 'center', maxWidth: 752, paddingTop: 22, width: '100%' },
+  yearBarWide: { bottom: 28, left: '50%', marginLeft: -260, right: undefined, width: 520 },
   rowReverse: { flexDirection: 'row-reverse' },
   list: { gap: 8, paddingHorizontal: 16, paddingTop: 4 },
   card: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },

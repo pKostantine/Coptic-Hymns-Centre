@@ -74,6 +74,7 @@ export default function BibleBookmarks() {
       arabic={arabic}
       backHref="/bible"
       action={null}
+      wide="single"
     >
       {books && !chapters.length ? (
         <View style={styles.empty}>

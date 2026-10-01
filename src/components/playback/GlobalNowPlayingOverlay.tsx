@@ -25,7 +25,6 @@ import { tr } from '../../utils/appText';
 const FLOATING_GAP = 10;
 
 const EXCLUDED_PATHS = new Set([
-  '/calendar',
   '/season-selector',
   '/account',
   '/settings',

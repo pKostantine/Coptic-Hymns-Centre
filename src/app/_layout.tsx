@@ -1,5 +1,5 @@
 import { useFonts as useLocalFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, usePathname, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import BookSyncBootstrap from '@/components/BookSyncBootstrap';
 import NotificationBootstrap from '@/components/NotificationBootstrap';
+import SideBar from '@/components/chc/ui/SideBar';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
@@ -16,6 +17,7 @@ import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import type { OrientationMode } from '@/utils/preferencesStorage';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -63,6 +65,36 @@ function AppStack() {
   );
 }
 
+/** The reader and the full players keep the whole window; every other page sits beside the desktop sidebar. */
+function isImmersiveRoute(segments: string[]): boolean {
+  return segments.some((segment) => segment === '[serviceId]' || segment === '[chapter]' || segment === '[hourId]' || segment === 'now-playing')
+    || segments[0] === 'veneration';
+}
+
+/**
+ * On a desktop browser the app sits beside the left sidebar (Coptic Vine,
+ * "Layout and spacing"), which takes the place of the bottom tab bar; on the
+ * phone and the iPad the pages fill the window and carry the tab bar
+ * themselves.
+ */
+function AppFrame() {
+  const layout = useLayoutMode();
+  const pathname = usePathname();
+  const segments = useSegments() as string[];
+  const { preferences } = useReadingPreferences();
+  const showSideBar = layout === 'desktop' && !isImmersiveRoute(segments);
+
+  return (
+    <View style={{ flex: 1, flexDirection: preferences.appLanguage === 'ar' ? 'row-reverse' : 'row', backgroundColor: COLORS.black }}>
+      {showSideBar ? <SideBar pathname={pathname} /> : null}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <AppStack />
+        <GlobalNowPlayingOverlay />
+      </View>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   // Keep the two Coptic fonts deliberately separate: Books/readers use the
   // CHC custom face, while Music synchronized lyrics use Athanasius.
@@ -93,8 +125,7 @@ export default function RootLayout() {
             <MusicPlayerProvider>
               <StatusBar style="light" />
               <BottomChromeProvider>
-                <AppStack />
-                <GlobalNowPlayingOverlay />
+                <AppFrame />
               </BottomChromeProvider>
             </MusicPlayerProvider>
           </CalendarProvider>

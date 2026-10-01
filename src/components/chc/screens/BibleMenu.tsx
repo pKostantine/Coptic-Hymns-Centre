@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import BookPage from './BookPage';
+import BookPage, { PageGutter } from './BookPage';
 import Icon from '../ui/Icon';
 import { BuddedCross } from '../ui/Ornaments';
 import { TESTAMENTS, type Testament } from '../../../constants/bibleTestaments';
@@ -42,40 +42,43 @@ export default function BibleMenu() {
       kicker={tr('Holy Scripture', 'Saintes Écritures', 'الأسفار المقدسة')}
       arabic={arabic}
       backHref="/books"
+      wide="single"
     >
-      <View style={[styles.searchBar, arabic && styles.rowReverse]}>
-        <Pressable
-          accessibilityRole="search"
-          accessibilityLabel={tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس')}
-          onPress={() => router.push('/bible/search')}
-          style={({ pressed }) => [styles.search, arabic && styles.rowReverse, pressed && styles.pressed]}
-        >
-          <Icon name="search-outline" size={19} color={COLORS.gold} />
-          <Text style={[styles.searchText, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-            {tr('Search a verse, word or reference', 'Rechercher un verset, un mot ou une référence', 'ابحث عن آية أو كلمة أو شاهد')}
-          </Text>
-        </Pressable>
-        {/* The chapters saved from their verse lists. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={tr('Bible bookmarks', 'Signets de la Bible', 'محفوظات الكتاب المقدس')}
-          onPress={() => router.push('/bible/bookmarks')}
-          style={({ pressed }) => [styles.bookmarks, pressed && styles.pressed]}
-        >
-          <Icon name="bookmark-outline" size={20} color={COLORS.gold} />
-        </Pressable>
-      </View>
+      <PageGutter>
+        <View style={[styles.searchBar, arabic && styles.rowReverse]}>
+          <Pressable
+            accessibilityRole="search"
+            accessibilityLabel={tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس')}
+            onPress={() => router.push('/bible/search')}
+            style={({ pressed }) => [styles.search, arabic && styles.rowReverse, pressed && styles.pressed]}
+          >
+            <Icon name="search-outline" size={19} color={COLORS.gold} />
+            <Text style={[styles.searchText, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+              {tr('Search a verse, word or reference', 'Rechercher un verset, un mot ou une référence', 'ابحث عن آية أو كلمة أو شاهد')}
+            </Text>
+          </Pressable>
+          {/* The chapters saved from their verse lists. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={tr('Bible bookmarks', 'Signets de la Bible', 'محفوظات الكتاب المقدس')}
+            onPress={() => router.push('/bible/bookmarks')}
+            style={({ pressed }) => [styles.bookmarks, pressed && styles.pressed]}
+          >
+            <Icon name="bookmark-outline" size={20} color={COLORS.gold} />
+          </Pressable>
+        </View>
 
-      <View style={styles.testaments}>
-        {(Object.keys(TESTAMENTS) as Testament[]).map((key) => (
-          <TestamentCard
-            key={key}
-            testament={key}
-            arabic={arabic}
-            onPress={() => router.push({ pathname: '/bible/[bookKey]', params: { bookKey: key } })}
-          />
-        ))}
-      </View>
+        <View style={styles.testaments}>
+          {(Object.keys(TESTAMENTS) as Testament[]).map((key) => (
+            <TestamentCard
+              key={key}
+              testament={key}
+              arabic={arabic}
+              onPress={() => router.push({ pathname: '/bible/[bookKey]', params: { bookKey: key } })}
+            />
+          ))}
+        </View>
+      </PageGutter>
     </BookPage>
   );
 }
@@ -102,7 +105,8 @@ function TestamentCard({ testament, arabic, onPress }: { testament: Testament; a
         <Text style={[styles.cardTitle, arabic && styles.arabicTitle]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
         <Text style={[styles.cardRange, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{appText(look.range)}</Text>
       </View>
-      <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={20} color={COLORS.gold} />
+      {/* Wrapped so it stacks above the gradient on web, where a bare SVG paints beneath positioned siblings. */}
+      <View><Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={20} color={COLORS.gold} /></View>
     </Pressable>
   );
 }
@@ -113,7 +117,7 @@ const styles = StyleSheet.create({
   arabicTitle: { fontFamily: TYPOGRAPHY.arabic, fontSize: 25, lineHeight: 38, textAlign: 'right', writingDirection: 'rtl' },
   pressed: { opacity: 0.8 },
 
-  searchBar: { flexDirection: 'row', gap: 10, marginBottom: 14, marginHorizontal: 16 },
+  searchBar: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   search: {
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
@@ -138,7 +142,7 @@ const styles = StyleSheet.create({
     width: 48,
   },
 
-  testaments: { gap: 12, paddingHorizontal: 16 },
+  testaments: { gap: 12 },
   card: {
     alignItems: 'center',
     borderColor: 'rgba(227, 181, 59, 0.3)',

@@ -2,7 +2,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 
-import BookPage, { BookRow, PageGutter, RowList, SectionHeading } from './BookPage';
+import BookPage, { BookRow, RowList, SectionHeading } from './BookPage';
 import DayControls from '../ui/DayControls';
 import type { IconName } from '../ui/Icon';
 import TodayCard from '../ui/TodayCard';
@@ -81,41 +81,39 @@ export default function PsalmodyMenu() {
       kicker={tr('The Praises', 'Les louanges', 'التسبحة')}
       arabic={arabic}
       backHref="/books"
+      aside={nextService ? (
+        <TodayCard
+          theme={day.theme}
+          arabic={arabic}
+          controls={(
+            <DayControls
+              theme={day.theme}
+              arabic={arabic}
+              status={tr('Up next', 'À suivre', 'التالي')}
+              seasonLabel={day.seasonLabel}
+              onOpenSeasons={() => router.push('/season-selector')}
+              trailing="none"
+            />
+          )}
+          heading={entryLabel(nextService)}
+          headingSize="small"
+          subheading={nextLine}
+          onPressHeading={() => open(nextService)}
+          headingAccessibilityLabel={`${entryLabel(nextService)}, ${nextLine}`}
+          footer={{
+            label: tr('Then', 'Puis', 'ثم'),
+            value: thenService ? entryLabel(thenService) : ' ',
+            detail: appText(WHEN[then.when]).toLocaleLowerCase(),
+            action: {
+              label: tr('Open', 'Ouvrir', 'افتح'),
+              accessibilityLabel: `${tr('Open', 'Ouvrir', 'افتح')} ${entryLabel(nextService)}`,
+              leadingIcon: 'play',
+              onPress: () => open(nextService),
+            },
+          }}
+        />
+      ) : undefined}
     >
-      {nextService ? (
-        <PageGutter>
-          <TodayCard
-            theme={day.theme}
-            arabic={arabic}
-            controls={(
-              <DayControls
-                theme={day.theme}
-                arabic={arabic}
-                status={tr('Up next', 'À suivre', 'التالي')}
-                seasonLabel={day.seasonLabel}
-                onOpenSeasons={() => router.push('/season-selector')}
-                trailing="none"
-              />
-            )}
-            heading={entryLabel(nextService)}
-            headingSize="small"
-            subheading={nextLine}
-            onPressHeading={() => open(nextService)}
-            headingAccessibilityLabel={`${entryLabel(nextService)}, ${nextLine}`}
-            footer={{
-              label: tr('Then', 'Puis', 'ثم'),
-              value: thenService ? entryLabel(thenService) : ' ',
-              detail: appText(WHEN[then.when]).toLocaleLowerCase(),
-              action: {
-                label: tr('Open', 'Ouvrir', 'افتح'),
-                accessibilityLabel: `${tr('Open', 'Ouvrir', 'افتح')} ${entryLabel(nextService)}`,
-                leadingIcon: 'play',
-                onPress: () => open(nextService),
-              },
-            }}
-          />
-        </PageGutter>
-      ) : null}
 
       <SectionHeading title={tr('Services', 'Offices', 'الصلوات')} arabic={arabic} />
       <RowList>

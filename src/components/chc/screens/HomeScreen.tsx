@@ -20,6 +20,7 @@ import { localDateAtUtcMidnight } from '@/utils/dateUtils';
 import { formatCopticDayMonth, formatDayMonthDate } from '@/utils/localeFormat';
 import { agpeyaHourAt } from '@/utils/agpeyaHours';
 import { getSundayMessageForDate } from '@/utils/readingsService';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../../utils/appText';
 
@@ -61,6 +62,7 @@ function splitSaintTitle(title: string): { main: string; detail: string | null }
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const layout = useLayoutMode();
   const { preferences } = useReadingPreferences();
   const [now, setNow] = useState(() => new Date());
   const arabic = preferences.appLanguage === 'ar';
@@ -131,6 +133,139 @@ export default function HomeScreen() {
     : tr("Last Sunday's Message", 'Message de dimanche dernier', 'رسالة الأحد الماضي');
   const sundayDate = formatDayMonthDate(sunday.date, arabic);
   const events = synaxDay === 'today' ? todayEvents : tomorrowEvents;
+  // The iPad sets Home in two columns, the desktop in three (Coptic Vine, "Layout and spacing").
+  const wideLayout = layout !== 'phone';
+  const card = [styles.card, wideLayout && styles.cardWide];
+
+  const heroBlock = (
+    <>
+      <View style={[styles.hero, { paddingTop: wideLayout ? 30 : insets.top + 30 }]}>
+        <View style={styles.halo}>
+          {/* The seal's shadow, cast by a circle the seal's own size behind
+              it. On the image itself it was clipped to the image's square
+              box on the web, which drew a dark square behind the logo. */}
+          <View style={styles.sealShadow} pointerEvents="none" />
+          <Image
+            accessible
+            accessibilityLabel="Coptic Vine"
+            source={require('../../../../assets/images/coptic-vine-seal.png')}
+            style={styles.logo}
+          />
+        </View>
+        <Text style={[styles.tagline, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
+          {tr('Pray. Read. Learn.', 'Prier. Lire. Apprendre.', 'صلِّ. اقرأ. تعلّم.')}
+        </Text>
+        <Text style={[styles.heroDate, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
+          {formatDayMonthDate(liveDate, arabic)}
+          {coptic ? <Text style={styles.heroCoptic}>{` · ${formatCopticDayMonth(coptic.monthName, coptic.day, arabic)}`}</Text> : null}
+        </Text>
+      </View>
+
+      <View style={styles.heroDivider} pointerEvents="none">
+        <VineDivider width={250} height={32} />
+      </View>
+    </>
+  );
+  const prayCard = (
+    <>
+      <View style={[card, styles.pray, arabic && styles.rowReverse]}>
+        <View style={styles.flex}>
+          <Text style={[styles.prayKicker, arabic && styles.arabic]}>{tr('Pray now · Agpeya', 'Prier maintenant · Agpia', 'صلِّ الآن · الأجبية')}</Text>
+          <Text style={[styles.prayTitle, arabic && styles.arabic]} numberOfLines={1}>{tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${tr('Pray', 'Prier', 'صلِّ')}: ${tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}`}
+          onPress={() => router.push(`/agpeya/${hour.id}` as never)}
+          style={({ pressed }) => [styles.prayButton, arabic && styles.rowReverse, pressed && styles.pressed]}
+        >
+          <Icon name="play" size={16} color={COLORS.greenDeep} />
+          <Text style={[styles.prayButtonText, arabic && styles.arabicTight]}>{tr('Pray', 'Prier', 'صلِّ')}</Text>
+        </Pressable>
+      </View>
+    </>
+  );
+  const messageCard = (
+    <>
+      <View style={[card, styles.message]}>
+        <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+        <View style={styles.crown} pointerEvents="none">
+          <CrownOrnament width={300} height={58} />
+        </View>
+        <View style={styles.messageBody}>
+          <Text style={[styles.messageKicker, arabic && styles.arabicTight]}>{sundayTitle}</Text>
+          <Text style={[styles.messageTitle, arabic && styles.arabicCentered]}>{sundayName ?? sundayDate}</Text>
+          {sundayName ? <Text style={[styles.messageDate, arabic && styles.arabicCentered]}>{sundayDate}</Text> : null}
+          <Text style={[styles.messageText, arabic && styles.arabicCentered]}>
+            {sundayLoading
+              ? tr('Loading message…', 'Chargement du message…', 'جارٍ تحميل الرسالة…')
+              : sundayMessage ?? tr('A message has not been added for this Sunday yet.', 'Aucun message n’a encore été ajouté pour ce dimanche.', 'لم تتم إضافة رسالة لهذا الأحد بعد.')}
+          </Text>
+        </View>
+      </View>
+    </>
+  );
+  const synaxCard = (
+    <>
+      <View style={card}>
+        <View style={[styles.synaxHeader, arabic && styles.rowReverse]}>
+          <View style={styles.flex}>
+            <Text style={[styles.synaxTitle, arabic && styles.arabic]}>{tr('Synaxarium', 'Synaxaire', 'السنكسار')}</Text>
+            <Text style={[styles.synaxSubtitle, arabic && styles.arabic]}>{tr('Saints commemorated', 'Saints commémorés', 'تذكارات القديسين')}</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={tr('Search the Synaxarium', 'Rechercher dans le Synaxaire', 'ابحث في السنكسار')}
+            onPress={() => router.push('/synaxarium')}
+            style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
+          >
+            <Icon name="search-outline" size={20} color={COLORS.gold} />
+          </Pressable>
+        </View>
+
+        <View style={[styles.segment, arabic && styles.rowReverse]}>
+          {(['today', 'tomorrow'] as const).map((option) => {
+            const active = synaxDay === option;
+            return (
+              <Pressable
+                key={option}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => setSynaxDay(option)}
+                style={[styles.segmentOption, active && styles.segmentOptionActive]}
+              >
+                <Text style={[styles.segmentText, active && styles.segmentTextActive, arabic && styles.arabicTight]}>
+                  {option === 'today' ? tr('Today', 'Aujourd’hui', 'اليوم') : tr('Tomorrow', 'Demain', 'غدًا')}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={styles.saints}>
+          {synaxLoading ? (
+            <Text style={[styles.empty, arabic && styles.arabic]}>{tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}</Text>
+          ) : events.length ? (
+            events.map((event, index) => {
+              const title = arabic ? event.titleArabic || event.titleEnglish || '' : event.titleEnglish || event.titleArabic || '';
+              const { main, detail } = arabic || preferences.appLanguage === 'fr' ? { main: title, detail: null } : splitSaintTitle(title);
+              return (
+                <View key={event.entryKey} style={[styles.saint, index === events.length - 1 && styles.saintLast, arabic && styles.rowReverse]}>
+                  <View style={styles.saintDot} />
+                  <View style={styles.flex}>
+                    <Text style={[styles.saintName, arabic && styles.arabic]}>{main}</Text>
+                    {detail ? <Text style={styles.saintDetail}>{detail}</Text> : null}
+                  </View>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={[styles.empty, arabic && styles.arabic]}>{tr('No saints listed.', 'Aucun saint indiqué.', 'لا توجد تذكارات مدرجة.')}</Text>
+          )}
+        </View>
+      </View>
+    </>
+  );
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -138,126 +273,41 @@ export default function HomeScreen() {
         <title>{tr('Coptic Vine', 'Coptic Vine', 'كوبتك فاين')}</title>
       </Head>
 
-      <NowPlayingAwareScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <NowPlayingAwareScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.content, wideLayout && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+      >
         <HeroGlow />
-        <View style={styles.column}>
-          <View style={[styles.hero, { paddingTop: insets.top + 30 }]}>
-            <View style={styles.halo}>
-              {/* The seal's shadow, cast by a circle the seal's own size behind
-                  it. On the image itself it was clipped to the image's square
-                  box on the web, which drew a dark square behind the logo. */}
-              <View style={styles.sealShadow} pointerEvents="none" />
-              <Image
-                accessible
-                accessibilityLabel="Coptic Vine"
-                source={require('../../../../assets/images/coptic-vine-seal.png')}
-                style={styles.logo}
-              />
+        {layout === 'desktop' ? (
+          // Desktop: the seal and the prayer, the message, the Synaxarium.
+          <View style={[styles.columns, arabic && styles.rowReverse]}>
+            <View style={styles.columnNarrow}>
+              {heroBlock}
+              {prayCard}
             </View>
-            <Text style={[styles.tagline, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
-              {tr('Pray. Read. Learn.', 'Prier. Lire. Apprendre.', 'صلِّ. اقرأ. تعلّم.')}
-            </Text>
-            <Text style={[styles.heroDate, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
-              {formatDayMonthDate(liveDate, arabic)}
-              {coptic ? <Text style={styles.heroCoptic}>{` · ${formatCopticDayMonth(coptic.monthName, coptic.day, arabic)}`}</Text> : null}
-            </Text>
+            <View style={styles.columnWide}>{messageCard}</View>
+            <View style={styles.columnWide}>{synaxCard}</View>
           </View>
-
-          <View style={styles.heroDivider} pointerEvents="none">
-            <VineDivider width={250} height={32} />
-          </View>
-
-          <View style={[styles.card, styles.pray, arabic && styles.rowReverse]}>
-            <View style={styles.flex}>
-              <Text style={[styles.prayKicker, arabic && styles.arabic]}>{tr('Pray now · Agpeya', 'Prier maintenant · Agpia', 'صلِّ الآن · الأجبية')}</Text>
-              <Text style={[styles.prayTitle, arabic && styles.arabic]} numberOfLines={1}>{tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}</Text>
+        ) : layout === 'tablet' ? (
+          // iPad: the seal and the prayer on the left, the message and the Synaxarium on the right.
+          <View style={[styles.columns, arabic && styles.rowReverse]}>
+            <View style={styles.columnWide}>
+              {heroBlock}
+              {prayCard}
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${tr('Pray', 'Prier', 'صلِّ')}: ${tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}`}
-              onPress={() => router.push(`/agpeya/${hour.id}` as never)}
-              style={({ pressed }) => [styles.prayButton, arabic && styles.rowReverse, pressed && styles.pressed]}
-            >
-              <Icon name="play" size={16} color={COLORS.greenDeep} />
-              <Text style={[styles.prayButtonText, arabic && styles.arabicTight]}>{tr('Pray', 'Prier', 'صلِّ')}</Text>
-            </Pressable>
-          </View>
-
-          <View style={[styles.card, styles.message]}>
-            <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-            <View style={styles.crown} pointerEvents="none">
-              <CrownOrnament width={300} height={58} />
-            </View>
-            <View style={styles.messageBody}>
-              <Text style={[styles.messageKicker, arabic && styles.arabicTight]}>{sundayTitle}</Text>
-              <Text style={[styles.messageTitle, arabic && styles.arabicCentered]}>{sundayName ?? sundayDate}</Text>
-              {sundayName ? <Text style={[styles.messageDate, arabic && styles.arabicCentered]}>{sundayDate}</Text> : null}
-              <Text style={[styles.messageText, arabic && styles.arabicCentered]}>
-                {sundayLoading
-                  ? tr('Loading message…', 'Chargement du message…', 'جارٍ تحميل الرسالة…')
-                  : sundayMessage ?? tr('A message has not been added for this Sunday yet.', 'Aucun message n’a encore été ajouté pour ce dimanche.', 'لم تتم إضافة رسالة لهذا الأحد بعد.')}
-              </Text>
+            <View style={styles.columnWide}>
+              {messageCard}
+              {synaxCard}
             </View>
           </View>
-
-          <View style={styles.card}>
-            <View style={[styles.synaxHeader, arabic && styles.rowReverse]}>
-              <View style={styles.flex}>
-                <Text style={[styles.synaxTitle, arabic && styles.arabic]}>{tr('Synaxarium', 'Synaxaire', 'السنكسار')}</Text>
-                <Text style={[styles.synaxSubtitle, arabic && styles.arabic]}>{tr('Saints commemorated', 'Saints commémorés', 'تذكارات القديسين')}</Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={tr('Search the Synaxarium', 'Rechercher dans le Synaxaire', 'ابحث في السنكسار')}
-                onPress={() => router.push('/synaxarium')}
-                style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
-              >
-                <Icon name="search-outline" size={20} color={COLORS.gold} />
-              </Pressable>
-            </View>
-
-            <View style={[styles.segment, arabic && styles.rowReverse]}>
-              {(['today', 'tomorrow'] as const).map((option) => {
-                const active = synaxDay === option;
-                return (
-                  <Pressable
-                    key={option}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    onPress={() => setSynaxDay(option)}
-                    style={[styles.segmentOption, active && styles.segmentOptionActive]}
-                  >
-                    <Text style={[styles.segmentText, active && styles.segmentTextActive, arabic && styles.arabicTight]}>
-                      {option === 'today' ? tr('Today', 'Aujourd’hui', 'اليوم') : tr('Tomorrow', 'Demain', 'غدًا')}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.saints}>
-              {synaxLoading ? (
-                <Text style={[styles.empty, arabic && styles.arabic]}>{tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}</Text>
-              ) : events.length ? (
-                events.map((event, index) => {
-                  const title = arabic ? event.titleArabic || event.titleEnglish || '' : event.titleEnglish || event.titleArabic || '';
-                  const { main, detail } = arabic || preferences.appLanguage === 'fr' ? { main: title, detail: null } : splitSaintTitle(title);
-                  return (
-                    <View key={event.entryKey} style={[styles.saint, index === events.length - 1 && styles.saintLast, arabic && styles.rowReverse]}>
-                      <View style={styles.saintDot} />
-                      <View style={styles.flex}>
-                        <Text style={[styles.saintName, arabic && styles.arabic]}>{main}</Text>
-                        {detail ? <Text style={styles.saintDetail}>{detail}</Text> : null}
-                      </View>
-                    </View>
-                  );
-                })
-              ) : (
-                <Text style={[styles.empty, arabic && styles.arabic]}>{tr('No saints listed.', 'Aucun saint indiqué.', 'لا توجد تذكارات مدرجة.')}</Text>
-              )}
-            </View>
+        ) : (
+          <View style={styles.column}>
+            {heroBlock}
+            {prayCard}
+            {messageCard}
+            {synaxCard}
           </View>
-        </View>
+        )}
       </NowPlayingAwareScrollView>
 
       <BottomTabBar active="home" />
@@ -289,6 +339,11 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   content: { paddingBottom: 28 },
   column: { alignSelf: 'center', maxWidth: 640, width: '100%' },
+  contentWide: { paddingHorizontal: 36 },
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
+  columnNarrow: { flex: 0.9, minWidth: 0 },
+  columnWide: { flex: 1, minWidth: 0 },
+  cardWide: { marginHorizontal: 0 },
   flex: { flex: 1, minWidth: 0 },
   rowReverse: { flexDirection: 'row-reverse' },
   glow: { height: 560, left: 0, position: 'absolute', right: 0, top: 0 },

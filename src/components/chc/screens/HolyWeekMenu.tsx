@@ -138,6 +138,7 @@ export default function HolyWeekMenu() {
       arabic={arabic}
       backHref="/books"
       glow="crimson"
+      wide="single"
     >
       <PageGutter>
         <TodayCard
