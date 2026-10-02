@@ -13,19 +13,19 @@
   },
   "r2_buckets": [
     {
-      "binding": "CHC_SUBMISSIONS",
+      "binding": "SUBMISSIONS_BUCKET",
       "bucket_name": "chc-submissions"
     },
     {
-      "binding": "CHC_MUSIC",
+      "binding": "MUSIC_BUCKET",
       "bucket_name": "chc-music"
     },
     {
-      "binding": "CHC_LEARNING",
+      "binding": "LEARNING_BUCKET",
       "bucket_name": "chc-learning"
     },
     {
-      "binding": "CHC_IMAGES",
+      "binding": "IMAGES_BUCKET",
       "bucket_name": "chc-images"
     }
   ]

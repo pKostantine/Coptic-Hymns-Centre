@@ -9,7 +9,7 @@
   },
   "r2_buckets": [
     {
-      "binding": "CHC_CONTENT",
+      "binding": "CONTENT_BUCKET",
       "bucket_name": "chc-content"
     }
   ],

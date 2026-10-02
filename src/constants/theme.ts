@@ -162,7 +162,7 @@ export const RUBRIC_COLORS: Record<string, string> = {
 };
 
 /** `theme` prop shape expected by SlideshowContainer/VerseBlock (ported from stuff for claude/). */
-export const CHC_SLIDESHOW_THEME = {
+export const SLIDESHOW_THEME = {
   colors: {
     text: COLORS.white,
     gold: COLORS.gold,

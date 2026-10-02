@@ -1,4 +1,4 @@
-# CHC Media Processor
+# Coptic Vine Media Processor
 
 FFmpeg worker that turns uploaded submission files into delivery assets.
 
@@ -63,8 +63,8 @@ npm run process:once
 ```
 
 ```bash
-docker build -t chc-media-processor .
-docker run --env-file .env chc-media-processor
+docker build -t coptic-vine-media-processor .
+docker run --env-file .env coptic-vine-media-processor
 ```
 
 ## Failure handling
@@ -87,6 +87,6 @@ its own unused timestamp. If it remains unused for three full days, the worker
 removes the R2 object and its orphaned media metadata. If the object becomes
 referenced again during the grace period, its unused clock is discarded.
 
-CHC Admin can explicitly bypass the three-day grace period from the Processing
+Coptic Vine Admin can explicitly bypass the three-day grace period from the Processing
 screen with **Delete all unused files**. That action performs a fresh inventory
 and deletes only objects that are still unreferenced at deletion time.

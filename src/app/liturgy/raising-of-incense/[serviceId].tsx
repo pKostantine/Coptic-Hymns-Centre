@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 
-import ServiceDocument from '@/components/chc/screens/ServiceDocument';
+import ServiceDocument from '@/components/vine/screens/ServiceDocument';
 import { RAISING_OF_INCENSE_OPTIONS } from '@/constants/manifest';
 
 export default function RaisingOfIncenseDocument() {

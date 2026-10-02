@@ -1,4 +1,4 @@
-name: Verify CHC
+name: Verify Coptic Vine
 
 on:
   pull_request:
@@ -33,7 +33,7 @@ jobs:
           src/app/account.tsx
           src/app/downloads.tsx
           "src/app/music/playlist/[id].tsx"
-          src/components/chc/ui/Icon.tsx
+          src/components/vine/ui/Icon.tsx
           src/components/offline/OfflineDownloadButton.tsx
           src/components/music/MusicPlaylistPicker.tsx
           src/components/music/MusicQueueList.tsx

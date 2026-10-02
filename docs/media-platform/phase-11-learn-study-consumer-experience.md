@@ -4,13 +4,13 @@ Completed on 2026-09-17.
 
 ## Scope
 
-Phase 11 adds the complete consumer-facing Learn & Study product to the CHC Expo application. It consumes the Phase 10 learning catalog and user-state APIs, and it reuses the Phase 9 global playback engine without treating learning material as Music releases.
+Phase 11 adds the complete consumer-facing Learn & Study product to the Coptic Vine Expo application. It consumes the Phase 10 learning catalog and user-state APIs, and it reuses the Phase 9 global playback engine without treating learning material as Music releases.
 
-Learn & Study remains recognizably CHC through the existing navy surfaces, gold supporting accents, typography, spacing, and bilingual behavior. A restrained teal accent and course-oriented information hierarchy distinguish the educational experience from both Books and Music.
+Learn & Study remains recognizably Coptic Vine through the existing navy surfaces, gold supporting accents, typography, spacing, and bilingual behavior. A restrained teal accent and course-oriented information hierarchy distinguish the educational experience from both Books and Music.
 
 ## Consumer experience
 
-Implemented in the main CHC application:
+Implemented in the main Coptic Vine application:
 
 - Learn & Study as a peer top-level tab beside Books, Music, and Settings
 - bilingual English/Arabic Learn landing and discovery
@@ -66,7 +66,7 @@ The consumer uses Phase 10's authenticated APIs directly:
 - `add_learning_playlist_item`
 - `remove_learning_playlist_item`
 
-Anonymous visitors can browse, listen, and watch all published learning material. Progress and custom playlist controls detect an anonymous session and explain that a CHC account is required instead of attempting unauthorized mutations.
+Anonymous visitors can browse, listen, and watch all published learning material. Progress and custom playlist controls detect an anonymous session and explain that a Coptic Vine account is required instead of attempting unauthorized mutations.
 
 Progress is kept on the canonical Hymn identity, independent of playlists. Custom playlists may mix learning Album recordings with audio or video lessons.
 
@@ -105,6 +105,6 @@ The live Phase 10 smoke catalog was read successfully through Home, Cantor, Seas
 
 ## Follow-up
 
-- Phase 12 can move Learn search into CHC's unified server-backed search experience.
+- Phase 12 can move Learn search into Coptic Vine's unified server-backed search experience.
 - Phase 13 should connect the download controls to durable media storage, version checks, and local playback.
 - Phase 14 should finish offline-first state synchronization and conflict handling for user progress and playlists.

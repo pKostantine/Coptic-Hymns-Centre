@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AppHeader from '@/components/chc/ui/AppHeader';
-import BibleTestamentMenu from '@/components/chc/screens/BibleTestamentMenu';
-import BookPage from '@/components/chc/screens/BookPage';
-import LoadingScreen from '@/components/chc/ui/LoadingScreen';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import BibleTestamentMenu from '@/components/vine/screens/BibleTestamentMenu';
+import BookPage from '@/components/vine/screens/BookPage';
+import LoadingScreen from '@/components/vine/ui/LoadingScreen';
 import { TESTAMENTS } from '@/constants/bibleTestaments';
 import { appText, tr } from '@/utils/appText';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';

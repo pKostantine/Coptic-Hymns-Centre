@@ -117,7 +117,7 @@ test('a lesser feast inside a fast keeps the fast colour; a great one does not',
 
 test('the themes carry the Coptic Vine season colours', () => {
   const t = appearance.DAY_BLOCK_THEMES;
-  // Annual is the vine green; the old CHC navy now belongs to the Apostles.
+  // Annual is the vine green; the old Coptic Vine navy now belongs to the Apostles.
   assert.deepEqual([t.annual.from, t.annual.to], ['#2B5A30', '#14301B']);
   assert.equal(t.annual.border, 'rgba(227, 181, 59, 0.30)');
   assert.equal(t.annual.strong, '#ECD48A');

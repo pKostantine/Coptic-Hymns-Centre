@@ -13,13 +13,13 @@ export default function NotificationBootstrap() {
   useEffect(() => {
     if (Platform.OS === 'web') {
       void syncWebPushDevice({ requestPermission: false }).catch((error) => {
-        console.warn('Unable to synchronize CHC web notifications:', error);
+        console.warn('Unable to synchronize Coptic Vine web notifications:', error);
       });
 
       const { data } = supabase.auth.onAuthStateChange((_event, session) => {
         if (!session) return;
         void syncWebPushDevice({ requestPermission: false }).catch((error) => {
-          console.warn('Unable to synchronize CHC web notifications after sign-in:', error);
+          console.warn('Unable to synchronize Coptic Vine web notifications after sign-in:', error);
         });
       });
 
@@ -38,17 +38,17 @@ export default function NotificationBootstrap() {
       }
       removeRuntime = remove;
     }).catch((error) => {
-      console.warn('Unable to start CHC notifications:', error);
+      console.warn('Unable to start Coptic Vine notifications:', error);
     });
 
     void syncNativeNotificationDevice({ requestPermission: false }).catch((error) => {
-      console.warn('Unable to synchronize CHC notifications:', error);
+      console.warn('Unable to synchronize Coptic Vine notifications:', error);
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) return;
       void syncNativeNotificationDevice({ requestPermission: false }).catch((error) => {
-        console.warn('Unable to synchronize CHC notifications after sign-in:', error);
+        console.warn('Unable to synchronize Coptic Vine notifications after sign-in:', error);
       });
     });
 

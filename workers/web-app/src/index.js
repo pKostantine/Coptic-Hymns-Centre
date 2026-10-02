@@ -218,7 +218,7 @@ function dedicatedShareResponse(request, entity) {
     + '<meta name="robots" content="noindex,follow" />\n'
     + '<link rel="icon" href="' + safeImage + '" />\n'
     + '<link rel="apple-touch-icon" href="' + safeImage + '" />\n'
-    + '<!-- CHC_SHARE_META_START -->\n' + metadata.tags + '\n<!-- CHC_SHARE_META_END -->\n'
+    + '<!-- COPTIC_VINE_SHARE_META_START -->\n' + metadata.tags + '\n<!-- COPTIC_VINE_SHARE_META_END -->\n'
     + '</head>\n<body style="margin:0;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif">\n'
     + '<main style="max-width:680px;margin:64px auto;padding:24px;text-align:center">\n'
     + '<img src="' + safeImage + '" alt="" style="width:min(78vw,420px);aspect-ratio:1;object-fit:cover;border-radius:20px" />\n'
@@ -235,7 +235,7 @@ function dedicatedShareResponse(request, entity) {
     headers: {
       'Cache-Control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=60',
       'Content-Type': 'text/html; charset=UTF-8',
-      'X-CHC-Share-Preview': 'dedicated',
+      'X-Coptic-Vine-Share-Preview': 'dedicated',
       'X-Robots-Tag': 'noindex',
     },
   });
@@ -257,10 +257,10 @@ async function entityAppResponse(request, env, entity) {
   if (!response.ok || !contentType.includes('text/html')) return response;
 
   const html = await response.text();
-  const shareBlock = /<!-- CHC_SHARE_META_START -->[\s\S]*?<!-- CHC_SHARE_META_END -->/i;
-  const markedTags = '<!-- CHC_SHARE_META_START -->\n'
+  const shareBlock = /<!-- COPTIC_VINE_SHARE_META_START -->[\s\S]*?<!-- COPTIC_VINE_SHARE_META_END -->/i;
+  const markedTags = '<!-- COPTIC_VINE_SHARE_META_START -->\n'
     + entity.metadata.tags
-    + '\n<!-- CHC_SHARE_META_END -->';
+    + '\n<!-- COPTIC_VINE_SHARE_META_END -->';
   let transformed = html.replace(
     /<title>[^<]*<\/title>/i,
     '<title>' + escapeHtml(entity.metadata.fullTitle) + '</title>',
@@ -273,7 +273,7 @@ async function entityAppResponse(request, env, entity) {
   headers.delete('content-length');
   headers.delete('etag');
   headers.set('Cache-Control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=60');
-  headers.set('X-CHC-Share-Preview', 'entity');
+  headers.set('X-Coptic-Vine-Share-Preview', 'entity');
 
   return new Response(request.method === 'HEAD' ? null : transformed, {
     status: response.status,
@@ -299,7 +299,7 @@ async function shareImageResponse(request, url) {
     method: request.method,
     headers: {
       Accept: 'image/jpeg,image/png,image/webp,image/*;q=0.8,*/*;q=0.5',
-      'User-Agent': 'CHC-Link-Preview/3.0',
+      'User-Agent': 'Coptic-Vine-Link-Preview/3.0',
     },
   });
 
@@ -324,7 +324,7 @@ async function shareImageResponse(request, url) {
   headers.set('Content-Disposition', 'inline');
   headers.set('Content-Type', contentType);
   headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
-  headers.set('X-CHC-Share-Image', 'proxied');
+  headers.set('X-Coptic-Vine-Share-Image', 'proxied');
   headers.set('X-Content-Type-Options', 'nosniff');
   for (const header of ['content-length', 'etag', 'last-modified']) {
     const value = upstream.headers.get(header);
@@ -345,7 +345,7 @@ function previewFailureResponse(error) {
       'Cache-Control': 'no-store',
       'Content-Type': 'text/plain; charset=UTF-8',
       'Retry-After': '30',
-      'X-CHC-Share-Preview': 'error',
+      'X-Coptic-Vine-Share-Preview': 'error',
     },
   });
 }

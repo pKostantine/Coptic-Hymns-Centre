@@ -4,7 +4,7 @@ Completed on 2026-09-16.
 
 ## Scope
 
-Phase 6 adds the canonical backend model for CHC Hymns & Songs.
+Phase 6 adds the canonical backend model for Coptic Vine Hymns & Songs.
 
 ## Supabase Migrations
 

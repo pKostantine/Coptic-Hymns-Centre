@@ -15,7 +15,7 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import Icon from '@/components/chc/ui/Icon';
+import Icon from '@/components/vine/ui/Icon';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import type { MusicQueueItem } from '@/context/MusicPlayerContext';

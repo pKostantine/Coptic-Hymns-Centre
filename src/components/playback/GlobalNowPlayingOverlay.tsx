@@ -5,7 +5,7 @@ import { Alert, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MusicNowPlayingScreen from '@/components/music/MusicNowPlayingScreen';
-import Icon from '@/components/chc/ui/Icon';
+import Icon from '@/components/vine/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningNowPlayingScreen from '@/components/learning/LearningNowPlayingScreen';
 import MusicArtwork from '@/components/music/MusicArtwork';

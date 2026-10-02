@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/coptic-vine-icon.png",
-    "scheme": "coptichymnscentre",
+    "scheme": [
+      "copticvine",
+      "coptichymnscentre"
+    ],
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/coptic-vine-icon.png",

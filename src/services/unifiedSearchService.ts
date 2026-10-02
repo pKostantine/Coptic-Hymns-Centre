@@ -31,7 +31,7 @@ export async function searchUnifiedMedia(
         p_limit: limit,
       });
 
-  const label = scope === 'music' ? 'Search Music' : scope === 'learning' ? 'Search Learn & Study' : 'Search CHC';
+  const label = scope === 'music' ? 'Search Music' : scope === 'learning' ? 'Search Learn & Study' : 'Search Coptic Vine';
   if (error) throw new Error(label + ': ' + error.message);
   if (!data) throw new Error(label + ': no data returned.');
   return data as unknown as UnifiedSearchPayload;

@@ -5,8 +5,8 @@ import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextIn
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import Icon from '@/components/chc/ui/Icon';
-import ShareMetadata from '@/components/chc/ui/ShareMetadata';
+import Icon from '@/components/vine/ui/Icon';
+import ShareMetadata from '@/components/vine/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';

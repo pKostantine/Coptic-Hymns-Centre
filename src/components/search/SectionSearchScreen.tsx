@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import Icon from '@/components/chc/ui/Icon';
-import BottomTabBar from '@/components/chc/ui/BottomTabBar';
+import Icon from '@/components/vine/ui/Icon';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';

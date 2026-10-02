@@ -3,8 +3,8 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AppHeader from '@/components/chc/ui/AppHeader';
-import ToggleRow from '@/components/chc/ui/ToggleRow';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import ToggleRow from '@/components/vine/ui/ToggleRow';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';

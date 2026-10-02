@@ -137,7 +137,7 @@ export async function installNativeNotificationRuntime(
 
   const tokenSubscription = Notifications.addPushTokenListener((devicePushToken) => {
     void syncNativeNotificationDevice({ devicePushToken }).catch((error) => {
-      console.warn('Unable to refresh the CHC push token:', error);
+      console.warn('Unable to refresh the Coptic Vine push token:', error);
     });
   });
 

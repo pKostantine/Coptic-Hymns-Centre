@@ -16,7 +16,7 @@ import {
 import { downloadObject, multipartUploadObject, sha256File } from '../src/processor.mjs';
 
 let dir;
-before(async () => { dir = await mkdtemp(path.join(tmpdir(), 'chc-large-video-')); });
+before(async () => { dir = await mkdtemp(path.join(tmpdir(), 'coptic-vine-large-video-')); });
 after(async () => { await rm(dir, { recursive: true, force: true }); });
 
 test('R2 original download is a streaming file write (no whole-file buffer)', async () => {

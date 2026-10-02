@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import Icon from '@/components/chc/ui/Icon';
+import Icon from '@/components/vine/ui/Icon';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 
 interface MiniPlayerCardProps {

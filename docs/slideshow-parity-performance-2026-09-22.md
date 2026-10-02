@@ -16,7 +16,7 @@ navigation bugs across the liturgical and Bible slideshow engines.
 - [Coptic Reader release notes](https://copticreader.org/releases/index.html)
   repeatedly call out rotation crashes, blank slides, section-toggle jumps,
   unresponsive links, selection conflicts, and external-display drift. These
-  are useful failure cases for CHC's regression plan.
+  are useful failure cases for Coptic Vine's regression plan.
 - [In Spirit and Truth](https://apps.apple.com/us/app/in-spirit-and-truth/id1498587179)
   supports projector presentation and presentation clickers. Its recent notes
   specifically mention fixing taps at button edges, side-menu jumps/black

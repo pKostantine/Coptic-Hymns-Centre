@@ -6,8 +6,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import AppHeader from '@/components/chc/ui/AppHeader';
-import BottomTabBar from '@/components/chc/ui/BottomTabBar';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';

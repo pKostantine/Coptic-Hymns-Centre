@@ -51,7 +51,7 @@ The Worker intentionally does not bind or expose:
 
 ## Application Resolver
 
-The CHC app should resolve canonical media references through `src/services/mediaService.ts`.
+The Coptic Vine app should resolve canonical media references through `src/services/mediaService.ts`.
 
 Canonical database values remain:
 
@@ -64,10 +64,10 @@ path = immutable/versioned/object/path
 The app runtime needs:
 
 ```text
-EXPO_PUBLIC_CHC_MEDIA_BASE_URL
+EXPO_PUBLIC_MEDIA_BASE_URL
 ```
 
-set to the deployed Worker base URL, or a future custom media domain such as `https://media.coptichymnscentre.com`.
+(the old name, `EXPO_PUBLIC_CHC_MEDIA_BASE_URL`, is still read as a fallback) set to the deployed Worker base URL, or a future custom media domain such as `https://media.coptichymnscentre.com`.
 
 ## Custom Domain Status
 

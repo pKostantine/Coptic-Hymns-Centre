@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import Icon, { type IconName } from '@/components/chc/ui/Icon';
+import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicPlaylistPicker from '@/components/music/MusicPlaylistPicker';

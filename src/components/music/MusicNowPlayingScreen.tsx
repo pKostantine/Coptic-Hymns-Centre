@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Icon, { type IconName } from '@/components/chc/ui/Icon';
+import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import MusicLyricsView, { lyricSetShortLabel } from '@/components/music/MusicLyricsView';

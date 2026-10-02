@@ -23,7 +23,7 @@ import {
 let dir;
 let original;
 before(async () => {
-  dir = await mkdtemp(path.join(tmpdir(), 'chc-streamed-job-'));
+  dir = await mkdtemp(path.join(tmpdir(), 'coptic-vine-streamed-job-'));
   const source = path.join(dir, 'source.m4v');
   await new Promise((resolve, reject) => {
     const child = spawn(ffmpegPath, [

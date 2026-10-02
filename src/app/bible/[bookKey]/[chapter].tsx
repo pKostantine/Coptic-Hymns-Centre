@@ -5,11 +5,11 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import BibleWebView, { BibleWebViewHandle } from '@/components/chc/BibleWebView';
-import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/chc/bibleDocumentHtml';
-import DocumentTopBar from '@/components/chc/ui/DocumentTopBar';
-import Icon from '@/components/chc/ui/Icon';
-import LoadingScreen from '@/components/chc/ui/LoadingScreen';
+import BibleWebView, { BibleWebViewHandle } from '@/components/vine/BibleWebView';
+import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/vine/bibleDocumentHtml';
+import DocumentTopBar from '@/components/vine/ui/DocumentTopBar';
+import Icon from '@/components/vine/ui/Icon';
+import LoadingScreen from '@/components/vine/ui/LoadingScreen';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useBottomChrome } from '@/context/BottomChromeContext';

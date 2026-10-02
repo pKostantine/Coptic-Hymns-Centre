@@ -27,10 +27,10 @@ const PREVIEW = {
 const APP_SHELL = `<!doctype html>
 <html><head>
 <title>Coptic Vine</title>
-<!-- CHC_SHARE_META_START -->
+<!-- COPTIC_VINE_SHARE_META_START -->
 <meta property="og:title" content="Coptic Vine" />
 <meta property="og:image" content="https://chc.pierrek.ca/apple-touch-icon.png" />
-<!-- CHC_SHARE_META_END -->
+<!-- COPTIC_VINE_SHARE_META_END -->
 </head><body><div id="root"></div></body></html>`;
 
 const originalFetch = globalThis.fetch;
@@ -85,7 +85,7 @@ test('dedicated share route returns crawler-ready entity metadata without touchi
   const html = await response.text();
 
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get('x-chc-share-preview'), 'dedicated');
+  assert.equal(response.headers.get('x-coptic-vine-share-preview'), 'dedicated');
   assert.equal(requests.length, 0);
   assert.match(html, /<meta property="og:type" content="music\.album" \/>/);
   assert.match(html, /<meta property="og:title" content="Liturgy with Cantor Ibrahim Ayad — Coptic Vine" \/>/);
@@ -161,7 +161,7 @@ test('direct entity route replaces the generic SPA Open Graph block', async () =
   const html = await response.text();
 
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get('x-chc-share-preview'), 'entity');
+  assert.equal(response.headers.get('x-coptic-vine-share-preview'), 'entity');
   assert.equal(requests.length, 1);
   assert.match(html, /<title>Liturgy with Cantor Ibrahim Ayad — Coptic Vine<\/title>/);
   assert.match(html, /<meta property="og:type" content="music\.album" \/>/);
@@ -196,7 +196,7 @@ test('share image route proxies the published entity artwork as an inline image'
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('content-type'), 'image/jpeg');
   assert.equal(response.headers.get('content-disposition'), 'inline');
-  assert.equal(response.headers.get('x-chc-share-image'), 'proxied');
+  assert.equal(response.headers.get('x-coptic-vine-share-image'), 'proxied');
   assert.deepEqual(new Uint8Array(await response.arrayBuffer()), expectedBytes);
   assert.equal(requests.length, 0);
 });
@@ -213,7 +213,7 @@ test('dedicated share route returns a non-cacheable error instead of poisoning p
 
   assert.equal(response.status, 503);
   assert.equal(response.headers.get('cache-control'), 'no-store');
-  assert.equal(response.headers.get('x-chc-share-preview'), 'error');
+  assert.equal(response.headers.get('x-coptic-vine-share-preview'), 'error');
   assert.equal(requests.length, 0);
   assert.doesNotMatch(await response.text(), /apple-touch-icon/);
 });

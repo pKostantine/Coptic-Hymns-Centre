@@ -1,4 +1,4 @@
-# CHC native content package Worker
+# Coptic Vine native content package Worker
 
 This Worker publishes immutable, gzip-encoded book-resource chunks to the
 private `chc-content` R2 bucket and exposes only the current root manifest and

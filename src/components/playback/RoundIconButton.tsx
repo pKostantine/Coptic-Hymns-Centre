@@ -1,6 +1,6 @@
 import { Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
-import Icon, { type IconName } from '@/components/chc/ui/Icon';
+import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 
 interface RoundIconButtonProps {

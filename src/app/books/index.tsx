@@ -6,12 +6,12 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import BottomTabBar from '@/components/chc/ui/BottomTabBar';
-import CalendarSheet from '@/components/chc/ui/CalendarSheet';
-import DayBlock from '@/components/chc/ui/DayBlock';
-import LibraryBook from '@/components/chc/ui/LibraryBook';
-import PageTitle from '@/components/chc/ui/PageTitle';
-import { useLiturgicalDay } from '@/components/chc/ui/useLiturgicalDay';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
+import CalendarSheet from '@/components/vine/ui/CalendarSheet';
+import DayBlock from '@/components/vine/ui/DayBlock';
+import LibraryBook from '@/components/vine/ui/LibraryBook';
+import PageTitle from '@/components/vine/ui/PageTitle';
+import { useLiturgicalDay } from '@/components/vine/ui/useLiturgicalDay';
 import { CATEGORIES, HOLY_WEEK_DAYS, holyWeekDayHref, type CategoryDef } from '@/constants/manifest';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';

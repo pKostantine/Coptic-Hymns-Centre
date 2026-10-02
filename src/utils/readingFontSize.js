@@ -98,7 +98,7 @@ export function nearestReadingFontLevel(pixelSize, deviceClass) {
 }
 
 /**
- * Converts both prior CHC ranges to their old rendered size, then chooses the
+ * Converts both prior Coptic Vine ranges to their old rendered size, then chooses the
  * closest level in the new device-aware table. A stored range marker of 10 is
  * the new format; the original 0-10 format never wrote a marker.
  */

@@ -1,6 +1,6 @@
 import { Href, useLocalSearchParams } from 'expo-router';
 
-import ServiceDocument from '@/components/chc/screens/ServiceDocument';
+import ServiceDocument from '@/components/vine/screens/ServiceDocument';
 import { HOLY_WEEK_DAYS, HOLY_WEEK_HOURS } from '@/constants/manifest';
 
 export default function HolyWeekHourDocument() {

@@ -183,7 +183,7 @@ async function deleteAllUnusedStorage(request, response, config) {
   );
 
   if (!authorization[0]?.authorized) {
-    throw new HttpError(403, 'admin_required', 'CHC admin access is required.');
+    throw new HttpError(403, 'admin_required', 'Coptic Vine admin access is required.');
   }
 
   const result = await purgeUnusedStorage(config, { dueOnly: false });

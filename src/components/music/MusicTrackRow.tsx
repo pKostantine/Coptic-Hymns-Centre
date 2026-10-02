@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import Icon from '@/components/chc/ui/Icon';
+import Icon from '@/components/vine/ui/Icon';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import type { MusicConsumerTrack } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';

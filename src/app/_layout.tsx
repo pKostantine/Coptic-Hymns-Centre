@@ -8,7 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import BookSyncBootstrap from '@/components/BookSyncBootstrap';
 import NotificationBootstrap from '@/components/NotificationBootstrap';
-import SideBar from '@/components/chc/ui/SideBar';
+import SideBar from '@/components/vine/ui/SideBar';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
@@ -95,7 +95,7 @@ function AppFrame() {
 
 export default function RootLayout() {
   // Keep the two Coptic fonts deliberately separate: Books/readers use the
-  // CHC custom face, while Music synchronized lyrics use Athanasius.
+  // Coptic Vine custom face, while Music synchronized lyrics use Athanasius.
   const [copticLoaded] = useLocalFonts({
     'CopticCHC-Regular': require('../../assets/fonts/CopticCHC-Regular-V3.1.ttf'),
     Athanasius: require('../../assets/fonts/CopticCHC-Athanasius-V1.0.ttf'),

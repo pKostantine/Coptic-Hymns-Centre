@@ -71,10 +71,10 @@ test('liked tracks show and play with their release artwork', () => {
 
 test('artist artwork is circular and tab headers no longer carry the logo', () => {
   const folder = read('src/app/music/library/[section].tsx');
-  const nativeHeader = read('src/components/chc/ui/AppHeader.tsx');
-  const webHeader = read('src/components/chc/ui/AppHeader.web.tsx');
+  const nativeHeader = read('src/components/vine/ui/AppHeader.tsx');
+  const webHeader = read('src/components/vine/ui/AppHeader.web.tsx');
   const books = read('src/app/books/index.tsx');
-  const home = read('src/components/chc/screens/HomeScreen.tsx');
+  const home = read('src/components/vine/screens/HomeScreen.tsx');
 
   assert.match(folder, /profileImageAsset[^\n]*size=\{58\} rounded/);
   assert.doesNotMatch(nativeHeader, /CHC_sm/);

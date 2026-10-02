@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AppHeader from '@/components/chc/ui/AppHeader';
-import Icon from '@/components/chc/ui/Icon';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import Icon from '@/components/vine/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';

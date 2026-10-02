@@ -61,7 +61,7 @@ test('Monastery flag remains controlled by its toggle independently of saint hym
 });
 
 test('the document uses the toggle flags after route-specific context', () => {
-  const source = fs.readFileSync('src/components/chc/screens/ServiceDocument.tsx', 'utf8');
+  const source = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
   assert.match(source, /getUserConditionFlags\(preferences\)/);
   assert.match(
     source,

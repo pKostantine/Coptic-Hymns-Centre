@@ -12,7 +12,7 @@ interface ScheduledEvent {}
 interface ExecutionContext { waitUntil(promise: Promise<unknown>): void }
 
 interface Env {
-  CHC_CONTENT: R2Bucket;
+  CONTENT_BUCKET: R2Bucket;
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   PUBLISH_TOKEN: string;
@@ -74,7 +74,7 @@ function resolveGraph(roots: string[], dependencies: Map<string, string[]>): str
 }
 
 async function loadExistingManifest(env: Env): Promise<any | null> {
-  const object = await env.CHC_CONTENT.get('manifest.json');
+  const object = await env.CONTENT_BUCKET.get('manifest.json');
   if (!object) return null;
   try { return JSON.parse(await object.text()); } catch { return null; }
 }
@@ -136,7 +136,7 @@ async function buildResource(
     if (!url) {
       const key = `packages/${snapshotId}/${resource.id}/${payload.chunkId}.json`;
       const compressed = await gzip(raw);
-      await env.CHC_CONTENT.put(key, compressed, {
+      await env.CONTENT_BUCKET.put(key, compressed, {
         httpMetadata: { contentType: 'application/json', contentEncoding: 'gzip', cacheControl: 'public, max-age=31536000, immutable' },
         customMetadata: { sha256: digest, decodedSize: String(raw.byteLength), rowCount: String(rowCount), resourceVersion: resource.version },
       });
@@ -166,7 +166,7 @@ async function buildResource(
   if (!chunks.length) throw new Error(`Resource ${resource.id} produced no package rows.`);
   const aggregate = encoder.encode(JSON.stringify(chunks.map((chunk) => [chunk.id, chunk.sha256, chunk.rowCount])));
   const manifest: ResourceManifest = { id: resource.id, version: resource.version, dependencies, size: chunks.reduce((sum, chunk) => sum + chunk.size, 0), sha256: await sha256(aggregate), chunks };
-  await env.CHC_CONTENT.put(`packages/${snapshotId}/${resource.id}/manifest.json`, JSON.stringify(manifest), { httpMetadata: { contentType: 'application/json', cacheControl: 'public, max-age=31536000, immutable' } });
+  await env.CONTENT_BUCKET.put(`packages/${snapshotId}/${resource.id}/manifest.json`, JSON.stringify(manifest), { httpMetadata: { contentType: 'application/json', cacheControl: 'public, max-age=31536000, immutable' } });
   return manifest;
 }
 
@@ -192,7 +192,7 @@ async function publish(env: Env): Promise<{ published: boolean; snapshotId: stri
     const manifest = { formatVersion: 1, snapshotId, publishedAt: new Date().toISOString(), books, resources: resourceManifests };
     // This final single-object write is the publication point. Until it
     // succeeds every client continues to see the preceding consistent root.
-    await env.CHC_CONTENT.put('manifest.json', JSON.stringify(manifest), { httpMetadata: { contentType: 'application/json', cacheControl: 'no-cache' } });
+    await env.CONTENT_BUCKET.put('manifest.json', JSON.stringify(manifest), { httpMetadata: { contentType: 'application/json', cacheControl: 'no-cache' } });
     await rpc(env, 'finish_offline_package_snapshot', { p_snapshot_id: snapshotId, p_success: true, p_error: null });
     return { published: true, snapshotId };
   } catch (error) {
@@ -202,7 +202,7 @@ async function publish(env: Env): Promise<{ published: boolean; snapshotId: stri
 }
 
 async function serveObject(env: Env, key: string): Promise<Response> {
-  const object = await env.CHC_CONTENT.get(key);
+  const object = await env.CONTENT_BUCKET.get(key);
   if (!object) return json({ error: 'not_found' }, 404);
   const headers = new Headers(); object.writeHttpMetadata(headers); headers.set('etag', object.httpEtag);
   headers.set('x-content-type-options', 'nosniff');

@@ -7,7 +7,7 @@ const copticFontModule = require('../../assets/fonts/CopticCHC-Regular-V3.1.ttf'
 let cachedDataUri: string | null = null;
 
 /**
- * Loads the bundled Coptic CHC font and returns it as a base64 data: URI so
+ * Loads the bundled Coptic Coptic Vine font and returns it as a base64 data: URI so
  * it can be embedded in a WebView's @font-face — WebView content can't see
  * fonts registered with expo-font in the RN side, and file:// font loading
  * is unreliable across Android/iOS WebView configurations.

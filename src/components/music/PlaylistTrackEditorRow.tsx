@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, View } from 'react-native';
 
-import Icon from '@/components/chc/ui/Icon';
+import Icon from '@/components/vine/ui/Icon';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { COLORS, SPACING } from '@/constants/theme';
 import type { MusicConsumerTrack } from '@/types/musicConsumer';

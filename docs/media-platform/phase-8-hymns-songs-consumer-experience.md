@@ -4,13 +4,13 @@ Completed on 2026-09-16.
 
 ## Scope
 
-Phase 8 adds the first complete consumer-facing Hymns & Songs experience to the main CHC application. It uses CHC's existing navy/gold design language and shared typography/spacing while adopting interaction patterns appropriate to a music product rather than copying the Books document UI.
+Phase 8 adds the first complete consumer-facing Hymns & Songs experience to the main Coptic Vine application. It uses Coptic Vine's existing navy/gold design language and shared typography/spacing while adopting interaction patterns appropriate to a music product rather than copying the Books document UI.
 
 The consumer experience is backed by the published Phase 6 music catalog, Phase 7 synchronized lyrics, canonical Cloudflare R2 media references, and the existing Supabase RLS model.
 
 ## Consumer Experience
 
-Implemented in the main CHC Expo application:
+Implemented in the main Coptic Vine Expo application:
 
 - Music as a peer top-level experience beside Books and App Settings
 - Music Home / discovery
@@ -83,7 +83,7 @@ Normal Phase 8 consumer RPCs execute as `SECURITY INVOKER` and rely on the exist
 
 ## RLS Verification
 
-Library behavior was tested against the live CHC Supabase project.
+Library behavior was tested against the live Coptic Vine Supabase project.
 
 Verified:
 
@@ -141,6 +141,6 @@ Existing project-wide findings in older schemas/backups and intentionally privil
 
 ## Follow-Up
 
-- Phase 9 should replace the provisional in-app playback layer with CHC's robust global playback engine while preserving the Phase 8 Music UI contracts.
-- Phase 12 can broaden Music search into CHC's unified cross-domain search.
+- Phase 9 should replace the provisional in-app playback layer with Coptic Vine's robust global playback engine while preserving the Phase 8 Music UI contracts.
+- Phase 12 can broaden Music search into Coptic Vine's unified cross-domain search.
 - Phase 13/14 should make the Phase 8 download actions perform real local persistence, offline playback, versioning, and storage management.

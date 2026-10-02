@@ -1,7 +1,7 @@
 interface Env {
-  CHC_MUSIC: R2Bucket;
-  CHC_LEARNING: R2Bucket;
-  CHC_IMAGES: R2Bucket;
+  MUSIC_BUCKET: R2Bucket;
+  LEARNING_BUCKET: R2Bucket;
+  IMAGES_BUCKET: R2Bucket;
   PUBLIC_CACHE_CONTROL?: string;
 }
 
@@ -36,9 +36,9 @@ interface R2ObjectBody extends R2Object {
 type PublicBucketSegment = 'music' | 'learning' | 'images';
 
 const PUBLIC_BUCKETS: Record<PublicBucketSegment, keyof Env> = {
-  music: 'CHC_MUSIC',
-  learning: 'CHC_LEARNING',
-  images: 'CHC_IMAGES',
+  music: 'MUSIC_BUCKET',
+  learning: 'LEARNING_BUCKET',
+  images: 'IMAGES_BUCKET',
 };
 
 const CORS_HEADERS = {

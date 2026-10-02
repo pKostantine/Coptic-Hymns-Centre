@@ -115,7 +115,7 @@ export const DAY_BLOCK_THEMES: Record<SeasonThemeKey, DayBlockTheme> = {
     accentBorder: '#B08A1C',
     chip: 'rgba(16, 34, 58, 0.07)',
   },
-  /** Navy — the old CHC navy, kept for the Apostles. */
+  /** Navy — the old Coptic Vine navy, kept for the Apostles. */
   apostles: { ...ON_COLOUR, key: 'apostles', from: '#0C3158', to: '#001D3D' },
   /** Royal blue: oklch(0.46 0.17 262) → oklch(0.24 0.11 262). */
   marian: { ...ON_COLOUR, key: 'marian', from: '#1C50B5', to: '#001852' },

@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import Icon, { type IconName } from '@/components/chc/ui/Icon';
+import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { learningService } from '@/services/learningService';
 import type {

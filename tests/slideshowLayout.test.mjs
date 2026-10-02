@@ -25,7 +25,7 @@ import {
   hashSlideshowText,
   joinRenderedLines,
   paginateItems,
-} from "../src/components/chc/slideshowLayout.js";
+} from "../src/components/vine/slideshowLayout.js";
 import {
   getAlternatingVerseColorIndex,
   getEffectiveAlternatingVerseIndex,

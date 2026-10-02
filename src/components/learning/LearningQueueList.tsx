@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-import Icon from '@/components/chc/ui/Icon';
+import Icon from '@/components/vine/ui/Icon';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import type { LearningQueueItem } from '@/context/LearningPlayerContext';

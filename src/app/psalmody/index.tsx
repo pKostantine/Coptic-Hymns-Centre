@@ -1,3 +1,3 @@
-import PsalmodyMenu from '@/components/chc/screens/PsalmodyMenu';
+import PsalmodyMenu from '@/components/vine/screens/PsalmodyMenu';
 
 export default PsalmodyMenu;

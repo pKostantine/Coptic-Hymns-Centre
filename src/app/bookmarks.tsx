@@ -5,13 +5,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
-import AppHeader from '@/components/chc/ui/AppHeader';
-import MenuRow, { menuRowPosition } from '@/components/chc/ui/MenuRow';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import MenuRow, { menuRowPosition } from '@/components/vine/ui/MenuRow';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { bookmarkKeyFor, CATEGORIES, DIVINE_LITURGY_SERVICES, HOLY_WEEK_HOURS, holyWeekHourHref, RAISING_OF_INCENSE_OPTIONS, SERVICES_BY_CATEGORY } from '@/constants/manifest';
 import { goBack } from '@/utils/navigation';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { isBibleBookmark } from '@/components/chc/screens/BibleBookmarks';
+import { isBibleBookmark } from '@/components/vine/screens/BibleBookmarks';
 
 interface BookmarkEntry {
   id: string;

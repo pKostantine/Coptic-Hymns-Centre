@@ -49,7 +49,7 @@ export interface ReadingPreferences {
   bibleVisibleLanguages: BibleVisibleLanguages;
   sermonPlannerVisibleLanguages: SermonPlannerVisibleLanguages;
   fontScale: number; // integer 1-10, see MIN_FONT_SCALE/MAX_FONT_SCALE
-  /** Persisted range marker used to migrate earlier CHC font-size scales. */
+  /** Persisted range marker used to migrate earlier Coptic Vine font-size scales. */
   fontScaleRangeMax: number;
   orientationMode: OrientationMode;
   selectText: boolean;

@@ -1,4 +1,4 @@
-import type { DocumentSection, DocumentVerse } from '../components/chc/documentHtml';
+import type { DocumentSection, DocumentVerse } from '../components/vine/documentHtml';
 import { buildVerseFromTextRow, formatDocumentHymnSection } from './hymnLibrary';
 import { contentDataClient as supabase } from '../services/contentDataClient';
 

@@ -166,7 +166,7 @@ async function dispatchWebPush(env) {
           title: delivery.title,
           body: delivery.body,
           url: delivery.deep_link || '/',
-          tag: `chc-${delivery.notification_id}`,
+          tag: `coptic-vine-${delivery.notification_id}`,
         },
         vapid,
         { ttl: 86400, urgency: 'normal', timeoutMs: 10000 },
@@ -272,7 +272,7 @@ async function runOnce(env) {
 export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(runOnce(env).catch((error) => {
-      console.error('CHC notification dispatcher failed:', error);
+      console.error('Coptic Vine notification dispatcher failed:', error);
     }));
   },
 

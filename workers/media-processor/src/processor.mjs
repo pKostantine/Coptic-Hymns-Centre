@@ -519,7 +519,7 @@ export async function handleAudioDelivery(inputPath, jobDir) {
   const inputAudio = inputProbe.streams?.find((stream) => stream.codec_type === 'audio');
   const canStreamCopy = inputAudio?.codec_name === 'aac';
 
-  // CHC Artists commonly uploads M4A/AAC. Re-encoding that audio wastes time
+  // Coptic Vine Artists commonly uploads M4A/AAC. Re-encoding that audio wastes time
   // and quality for no benefit, so compatible AAC is only remuxed with
   // +faststart. This is normally several times faster than real-time.
   if (canStreamCopy) {
@@ -637,7 +637,7 @@ async function runJob(config, job) {
   });
   if (streamed) return streamed;
 
-  const jobDir = path.join(config.workDir, `chc-media-job-${job.job_id}`);
+  const jobDir = path.join(config.workDir, `coptic-vine-media-job-${job.job_id}`);
   const inputPath = path.join(jobDir, `input${sourceExtension(job.input_path)}`);
 
   try {
