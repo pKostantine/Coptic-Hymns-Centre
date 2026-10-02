@@ -209,7 +209,7 @@ async function handleRequest(request, response, config) {
   const url = new URL(request.url || '/', `http://${host}`);
 
   if (request.method === 'GET' && url.pathname === '/health') {
-    sendJson(response, 200, { ok: true, service: 'chc-media-processor' });
+    sendJson(response, 200, { ok: true, service: 'cv-media-processor' });
     return;
   }
 

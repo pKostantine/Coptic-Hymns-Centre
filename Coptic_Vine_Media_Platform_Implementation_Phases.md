@@ -55,7 +55,7 @@ Pierre/admin should have a complete review and moderation experience for approvi
 
 The Coptic Vine Artists repository already exists:
 
-https://github.com/pKostantine/CHC-Artists.git
+https://github.com/pKostantine/CV-Artists.git
 
 Use this repository for all Coptic Vine Artists work.
 
@@ -332,7 +332,7 @@ Status: complete. Cloudflare API/MCP access, Wrangler CLI authentication, Supaba
 - Supabase MCP access works for project `wtuujmeinzqfikvuofmh` (`Coptic Vine`, `us-east-2`, Postgres `17.6.1.155`, active/healthy).
 - Cloudflare API/MCP access works for account `pKostantine` (`cf3267bfcb8e3b6d980e9a690c7e7a00`).
 - GitHub remote for the main app is `https://github.com/pKostantine/Coptic-Vine.git` (formerly `Coptic-Hymns-Centre`), current branch `master`, current HEAD `6abf333a992b60be218d32015b6f7bdb31322c43`.
-- Coptic Vine Artists remote `https://github.com/pKostantine/CHC-Artists.git` exists but appears empty/uninitialized: `git ls-remote` returns no refs/HEAD, and it is not checked out locally.
+- Coptic Vine Artists remote `https://github.com/pKostantine/CV-Artists.git` exists but appears empty/uninitialized: `git ls-remote` returns no refs/HEAD, and it is not checked out locally.
 
 ### Existing Cloudflare Resources
 
@@ -442,7 +442,7 @@ Status: complete. Cloudflare API/MCP access, Wrangler CLI authentication, Supaba
 - Dockerized FFmpeg worker outside Expo and outside long-running Cloudflare Workers.
 - Media resolver abstraction in the app.
 - Playback engine, audio/video dependencies, synchronized lyrics support, offline download manager, and SQLite metadata store.
-- Coptic Vine Artists application in the existing `CHC-Artists` repository, not embedded in this repo.
+- Coptic Vine Artists application in the existing `CV-Artists` repository, not embedded in this repo.
 
 ### Conflicts, Risks, and Required Follow-Up
 
@@ -668,9 +668,9 @@ Status: complete. Cloudflare R2 is now the canonical media storage layer for the
   - `chc-music` published delivery assets
   - `chc-learning` published delivery assets
   - `chc-images` published delivery assets
-- Added and deployed the `chc-media-resolver` Worker:
+- Added and deployed the `cv-media-resolver` Worker:
   - source: `workers/media-resolver`
-  - deployed URL: `https://chc-media-resolver.hrmpdd8d6c.workers.dev`
+  - deployed URL: `https://cv-media-resolver.hrmpdd8d6c.workers.dev`
   - version ID: `e7908fc2-b905-4f2e-b34a-aab0b71b295c`
 - The Worker exposes only:
   - `/music/{object_key}`
@@ -762,8 +762,8 @@ Implemented:
   - `public.create_media_upload_intent(...)`
   - `public.get_media_upload_intent_for_upload(...)`
   - `public.complete_media_upload_intent(...)`
-- Deployed Cloudflare Worker `chc-upload-authorizer`.
-- Active Worker URL: `https://chc-upload-authorizer.hrmpdd8d6c.workers.dev`
+- Deployed Cloudflare Worker `cv-upload-authorizer`.
+- Active Worker URL: `https://cv-upload-authorizer.hrmpdd8d6c.workers.dev`
 - Bound Worker to private R2 bucket `chc-submissions`.
 - Stored the Supabase publishable key as a Cloudflare Worker secret.
 - Added TypeScript upload-intent types in `src/types/mediaPlatform.ts`.

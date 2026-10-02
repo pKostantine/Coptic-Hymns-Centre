@@ -155,7 +155,7 @@ async function handleMediaRequest(request: Request, env: Env): Promise<Response>
   const url = new URL(request.url);
 
   if (url.pathname === '/health') {
-    return json({ ok: true, service: 'chc-media-resolver' });
+    return json({ ok: true, service: 'cv-media-resolver' });
   }
 
   const resolvedPath = parseRequestPath(url.pathname);

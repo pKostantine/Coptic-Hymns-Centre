@@ -174,7 +174,7 @@ test('share image route proxies the published entity artwork as an inline image'
   globalThis.fetch = async (input, init) => {
     assert.equal(
       String(input),
-      'https://chc-media-resolver.hrmpdd8d6c.workers.dev/images/processed/release/version/cover.jpg',
+      'https://cv-media-resolver.hrmpdd8d6c.workers.dev/images/processed/release/version/cover.jpg',
     );
     assert.equal(init?.method, 'GET');
     return new Response(expectedBytes, {

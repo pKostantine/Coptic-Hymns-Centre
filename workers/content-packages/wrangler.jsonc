@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "chc-content-packages",
+  "name": "cv-content-packages",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-20",
   "workers_dev": true,

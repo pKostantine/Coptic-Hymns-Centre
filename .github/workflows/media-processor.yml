@@ -1,4 +1,4 @@
-name: Validate CHC Media Processor
+name: Validate Coptic Vine Media Processor
 
 on:
   pull_request:
