@@ -30,7 +30,7 @@ Public upload RPC execute grants are only available to `authenticated`, not `ano
 Worker:
 
 - `workers/upload-authorizer`
-- Deployed URL: `https://chc-upload-authorizer.hrmpdd8d6c.workers.dev`
+- Deployed URL: `https://cv-upload-authorizer.hrmpdd8d6c.workers.dev`
 - Current deployed version: `1e9162fa-22a9-4452-910f-f73ebb2d9018`
 
 Bindings and secrets:
@@ -65,7 +65,7 @@ Completed:
 
 - `npx.cmd tsc --noEmit` passed.
 - `npx.cmd wrangler deploy --config workers\upload-authorizer\wrangler.jsonc --dry-run` passed.
-- `GET /health` returned `200` with `{"ok":true,"service":"chc-upload-authorizer"}`.
+- `GET /health` returned `200` with `{"ok":true,"service":"cv-upload-authorizer"}`.
 - `POST /uploads/authorize` without a bearer token returned `401 auth_required`.
 - `PUT /uploads/{uuid}` without a bearer token returned `401 auth_required`.
 - `POST /uploads/authorize` with a malformed bearer token reached Supabase and returned `401 PGRST301`.

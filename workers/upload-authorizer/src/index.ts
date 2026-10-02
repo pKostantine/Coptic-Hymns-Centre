@@ -838,7 +838,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
 
   if (url.pathname === '/health' && request.method === 'GET') {
-    return json({ ok: true, service: 'chc-upload-authorizer' }, env);
+    return json({ ok: true, service: 'cv-upload-authorizer' }, env);
   }
 
   if (url.pathname === '/uploads/authorize') {

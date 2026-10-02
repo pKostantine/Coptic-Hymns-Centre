@@ -10,7 +10,7 @@ Created in Cloudflare account `pKostantine` (`cf3267bfcb8e3b6d980e9a690c7e7a00`)
 - `chc-learning`: published learning audio/video delivery assets
 - `chc-images`: published artwork and image assets
 
-R2 buckets are private by default. Public delivery goes through the `chc-media-resolver` Worker rather than exposing private buckets directly.
+R2 buckets are private by default. Public delivery goes through the `cv-media-resolver` Worker rather than exposing private buckets directly.
 
 ## Delivery Worker
 
@@ -19,7 +19,7 @@ Source: `workers/media-resolver`
 Deployed Worker:
 
 ```text
-https://chc-media-resolver.hrmpdd8d6c.workers.dev
+https://cv-media-resolver.hrmpdd8d6c.workers.dev
 ```
 
 Current deployed version:
@@ -67,7 +67,7 @@ The app runtime needs:
 EXPO_PUBLIC_MEDIA_BASE_URL
 ```
 
-(the old name, `EXPO_PUBLIC_CHC_MEDIA_BASE_URL`, is still read as a fallback) set to the deployed Worker base URL, or a future custom media domain such as `https://media.coptichymnscentre.com`.
+set to the deployed Worker base URL, or a future custom media domain such as `https://media.coptichymnscentre.com`.
 
 ## Custom Domain Status
 
