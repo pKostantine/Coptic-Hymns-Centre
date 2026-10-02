@@ -202,7 +202,7 @@ class HybridRpc implements PromiseLike<QueryResult> {
     }
     const localResourceSchema = this.functionName === 'get_readings_for_date' ? 'calendar' : this.schemaName;
     if (await hasLocalSchema(localResourceSchema)) {
-      return { data: null, error: { message: `Offline package does not contain ${this.schemaName}.${this.functionName}.`, code: 'CHC_OFFLINE_RPC_MISSING' } };
+      return { data: null, error: { message: `Offline package does not contain ${this.schemaName}.${this.functionName}.`, code: 'OFFLINE_RPC_MISSING' } };
     }
     let query: any = supabase.schema(this.schemaName).rpc(this.functionName, this.args);
     if (this.signal) query = query.abortSignal(this.signal);

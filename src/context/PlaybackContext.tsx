@@ -340,7 +340,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
     // expo-audio owns playback on web, but Chrome's global media controls use
     // the Media Session API for the rich card. Set that metadata explicitly so
-    // CHC gets the same album-art treatment as YouTube and SoundCloud.
+    // Coptic Vine gets the same album-art treatment as YouTube and SoundCloud.
     if (Platform.OS === 'web' && webGlobal.navigator?.mediaSession && webGlobal.MediaMetadata) {
       webGlobal.navigator.mediaSession.metadata = new webGlobal.MediaMetadata({
         title: playable.title,
@@ -350,7 +350,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       });
 
       // expo-audio maps Chrome's previous/next buttons to 10-second seeks.
-      // CHC is a queue player, so those buttons should change tracks.
+      // Coptic Vine is a queue player, so those buttons should change tracks.
       const session = webGlobal.navigator.mediaSession;
       try {
         session.setActionHandler?.('nexttrack', () => nextRef.current());

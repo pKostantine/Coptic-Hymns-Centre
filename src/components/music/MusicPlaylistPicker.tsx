@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import Icon from '@/components/chc/ui/Icon';
+import Icon from '@/components/vine/ui/Icon';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';

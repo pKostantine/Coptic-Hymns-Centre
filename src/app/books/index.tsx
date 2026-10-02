@@ -2,16 +2,16 @@
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { Alert, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import BottomTabBar from '@/components/chc/ui/BottomTabBar';
-import CalendarSheet from '@/components/chc/ui/CalendarSheet';
-import DayBlock from '@/components/chc/ui/DayBlock';
-import LibraryBook from '@/components/chc/ui/LibraryBook';
-import PageTitle from '@/components/chc/ui/PageTitle';
-import { useLiturgicalDay } from '@/components/chc/ui/useLiturgicalDay';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
+import CalendarSheet from '@/components/vine/ui/CalendarSheet';
+import DayBlock from '@/components/vine/ui/DayBlock';
+import LibraryBook from '@/components/vine/ui/LibraryBook';
+import PageTitle from '@/components/vine/ui/PageTitle';
+import { useLiturgicalDay } from '@/components/vine/ui/useLiturgicalDay';
 import { CATEGORIES, HOLY_WEEK_DAYS, holyWeekDayHref, type CategoryDef } from '@/constants/manifest';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -19,6 +19,7 @@ import { bookDownloadManager } from '@/services/bookDownloadManager';
 import type { BookDownloadProgress } from '@/types/bookDownloads';
 import { formatCopticDayMonth } from '@/utils/localeFormat';
 import { useHolyWeekSchedule } from '@/utils/useHolyWeekSchedule';
+import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
 import { appText, entryLabel, tr } from '../../utils/appText';
 
@@ -38,11 +39,18 @@ function chunk<T>(items: T[], size: number): T[][] {
   return rows;
 }
 
-/** The Books tab (CHC design, "Books"): the liturgical day in its season's colours, then the library. */
+/**
+ * The Books tab (Coptic Vine design system, "DayBlock" and "BookShelf"): the
+ * liturgical day in its season's colours, then the library. The iPad sets the
+ * day beside the library; the desktop pins it in a narrower left column with
+ * the library four books across.
+ */
 export default function BooksHome() {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
-  const { width } = useWindowDimensions();
+  const width = useContentWidth();
+  const layout = useLayoutMode();
+  const insets = useSafeAreaInsets();
   const arabic = preferences.appLanguage === 'ar';
   const holyWeek = useHolyWeekSchedule();
   const day = useLiturgicalDay();
@@ -96,8 +104,50 @@ export default function BooksHome() {
 
   const tiles = CATEGORIES.filter((item) => !WIDE_BOOKS.has(item.id));
   const rows = CATEGORIES.filter((item) => WIDE_BOOKS.has(item.id));
-  const columns = columnsFor(width);
-  const rowColumns = width >= 700 ? 2 : 1;
+  const columns = layout === 'desktop' ? 4 : layout === 'tablet' ? 2 : columnsFor(width);
+  const rowColumns = layout === 'desktop' ? 2 : layout === 'tablet' ? 1 : width >= 700 ? 2 : 1;
+
+  const title = (
+    <PageTitle
+      title={tr('Books', 'Livres', 'الكتب')}
+      arabic={arabic}
+      flush={layout !== 'phone'}
+      actions={[
+        { icon: 'bookmark-outline', label: tr('Open bookmarks', 'Ouvrir les signets', 'افتح العلامات'), onPress: () => router.push('/bookmarks') },
+        { icon: 'settings-outline', label: tr('Open settings', 'Ouvrir les réglages', 'افتح الإعدادات'), onPress: () => router.push('/book-settings') },
+      ]}
+    />
+  );
+  const dayBlock = (
+    <DayBlock
+      day={day}
+      arabic={arabic}
+      onOpenCalendar={() => setCalendarOpen(true)}
+      onOpenSeasons={openSeasons}
+      action={current ? { label: entryLabel(current), onPress: () => router.push(holyWeekDayHref(current) as never) } : undefined}
+    />
+  );
+  const library = (
+    <>
+      <Text style={[styles.section, layout !== 'phone' && styles.sectionBeside, arabic && styles.arabic]} accessibilityRole="header">
+        {tr('Library', 'Bibliothèque', 'المكتبة')}
+      </Text>
+      <View style={styles.shelf}>
+        {chunk(tiles, columns).map((row) => (
+          <View key={row[0].id} style={[styles.shelfRow, arabic && styles.rowReverse]}>
+            {row.map(renderBook)}
+            {/* A short last row keeps its tiles tile-sized. */}
+            {Array.from({ length: columns - row.length }).map((_, index) => <View key={`gap-${index}`} style={styles.gap} />)}
+          </View>
+        ))}
+        {chunk(rows, rowColumns).map((row) => (
+          <View key={row[0].id} style={[styles.shelfRow, arabic && styles.rowReverse]}>
+            {row.map(renderBook)}
+          </View>
+        ))}
+      </View>
+    </>
+  );
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -105,45 +155,27 @@ export default function BooksHome() {
         <title>{tr('Books', 'Livres', 'الكتب')}</title>
       </Head>
 
-      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.column}>
-          <PageTitle
-            title={tr('Books', 'Livres', 'الكتب')}
-            arabic={arabic}
-            actions={[
-              { icon: 'bookmark-outline', label: tr('Open bookmarks', 'Ouvrir les signets', 'افتح العلامات'), onPress: () => router.push('/bookmarks') },
-              { icon: 'settings-outline', label: tr('Open settings', 'Ouvrir les réglages', 'افتح الإعدادات'), onPress: () => router.push('/book-settings') },
-            ]}
-          />
-
-          <View style={styles.gutter}>
-            <DayBlock
-              day={day}
-              arabic={arabic}
-              onOpenCalendar={() => setCalendarOpen(true)}
-              onOpenSeasons={openSeasons}
-              action={current ? { label: entryLabel(current), onPress: () => router.push(holyWeekDayHref(current) as never) } : undefined}
-            />
-
-            <Text style={[styles.section, arabic && styles.arabic]} accessibilityRole="header">
-              {tr('Library', 'Bibliothèque', 'المكتبة')}
-            </Text>
-            <View style={styles.shelf}>
-              {chunk(tiles, columns).map((row) => (
-                <View key={row[0].id} style={[styles.shelfRow, arabic && styles.rowReverse]}>
-                  {row.map(renderBook)}
-                  {/* A short last row keeps its tiles tile-sized. */}
-                  {Array.from({ length: columns - row.length }).map((_, index) => <View key={`gap-${index}`} style={styles.gap} />)}
-                </View>
-              ))}
-              {chunk(rows, rowColumns).map((row) => (
-                <View key={row[0].id} style={[styles.shelfRow, arabic && styles.rowReverse]}>
-                  {row.map(renderBook)}
-                </View>
-              ))}
+      <NowPlayingAwareScrollView
+        contentContainerStyle={[styles.content, layout !== 'phone' && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        showsVerticalScrollIndicator={false}
+      >
+        {layout === 'phone' ? (
+          <View style={styles.column}>
+            {title}
+            <View style={styles.gutter}>
+              {dayBlock}
+              {library}
             </View>
           </View>
-        </View>
+        ) : (
+          <View style={[styles.columns, arabic && styles.rowReverse]}>
+            <View style={layout === 'desktop' ? styles.dayColumn : styles.half}>
+              {title}
+              {dayBlock}
+            </View>
+            <View style={styles.half}>{library}</View>
+          </View>
+        )}
       </NowPlayingAwareScrollView>
 
       <CalendarSheet visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={openSeasons} />
@@ -158,6 +190,12 @@ const styles = StyleSheet.create({
   // A desktop browser is far wider than the shelf wants to be; past this it centres.
   column: { alignSelf: 'center', maxWidth: 980, width: '100%' },
   gutter: { paddingHorizontal: 16 },
+  contentWide: { paddingHorizontal: 36 },
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
+  dayColumn: { width: 420 },
+  half: { flex: 1, minWidth: 0 },
+  // Beside the day block the library's heading lines up with the page title.
+  sectionBeside: { marginTop: 10 },
   rowReverse: { flexDirection: 'row-reverse' },
   section: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700', marginBottom: 12, marginTop: 28 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },

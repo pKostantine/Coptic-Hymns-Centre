@@ -6,7 +6,7 @@ self.addEventListener('push', (event) => {
     payload = { body: event.data ? event.data.text() : '' };
   }
 
-  const title = payload.title || 'Coptic Hymns Centre';
+  const title = payload.title || 'Coptic Vine';
   const body = payload.body || '';
   const url = typeof payload.url === 'string' && payload.url.startsWith('/') ? payload.url : '/';
   const tag = payload.tag || payload.notification_id || undefined;

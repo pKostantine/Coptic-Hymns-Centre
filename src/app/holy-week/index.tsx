@@ -1,3 +1,3 @@
-import HolyWeekMenu from '@/components/chc/screens/HolyWeekMenu';
+import HolyWeekMenu from '@/components/vine/screens/HolyWeekMenu';
 
 export default HolyWeekMenu;

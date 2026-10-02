@@ -5,7 +5,7 @@ import { Alert, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MusicNowPlayingScreen from '@/components/music/MusicNowPlayingScreen';
-import Icon from '@/components/chc/ui/Icon';
+import Icon from '@/components/vine/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningNowPlayingScreen from '@/components/learning/LearningNowPlayingScreen';
 import MusicArtwork from '@/components/music/MusicArtwork';
@@ -25,7 +25,6 @@ import { tr } from '../../utils/appText';
 const FLOATING_GAP = 10;
 
 const EXCLUDED_PATHS = new Set([
-  '/calendar',
   '/season-selector',
   '/account',
   '/settings',
@@ -57,6 +56,7 @@ export default function GlobalNowPlayingOverlay() {
   const {
     tabBarInset,
     reportNowPlayingInset,
+    reportNowPlayingExpanded,
     nowPlayingCollapsed: isCollapsed,
     setNowPlayingCollapsed: setIsCollapsed,
   } = useBottomChrome();
@@ -108,6 +108,15 @@ export default function GlobalNowPlayingOverlay() {
       useNativeDriver: true,
     }).start();
   }, [collapseAnimation, isCollapsed]);
+
+  // The desktop sidebar steps aside while a full player is open, so the player
+  // gets the whole window. Reported per overlay and cleared on unmount, the
+  // same way the inset is, because a subdocument can mount one of its own over
+  // the app's.
+  useEffect(() => {
+    reportNowPlayingExpanded(overlayId, isPopupOpen && allowDisplay);
+    return () => reportNowPlayingExpanded(overlayId, false);
+  }, [allowDisplay, isPopupOpen, overlayId, reportNowPlayingExpanded]);
 
   useEffect(() => {
     // The slideshow deliberately renders underneath the floating player. The
@@ -203,7 +212,7 @@ export default function GlobalNowPlayingOverlay() {
 
   let title = 'Now playing';
   let titleSuffix: string | null = null;
-  let subtitle = 'Coptic Hymns Centre';
+  let subtitle = 'Coptic Vine';
   let artwork: ReactNode = null;
 
   if (isMusic && music.currentItem) {
@@ -212,7 +221,7 @@ export default function GlobalNowPlayingOverlay() {
     titleSuffix = item.releaseType === 'album' || item.releaseType === 'ep'
       ? item.releaseTitle ?? null
       : null;
-    subtitle = formatMusicTrackPerformers(item.track) || 'Coptic Hymns Centre';
+    subtitle = formatMusicTrackPerformers(item.track) || 'Coptic Vine';
     artwork = (
       <MusicArtwork
         asset={item.coverAsset ?? null}
@@ -304,8 +313,8 @@ export default function GlobalNowPlayingOverlay() {
             Alert.alert(
               tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
               preferences.appLanguage === 'ar'
-                ? 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'
-                : `Sign in to your CHC account to save ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
+                ? 'سجّل الدخول إلى حساب كوبتك فاين لحفظ الأغاني المعجبة.'
+                : `Sign in to your Coptic Vine account to save ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
             );
             return;
           }

@@ -1,10 +1,10 @@
 type MediaType = 'audio' | 'video' | 'image';
 
 interface Env {
-  CHC_SUBMISSIONS: R2Bucket;
-  CHC_MUSIC: R2Bucket;
-  CHC_LEARNING: R2Bucket;
-  CHC_IMAGES: R2Bucket;
+  SUBMISSIONS_BUCKET: R2Bucket;
+  MUSIC_BUCKET: R2Bucket;
+  LEARNING_BUCKET: R2Bucket;
+  IMAGES_BUCKET: R2Bucket;
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
   MAX_UPLOAD_BYTES?: string;
@@ -448,7 +448,7 @@ async function handleMultipartCreate(request: Request, env: Env, route: Multipar
   const bearerToken = requireBearerToken(request);
   const intent = await getActiveUploadIntent(env, bearerToken, route.uploadIntentId);
 
-  const multipart = await env.CHC_SUBMISSIONS.createMultipartUpload(intent.object_path, {
+  const multipart = await env.SUBMISSIONS_BUCKET.createMultipartUpload(intent.object_path, {
     httpMetadata: { contentType: intent.content_type },
     customMetadata: {
       uploadIntentId: intent.upload_intent_id,
@@ -480,10 +480,10 @@ async function handleMultipartPart(request: Request, env: Env, route: MultipartR
   }
 
   if (contentLength > MAX_MULTIPART_PART_BYTES) {
-    throw new HttpError(413, 'multipart_part_too_large', 'Multipart part exceeds the CHC part-size limit.');
+    throw new HttpError(413, 'multipart_part_too_large', 'Multipart part exceeds the Coptic Vine part-size limit.');
   }
 
-  const multipart = env.CHC_SUBMISSIONS.resumeMultipartUpload(intent.object_path, route.uploadId!);
+  const multipart = env.SUBMISSIONS_BUCKET.resumeMultipartUpload(intent.object_path, route.uploadId!);
   const uploaded = await multipart.uploadPart(route.partNumber!, request.body);
 
   return json({
@@ -527,11 +527,11 @@ async function handleMultipartComplete(request: Request, env: Env, route: Multip
   const bearerToken = requireBearerToken(request);
   const intent = await getActiveUploadIntent(env, bearerToken, route.uploadIntentId);
   const body = parseCompleteMultipartBody(await readJsonObject(request));
-  const multipart = env.CHC_SUBMISSIONS.resumeMultipartUpload(intent.object_path, route.uploadId!);
+  const multipart = env.SUBMISSIONS_BUCKET.resumeMultipartUpload(intent.object_path, route.uploadId!);
   const object = await multipart.complete(body.parts);
 
   if (object.size !== Number(intent.content_length)) {
-    await env.CHC_SUBMISSIONS.delete(intent.object_path).catch(() => undefined);
+    await env.SUBMISSIONS_BUCKET.delete(intent.object_path).catch(() => undefined);
     throw new HttpError(400, 'content_length_mismatch', 'Multipart upload size does not match the authorized upload.');
   }
 
@@ -560,7 +560,7 @@ async function handleMultipartComplete(request: Request, env: Env, route: Multip
       uploadedAt: completed.uploaded_at,
     }, env);
   } catch (error) {
-    await env.CHC_SUBMISSIONS.delete(intent.object_path).catch(() => undefined);
+    await env.SUBMISSIONS_BUCKET.delete(intent.object_path).catch(() => undefined);
     throw error;
   }
 }
@@ -568,7 +568,7 @@ async function handleMultipartComplete(request: Request, env: Env, route: Multip
 async function handleMultipartAbort(request: Request, env: Env, route: MultipartRoute): Promise<Response> {
   const bearerToken = requireBearerToken(request);
   const intent = await getActiveUploadIntent(env, bearerToken, route.uploadIntentId);
-  const multipart = env.CHC_SUBMISSIONS.resumeMultipartUpload(intent.object_path, route.uploadId!);
+  const multipart = env.SUBMISSIONS_BUCKET.resumeMultipartUpload(intent.object_path, route.uploadId!);
   await multipart.abort();
   return json({ aborted: true }, env);
 }
@@ -600,7 +600,7 @@ async function handleUpload(request: Request, env: Env, uploadIntentId: string):
     throw new HttpError(400, 'content_type_mismatch', 'Content-Type does not match the authorized upload.');
   }
 
-  const object = await env.CHC_SUBMISSIONS.put(intent.object_path, request.body, {
+  const object = await env.SUBMISSIONS_BUCKET.put(intent.object_path, request.body, {
     httpMetadata: {
       contentType: intent.content_type,
     },
@@ -638,7 +638,7 @@ async function handleUpload(request: Request, env: Env, uploadIntentId: string):
       },
     );
   } catch (error) {
-    await env.CHC_SUBMISSIONS.delete(intent.object_path).catch(() => undefined);
+    await env.SUBMISSIONS_BUCKET.delete(intent.object_path).catch(() => undefined);
     throw error;
   }
 }
@@ -711,7 +711,7 @@ async function handleAdminPreview(request: Request, env: Env, itemId: string): P
   );
 
   if (request.method === 'HEAD') {
-    const object = await env.CHC_SUBMISSIONS.head(item.object_path);
+    const object = await env.SUBMISSIONS_BUCKET.head(item.object_path);
     if (!object) throw new HttpError(404, 'preview_object_not_found', 'The uploaded file could not be found.');
 
     if (object.httpEtag || object.etag) headers.set('etag', object.httpEtag ?? object.etag ?? '');
@@ -719,7 +719,7 @@ async function handleAdminPreview(request: Request, env: Env, itemId: string): P
     return new Response(null, { headers });
   }
 
-  const object = await env.CHC_SUBMISSIONS.get(item.object_path, { range: request.headers });
+  const object = await env.SUBMISSIONS_BUCKET.get(item.object_path, { range: request.headers });
   if (!object) throw new HttpError(404, 'preview_object_not_found', 'The uploaded file could not be found.');
   if (object.httpEtag || object.etag) headers.set('etag', object.httpEtag ?? object.etag ?? '');
 
@@ -751,13 +751,13 @@ function isValidDeleteObjectPath(path: string): boolean {
 function bucketForAdminDelete(env: Env, bucketName: string): R2Bucket {
   switch (bucketName) {
     case 'chc-submissions':
-      return env.CHC_SUBMISSIONS;
+      return env.SUBMISSIONS_BUCKET;
     case 'chc-music':
-      return env.CHC_MUSIC;
+      return env.MUSIC_BUCKET;
     case 'chc-learning':
-      return env.CHC_LEARNING;
+      return env.LEARNING_BUCKET;
     case 'chc-images':
-      return env.CHC_IMAGES;
+      return env.IMAGES_BUCKET;
     default:
       throw new HttpError(409, 'unsupported_delete_bucket', `Cannot permanently delete objects from bucket ${bucketName}.`);
   }

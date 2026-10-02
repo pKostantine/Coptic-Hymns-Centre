@@ -38,7 +38,7 @@ function streamOf(probe, type) {
 let workDir;
 
 before(async () => {
-  workDir = await mkdtemp(path.join(tmpdir(), 'chc-media-test-'));
+  workDir = await mkdtemp(path.join(tmpdir(), 'coptic-vine-media-test-'));
 });
 
 after(async () => {

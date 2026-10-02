@@ -1,16 +1,16 @@
-# Coptic Hymns Centre
+# Coptic Vine
 
-**Coptic Hymns Centre (CHC)** is a unified Coptic Orthodox worship, Scripture, hymn, and liturgical resource platform.
+**Coptic Vine** is a unified Coptic Orthodox worship, Scripture, hymn, and liturgical resource platform.
 
-CHC is designed to bring the texts, rites, hymns, readings, and recordings used in the life of the Coptic Orthodox Church into one modern application. Instead of relying on separate apps, PDFs, websites, and audio libraries, CHC brings these resources together in a consistent, searchable, multilingual experience for personal use, church services, study, and teaching.
+Coptic Vine is designed to bring the texts, rites, hymns, readings, and recordings used in the life of the Coptic Orthodox Church into one modern application. Instead of relying on separate apps, PDFs, websites, and audio libraries, Coptic Vine brings these resources together in a consistent, searchable, multilingual experience for personal use, church services, study, and teaching.
 
 The project is built with a strong focus on preserving the structure and tradition of Coptic worship while making its resources easier to access on modern devices.
 
 ---
 
-## What CHC Is
+## What Coptic Vine Is
 
-CHC is more than a hymn library. It is the main user-facing application in a wider Coptic Hymns Centre ecosystem.
+Coptic Vine is more than a hymn library. It is the main user-facing application in a wider Coptic Vine ecosystem.
 
 The app currently brings together:
 
@@ -22,7 +22,7 @@ The app currently brings together:
 - **A live Home experience for the current church day**
 - **Music releases, artists, tracks, playlists, synchronized lyrics, and playback**
 - **Learning and study audio**
-- **CHC accounts, profiles, preferences, and cross-device library data**
+- **Coptic Vine accounts, profiles, preferences, and cross-device library data**
 - **Native offline downloads for supported audio**
 - **Multilingual liturgical and Scriptural texts**
 - **Search, rich sharing, notifications, and presentation/slideshow tools**
@@ -35,11 +35,11 @@ The goal is to provide one reliable place for the texts, media, and daily church
 
 ### Liturgical Books
 
-CHC contains structured digital versions of the books used in Coptic Orthodox worship.
+Coptic Vine contains structured digital versions of the books used in Coptic Orthodox worship.
 
 Rather than presenting services as static PDFs, the app stores liturgical material as organized content that can respond to the current service, season, feast, day, and context.
 
-This allows CHC to present the appropriate prayers, hymns, responses, and readings while keeping the service easy to navigate.
+This allows Coptic Vine to present the appropriate prayers, hymns, responses, and readings while keeping the service easy to navigate.
 
 Content can include areas such as:
 
@@ -61,7 +61,7 @@ Content can include areas such as:
 
 ## Intelligent Seasonal Content
 
-One of CHC's central goals is to understand the structure of the Coptic liturgical year.
+One of Coptic Vine's central goals is to understand the structure of the Coptic liturgical year.
 
 Hymns and responses can be associated with conditions such as:
 
@@ -116,11 +116,11 @@ Sunday content follows the appropriate annual, Great Lent, or Holy Fifty Days le
 
 ## The Holy Bible
 
-CHC includes a structured Bible designed specifically for the textual needs of the Coptic Orthodox tradition.
+Coptic Vine includes a structured Bible designed specifically for the textual needs of the Coptic Orthodox tradition.
 
 The Bible database supports multiple textual traditions and languages while accounting for differences in chapter order, verse numbering, introductions, and Septuagint structure.
 
-Depending on the book and language, CHC can include:
+Depending on the book and language, Coptic Vine can include:
 
 - **Greek Septuagint**
 - **English Orthodox translations**
@@ -148,9 +148,9 @@ This is especially important in books where numbering or content differs substan
 
 ## Psalms
 
-The Psalms receive special treatment within CHC because of their importance in both Scripture and Coptic worship.
+The Psalms receive special treatment within Coptic Vine because of their importance in both Scripture and Coptic worship.
 
-CHC supports:
+Coptic Vine supports:
 
 - Septuagint Psalm numbering
 - Liturgical Psalm introductions
@@ -167,7 +167,7 @@ Introductions that belong to the liturgical text can be stored separately from n
 
 ## Multilingual Support
 
-Coptic worship is inherently multilingual, and CHC is designed around that reality.
+Coptic worship is inherently multilingual, and Coptic Vine is designed around that reality.
 
 Content can be displayed in combinations of:
 
@@ -179,7 +179,7 @@ Content can be displayed in combinations of:
 
 The system is designed so translations remain aligned with the same prayer, hymn, verse, or liturgical unit whenever possible.
 
-This makes CHC useful both for congregational worship and for users learning Coptic texts through another language.
+This makes Coptic Vine useful both for congregational worship and for users learning Coptic texts through another language.
 
 ---
 
@@ -204,7 +204,7 @@ The goal is to make it easy to find both **what is sung** and **when it is sung*
 
 ## Audio
 
-CHC now includes a full consumer audio experience rather than only a future media library.
+Coptic Vine now includes a full consumer audio experience rather than only a future media library.
 
 ### Music
 
@@ -229,7 +229,7 @@ The Music Library is organized into dedicated folders for liked tracks, playlist
 
 ### Learn & Study
 
-CHC also has a separate learning-oriented audio experience for hymn instruction and educational recordings, including cantors, albums, lesson sets, lessons, playlists, seasons, search, and playback.
+Coptic Vine also has a separate learning-oriented audio experience for hymn instruction and educational recordings, including cantors, albums, lesson sets, lessons, playlists, seasons, search, and playback.
 
 ### Playback
 
@@ -237,13 +237,13 @@ Music and learning playback use a shared global playback layer so the player can
 
 ### Creator integration
 
-A separate **CHC Artists** application provides the creator-facing workflow for uploading, processing, editing, timing, and submitting releases that are distributed through CHC.
+A separate **Coptic Vine Artists** application provides the creator-facing workflow for uploading, processing, editing, timing, and submitting releases that are distributed through Coptic Vine.
 
 ---
 
 ## Synaxarion and Saints
 
-CHC includes the Coptic Synaxarium and saint-related resources throughout the application.
+Coptic Vine includes the Coptic Synaxarium and saint-related resources throughout the application.
 
 The Home tab shows the live Synaxarium for the current day, while the dedicated Synaxarium browser can load the full Coptic year, scroll to the current date, and search entries by saint, event, or text while keeping results grouped by their Coptic dates.
 
@@ -262,7 +262,7 @@ A consistent saint order keeps these sections aligned across the application.
 
 ## Slideshow and Presentation Mode
 
-CHC includes a presentation experience for displaying liturgical text during church services.
+Coptic Vine includes a presentation experience for displaying liturgical text during church services.
 
 Slideshow mode is designed for use on:
 
@@ -281,7 +281,7 @@ The goal is to provide a clean, reliable presentation experience even when large
 
 ## Search and Navigation
 
-CHC is organized as connected app sections rather than isolated documents.
+Coptic Vine is organized as connected app sections rather than isolated documents.
 
 Users can move between:
 
@@ -300,7 +300,7 @@ Books retain their own calendar and reading controls, while live Home content re
 
 ## Accounts and Preferences
 
-CHC accounts support email/password and Google sign-in.
+Coptic Vine accounts support email/password and Google sign-in.
 
 Signed-in users can keep personal content with them across devices, including areas such as:
 
@@ -315,15 +315,15 @@ Users can also manage their display profile and avatar. Reading and book-display
 
 ## Notifications
 
-The CHC ecosystem now includes shared notification infrastructure for the main app, CHC Artists, and CHC Admin.
+The Coptic Vine ecosystem now includes shared notification infrastructure for the main app, Coptic Vine Artists, and Coptic Vine Admin.
 
-The system supports device registration, notification-category preferences, deep links, web push support, and native notification registration for store builds. A dedicated notification dispatcher handles queued delivery, while CHC Admin can send audited manual broadcasts such as feast congratulations and general announcements.
+The system supports device registration, notification-category preferences, deep links, web push support, and native notification registration for store builds. A dedicated notification dispatcher handles queued delivery, while Coptic Vine Admin can send audited manual broadcasts such as feast congratulations and general announcements.
 
 ---
 
 ## Designed for Different Uses
 
-CHC is intended to be useful in several settings.
+Coptic Vine is intended to be useful in several settings.
 
 ### Personal Use
 
@@ -331,7 +331,7 @@ Users can read Scripture, learn hymns, follow prayers, listen to recordings, and
 
 ### Church Services
 
-Deacons, cantors, servants, clergy, and congregations can use CHC to follow services and display liturgical text.
+Deacons, cantors, servants, clergy, and congregations can use Coptic Vine to follow services and display liturgical text.
 
 ### Hymn Study
 
@@ -349,7 +349,7 @@ Structured multilingual texts make it possible to preserve and compare Coptic li
 
 ## Design Philosophy
 
-CHC is built around several principles.
+Coptic Vine is built around several principles.
 
 ### Preserve the Tradition
 
@@ -373,13 +373,13 @@ The application is built around the full cycle of ordinary days, fasts, feasts, 
 
 ### Work Across Devices
 
-CHC is intended to provide a consistent experience across desktop, web, tablet, and mobile devices.
+Coptic Vine is intended to provide a consistent experience across desktop, web, tablet, and mobile devices.
 
 ---
 
 ## Technology
 
-The CHC application uses a cross-platform architecture shared across web and native platforms.
+The Coptic Vine application uses a cross-platform architecture shared across web and native platforms.
 
 ### React Native / Expo
 
@@ -411,7 +411,7 @@ The database is designed around relationships and liturgical logic rather than s
 
 ### Cloudflare
 
-**Cloudflare** is used for the deployed web application and the media/edge infrastructure around CHC.
+**Cloudflare** is used for the deployed web application and the media/edge infrastructure around Coptic Vine.
 
 The current infrastructure includes components for:
 
@@ -427,31 +427,31 @@ Large media is kept outside the primary relational database while Supabase store
 
 ---
 
-## The CHC Ecosystem
+## The Coptic Vine Ecosystem
 
-The main Coptic Hymns Centre app is the user-facing center of a larger ecosystem.
+The main Coptic Vine app is the user-facing center of a larger ecosystem.
 
-### Coptic Hymns Centre
+### Coptic Vine
 
 The main application for reading, listening, learning, searching, following services, managing a personal library, and exploring Coptic Orthodox resources.
 
-### CHC Artists
+### Coptic Vine Artists
 
 The creator portal for approved artists, cantors, choirs, musicians, and publishers. It handles profiles, uploads, release submissions, release editing, synchronized lyrics, release timing, and creator-side media workflows.
 
-### CHC Admin
+### Coptic Vine Admin
 
-The restricted administrative application for CHC staff. It handles submission review, publication controls, media-processing exceptions, storage cleanup, and manual notification broadcasts.
+The restricted administrative application for Coptic Vine staff. It handles submission review, publication controls, media-processing exceptions, storage cleanup, and manual notification broadcasts.
 
-Together, the three applications separate the listener, creator, and administrative workflows while sharing the same CHC backend and media platform.
+Together, the three applications separate the listener, creator, and administrative workflows while sharing the same Coptic Vine backend and media platform.
 
 ---
 
 ## Project Goal
 
-The long-term goal of Coptic Hymns Centre is to create a comprehensive digital home for Coptic Orthodox worship and tradition.
+The long-term goal of Coptic Vine is to create a comprehensive digital home for Coptic Orthodox worship and tradition.
 
-CHC aims to make the Church's Scripture, rites, hymns, saints, languages, and recordings easier to access without separating them from the liturgical context that gives them meaning.
+Coptic Vine aims to make the Church's Scripture, rites, hymns, saints, languages, and recordings easier to access without separating them from the liturgical context that gives them meaning.
 
 The project is continually expanding as more texts, translations, recordings, books, and liturgical structures are added.
 
@@ -459,7 +459,7 @@ The project is continually expanding as more texts, translations, recordings, bo
 
 ## Status
 
-Coptic Hymns Centre is under active development.
+Coptic Vine is under active development.
 
 The project now includes a working cross-platform reading and liturgical application, live church-calendar Home experience, account system, consumer music and learning platforms, creator and admin companion apps, Cloudflare-backed media infrastructure, storage lifecycle management, and shared notification infrastructure.
 

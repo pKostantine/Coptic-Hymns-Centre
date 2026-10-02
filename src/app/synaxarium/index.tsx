@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AppHeader from '@/components/chc/ui/AppHeader';
-import Icon from '@/components/chc/ui/Icon';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import Icon from '@/components/vine/ui/Icon';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -170,7 +170,7 @@ export default function SynaxariumBrowserScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>Synaxarium — Coptic Hymns Centre</title></Head>
+      <Head><title>Synaxarium — Coptic Vine</title></Head>
 
       <AppHeader
         title={{ english: 'Synaxarium', arabic: 'السنكسار', french: 'Synaxaire' }}
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADII.lg,
-    backgroundColor: COLORS.navyDark,
+    backgroundColor: COLORS.greenDeep,
     padding: SPACING.lg,
   },
   dayCardToday: {

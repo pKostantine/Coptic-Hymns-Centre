@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 
-import ServiceDocument from '@/components/chc/screens/ServiceDocument';
+import ServiceDocument from '@/components/vine/screens/ServiceDocument';
 import { SERVICES_BY_CATEGORY } from '@/constants/manifest';
 
 export default function HolyWeekDocument() {

@@ -1,3 +1,3 @@
-import BibleMenu from '@/components/chc/screens/BibleMenu';
+import BibleMenu from '@/components/vine/screens/BibleMenu';
 
 export default BibleMenu;

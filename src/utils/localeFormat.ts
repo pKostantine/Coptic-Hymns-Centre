@@ -103,7 +103,7 @@ export function formatWeekdayDate(date: Date, isArabic: boolean) {
   return `${WEEKDAYS_EN[weekday]}, ${GREGORIAN_MONTHS_EN[date.getUTCMonth()]} ${date.getUTCDate()}`;
 }
 
-/** "Wednesday, 30 September" / "Mercredi 30 septembre" / "الأربعاء ٣٠ سبتمبر" — the Home hero's date, day before month as the CHC design writes it. */
+/** "Wednesday, 30 September" / "Mercredi 30 septembre" / "الأربعاء ٣٠ سبتمبر" — the Home hero's date, day before month as the Coptic Vine design writes it. */
 export function formatDayMonthDate(date: Date, isArabic: boolean) {
   const weekday = date.getUTCDay();
   if (isArabic) return `${WEEKDAYS_AR[weekday]} ${toEasternArabicDigits(date.getUTCDate())} ${GREGORIAN_MONTHS_AR[date.getUTCMonth()]}`;

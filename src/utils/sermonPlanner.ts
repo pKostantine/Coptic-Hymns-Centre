@@ -1,4 +1,4 @@
-import type { DocumentSection } from '@/components/chc/documentHtml';
+import type { DocumentSection } from '@/components/vine/documentHtml';
 import {
   SERMON_HIGHLIGHT_COLORS,
   type SermonHighlight,

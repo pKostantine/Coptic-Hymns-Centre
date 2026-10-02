@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Icon from '@/components/chc/ui/Icon';
+import Icon from '@/components/vine/ui/Icon';
 import MusicLyricsView from '@/components/music/MusicLyricsView';
 import SeekBar from '@/components/music/SeekBar';
 import PlayerSheet from '@/components/playback/PlayerSheet';

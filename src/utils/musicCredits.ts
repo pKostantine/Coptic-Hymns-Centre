@@ -17,7 +17,7 @@ function performerCredits(artists: MusicConsumerTrackArtist[]): MusicConsumerTra
 /**
  * Consumer-facing performer line for a track.
  *
- * CHC Artists stores the main artist first and featured performers after it,
+ * Coptic Vine Artists stores the main artist first and featured performers after it,
  * with sortOrder preserving the exact submission order. Composer, lyricist,
  * producer, arranger, and artwork credits remain available as credits but do
  * not belong in the track's "performed by" line.

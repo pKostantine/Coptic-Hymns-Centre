@@ -4,7 +4,7 @@ Completed on 2026-09-16.
 
 ## Goal
 
-Phase 10 creates a dedicated structured backend for CHC educational material instead of forcing learning content into the Music release model.
+Phase 10 creates a dedicated structured backend for Coptic Vine educational material instead of forcing learning content into the Music release model.
 
 It reuses the existing Phase 1-5 creator/media/submission infrastructure and the Phase 9 normalized playback foundation.
 
@@ -39,7 +39,7 @@ All 20 tables have RLS enabled and explicit policies.
 
 `learning.hymns.source_hymn_key` references the existing `public.hymn_titles(hymn_key)` primary key.
 
-That lets Learn & Study organize educational content around canonical CHC hymn identities instead of duplicating hymn identity in a separate catalog.
+That lets Learn & Study organize educational content around canonical Coptic Vine hymn identities instead of duplicating hymn identity in a separate catalog.
 
 A learning hymn may also belong to one or more learning Seasons through `learning.hymn_seasons`, and hymns can be connected through typed `learning.hymn_relationships`.
 
@@ -153,7 +153,7 @@ A published Phase 10 smoke catalog was created using the existing Phase 6 proces
 - Cantor: `Phase 10 Smoke Cantor`
 - Season: `Phase 10 Smoke Season`
 - canonical Hymn: `O King of Peace`
-- source CHC hymn key: `epouro`
+- source Coptic Vine hymn key: `epouro`
 - learning Album: `Phase 10 Smoke Album`
 - one ordered audio recording
 - Lesson Set: `Phase 10 Smoke Lesson Set`
@@ -190,4 +190,4 @@ The three learning publish RPCs intentionally remain authenticated `SECURITY DEF
 
 ## Deliverable
 
-Phase 10's deliverable is satisfied: learning content can now be represented, connected to canonical CHC hymn identities, localized, submitted through the existing media workflow, processed using the existing media pipeline, published through guarded transitions, retrieved anonymously when published, and tracked privately per user.
+Phase 10's deliverable is satisfied: learning content can now be represented, connected to canonical Coptic Vine hymn identities, localized, submitted through the existing media workflow, processed using the existing media pipeline, published through guarded transitions, retrieved anonymously when published, and tracked privately per user.

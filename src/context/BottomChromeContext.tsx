@@ -22,6 +22,14 @@ interface BottomChromeContextValue {
    */
   nowPlayingCollapsed: boolean;
   setNowPlayingCollapsed: (collapsed: boolean) => void;
+  /**
+   * Whether a full now-playing screen is open. The desktop sidebar reads this
+   * to get out of the way, so the player takes the whole window instead of
+   * sitting in the column beside it.
+   */
+  nowPlayingExpanded: boolean;
+  /** Each overlay reports its own state, for the same reason insets are per-overlay. */
+  reportNowPlayingExpanded: (id: string, expanded: boolean) => void;
 }
 
 const BottomChromeContext = createContext<BottomChromeContextValue>({
@@ -31,6 +39,8 @@ const BottomChromeContext = createContext<BottomChromeContextValue>({
   reportNowPlayingInset: () => undefined,
   nowPlayingCollapsed: false,
   setNowPlayingCollapsed: () => undefined,
+  nowPlayingExpanded: false,
+  reportNowPlayingExpanded: () => undefined,
 });
 
 /**
@@ -43,6 +53,7 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
   const [insets, setInsets] = useState<Record<string, number>>({});
   const [nowPlayingInsets, setNowPlayingInsets] = useState<Record<string, number>>({});
   const [nowPlayingCollapsed, setNowPlayingCollapsed] = useState(false);
+  const [expandedOverlays, setExpandedOverlays] = useState<Record<string, true>>({});
 
   const reportTabBar = useCallback((id: string, inset: number | null) => {
     setInsets((current) => {
@@ -71,7 +82,21 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const reportNowPlayingExpanded = useCallback((id: string, expanded: boolean) => {
+    setExpandedOverlays((current) => {
+      if (!expanded) {
+        if (!(id in current)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      if (current[id]) return current;
+      return { ...current, [id]: true };
+    });
+  }, []);
+
   const nowPlayingInset = Math.max(0, ...Object.values(nowPlayingInsets));
+  const nowPlayingExpanded = Object.keys(expandedOverlays).length > 0;
   const value = useMemo(() => ({
     tabBarInset: Math.max(0, ...Object.values(insets)),
     nowPlayingInset,
@@ -79,7 +104,9 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
     reportNowPlayingInset,
     nowPlayingCollapsed,
     setNowPlayingCollapsed,
-  }), [insets, nowPlayingInset, reportTabBar, reportNowPlayingInset, nowPlayingCollapsed]);
+    nowPlayingExpanded,
+    reportNowPlayingExpanded,
+  }), [insets, nowPlayingInset, reportTabBar, reportNowPlayingInset, nowPlayingCollapsed, nowPlayingExpanded, reportNowPlayingExpanded]);
 
   return <BottomChromeContext.Provider value={value}>{children}</BottomChromeContext.Provider>;
 }

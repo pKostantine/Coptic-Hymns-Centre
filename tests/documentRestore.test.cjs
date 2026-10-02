@@ -94,12 +94,12 @@ test('a frozen snapshot survives multiple settings/date changes and is cleared o
 });
 
 test('native, iframe, and slideshow implement the two distinct target edges', () => {
-  const html = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
-  const native = fs.readFileSync('src/components/chc/DocumentWebView.tsx', 'utf8');
-  const web = fs.readFileSync('src/components/chc/DocumentWebView.web.tsx', 'utf8');
-  const slides = fs.readFileSync('src/components/chc/SlideshowContainer.js', 'utf8');
-  const surface = fs.readFileSync('src/components/chc/DocumentSurface.tsx', 'utf8');
-  const reader = fs.readFileSync('src/components/chc/screens/ServiceDocument.tsx', 'utf8');
+  const html = fs.readFileSync('src/components/vine/documentHtml.ts', 'utf8');
+  const native = fs.readFileSync('src/components/vine/DocumentWebView.tsx', 'utf8');
+  const web = fs.readFileSync('src/components/vine/DocumentWebView.web.tsx', 'utf8');
+  const slides = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
+  const surface = fs.readFileSync('src/components/vine/DocumentSurface.tsx', 'utf8');
+  const reader = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
   assert.match(html, /targetEdge === 'end'/);
   assert.match(html, /getBoundingClientRect\(\)\.bottom/);
   assert.match(native, /restoreRequest\?\.token/);
@@ -112,10 +112,10 @@ test('native, iframe, and slideshow implement the two distinct target edges', ()
 });
 
 test('Bible captures the current verse and restores it without deep-link highlighting', () => {
-  const html = fs.readFileSync('src/components/chc/bibleDocumentHtml.ts', 'utf8');
+  const html = fs.readFileSync('src/components/vine/bibleDocumentHtml.ts', 'utf8');
   const chapter = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
-  const native = fs.readFileSync('src/components/chc/BibleWebView.tsx', 'utf8');
-  const web = fs.readFileSync('src/components/chc/BibleWebView.web.tsx', 'utf8');
+  const native = fs.readFileSync('src/components/vine/BibleWebView.tsx', 'utf8');
+  const web = fs.readFileSync('src/components/vine/BibleWebView.web.tsx', 'utf8');
   assert.match(html, /type: 'currentVerse'/);
   assert.match(html, /restoreVerse \|\| initialVerse/);
   assert.match(html, /initialVerse && !restoreVerse/);
@@ -129,7 +129,7 @@ test('Bible captures the current verse and restores it without deep-link highlig
 
 test('Bible verse selector freezes its opening verse across successive language toggles', () => {
   const chapter = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
-  const html = fs.readFileSync('src/components/chc/bibleDocumentHtml.ts', 'utf8');
+  const html = fs.readFileSync('src/components/vine/bibleDocumentHtml.ts', 'utf8');
   assert.match(chapter, /selectorAnchorRef\.current = currentVerseRef\.current/);
   assert.match(chapter, /const anchor = selectorAnchorRef\.current \|\| currentVerseRef\.current/);
   assert.match(chapter, /selectorOpenRef\.current\) return/);
@@ -142,14 +142,14 @@ test('Bible verse selector freezes its opening verse across successive language 
 test('A document never reloads for the Now Playing bar or an unchanged language set', () => {
   // Reloading the reader throws its place away; a subdocument opened a moment
   // ago has no remembered place, so it landed back at the top.
-  for (const file of ['src/components/chc/DocumentWebView.tsx', 'src/components/chc/DocumentWebView.web.tsx']) {
+  for (const file of ['src/components/vine/DocumentWebView.tsx', 'src/components/vine/DocumentWebView.web.tsx']) {
     const view = fs.readFileSync(file, 'utf8');
     const buildDeps = view.slice(view.indexOf('const html = useMemo('), view.indexOf('],', view.indexOf('const html = useMemo(')));
     assert.match(buildDeps, /bottomContentInset: 0/, file);
     assert.doesNotMatch(buildDeps.split('[').pop(), /bottomContentInset/, file);
     assert.match(view, /const applyBottomInset = \(\) =>/, file);
   }
-  const surface = fs.readFileSync('src/components/chc/DocumentSurface.tsx', 'utf8');
+  const surface = fs.readFileSync('src/components/vine/DocumentSurface.tsx', 'utf8');
   assert.match(surface, /visibleColumns=\{visibleColumns\}/);
   assert.match(surface, /const visibleColumns = useMemo\(/);
   const chrome = fs.readFileSync('src/context/BottomChromeContext.tsx', 'utf8');
@@ -157,7 +157,7 @@ test('A document never reloads for the Now Playing bar or an unchanged language 
 });
 
 test('Calendar and Settings opened from a subdocument close with the edge swipe', () => {
-  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
   assert.match(modal, /const overlaySwipePanResponder = useMemo\(/);
   assert.match(modal, /isMobileDocument \? overlaySwipePanResponder\.panHandlers/);
   assert.match(modal, /screen === 'seasons' \? 'calendar' : null/);
@@ -167,7 +167,7 @@ test('a reload or a jump never lets the page\'s first "at the top" report replac
   // A (re)loaded page reports its top before its restore arrives, and a jump
   // reports sections it passes; in a subdocument that sent a jump straight
   // back to the top.
-  for (const file of ['src/components/chc/DocumentWebView.tsx', 'src/components/chc/DocumentWebView.web.tsx']) {
+  for (const file of ['src/components/vine/DocumentWebView.tsx', 'src/components/vine/DocumentWebView.web.tsx']) {
     const view = fs.readFileSync(file, 'utf8');
     assert.match(view, /if \(loadingRef\.current\) \{\s*reportDuringLoadRef\.current = action;\s*return;/, file);
     assert.match(view, /guard\.sectionId !== action\.sectionId && Date\.now\(\) < guard\.until\) return;/, file);
@@ -176,12 +176,12 @@ test('a reload or a jump never lets the page\'s first "at the top" report replac
     // Reports count again only once the restore has been sent.
     assert.match(view, /guardJump\(candidates\[0\]\.sectionId\);\s*\}\s*loadingRef\.current = false;/, file);
   }
-  const native = fs.readFileSync('src/components/chc/DocumentWebView.tsx', 'utf8');
+  const native = fs.readFileSync('src/components/vine/DocumentWebView.tsx', 'utf8');
   assert.match(native, /onLoadStart=\{\(\) => \{\s*loadingRef\.current = true;/);
-  const web = fs.readFileSync('src/components/chc/DocumentWebView.web.tsx', 'utf8');
+  const web = fs.readFileSync('src/components/vine/DocumentWebView.web.tsx', 'utf8');
   assert.match(web, /useLayoutEffect\(\(\) => \{\s*loadingRef\.current = true;[\s\S]*?\}, \[html\]\);/);
   // The subdocument remembers a jump itself, so a remounted reader lands there.
-  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
   assert.match(modal, /function jumpToSection\(id: string\) \{[\s\S]*?setCurrentSectionId\(id\);/);
 });
 
@@ -189,7 +189,7 @@ test('a reload or a jump never lets the page\'s first "at the top" report replac
 // window: made a task after the call that asked, then held briefly against
 // anything else moving the page, but never against the reader.
 function loadJumpHold() {
-  const source = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
+  const source = fs.readFileSync('src/components/vine/documentHtml.ts', 'utf8');
   const start = source.indexOf("      var pageScroller = document.querySelector('.page-scroller');");
   const end = source.indexOf('      window.scrollToTune = function');
   assert.ok(start > 0 && end > start, 'jump hold script not found');
@@ -281,7 +281,7 @@ test('the document scrolls in its own scroller, never as the page', () => {
   // On iPhone/iPad the web view's own scroll view answers iOS's
   // scroll-to-top; a subdocument pill jump kept sliding back to the top a
   // third of a second later. WebKit never offers an inner scroller to it.
-  const html = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
+  const html = fs.readFileSync('src/components/vine/documentHtml.ts', 'utf8');
   const rootRule = html.slice(html.indexOf('      html, body {'), html.indexOf('      .page-scroller {'));
   assert.match(rootRule, /height: 100%;/);
   assert.match(rootRule, /overflow: hidden;/);
@@ -296,7 +296,7 @@ test('a subdocument (and its Settings/Calendar) can be swiped out from a landsca
   // The edge swipe starts in the side safe-area padding in landscape, which
   // the PanResponder was never offered; raw touches there are read instead,
   // and the PanResponder leaves those starts alone so nothing fires twice.
-  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
   assert.match(modal, /function useInsetEdgeSwipe\(/);
   assert.match(modal, /onTouchStart: \(event: GestureResponderEvent\) => \{[\s\S]*?if \(!startsInInset\(pageX\)\) return;/);
   assert.match(modal, /if \(start\.edge === 'left' && dx > 60\) onSwipeFromLeft\(\);/);
@@ -309,7 +309,7 @@ test('a subdocument\'s edge swipes know where they started, in slideshow mode to
   // gestureState.x0 is 0 until a responder is granted, and granting resets
   // dx; reading either made every swipe look like it began at the left edge,
   // so the content list could never be swiped open over a slideshow.
-  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
   assert.match(modal, /return gestureState\.moveX - gestureState\.dx;/);
   assert.doesNotMatch(modal, /gestureState\.x0\s*[<>]|\(gestureState\.x0\)/);
   assert.match(modal, /if \(isCloseSwipe \|\| isSelectorSwipe\) swipeTakenFromXRef\.current = startX;/);

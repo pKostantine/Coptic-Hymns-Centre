@@ -1,3 +1,3 @@
-import BibleBookmarks from '@/components/chc/screens/BibleBookmarks';
+import BibleBookmarks from '@/components/vine/screens/BibleBookmarks';
 
 export default BibleBookmarks;

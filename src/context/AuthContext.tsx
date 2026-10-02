@@ -41,7 +41,7 @@ function accountRedirectUrl() {
 function authError(error: { message: string } | null, fallback: string) {
   if (!error) return;
   if (/provider is not enabled|unsupported provider/i.test(error.message)) {
-    throw new Error('Google sign-in is not enabled for CHC yet. Please use email for now.');
+    throw new Error('Google sign-in is not enabled for Coptic Vine yet. Please use email for now.');
   }
   throw new Error(error.message || fallback);
 }
@@ -95,11 +95,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
           const initialUrl = await Linking.getInitialURL();
           if (initialUrl) await applyAuthCallback(initialUrl);
         } catch (error) {
-          console.warn('Unable to process the initial CHC sign-in link:', error);
+          console.warn('Unable to process the initial Coptic Vine sign-in link:', error);
         }
       }
       const { data, error } = await supabase.auth.getSession();
-      if (error) console.warn('Unable to restore CHC session:', error.message);
+      if (error) console.warn('Unable to restore Coptic Vine session:', error.message);
       if (mounted) {
         setSession(data.session);
         setLoading(false);
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       ? null
       : Linking.addEventListener('url', ({ url }) => {
         void applyAuthCallback(url).catch((error) => {
-          console.warn('Unable to process CHC sign-in link:', error);
+          console.warn('Unable to process Coptic Vine sign-in link:', error);
         });
       });
 
@@ -213,7 +213,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     ]);
     for (const result of detachResults) {
       if (result.status === 'rejected') {
-        console.warn('Unable to detach this device from CHC notifications before sign-out:', result.reason);
+        console.warn('Unable to detach this device from Coptic Vine notifications before sign-out:', result.reason);
       }
     }
     const { error } = await supabase.auth.signOut();

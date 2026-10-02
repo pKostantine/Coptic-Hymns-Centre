@@ -7,8 +7,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
-import AppHeader from '@/components/chc/ui/AppHeader';
-import Icon from '@/components/chc/ui/Icon';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import Icon from '@/components/vine/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
@@ -244,7 +244,7 @@ export default function BibleSearchScreen() {
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
       <Head>
-        <title>CHC Bible Search</title>
+        <title>Coptic Vine Bible Search</title>
       </Head>
       <AppHeader
         title={LABELS.title}

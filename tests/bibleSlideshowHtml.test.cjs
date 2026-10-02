@@ -4,7 +4,7 @@ const test = require('node:test');
 const ts = require('typescript');
 
 function loadBuilder() {
-  let source = fs.readFileSync('src/components/chc/bibleDocumentHtml.ts', 'utf8');
+  let source = fs.readFileSync('src/components/vine/bibleDocumentHtml.ts', 'utf8');
   source = source
     .replace(
       "import { COLORS } from '../../constants/theme';",
@@ -16,7 +16,7 @@ function loadBuilder() {
     );
   // The builder's local imports: the shared highlighting layer and numerals.
   const localModules = {
-    './textHighlights': evaluateModule(fs.readFileSync('src/components/chc/textHighlights.ts', 'utf8'), 'textHighlights.ts', require),
+    './textHighlights': evaluateModule(fs.readFileSync('src/components/vine/textHighlights.ts', 'utf8'), 'textHighlights.ts', require),
     '../../utils/bibleNumerals': evaluateModule(fs.readFileSync('src/utils/bibleNumerals.ts', 'utf8'), 'bibleNumerals.ts', require),
   };
   const localRequire = (name) => localModules[name] || require(name);
@@ -115,15 +115,15 @@ test('Bible reading view highlights by stored chapter and verse, and offers Copy
   assert.match(html, /data-sermon-verse-id="9:22" data-sermon-language="arabic"/);
   assert.match(html, /"copy":"copyBibleText"/);
   assert.match(html, /addAction\('copy', "Copy"\)/);
-  assert.match(html, /window\.__chcBiblePost = post/);
+  assert.match(html, /window\.__vineBiblePost = post/);
   // Copy — the toolbar's and the system's — is signed with the chapter. The
   // toolbar writes it through the page's copy command, and the host only when
   // that is refused.
   assert.match(html, /var copyReference = \{"english":"Psalm 10","arabic":"مزمور ١٠","coptic":"Ⲯⲁⲗⲙⲟⲥ ⲓ̅"\}/);
   // A copy is the reader's base size whatever the column's own size.
   assert.match(html, /'font-size': '18px'/);
-  assert.match(html, /window\.__chcBibleCopyPayload = bibleCopyPayload/);
-  assert.match(html, /var build = window\.__chcBibleCopyPayload;/);
+  assert.match(html, /window\.__vineBibleCopyPayload = bibleCopyPayload/);
+  assert.match(html, /var build = window\.__vineBibleCopyPayload;/);
   assert.match(html, /pendingCopy = payload;[\s\S]*?document\.execCommand\('copy'\);[\s\S]*?if \(!copyWritten && ACTIONS\.copy\) emit\(ACTIONS\.copy, payload\)/);
   // A phone's tap clears the live selection before a click: the toolbar takes
   // the touch itself and acts on the selection it kept.

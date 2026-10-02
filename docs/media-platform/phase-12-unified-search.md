@@ -60,7 +60,7 @@ The result list preserves database rank across domains and identifies every resu
 
 ## Verification
 
-Verified against the live CHC Supabase project:
+Verified against the live Coptic Vine Supabase project:
 
 - the initial refresh produced all eight requested entity types
 - English exact, prefix, contextual full-text, and typo-tolerant searches

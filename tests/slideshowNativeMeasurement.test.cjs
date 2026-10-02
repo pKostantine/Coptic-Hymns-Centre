@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const test = require('node:test');
 
 test('native line probe contributes its full height to slideshow measurement', () => {
-  const source = fs.readFileSync('src/components/chc/JustifiedText.js', 'utf8');
+  const source = fs.readFileSync('src/components/vine/JustifiedText.js', 'utf8');
   const probe = source.match(/const measuringNode = isMeasuring \? \(([\s\S]*?)\n\s*\) : null;/)?.[1] || '';
 
   assert.match(probe, /opacity:\s*0/);
@@ -11,9 +11,9 @@ test('native line probe contributes its full height to slideshow measurement', (
 });
 
 test('liturgical slideshow pagination is independent of Now Playing geometry', () => {
-  const surface = fs.readFileSync('src/components/chc/DocumentSurface.tsx', 'utf8');
+  const surface = fs.readFileSync('src/components/vine/DocumentSurface.tsx', 'utf8');
   const slideshowBranch = surface.match(/if \(preferences\.slideshowMode\) \{([\s\S]*?)\n\s*\}/)?.[1] || '';
-  const container = fs.readFileSync('src/components/chc/SlideshowContainer.js', 'utf8');
+  const container = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
   const overlay = fs.readFileSync('src/components/playback/GlobalNowPlayingOverlay.tsx', 'utf8');
 
   assert.doesNotMatch(slideshowBranch, /nowPlayingInset|bottomContentInset/);
@@ -27,7 +27,7 @@ test('collapsed Now Playing control cannot create a full-width slideshow mask', 
   const collapsedStart = overlay.indexOf('if (isCollapsed)');
   const collapsedEnd = overlay.indexOf('\n  return (', collapsedStart);
   const collapsedBranch = overlay.slice(collapsedStart, collapsedEnd);
-  const container = fs.readFileSync('src/components/chc/SlideshowContainer.js', 'utf8');
+  const container = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
 
   assert.match(collapsedBranch, /pointerEvents="box-none"/);
   assert.match(collapsedBranch, /width:\s*42/);
@@ -57,9 +57,9 @@ test('hiding Now Playing is one app-wide state shared by every bar', () => {
 test('web slideshow keeps user-selected font size independent of orientation', () => {
   const singlePage = fs.readFileSync('public/index.html', 'utf8');
   const expoRouterHtml = fs.readFileSync('src/app/+html.tsx', 'utf8');
-  const slideshow = fs.readFileSync('src/components/chc/SlideshowContainer.js', 'utf8');
-  const surface = fs.readFileSync('src/components/chc/DocumentSurface.tsx', 'utf8');
-  const scrollReader = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
+  const slideshow = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
+  const surface = fs.readFileSync('src/components/vine/DocumentSurface.tsx', 'utf8');
+  const scrollReader = fs.readFileSync('src/components/vine/documentHtml.ts', 'utf8');
 
   for (const entrypoint of [singlePage, expoRouterHtml]) {
     assert.match(entrypoint, /\[data-testid="slideshow-container"\]/);

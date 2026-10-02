@@ -5,7 +5,7 @@ class WebDownloadManager implements OfflineDownloadManager {
   private revision = 0; private listeners = new Set<() => void>();
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   getRevision = (): number => this.revision;
-  private unavailableError(): Error { return new Error('Offline downloads are available in the CHC iOS and Android apps.'); }
+  private unavailableError(): Error { return new Error('Offline downloads are available in the Coptic Vine iOS and Android apps.'); }
   enqueue(_request: OfflineDownloadRequest): Promise<void> { return Promise.reject(this.unavailableError()); }
   update(_request: OfflineDownloadRequest): Promise<void> { return Promise.reject(this.unavailableError()); }
   checkForUpdate(_request: OfflineDownloadRequest): Promise<boolean> { return Promise.resolve(false); }

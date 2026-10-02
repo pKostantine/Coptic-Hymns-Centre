@@ -1,6 +1,6 @@
 # Phase 1 Shared Backend Foundation
 
-This phase introduces the shared database vocabulary that Music, Learn & Study, CHC Artists, and admin review will build on.
+This phase introduces the shared database vocabulary that Music, Learn & Study, Coptic Vine Artists, and admin review will build on.
 
 ## Applied Migrations
 

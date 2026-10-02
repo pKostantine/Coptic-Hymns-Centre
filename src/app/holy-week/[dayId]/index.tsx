@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 
-import HolyWeekDay from '@/components/chc/screens/HolyWeekDay';
+import HolyWeekDay from '@/components/vine/screens/HolyWeekDay';
 import { HOLY_WEEK_DAYS } from '@/constants/manifest';
 
 /** A single day or eve: just its own hours. */

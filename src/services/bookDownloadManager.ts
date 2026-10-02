@@ -169,7 +169,7 @@ class NativeBookDownloadManager implements BookDownloadManager {
 
   private async fetchManifest(force = false): Promise<ContentRootManifest> {
     if (!force && this.manifestCache && Date.now() - this.manifestCache.at < MANIFEST_CACHE_MS) return this.manifestCache.value;
-    if (!MANIFEST_BASE_URL) throw new Error('Set EXPO_PUBLIC_CONTENT_PACKAGES_URL to the CHC content package Worker.');
+    if (!MANIFEST_BASE_URL) throw new Error('Set EXPO_PUBLIC_CONTENT_PACKAGES_URL to the Coptic Vine content package Worker.');
     const response = await fetch(`${MANIFEST_BASE_URL}/manifest.json`, { headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error(`Unable to check book packages (${response.status}).`);
     const manifest = await response.json() as ContentRootManifest;

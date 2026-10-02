@@ -1,3 +1,3 @@
-import LectionaryMenu from '@/components/chc/screens/LectionaryMenu';
+import LectionaryMenu from '@/components/vine/screens/LectionaryMenu';
 
 export default LectionaryMenu;

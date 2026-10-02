@@ -167,7 +167,7 @@ test('a Holy Week reading known by its reference has no title; a titled one name
   );
   assert.match(branch, /isKnownByReference\(key\)\s+\? \{ english: "", arabic: "" \}\s+: citation && citesReadingInTitle\(key\)/);
   // The four Coptic Gospels' subdocument pills are their references.
-  const modalSource = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  const modalSource = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
   assert.match(modalSource, /const COPTIC_READINGS_SUBDOCUMENT_KEYS = new Set\(\[[^\]]*'mournful4CopticGospels'\]\)/);
 });
 

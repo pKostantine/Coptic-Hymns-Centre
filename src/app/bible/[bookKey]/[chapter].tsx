@@ -5,11 +5,11 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import BibleWebView, { BibleWebViewHandle } from '@/components/chc/BibleWebView';
-import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/chc/bibleDocumentHtml';
-import DocumentTopBar from '@/components/chc/ui/DocumentTopBar';
-import Icon from '@/components/chc/ui/Icon';
-import LoadingScreen from '@/components/chc/ui/LoadingScreen';
+import BibleWebView, { BibleWebViewHandle } from '@/components/vine/BibleWebView';
+import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/vine/bibleDocumentHtml';
+import DocumentTopBar from '@/components/vine/ui/DocumentTopBar';
+import Icon from '@/components/vine/ui/Icon';
+import LoadingScreen from '@/components/vine/ui/LoadingScreen';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useBottomChrome } from '@/context/BottomChromeContext';
@@ -454,7 +454,7 @@ export default function BibleChapterDocument() {
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}>
       <Head>
-        <title>{`CHC ${headerTitleEnglish || 'Bible'}`}</title>
+        <title>{`Coptic Vine ${headerTitleEnglish || 'Bible'}`}</title>
       </Head>
       {/* The same bar as every other document. Unlike them it stays in the
           app too, not only on the web: it is the only place that says which
@@ -693,7 +693,7 @@ const styles = StyleSheet.create({
   // list items, per the request to make the two selectors feel consistent.
   selectorPanel: {
     backgroundColor: '#050505',
-    borderColor: 'rgba(201, 162, 39, 0.35)',
+    borderColor: 'rgba(227, 181, 59, 0.35)',
     borderLeftWidth: 1,
     paddingHorizontal: SPACING.md,
   },
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#111111',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(201, 162, 39, 0.28)',
+    borderBottomColor: 'rgba(227, 181, 59, 0.28)',
     flexDirection: 'row',
     justifyContent: 'center',
     marginHorizontal: -SPACING.md,
@@ -711,10 +711,10 @@ const styles = StyleSheet.create({
   },
   selectorHeaderTitle: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
   selectorHeaderArabic: { fontFamily: 'Arial', textAlign: 'right', writingDirection: 'rtl' },
-  chapterNavRow: { borderBottomColor: 'rgba(201, 162, 39, 0.18)', borderBottomWidth: 1, flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.sm },
+  chapterNavRow: { borderBottomColor: 'rgba(227, 181, 59, 0.18)', borderBottomWidth: 1, flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.sm },
   chapterNavButton: {
     alignItems: 'center',
-    borderColor: 'rgba(201, 162, 39, 0.42)',
+    borderColor: 'rgba(227, 181, 59, 0.42)',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -726,13 +726,13 @@ const styles = StyleSheet.create({
   chapterNavButtonDisabled: { borderColor: 'rgba(110, 110, 110, 0.4)', opacity: 0.72 },
   chapterNavText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '800' },
   chapterNavTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  selectorLanguageBar: { borderBottomColor: 'rgba(201, 162, 39, 0.18)', borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingVertical: SPACING.sm },
+  selectorLanguageBar: { borderBottomColor: 'rgba(227, 181, 59, 0.18)', borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingVertical: SPACING.sm },
   languageButton: { borderRadius: 8, borderWidth: 1, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
   languageText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
   languageTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   selectorList: { flex: 1, paddingTop: SPACING.md },
   psalmStanzaDivider: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
-  psalmStanzaLine: { backgroundColor: 'rgba(201, 162, 39, 0.38)', flex: 1, height: 1 },
+  psalmStanzaLine: { backgroundColor: 'rgba(227, 181, 59, 0.38)', flex: 1, height: 1 },
   psalmStanzaLabel: { alignItems: 'center', flexDirection: 'row', gap: SPACING.xs },
   psalmStanzaLetter: { color: COLORS.gold, fontFamily: 'Arial', fontSize: 21, fontWeight: '700', lineHeight: 28, textAlign: 'center' },
   psalmStanzaNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700', textAlign: 'left', writingDirection: 'ltr' },
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111111',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#262626',
+    borderColor: COLORS.border,
     flexDirection: 'row',
     gap: SPACING.sm,
     minHeight: 56,
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
   selectorActionRow: {
     alignItems: 'center',
     backgroundColor: '#101010',
-    borderColor: 'rgba(201, 162, 39, 0.32)',
+    borderColor: 'rgba(227, 181, 59, 0.32)',
     borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -769,8 +769,8 @@ const styles = StyleSheet.create({
   },
   selectorIconButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(201, 162, 39, 0.06)',
-    borderColor: 'rgba(201, 162, 39, 0.24)',
+    backgroundColor: 'rgba(227, 181, 59, 0.06)',
+    borderColor: 'rgba(227, 181, 59, 0.24)',
     borderRadius: 20,
     borderWidth: 1,
     height: 40,

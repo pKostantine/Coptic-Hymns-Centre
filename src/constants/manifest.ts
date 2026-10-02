@@ -1,4 +1,4 @@
-/** CHC main-menu + submenu manifest. */
+/** Coptic Vine main-menu + submenu manifest. */
 
 import type { DownloadableBookKey } from '@/types/bookDownloads';
 

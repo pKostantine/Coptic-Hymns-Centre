@@ -45,7 +45,7 @@ async function prepareNativeNotifications(requestPermission: boolean) {
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-      name: 'Coptic Hymns Centre',
+      name: 'Coptic Vine',
       importance: Notifications.AndroidImportance.MAX,
       sound: 'default',
       enableVibrate: true,
@@ -137,7 +137,7 @@ export async function installNativeNotificationRuntime(
 
   const tokenSubscription = Notifications.addPushTokenListener((devicePushToken) => {
     void syncNativeNotificationDevice({ devicePushToken }).catch((error) => {
-      console.warn('Unable to refresh the CHC push token:', error);
+      console.warn('Unable to refresh the Coptic Vine push token:', error);
     });
   });
 

@@ -26,11 +26,11 @@ const PREVIEW = {
 };
 const APP_SHELL = `<!doctype html>
 <html><head>
-<title>Coptic Hymns Centre</title>
-<!-- CHC_SHARE_META_START -->
-<meta property="og:title" content="Coptic Hymns Centre" />
+<title>Coptic Vine</title>
+<!-- COPTIC_VINE_SHARE_META_START -->
+<meta property="og:title" content="Coptic Vine" />
 <meta property="og:image" content="https://chc.pierrek.ca/apple-touch-icon.png" />
-<!-- CHC_SHARE_META_END -->
+<!-- COPTIC_VINE_SHARE_META_END -->
 </head><body><div id="root"></div></body></html>`;
 
 const originalFetch = globalThis.fetch;
@@ -85,10 +85,10 @@ test('dedicated share route returns crawler-ready entity metadata without touchi
   const html = await response.text();
 
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get('x-chc-share-preview'), 'dedicated');
+  assert.equal(response.headers.get('x-coptic-vine-share-preview'), 'dedicated');
   assert.equal(requests.length, 0);
   assert.match(html, /<meta property="og:type" content="music\.album" \/>/);
-  assert.match(html, /<meta property="og:title" content="Liturgy with Cantor Ibrahim Ayad — Coptic Hymns Centre" \/>/);
+  assert.match(html, /<meta property="og:title" content="Liturgy with Cantor Ibrahim Ayad — Coptic Vine" \/>/);
   assert.match(
     html,
     new RegExp('<meta property="og:image" content="https://chc\\.pierrek\\.ca/__share-image\\?bucket=chc-images&amp;path='),
@@ -124,7 +124,7 @@ test('artist and track share routes select their entity-specific Open Graph type
     assert.equal(response.status, 200);
     assert.equal(requests.length, 0);
     assert.match(html, new RegExp(`<meta property="og:type" content="${item.type.replace('.', '\\.')}" \\/>`));
-    assert.match(html, new RegExp(`<meta property="og:title" content="${item.title} — Coptic Hymns Centre" \\/>`));
+    assert.match(html, new RegExp(`<meta property="og:title" content="${item.title} — Coptic Vine" \\/>`));
     assert.match(html, /<meta property="og:image" content="https:\/\/chc\.pierrek\.ca\/__share-image\?/);
   }
 });
@@ -148,7 +148,7 @@ test('public playlist share routes use the visibility-safe playlist preview RPC'
   assert.equal(response.status, 200);
   assert.equal(requests.length, 0);
   assert.match(html, /<meta property="og:type" content="music\.playlist" \/>/);
-  assert.match(html, /<meta property="og:title" content="Sunday Liturgy — Coptic Hymns Centre" \/>/);
+  assert.match(html, /<meta property="og:title" content="Sunday Liturgy — Coptic Vine" \/>/);
   assert.match(html, new RegExp(`window\\.location\\.replace\\("https://chc\\.pierrek\\.ca/music/playlist/${PLAYLIST_ID}"\\)`));
 });
 
@@ -161,11 +161,11 @@ test('direct entity route replaces the generic SPA Open Graph block', async () =
   const html = await response.text();
 
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get('x-chc-share-preview'), 'entity');
+  assert.equal(response.headers.get('x-coptic-vine-share-preview'), 'entity');
   assert.equal(requests.length, 1);
-  assert.match(html, /<title>Liturgy with Cantor Ibrahim Ayad — Coptic Hymns Centre<\/title>/);
+  assert.match(html, /<title>Liturgy with Cantor Ibrahim Ayad — Coptic Vine<\/title>/);
   assert.match(html, /<meta property="og:type" content="music\.album" \/>/);
-  assert.doesNotMatch(html, /<meta property="og:title" content="Coptic Hymns Centre" \/>/);
+  assert.doesNotMatch(html, /<meta property="og:title" content="Coptic Vine" \/>/);
   assert.doesNotMatch(html, /<meta property="og:image" content="https:\/\/chc\.pierrek\.ca\/apple-touch-icon\.png" \/>/);
 });
 
@@ -196,7 +196,7 @@ test('share image route proxies the published entity artwork as an inline image'
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('content-type'), 'image/jpeg');
   assert.equal(response.headers.get('content-disposition'), 'inline');
-  assert.equal(response.headers.get('x-chc-share-image'), 'proxied');
+  assert.equal(response.headers.get('x-coptic-vine-share-image'), 'proxied');
   assert.deepEqual(new Uint8Array(await response.arrayBuffer()), expectedBytes);
   assert.equal(requests.length, 0);
 });
@@ -213,7 +213,7 @@ test('dedicated share route returns a non-cacheable error instead of poisoning p
 
   assert.equal(response.status, 503);
   assert.equal(response.headers.get('cache-control'), 'no-store');
-  assert.equal(response.headers.get('x-chc-share-preview'), 'error');
+  assert.equal(response.headers.get('x-coptic-vine-share-preview'), 'error');
   assert.equal(requests.length, 0);
   assert.doesNotMatch(await response.text(), /apple-touch-icon/);
 });

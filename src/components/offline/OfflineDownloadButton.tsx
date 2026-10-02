@@ -11,7 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import Icon, { type IconName } from '@/components/chc/ui/Icon';
+import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { downloadManager } from '@/services/downloadManager';
 import type { OfflineDownloadProgress, OfflineDownloadRequest } from '@/types/offlineDownloads';

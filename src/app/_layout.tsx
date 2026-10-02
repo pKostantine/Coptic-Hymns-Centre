@@ -1,5 +1,5 @@
 import { useFonts as useLocalFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, usePathname, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -8,14 +8,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import BookSyncBootstrap from '@/components/BookSyncBootstrap';
 import NotificationBootstrap from '@/components/NotificationBootstrap';
+import SideBar from '@/components/vine/ui/SideBar';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
-import { BottomChromeProvider } from '@/context/BottomChromeContext';
+import { BottomChromeProvider, useBottomChrome } from '@/context/BottomChromeContext';
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import type { OrientationMode } from '@/utils/preferencesStorage';
+import { keepsWholeWindow } from '@/utils/desktopChrome';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -63,9 +66,36 @@ function AppStack() {
   );
 }
 
+/**
+ * On a desktop browser the app sits beside the left sidebar (Coptic Vine,
+ * "Layout and spacing"), which takes the place of the bottom tab bar; on the
+ * phone and the iPad the pages fill the window and carry the tab bar
+ * themselves.
+ */
+function AppFrame() {
+  const layout = useLayoutMode();
+  const pathname = usePathname();
+  const segments = useSegments() as string[];
+  const { preferences } = useReadingPreferences();
+  // A full now-playing screen is an overlay, not a route, so the segments alone
+  // cannot tell us it is open — the overlay reports it instead.
+  const { nowPlayingExpanded } = useBottomChrome();
+  const showSideBar = layout === 'desktop' && !keepsWholeWindow(segments) && !nowPlayingExpanded;
+
+  return (
+    <View style={{ flex: 1, flexDirection: preferences.appLanguage === 'ar' ? 'row-reverse' : 'row', backgroundColor: COLORS.black }}>
+      {showSideBar ? <SideBar pathname={pathname} /> : null}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <AppStack />
+        <GlobalNowPlayingOverlay />
+      </View>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   // Keep the two Coptic fonts deliberately separate: Books/readers use the
-  // CHC custom face, while Music synchronized lyrics use Athanasius.
+  // Coptic Vine custom face, while Music synchronized lyrics use Athanasius.
   const [copticLoaded] = useLocalFonts({
     'CopticCHC-Regular': require('../../assets/fonts/CopticCHC-Regular-V3.1.ttf'),
     Athanasius: require('../../assets/fonts/CopticCHC-Athanasius-V1.0.ttf'),
@@ -93,8 +123,7 @@ export default function RootLayout() {
             <MusicPlayerProvider>
               <StatusBar style="light" />
               <BottomChromeProvider>
-                <AppStack />
-                <GlobalNowPlayingOverlay />
+                <AppFrame />
               </BottomChromeProvider>
             </MusicPlayerProvider>
           </CalendarProvider>

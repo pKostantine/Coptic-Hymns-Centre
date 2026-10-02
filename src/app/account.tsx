@@ -7,9 +7,9 @@ import { useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AppHeader from '@/components/chc/ui/AppHeader';
-import BottomTabBar from '@/components/chc/ui/BottomTabBar';
-import Icon from '@/components/chc/ui/Icon';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
+import Icon from '@/components/vine/ui/Icon';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -32,7 +32,7 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>Account - Coptic Hymns Centre</title></Head>
+      <Head><title>Account - Coptic Vine</title></Head>
       <AppHeader
         title={{ english: 'Account', arabic: 'الحساب', french: 'Compte' }}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
@@ -144,7 +144,7 @@ function SignedOutAccount() {
 
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Your CHC account', 'Votre compte CHC', 'حساب CHC الخاص بك')}</Text>
+      <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Your Coptic Vine account', 'Votre compte Coptic Vine', 'حساب كوبتك فاين الخاص بك')}</Text>
       <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
         {tr('Keep your likes, follows, playlists, and learning progress with you across devices.', 'Retrouvez vos favoris, abonnements, playlists et progrès sur tous vos appareils.', 'احفظ الإعجابات والمتابعات وقوائم التشغيل وتقدّم التعلّم على أجهزتك.')}
       </Text>
@@ -244,7 +244,7 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const provider = user.app_metadata.provider === 'google' ? 'Google' : 'Email';
-  const initials = (currentName || user.email || 'CHC')
+  const initials = (currentName || user.email || 'CV')
     .split(/\s+/)
     .map((part) => part[0])
     .join('')
@@ -358,7 +358,7 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
           </View>
 
           <View style={styles.profileIdentity}>
-            <Text numberOfLines={1} style={styles.identityName}>{currentName || 'CHC listener'}</Text>
+            <Text numberOfLines={1} style={styles.identityName}>{currentName || 'Coptic Vine listener'}</Text>
             <Text numberOfLines={1} style={styles.identityEmail}>{user.email}</Text>
             <Text style={styles.identityMeta}>{provider} account{user.email_confirmed_at ? ' · Verified' : ''}</Text>
           </View>
@@ -392,7 +392,7 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Profile', 'Profil', 'الملف الشخصي')}</Text>
         <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
-          {tr('Choose the name that appears on your CHC account.', 'Choisissez le nom qui apparaît sur votre compte CHC.', 'عدّل الاسم الذي يظهر في حساب CHC الخاص بك.')}
+          {tr('Choose the name that appears on your Coptic Vine account.', 'Choisissez le nom qui apparaît sur votre compte Coptic Vine.', 'عدّل الاسم الذي يظهر في حساب كوبتك فاين الخاص بك.')}
         </Text>
         <Field label="Display name">
           <TextInput value={displayName} onChangeText={setDisplayName} style={styles.input} placeholder="Your name" placeholderTextColor={COLORS.muted} />
@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
   errorText: { color: '#FF8A8A', fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
   noticeText: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
   identityRow: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md },
-  avatar: { alignItems: 'center', backgroundColor: COLORS.navy, borderColor: COLORS.goldLine, borderRadius: 32, borderWidth: 1, height: 64, justifyContent: 'center', width: 64 },
+  avatar: { alignItems: 'center', backgroundColor: COLORS.green, borderColor: COLORS.goldLine, borderRadius: 32, borderWidth: 1, height: 64, justifyContent: 'center', width: 64 },
   avatarText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
   identityText: { flex: 1, minWidth: 0 },
   identityName: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },

@@ -1,39 +1,41 @@
 {
   "expo": {
-    "name": "Coptic-Hymns-Centre",
+    "name": "Coptic Vine",
     "slug": "Coptic-Hymns-Centre",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/images/CHC.png",
-    "scheme": "coptichymnscentre",
+    "icon": "./assets/images/coptic-vine-icon.png",
+    "scheme": [
+      "copticvine",
+      "coptichymnscentre"
+    ],
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/coptic-vine-icon.png",
       "supportsTablet": true,
       "requireFullScreen": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#14301B",
+        "foregroundImage": "./assets/images/coptic-vine-android-foreground.png",
+        "backgroundImage": "./assets/images/coptic-vine-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.pkostantine.CopticHymnsCentre"
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/CHC_sm_web.png"
+      "favicon": "./assets/images/coptic-vine-favicon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#003566",
-          "image": "./assets/images/CHC.png",
-          "imageWidth": 76
+          "backgroundColor": "#14301B",
+          "image": "./assets/images/coptic-vine-seal.png",
+          "imageWidth": 160
         }
       ],
       "expo-asset",
@@ -62,7 +64,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow CHC to choose a profile or playlist cover photo.",
+          "photosPermission": "Allow Coptic Vine to choose a profile or playlist cover photo.",
           "cameraPermission": false,
           "microphonePermission": false
         }

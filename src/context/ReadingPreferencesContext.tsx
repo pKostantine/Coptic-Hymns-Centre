@@ -177,7 +177,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
         setContentSyncStatus('synced');
       } catch (error) {
         if (cancelled || activeSyncUserRef.current !== accountUserId) return;
-        console.warn('Unable to synchronize CHC content preferences:', error);
+        console.warn('Unable to synchronize Coptic Vine content preferences:', error);
         setContentSyncStatus('error');
       }
     };
@@ -209,7 +209,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
         })
         .catch((error) => {
           if (activeSyncUserRef.current !== accountUserId) return;
-          console.warn('Unable to save CHC content preferences:', error);
+          console.warn('Unable to save Coptic Vine content preferences:', error);
           setContentSyncStatus('error');
         });
     }, 700);

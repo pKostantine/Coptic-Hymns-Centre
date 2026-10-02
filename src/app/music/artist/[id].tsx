@@ -5,8 +5,8 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import Icon from '@/components/chc/ui/Icon';
-import ShareMetadata from '@/components/chc/ui/ShareMetadata';
+import Icon from '@/components/vine/ui/Icon';
+import ShareMetadata from '@/components/vine/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -85,7 +85,7 @@ export default function MusicArtistScreen() {
     if (!libraryAuthenticated) {
       Alert.alert(
         tr('Follow artist', 'Suivre l’artiste', 'متابعة الفنان'),
-        tr('Sign in to your CHC account to follow artists.', 'Connectez-vous à votre compte CHC pour suivre des artistes.', 'سجّل الدخول إلى حساب CHC لمتابعة الفنانين.'),
+        tr('Sign in to your Coptic Vine account to follow artists.', 'Connectez-vous à votre compte Coptic Vine pour suivre des artistes.', 'سجّل الدخول إلى حساب كوبتك فاين لمتابعة الفنانين.'),
       );
       return;
     }
@@ -129,7 +129,7 @@ export default function MusicArtistScreen() {
       {artist ? (
         <ShareMetadata
           title={artist.displayName}
-          description={artist.biography || 'Listen on Coptic Hymns Centre'}
+          description={artist.biography || 'Listen on Coptic Vine'}
           canonicalUrl={publicUrl(`/music/artist/${artist.id}`)}
           imageUrl={shareImageUrl}
           type="profile"

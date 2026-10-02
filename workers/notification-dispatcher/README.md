@@ -1,6 +1,6 @@
-# CHC Notification Dispatcher
+# Coptic Vine Notification Dispatcher
 
-Cloudflare Worker for CHC native push and standards-based Web Push.
+Cloudflare Worker for Coptic Vine native push and standards-based Web Push.
 
 ## Required Worker secrets
 
@@ -15,7 +15,7 @@ Set these with Wrangler before deployment:
 
 `SUPABASE_URL` is a non-secret Worker variable in `wrangler.jsonc`.
 
-The same VAPID public key must be supplied to the CHC web build as
+The same VAPID public key must be supplied to the Coptic Vine web build as
 `EXPO_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY`. Never expose the VAPID private key to
 the app or website.
 

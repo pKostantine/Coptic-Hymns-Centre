@@ -5,9 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AppHeader from '@/components/chc/ui/AppHeader';
-import BottomTabBar from '@/components/chc/ui/BottomTabBar';
-import Icon from '@/components/chc/ui/Icon';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
+import Icon from '@/components/vine/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -130,7 +130,7 @@ export default function MusicLibraryScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>{tr('Your Library — Coptic Hymns Centre', 'Votre bibliothèque — Coptic Hymns Centre', 'مكتبتي — كوبتك هيمنز سنتر')}</title></Head>
+      <Head><title>{tr('Your Library — Coptic Vine', 'Votre bibliothèque — Coptic Vine', 'مكتبتي — كوبتك فاين')}</title></Head>
       <AppHeader
         title={{ english: 'Your Library', arabic: 'مكتبتك', french: 'Votre bibliothèque' }}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
@@ -143,7 +143,7 @@ export default function MusicLibraryScreen() {
 
         {!loading && library && !library.authenticated ? (
           <View style={styles.authCard}>
-            <Text style={[styles.authTitle, isArabic && styles.arabic]}>{tr('Sign in to your CHC account', 'Connectez-vous à votre compte CHC', 'سجّل الدخول إلى حساب CHC')}</Text>
+            <Text style={[styles.authTitle, isArabic && styles.arabic]}>{tr('Sign in to your Coptic Vine account', 'Connectez-vous à votre compte Coptic Vine', 'سجّل الدخول إلى حساب كوبتك فاين')}</Text>
             <Text style={[styles.authBody, isArabic && styles.arabic]}>
               {tr('Likes, playlists, follows, and listening history are tied to your account.', 'Vos favoris, playlists, abonnements et historique d’écoute sont liés à votre compte.', 'الإعجابات وقوائم التشغيل وسجل الاستماع مرتبطة بحسابك.')}
             </Text>
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   content: { alignSelf: 'center', gap: SPACING.md, maxWidth: 1120, padding: SPACING.md, paddingBottom: SPACING.xl * 2, width: '100%' },
   loader: { marginVertical: SPACING.xl },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
-  crashCard: { backgroundColor: COLORS.navyDark, borderColor: COLORS.goldLine, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.md, margin: SPACING.md, padding: SPACING.lg },
+  crashCard: { backgroundColor: COLORS.greenDeep, borderColor: COLORS.goldLine, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.md, margin: SPACING.md, padding: SPACING.lg },
   crashTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
   crashBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
   crashActions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
   secondaryButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: RADII.pill, borderWidth: 1, justifyContent: 'center', minHeight: 40, paddingHorizontal: SPACING.lg },
   secondaryButtonText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
-  authCard: { backgroundColor: COLORS.navyDark, borderColor: COLORS.border, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.sm, padding: SPACING.lg },
+  authCard: { backgroundColor: COLORS.greenDeep, borderColor: COLORS.border, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.sm, padding: SPACING.lg },
   authTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
   authBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
   folderList: { borderBottomColor: COLORS.border, borderBottomWidth: StyleSheet.hairlineWidth },

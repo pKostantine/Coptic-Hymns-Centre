@@ -19,11 +19,11 @@ const [worker, configSource, appShell] = await Promise.all([
 ]);
 const config = JSON.parse(configSource);
 
-if (!appShell.includes('CHC_SHARE_META_START')) {
+if (!appShell.includes('COPTIC_VINE_SHARE_META_START')) {
   throw new Error('Expo app shell is missing the replaceable share metadata block.');
 }
 
-for (const marker of ['X-CHC-Share-Preview', '/__share-image', 'get_share_preview', 'Content-Profile']) {
+for (const marker of ['X-Coptic-Vine-Share-Preview', '/__share-image', 'get_share_preview', 'Content-Profile']) {
   if (!worker.includes(marker)) {
     throw new Error(`Cloudflare share worker is missing required marker: ${marker}`);
   }

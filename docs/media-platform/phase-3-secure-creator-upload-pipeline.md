@@ -35,7 +35,7 @@ Worker:
 
 Bindings and secrets:
 
-- `CHC_SUBMISSIONS` -> R2 bucket `chc-submissions`
+- `SUBMISSIONS_BUCKET` -> R2 bucket `chc-submissions`
 - `SUPABASE_URL` -> `https://wtuujmeinzqfikvuofmh.supabase.co`
 - `MAX_UPLOAD_BYTES` -> `21474836480`
 - `SUPABASE_PUBLISHABLE_KEY` -> Cloudflare Worker secret

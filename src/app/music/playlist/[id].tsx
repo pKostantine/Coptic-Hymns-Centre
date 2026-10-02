@@ -5,8 +5,8 @@ import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextIn
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import Icon from '@/components/chc/ui/Icon';
-import ShareMetadata from '@/components/chc/ui/ShareMetadata';
+import Icon from '@/components/vine/ui/Icon';
+import ShareMetadata from '@/components/vine/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
@@ -230,7 +230,7 @@ export default function MusicPlaylistScreen() {
     if (!playlist || playlist.visibility !== 'public') return;
     await shareLink({
       title: playlist.name,
-      text: playlist.description || `Listen to ${playlist.name} on Coptic Hymns Centre.`,
+      text: playlist.description || `Listen to ${playlist.name} on Coptic Vine.`,
       url: publicShareUrl(`/share/music/playlist/${playlist.id}`, playlist.coverAsset?.id),
     });
   };
@@ -240,7 +240,7 @@ export default function MusicPlaylistScreen() {
       {playlist?.visibility === 'public' ? (
         <ShareMetadata
           title={playlist.name}
-          description={playlist.description || `Listen to ${playlist.name} on Coptic Hymns Centre.`}
+          description={playlist.description || `Listen to ${playlist.name} on Coptic Vine.`}
           canonicalUrl={publicUrl(`/music/playlist/${playlist.id}`)}
           imageUrl={musicService.resolveAsset(playlist.coverAsset)}
           type="music.album"
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   center: { padding: SPACING.lg, alignItems: 'center' },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
   content: { padding: SPACING.md, paddingBottom: SPACING.xl },
-  hero: { alignItems: 'center', padding: SPACING.lg, borderRadius: RADII.lg, backgroundColor: COLORS.navyDark, borderWidth: 1, borderColor: COLORS.goldLine },
+  hero: { alignItems: 'center', padding: SPACING.lg, borderRadius: RADII.lg, backgroundColor: COLORS.greenDeep, borderWidth: 1, borderColor: COLORS.goldLine },
   heroText: { width: '100%', maxWidth: 680, alignItems: 'center', marginTop: SPACING.lg },
   eyebrow: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textAlign: 'center' },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 30, fontWeight: '700', marginTop: SPACING.xs, textAlign: 'center' },

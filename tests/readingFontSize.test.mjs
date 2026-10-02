@@ -104,8 +104,8 @@ test('old font preferences migrate by nearest rendered size', () => {
   assert.equal(migrateReadingFontLevel(5, 10, 'phone'), 5);
 });
 
-test('every CHC reading renderer receives the same base-size calculation', () => {
-  const surface = fs.readFileSync('src/components/chc/DocumentSurface.tsx', 'utf8');
+test('every Coptic Vine reading renderer receives the same base-size calculation', () => {
+  const surface = fs.readFileSync('src/components/vine/DocumentSurface.tsx', 'utf8');
   const bible = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
 
   assert.match(surface, /const fontSize = fontScaleToPx\(preferences\.fontScale\);/);

@@ -1,4 +1,4 @@
-import type { DocumentSection } from '../components/chc/documentHtml';
+import type { DocumentSection } from '../components/vine/documentHtml';
 import { toIsoDate as toIsoDateString } from './dateUtils';
 import { FIXED_FEASTS } from './fixedFeasts';
 import { hydrateSupabaseServiceHymn } from './hymnLibrary';

@@ -6,8 +6,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import AppHeader from '@/components/chc/ui/AppHeader';
-import BottomTabBar from '@/components/chc/ui/BottomTabBar';
+import AppHeader from '@/components/vine/ui/AppHeader';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -35,7 +35,7 @@ export default function MusicHomeScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>{tr('Music — Coptic Hymns Centre', 'Musique — Coptic Hymns Centre', 'الترانيم — كوبتك هيمنز سنتر')}</title></Head>
+      <Head><title>{tr('Music — Coptic Vine', 'Musique — Coptic Vine', 'الترانيم — كوبتك فاين')}</title></Head>
       <AppHeader
         title={{ english: 'Hymns & Songs', arabic: 'الألحان والترانيم', french: 'Hymnes et chants' }}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
@@ -44,7 +44,7 @@ export default function MusicHomeScreen() {
 
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Text style={[styles.heroEyebrow, isArabic && styles.arabic]}>COPTIC HYMNS CENTRE</Text>
+          <Text style={[styles.heroEyebrow, isArabic && styles.arabic]}>COPTIC VINE</Text>
           <Text style={[styles.heroTitle, isArabic && styles.arabic]}>{tr('Listen. Pray. Remember.', 'Écouter. Prier. Se souvenir.', 'استمع. صلِّ. احفظ.')}</Text>
           <Text style={[styles.heroBody, isArabic && styles.arabic]}>
             {tr('Coptic Orthodox hymns and spiritual music, gathered into one listening experience.', 'Hymnes coptes orthodoxes et musique spirituelle, réunis en un seul lieu d’écoute.', 'موسيقى وترانيم قبطية أرثوذكسية في مكان واحد.')}
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: RADII.lg,
     borderWidth: 1,
     borderColor: COLORS.goldLine,
-    backgroundColor: COLORS.navyDark,
+    backgroundColor: COLORS.greenDeep,
   },
   heroEyebrow: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
   heroTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 28, fontWeight: '700', marginTop: SPACING.sm },

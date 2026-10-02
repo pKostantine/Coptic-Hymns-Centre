@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import Icon from '@/components/chc/ui/Icon';
-import BottomTabBar from '@/components/chc/ui/BottomTabBar';
+import Icon from '@/components/vine/ui/Icon';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
@@ -206,7 +206,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     if (!libraryAuthenticated) {
       Alert.alert(
         tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
-        tr('Sign in to your CHC account to save Liked Songs.', 'Connectez-vous à votre compte CHC pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'),
+        tr('Sign in to your Coptic Vine account to save Liked Songs.', 'Connectez-vous à votre compte Coptic Vine pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب كوبتك فاين لحفظ الأغاني المعجبة.'),
       );
       return;
     }
@@ -309,7 +309,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
 
         <View style={[
           styles.searchBox,
-          { borderColor: music ? 'rgba(201,162,39,0.34)' : 'rgba(151,126,216,0.38)' },
+          { borderColor: music ? 'rgba(227, 181, 59,0.34)' : 'rgba(151,126,216,0.38)' },
         ]}>
           <Icon name="search-outline" size={19} color={COLORS.muted} />
           <TextInput

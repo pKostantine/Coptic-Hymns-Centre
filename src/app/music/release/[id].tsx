@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import Icon from '@/components/chc/ui/Icon';
-import ShareMetadata from '@/components/chc/ui/ShareMetadata';
+import Icon from '@/components/vine/ui/Icon';
+import ShareMetadata from '@/components/vine/ui/ShareMetadata';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicDownloadButton from '@/components/music/MusicDownloadButton';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
@@ -121,7 +121,7 @@ export default function MusicReleaseScreen() {
     if (!libraryAuthenticated) {
       Alert.alert(
         tr('Liked Releases', 'Parutions aimées', 'الإصدارات المعجبة'),
-        tr('Sign in to your CHC account to save liked releases.', 'Connectez-vous à votre compte CHC pour enregistrer vos parutions aimées.', 'سجّل الدخول إلى حساب CHC لحفظ الإصدارات.'),
+        tr('Sign in to your Coptic Vine account to save liked releases.', 'Connectez-vous à votre compte Coptic Vine pour enregistrer vos parutions aimées.', 'سجّل الدخول إلى حساب كوبتك فاين لحفظ الإصدارات.'),
       );
       return;
     }
@@ -145,7 +145,7 @@ export default function MusicReleaseScreen() {
     if (!libraryAuthenticated) {
       Alert.alert(
         tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
-        tr('Sign in to your CHC account to save Liked Songs.', 'Connectez-vous à votre compte CHC pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب CHC لحفظ الأغاني المعجبة.'),
+        tr('Sign in to your Coptic Vine account to save Liked Songs.', 'Connectez-vous à votre compte Coptic Vine pour enregistrer vos titres aimés.', 'سجّل الدخول إلى حساب كوبتك فاين لحفظ الأغاني المعجبة.'),
       );
       return;
     }
@@ -172,7 +172,7 @@ export default function MusicReleaseScreen() {
     );
   }
 
-  const artistName = release.primaryArtist?.displayName ?? 'Coptic Hymns Centre';
+  const artistName = release.primaryArtist?.displayName ?? 'Coptic Vine';
   const releaseType = isArabic
     ? release.releaseType === 'album' ? 'ألبوم' : release.releaseType === 'ep' ? 'EP' : 'أغنية منفردة'
     : release.releaseType === 'album' ? 'Album' : release.releaseType === 'ep' ? 'EP' : 'Single';
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
   },
   artBox: { alignItems: 'center', justifyContent: 'center' },
-  artBoxDesktop: { padding: SPACING.lg, backgroundColor: '#0B1E33', borderRightWidth: 1, borderRightColor: COLORS.border },
+  artBoxDesktop: { padding: SPACING.lg, backgroundColor: COLORS.surfaceSoft, borderRightWidth: 1, borderRightColor: COLORS.border },
   meta: { width: '100%', maxWidth: 680, alignItems: 'center', marginTop: SPACING.lg },
   metaDesktop: { flex: 1, maxWidth: undefined, alignItems: 'flex-start', justifyContent: 'center', marginTop: 0, padding: SPACING.xl },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 28, fontWeight: '700', textAlign: 'center' },

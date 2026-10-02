@@ -1181,7 +1181,7 @@ const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "psalmody", "agpeya", "v
 async function getHymnKeyLookupSchemas(schema, table) {
   // Sermon Planner reuses the existing Gospel Rite's Psalm/Gospel framing
   // hymns. Only its document needs this extra lookup; avoid querying the
-  // gospel_rite schema for every other service in CHC.
+  // gospel_rite schema for every other service in Coptic Vine.
   const extraSchemas = schema === "liturgy" && table === "sermon_planner" ? ["gospel_rite"] : [];
   const schemas = [...new Set([schema, ...HYMN_KEY_FALLBACK_SCHEMAS, ...extraSchemas].filter(Boolean))];
   if (!(await isContentSchemaInstalled(schema))) return schemas;

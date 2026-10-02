@@ -16,10 +16,10 @@ export default function Root({ children }: PropsWithChildren) {
         />
         <ScrollViewStyleReset />
         {/* Match the splash/loading background so safe-area gutters in landscape
-            show navy instead of the browser's default white. */}
+            show the deep green instead of the browser's default white. */}
         <style
           dangerouslySetInnerHTML={{
-            __html: 'html,body{background-color:#003566;}[data-testid="slideshow-container"]{-webkit-text-size-adjust:none;text-size-adjust:none;}',
+            __html: 'html,body{background-color:#14301B;}[data-testid="slideshow-container"]{-webkit-text-size-adjust:none;text-size-adjust:none;}',
           }}
         />
       </head>

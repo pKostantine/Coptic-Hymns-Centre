@@ -4,7 +4,7 @@ Completed on 2026-09-16.
 
 ## Scope
 
-Phase 7 adds structured multilingual synchronized lyrics to the CHC music platform and the first focused creator surface in the separate `pKostantine/CHC-Artists` repository.
+Phase 7 adds structured multilingual synchronized lyrics to the Coptic Vine music platform and the first focused creator surface in the separate `pKostantine/CHC-Artists` repository.
 
 LRC is supported only as an interchange format. Canonical lyrics remain structured PostgreSQL data.
 
@@ -49,7 +49,7 @@ The editor RPCs execute as `SECURITY INVOKER` and rely on the existing creator/m
 
 The first implementation used `INSERT ... RETURNING` inside the invoker save RPC. Authenticated RLS verification showed PostgreSQL rejected that return path even though the insert policy predicates passed. The final implementation inserts/updates first and then performs a separately authorized select, preserving RLS rather than weakening the function to `SECURITY DEFINER`.
 
-## CHC Artists Lyrics Studio
+## Coptic Vine Artists Lyrics Studio
 
 Phase 7 initializes the separate `pKostantine/CHC-Artists` repository with a focused Expo 57 Lyrics Studio. This is not the full Phase 15 creator portal.
 
@@ -75,11 +75,11 @@ Implemented:
 - LRC import
 - LRC export
 
-The editor resolves published audio through the same Cloudflare media resolver contract used by CHC instead of storing R2 URLs in lyric records.
+The editor resolves published audio through the same Cloudflare media resolver contract used by Coptic Vine instead of storing R2 URLs in lyric records.
 
-## Shared CHC Utilities
+## Shared Coptic Vine Utilities
 
-The main CHC repository contains:
+The main Coptic Vine repository contains:
 
 - `src/utils/synchronizedLyrics.ts`
 - `tests/synchronizedLyrics.test.cjs`
@@ -131,10 +131,10 @@ Project-wide Supabase advisor findings that predate Phase 7 remain outside this 
 
 ## Validation Note
 
-The CHC Artists dependency versions are exact-pinned in `package.json`. The execution environment used for this phase could not reach the npm registry because of DNS resolution failures, so a new `package-lock.json` and a full dependency-backed `tsc --noEmit` run could not be generated here. Source syntax/transpilation was checked, and database/RLS/API behavior was verified directly against the live CHC Supabase project.
+The Coptic Vine Artists dependency versions are exact-pinned in `package.json`. The execution environment used for this phase could not reach the npm registry because of DNS resolution failures, so a new `package-lock.json` and a full dependency-backed `tsc --noEmit` run could not be generated here. Source syntax/transpilation was checked, and database/RLS/API behavior was verified directly against the live Coptic Vine Supabase project.
 
 ## Follow-Up
 
 - Phase 8 can consume `get_published_track_lyrics` in the Hymns & Songs Now Playing experience.
 - Phase 9 should make lyric highlighting follow the shared global playback engine rather than a screen-local player.
-- Phase 15 can expand the focused CHC Artists Lyrics Studio into the complete creator/management application.
+- Phase 15 can expand the focused Coptic Vine Artists Lyrics Studio into the complete creator/management application.

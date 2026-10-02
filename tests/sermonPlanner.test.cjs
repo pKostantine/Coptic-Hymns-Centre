@@ -4,8 +4,8 @@ const test = require('node:test');
 
 const hymnLibrarySource = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
 const manifestSource = fs.readFileSync('src/constants/manifest.ts', 'utf8');
-const documentSource = fs.readFileSync('src/components/chc/screens/ServiceDocument.tsx', 'utf8');
-const drawerSource = fs.readFileSync('src/components/chc/ui/SermonPlannerDrawer.tsx', 'utf8');
+const documentSource = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
+const drawerSource = fs.readFileSync('src/components/vine/ui/SermonPlannerDrawer.tsx', 'utf8');
 const preferencesSource = fs.readFileSync('src/utils/preferencesStorage.ts', 'utf8');
 
 function extractFunction(startMarker, endMarker) {
@@ -281,7 +281,7 @@ test('A synced highlight deletion wins over an older copy from another device', 
 });
 
 test('Sermon selection snaps across complete English, Arabic and Coptic words', () => {
-  const html = fs.readFileSync('src/components/chc/textHighlights.ts', 'utf8');
+  const html = fs.readFileSync('src/components/vine/textHighlights.ts', 'utf8');
   const start = html.indexOf('function expandToWholeWords(text, start, end)');
   const end = html.indexOf('function anchorsFromSelection(selection)', start);
   assert.ok(start >= 0 && end > start);
@@ -305,7 +305,7 @@ test('Sermon selection snaps across complete English, Arabic and Coptic words', 
 });
 
 test('Sermon notes open on highlighted text, not an eye icon', () => {
-  const drawer = fs.readFileSync('src/components/chc/ui/SermonPlannerDrawer.tsx', 'utf8');
+  const drawer = fs.readFileSync('src/components/vine/ui/SermonPlannerDrawer.tsx', 'utf8');
   assert.match(drawer, /verseReferences\[highlight\.verseId\]/);
   assert.match(drawer, /accessibilityLabel=\{\`Go to highlighted verse/);
   assert.match(drawer, /onJumpToHighlight\(highlight\)/);
@@ -313,12 +313,12 @@ test('Sermon notes open on highlighted text, not an eye icon', () => {
 });
 
 test('Web documents and Bible never attach app swipe-exit gestures', () => {
-  const html = fs.readFileSync('src/components/chc/documentHtml.ts', 'utf8');
-  const nativeView = fs.readFileSync('src/components/chc/DocumentWebView.tsx', 'utf8');
-  const service = fs.readFileSync('src/components/chc/screens/ServiceDocument.tsx', 'utf8');
-  const modal = fs.readFileSync('src/components/chc/screens/DocumentModal.tsx', 'utf8');
+  const html = fs.readFileSync('src/components/vine/documentHtml.ts', 'utf8');
+  const nativeView = fs.readFileSync('src/components/vine/DocumentWebView.tsx', 'utf8');
+  const service = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
+  const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
   const bible = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
-  const bibleHtml = fs.readFileSync('src/components/chc/bibleDocumentHtml.ts', 'utf8');
+  const bibleHtml = fs.readFileSync('src/components/vine/bibleDocumentHtml.ts', 'utf8');
   assert.match(html, /if \(!\$\{JSON\.stringify\(nativeSwipeNavigation\)\}\) return;/);
   assert.match(nativeView, /nativeSwipeNavigation: true/);
   assert.match(service, /isMobileDocument \? gesturePanResponder\.panHandlers/);

@@ -11,7 +11,8 @@ const PUBLIC_BUCKET_ROUTES: Record<PublicMediaBucket, string> = {
 const DEFAULT_MEDIA_BASE_URL = 'https://chc-media-resolver.hrmpdd8d6c.workers.dev';
 
 function getMediaBaseUrl(): string {
-  return (process.env.EXPO_PUBLIC_CHC_MEDIA_BASE_URL || DEFAULT_MEDIA_BASE_URL).replace(/\/+$/, '');
+  // EXPO_PUBLIC_CHC_MEDIA_BASE_URL is the variable's name from before the rename to Coptic Vine.
+  return (process.env.EXPO_PUBLIC_MEDIA_BASE_URL || process.env.EXPO_PUBLIC_CHC_MEDIA_BASE_URL || DEFAULT_MEDIA_BASE_URL).replace(/\/+$/, '');
 }
 
 function isPublicMediaBucket(bucket: string): bucket is PublicMediaBucket {
@@ -40,7 +41,7 @@ export function resolveMediaAsset(asset: MediaAssetReference): string {
   }
 
   if (!isPublicMediaBucket(asset.bucket)) {
-    throw new Error(`R2 bucket is not publicly resolvable through the CHC media service: ${asset.bucket}`);
+    throw new Error(`R2 bucket is not publicly resolvable through the Coptic Vine media service: ${asset.bucket}`);
   }
 
   return `${getMediaBaseUrl()}/${PUBLIC_BUCKET_ROUTES[asset.bucket]}/${encodeObjectPath(asset.path)}`;

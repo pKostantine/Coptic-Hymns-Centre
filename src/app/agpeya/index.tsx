@@ -1,3 +1,3 @@
-import AgpeyaMenu from '@/components/chc/screens/AgpeyaMenu';
+import AgpeyaMenu from '@/components/vine/screens/AgpeyaMenu';
 
 export default AgpeyaMenu;

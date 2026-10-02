@@ -62,7 +62,7 @@ The Music Now Playing screen now exposes Shuffle and Repeat controls.
 
 ## Background Playback
 
-`app.json` now configures the `expo-audio` config plugin with background playback enabled while explicitly disabling recording permissions/features that CHC does not need.
+`app.json` now configures the `expo-audio` config plugin with background playback enabled while explicitly disabling recording permissions/features that Coptic Vine does not need.
 
 Runtime audio mode is configured with:
 
@@ -70,7 +70,7 @@ Runtime audio mode is configured with:
 - `shouldPlayInBackground: true`
 - `interruptionMode: 'doNotMix'`
 
-`doNotMix` is required by Expo Audio for its lock-screen controls and also gives CHC normal OS audio-focus behavior for calls and competing audio sessions.
+`doNotMix` is required by Expo Audio for its lock-screen controls and also gives Coptic Vine normal OS audio-focus behavior for calls and competing audio sessions.
 
 The current playable entity is registered with `setActiveForLockScreen`, including metadata and artwork. On Android this also activates the media-playback foreground service path required for sustained background playback.
 
@@ -78,15 +78,15 @@ Expo Audio itself handles noisy-route behavior such as headphones/Bluetooth disc
 
 ## SDK 57 Compatibility Decision
 
-Expo SDK 57 / `expo-audio ~57.0.5` supports background playback and lock-screen controls on `AudioPlayer`, which CHC uses as the native playback primitive.
+Expo SDK 57 / `expo-audio ~57.0.5` supports background playback and lock-screen controls on `AudioPlayer`, which Coptic Vine uses as the native playback primitive.
 
-Playlist-level lock-screen control support is an SDK 58-era addition. SDK 58 only entered beta on 2026-09-15, so Phase 9 deliberately does not migrate the whole CHC application to that beta.
+Playlist-level lock-screen control support is an SDK 58-era addition. SDK 58 only entered beta on 2026-09-15, so Phase 9 deliberately does not migrate the whole Coptic Vine application to that beta.
 
 Consequently:
 
-- CHC has lock-screen play/pause, scrub/seek, metadata, artwork, and sustained background playback on the SDK 57 path.
-- Previous / next / repeat / shuffle are fully supported by the CHC engine and in-app UI.
-- A future stable SDK 58+ upgrade can move more queue behavior into Expo Audio's native `AudioPlaylist` and expose richer playlist-level lock-screen controls without changing CHC's normalized `PlayableEntity` contract.
+- Coptic Vine has lock-screen play/pause, scrub/seek, metadata, artwork, and sustained background playback on the SDK 57 path.
+- Previous / next / repeat / shuffle are fully supported by the Coptic Vine engine and in-app UI.
+- A future stable SDK 58+ upgrade can move more queue behavior into Expo Audio's native `AudioPlaylist` and expose richer playlist-level lock-screen controls without changing Coptic Vine's normalized `PlayableEntity` contract.
 
 ## Remote and Downloaded Media
 
@@ -106,7 +106,7 @@ Music queue items already accept an optional `localUri`. Phase 13 can attach its
 
 ## Persistence
 
-Playback state is stored separately from reading preferences using the existing CHC persistence conventions:
+Playback state is stored separately from reading preferences using the existing Coptic Vine persistence conventions:
 
 - `localStorage` on web
 - an app-document JSON file on native
@@ -120,7 +120,7 @@ Persisted state includes:
 - repeat mode
 - shuffle state
 
-Restored sessions are loaded paused at the remembered position so opening CHC never starts audio unexpectedly.
+Restored sessions are loaded paused at the remembered position so opening Coptic Vine never starts audio unexpectedly.
 
 ## Queue Semantics
 
@@ -184,4 +184,4 @@ This is release QA, not missing Phase 9 architecture.
 
 - Phase 10/11 can build Learn & Study playback entries directly against `PlaybackContext`.
 - Phase 13 should populate `localUri` from its offline-download index.
-- A future stable Expo SDK 58+ upgrade can evaluate migrating the native primitive to `AudioPlaylist` while retaining the same CHC playback contract.
+- A future stable Expo SDK 58+ upgrade can evaluate migrating the native primitive to `AudioPlaylist` while retaining the same Coptic Vine playback contract.

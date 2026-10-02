@@ -55,7 +55,7 @@ function isMusicQueueItem(value: unknown): value is MusicQueueItem {
 }
 
 function toPlaybackEntry(item: MusicQueueItem, occurrence: number): PlaybackQueueEntry<MusicQueueItem> {
-  const performerLine = formatMusicTrackPerformers(item.track, 'Coptic Hymns Centre');
+  const performerLine = formatMusicTrackPerformers(item.track, 'Coptic Vine');
   const isCollectionTrack = item.releaseType === 'album' || item.releaseType === 'ep';
   const deviceTitle = isCollectionTrack && item.releaseTitle
     ? `${item.track.title} — ${item.releaseTitle}`
