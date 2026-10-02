@@ -185,7 +185,7 @@ function entityMetadata(url, target, preview) {
     : canonicalUrl;
   const directImage = resolveDirectImage(preview.imageAsset);
   const proxiedImage = sameOriginImage(url.origin, preview.imageAsset);
-  const imageUrl = proxiedImage || directImage || url.origin + '/apple-touch-icon.png';
+  const imageUrl = proxiedImage || directImage || url.origin + '/coptic-vine-share.png';
 
   return {
     canonicalUrl,

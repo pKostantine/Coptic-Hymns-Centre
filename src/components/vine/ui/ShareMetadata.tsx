@@ -17,13 +17,16 @@ export default function ShareMetadata({
     ? title
     : title + ' — Coptic Vine';
   const summary = description?.trim() || 'Coptic Vine';
-  let fallbackImage = 'https://chc.pierrek.ca/apple-touch-icon.png';
+  // A page with no artwork of its own falls back to the seal card rather than
+  // the app icon, which is a 1024 square and reads as a tiny tile in a chat.
+  let fallbackImage = 'https://chc.pierrek.ca/coptic-vine-share.png';
   try {
-    fallbackImage = new URL('/apple-touch-icon.png', canonicalUrl).toString();
+    fallbackImage = new URL('/coptic-vine-share.png', canonicalUrl).toString();
   } catch {
     // Keep the deployed Coptic Vine fallback.
   }
   const image = imageUrl || fallbackImage;
+  const isFallbackImage = image === fallbackImage;
 
   return (
     <Head>
@@ -37,6 +40,10 @@ export default function ShareMetadata({
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:image" content={image} />
       <meta property="og:image:secure_url" content={image} />
+      {/* Only the card's size is known here; an entity's artwork is whatever it is. */}
+      {isFallbackImage ? <meta property="og:image:type" content="image/png" /> : null}
+      {isFallbackImage ? <meta property="og:image:width" content="1200" /> : null}
+      {isFallbackImage ? <meta property="og:image:height" content="630" /> : null}
       <meta property="og:image:alt" content={title} />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={fullTitle} />
