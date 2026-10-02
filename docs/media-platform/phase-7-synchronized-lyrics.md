@@ -4,7 +4,7 @@ Completed on 2026-09-16.
 
 ## Scope
 
-Phase 7 adds structured multilingual synchronized lyrics to the Coptic Vine music platform and the first focused creator surface in the separate `pKostantine/CHC-Artists` repository.
+Phase 7 adds structured multilingual synchronized lyrics to the Coptic Vine music platform and the first focused creator surface in the separate `pKostantine/CV-Artists` repository.
 
 LRC is supported only as an interchange format. Canonical lyrics remain structured PostgreSQL data.
 
@@ -51,7 +51,7 @@ The first implementation used `INSERT ... RETURNING` inside the invoker save RPC
 
 ## Coptic Vine Artists Lyrics Studio
 
-Phase 7 initializes the separate `pKostantine/CHC-Artists` repository with a focused Expo 57 Lyrics Studio. This is not the full Phase 15 creator portal.
+Phase 7 initializes the separate `pKostantine/CV-Artists` repository with a focused Expo 57 Lyrics Studio. This is not the full Phase 15 creator portal.
 
 Implemented:
 

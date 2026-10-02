@@ -279,7 +279,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
-      return json({ ok: true, service: 'chc-notification-dispatcher' });
+      return json({ ok: true, service: 'cv-notification-dispatcher' });
     }
 
     if (request.method === 'POST' && url.pathname === '/run') {
