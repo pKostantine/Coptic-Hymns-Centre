@@ -158,7 +158,7 @@ export function buildBibleChapterHtml({
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <style>
       @font-face {
-        font-family: 'CopticCHC';
+        font-family: 'CopticVine';
         src: url('${copticFontDataUri}') format('truetype');
       }
       :root {
@@ -250,7 +250,7 @@ export function buildBibleChapterHtml({
         user-select: none !important;
       }
       .cell.coptic {
-        font-family: CopticCHC, Georgia, serif;
+        font-family: CopticVine, Georgia, serif;
         font-size: ${getLanguageFontSize(safeFontSize, 'coptic')}px;
         line-height: ${getLanguageLineHeight(safeFontSize, 'coptic')}px;
       }

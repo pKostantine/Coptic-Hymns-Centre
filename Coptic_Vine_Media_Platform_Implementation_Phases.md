@@ -406,7 +406,7 @@ Status: complete. Cloudflare API/MCP access, Wrangler CLI authentication, Supaba
   - gold primary accent
   - muted light text
   - liturgical role colors
-  - `Georgia` title typography, system body typography, bundled `CopticCHC-Regular`, `Arial` for Arabic
+  - `Georgia` title typography, system body typography, bundled `CopticVine-Regular`, `Arial` for Arabic
   - spacing scale: 4/8/16/24/32
   - reusable radii: 8/16/18/pill
   - simple card shadows

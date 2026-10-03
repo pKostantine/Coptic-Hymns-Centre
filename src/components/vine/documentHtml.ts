@@ -264,7 +264,7 @@ export function buildDocumentHtml(
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <style>
       @font-face {
-        font-family: "CopticCHC";
+        font-family: "CopticVine";
         src: url("${copticFontDataUri}") format("truetype");
         font-weight: 400;
         font-style: normal;
@@ -393,7 +393,7 @@ export function buildDocumentHtml(
       }
       .english, .french { font-family: Georgia, serif !important; }
       .coptic {
-        font-family: CopticCHC, Georgia, serif !important;
+        font-family: CopticVine, Georgia, serif !important;
         font-size: ${copticFontSize}px;
         line-height: ${verseLineHeight}px;
       }

@@ -97,8 +97,8 @@ export default function RootLayout() {
   // Keep the two Coptic fonts deliberately separate: Books/readers use the
   // Coptic Vine custom face, while Music synchronized lyrics use Athanasius.
   const [copticLoaded] = useLocalFonts({
-    'CopticCHC-Regular': require('../../assets/fonts/CopticCHC-Regular-V3.1.ttf'),
-    Athanasius: require('../../assets/fonts/CopticCHC-Athanasius-V1.0.ttf'),
+    'CopticVine-Regular': require('../../assets/fonts/CopticVine-Regular-v3.1.ttf'),
+    Athanasius: require('../../assets/fonts/CopticVine-Athanasius-v1.0.ttf'),
   });
 
   const fontsReady = copticLoaded;
