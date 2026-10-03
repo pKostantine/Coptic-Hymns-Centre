@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
-export const DEFAULT_PUBLIC_ORIGIN = 'https://chc.pierrek.ca';
-export const SHARE_PREVIEW_REVISION = '5';
+export const DEFAULT_PUBLIC_ORIGIN = 'https://copticvine.ca';
+export const SHARE_PREVIEW_REVISION = '6';
 
 export function getPublicOrigin(): string {
   if (Platform.OS === 'web') {

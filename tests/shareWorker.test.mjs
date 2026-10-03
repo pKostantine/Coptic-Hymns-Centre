@@ -29,7 +29,7 @@ const APP_SHELL = `<!doctype html>
 <title>Coptic Vine</title>
 <!-- COPTIC_VINE_SHARE_META_START -->
 <meta property="og:title" content="Coptic Vine" />
-<meta property="og:image" content="https://chc.pierrek.ca/apple-touch-icon.png" />
+<meta property="og:image" content="https://copticvine.ca/apple-touch-icon.png" />
 <!-- COPTIC_VINE_SHARE_META_END -->
 </head><body><div id="root"></div></body></html>`;
 
@@ -78,7 +78,7 @@ test('dedicated share route returns crawler-ready entity metadata without touchi
   mockPreview();
   const { env, requests } = makeEnv();
   const request = new Request(
-    `https://chc.pierrek.ca/share/music/release/${RELEASE_ID}?v=${ASSET_ID}`,
+    `https://copticvine.ca/share/music/release/${RELEASE_ID}?v=${ASSET_ID}`,
   );
 
   const response = await worker.fetch(request, env);
@@ -91,10 +91,10 @@ test('dedicated share route returns crawler-ready entity metadata without touchi
   assert.match(html, /<meta property="og:title" content="Liturgy with Cantor Ibrahim Ayad — Coptic Vine" \/>/);
   assert.match(
     html,
-    new RegExp('<meta property="og:image" content="https://chc\\.pierrek\\.ca/__share-image\\?bucket=chc-images&amp;path='),
+    new RegExp('<meta property="og:image" content="https://copticvine\\.ca/__share-image\\?bucket=chc-images&amp;path='),
   );
   assert.doesNotMatch(html, /<meta property="og:image" content="[^"]*apple-touch-icon\.png"/);
-  assert.match(html, new RegExp(`window\\.location\\.replace\\("https://chc\\.pierrek\\.ca/music/release/${RELEASE_ID}"\\)`));
+  assert.match(html, new RegExp(`window\\.location\\.replace\\("https://copticvine\\.ca/music/release/${RELEASE_ID}"\\)`));
 });
 
 test('artist and track share routes select their entity-specific Open Graph types and images', async () => {
@@ -116,7 +116,7 @@ test('artist and track share routes select their entity-specific Open Graph type
     const { env, requests } = makeEnv();
 
     const response = await worker.fetch(
-      new Request('https://chc.pierrek.ca/share' + item.path + '?v=' + ASSET_ID),
+      new Request('https://copticvine.ca/share' + item.path + '?v=' + ASSET_ID),
       env,
     );
     const html = await response.text();
@@ -125,7 +125,7 @@ test('artist and track share routes select their entity-specific Open Graph type
     assert.equal(requests.length, 0);
     assert.match(html, new RegExp(`<meta property="og:type" content="${item.type.replace('.', '\\.')}" \\/>`));
     assert.match(html, new RegExp(`<meta property="og:title" content="${item.title} — Coptic Vine" \\/>`));
-    assert.match(html, /<meta property="og:image" content="https:\/\/chc\.pierrek\.ca\/__share-image\?/);
+    assert.match(html, /<meta property="og:image" content="https:\/\/copticvine\.ca\/__share-image\?/);
   }
 });
 
@@ -140,7 +140,7 @@ test('public playlist share routes use the visibility-safe playlist preview RPC'
   const { env, requests } = makeEnv();
 
   const response = await worker.fetch(
-    new Request(`https://chc.pierrek.ca/share/music/playlist/${PLAYLIST_ID}`),
+    new Request(`https://copticvine.ca/share/music/playlist/${PLAYLIST_ID}`),
     env,
   );
   const html = await response.text();
@@ -149,13 +149,13 @@ test('public playlist share routes use the visibility-safe playlist preview RPC'
   assert.equal(requests.length, 0);
   assert.match(html, /<meta property="og:type" content="music\.playlist" \/>/);
   assert.match(html, /<meta property="og:title" content="Sunday Liturgy — Coptic Vine" \/>/);
-  assert.match(html, new RegExp(`window\\.location\\.replace\\("https://chc\\.pierrek\\.ca/music/playlist/${PLAYLIST_ID}"\\)`));
+  assert.match(html, new RegExp(`window\\.location\\.replace\\("https://copticvine\\.ca/music/playlist/${PLAYLIST_ID}"\\)`));
 });
 
 test('direct entity route replaces the generic SPA Open Graph block', async () => {
   mockPreview();
   const { env, requests } = makeEnv();
-  const request = new Request(`https://chc.pierrek.ca/music/release/${RELEASE_ID}`);
+  const request = new Request(`https://copticvine.ca/music/release/${RELEASE_ID}`);
 
   const response = await worker.fetch(request, env);
   const html = await response.text();
@@ -166,7 +166,7 @@ test('direct entity route replaces the generic SPA Open Graph block', async () =
   assert.match(html, /<title>Liturgy with Cantor Ibrahim Ayad — Coptic Vine<\/title>/);
   assert.match(html, /<meta property="og:type" content="music\.album" \/>/);
   assert.doesNotMatch(html, /<meta property="og:title" content="Coptic Vine" \/>/);
-  assert.doesNotMatch(html, /<meta property="og:image" content="https:\/\/chc\.pierrek\.ca\/apple-touch-icon\.png" \/>/);
+  assert.doesNotMatch(html, /<meta property="og:image" content="https:\/\/copticvine\.ca\/apple-touch-icon\.png" \/>/);
 });
 
 test('share image route proxies the published entity artwork as an inline image', async () => {
@@ -186,7 +186,7 @@ test('share image route proxies the published entity artwork as an inline image'
     });
   };
   const { env, requests } = makeEnv();
-  const url = new URL('https://chc.pierrek.ca/__share-image');
+  const url = new URL('https://copticvine.ca/__share-image');
   url.searchParams.set('bucket', 'chc-images');
   url.searchParams.set('path', ASSET_PATH);
   url.searchParams.set('v', ASSET_ID);
@@ -207,7 +207,7 @@ test('dedicated share route returns a non-cacheable error instead of poisoning p
   const { env, requests } = makeEnv();
 
   const response = await worker.fetch(
-    new Request(`https://chc.pierrek.ca/share/music/release/${RELEASE_ID}`),
+    new Request(`https://copticvine.ca/share/music/release/${RELEASE_ID}`),
     env,
   );
 
@@ -225,7 +225,7 @@ test('unrelated routes remain ordinary static asset requests', async () => {
   const staticResponse = new Response('static asset', { status: 200 });
   const { env, requests } = makeEnv(staticResponse);
 
-  const response = await worker.fetch(new Request('https://chc.pierrek.ca/bible'), env);
+  const response = await worker.fetch(new Request('https://copticvine.ca/bible'), env);
 
   assert.equal(await response.text(), 'static asset');
   assert.equal(requests.length, 1);

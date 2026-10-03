@@ -19,7 +19,7 @@ export default function ShareMetadata({
   const summary = description?.trim() || 'Coptic Vine';
   // A page with no artwork of its own falls back to the seal card rather than
   // the app icon, which is a 1024 square and reads as a tiny tile in a chat.
-  let fallbackImage = 'https://chc.pierrek.ca/coptic-vine-share.png';
+  let fallbackImage = 'https://copticvine.ca/coptic-vine-share.png';
   try {
     fallbackImage = new URL('/coptic-vine-share.png', canonicalUrl).toString();
   } catch {
