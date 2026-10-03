@@ -1,13 +1,16 @@
 {
 	"folders": [
 		{
+			"name": "Coptic-Vine",
 			"path": "."
 		},
 		{
-			"path": "../CV-Admin"
+			"name": "CV-Artists",
+			"path": "../CV-Artists"
 		},
 		{
-			"path": "../CV-Artists"
+			"name": "CV-Admin",
+			"path": "../CV-Admin"
 		}
 	]
 }
