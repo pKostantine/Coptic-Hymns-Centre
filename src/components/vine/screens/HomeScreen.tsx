@@ -152,9 +152,6 @@ export default function HomeScreen() {
             style={styles.logo}
           />
         </View>
-        <Text style={[styles.tagline, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
-          {tr('Pray. Read. Learn.', 'Prier. Lire. Apprendre.', 'صلِّ. اقرأ. تعلّم.')}
-        </Text>
         <Text style={[styles.heroDate, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
           {formatDayMonthDate(liveDate, arabic)}
           {coptic ? <Text style={styles.heroCoptic}>{` · ${formatCopticDayMonth(coptic.monthName, coptic.day, arabic)}`}</Text> : null}
@@ -360,8 +357,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 184,
   },
-  tagline: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', marginTop: 26, textAlign: 'center' },
-  heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 8, textAlign: 'center' },
+  heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 24, textAlign: 'center' },
   heroCoptic: { color: COLORS.goldBright, fontWeight: '600' },
   heroDivider: { alignItems: 'center', marginBottom: 22, marginTop: 20 },
   card: {

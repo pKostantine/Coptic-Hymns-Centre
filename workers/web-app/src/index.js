@@ -2,7 +2,7 @@ const SUPABASE_URL = 'https://wtuujmeinzqfikvuofmh.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_H0lG0vRL6io4Uy0htd77Cw_dlNbwx0n';
 const MEDIA_BASE_URL = 'https://cv-media-resolver.hrmpdd8d6c.workers.dev';
 const APP_NAME = 'Coptic Vine';
-const DEFAULT_DESCRIPTION = 'Coptic hymns, liturgical books, music, and structured learning.';
+const DEFAULT_DESCRIPTION = 'Cross-platform Coptic Orthodox worship app for multilingual liturgical books, Scripture, and hymns.';
 
 const PUBLIC_BUCKET_ROUTES = {
   'chc-music': 'music',

@@ -1,5 +1,8 @@
 import Head from 'expo-router/head';
 
+/** What a shared page says when it has no description of its own. */
+export const DEFAULT_SHARE_DESCRIPTION = 'Cross-platform Coptic Orthodox worship app for multilingual liturgical books, Scripture, and hymns.';
+
 export default function ShareMetadata({
   title,
   description,
@@ -16,7 +19,7 @@ export default function ShareMetadata({
   const fullTitle = title.includes('Coptic Vine')
     ? title
     : title + ' — Coptic Vine';
-  const summary = description?.trim() || 'Coptic Vine';
+  const summary = description?.trim() || DEFAULT_SHARE_DESCRIPTION;
   // A page with no artwork of its own falls back to the seal card rather than
   // the app icon, which is a 1024 square and reads as a tiny tile in a chat.
   let fallbackImage = 'https://copticvine.ca/coptic-vine-share.png';
